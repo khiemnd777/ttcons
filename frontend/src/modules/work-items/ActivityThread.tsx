@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, lazy, Suspense, useContext, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -26,6 +26,7 @@ import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { Dialog } from '../../components/Dialog';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
+import { UserAvatar } from '../../components/UserAvatar';
 import { ApiError, get, post, put, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useToast } from '../../components/ToastProvider';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -35,10 +36,17 @@ import type {
   ProjectActivityFeed,
   ProjectActivityOptions,
   ProjectActivitySummary,
+  User,
+  WorkItem,
   WorkItemActivity,
 } from '../../lib/types/domain';
 import { activityLabel, compactDateTime, scopeTypeLabel, workflowFormActivityComment } from './workItemPresentation';
 import { ActivityAttachments } from './ActivityAttachments';
+import { DiscussionWorkRail } from './DiscussionWorkRail';
+import { DiscussionWorkflowActionCard, type DiscussionWorkflowAction } from './DiscussionWorkflowActionCard';
+import { DiscussionWorkUpdateCard } from './DiscussionWorkUpdateCard';
+const DiscussionWorkDialog = lazy(() => import('./DiscussionWorkDialog').then(module => ({ default: module.DiscussionWorkDialog })));
+const OpenDiscussionWork = createContext<((id: string) => void) | null>(null);
 import { ActivityTopicCard, ActivityTopicProvider } from './ActivityTopic';
 import { activityVisibilityLabel } from './activityTopicDomain';
 import { ActivityReactionBar, ActivityReplyQuote } from './ActivityConversationMeta';
@@ -105,6 +113,7 @@ const activityTypeFilters = [
   'decision',
   'reminder',
   'file_note',
+  'work_update',
 ];
 
 const visibilityLabels: Record<string, string> = {
@@ -121,17 +130,21 @@ function ActivityThreadContent({
   projectId,
   targetOptions,
   attachmentOptions = [],
+  workflowAction,
   onChanged,
 }: {
   projectId: string;
   targetOptions: ActivityTargetOption[];
   attachmentOptions?: ActivityAttachmentOption[];
+  workflowAction?: DiscussionWorkflowAction;
   onChanged?: () => void;
 }) {
   const toast = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<ActivityKind>('discussion');
+  const [openWorkItemId, setOpenWorkItemId] = useState<string | null>(null);
+  const [workScopeTitle, setWorkScopeTitle] = useState('');
   const [attention, setAttention] = useState<AttentionFilter>('');
   const [scopeFilter, setScopeFilter] = useState('');
   const [scopeIdFilter, setScopeIdFilter] = useState('');
@@ -315,12 +328,21 @@ function ActivityThreadContent({
   useEffect(() => {
     if (!projectId) return undefined;
     return streamSSE(`/projects/${projectId}/activity/stream`, {
-      onStatus: setStreamStatus,
+      onStatus: (status) => {
+        setStreamStatus(status);
+        if (status === 'connected') {
+          void queryClient.invalidateQueries({ queryKey: ['project-activity', projectId] });
+          void queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+        }
+      },
       onEvent: (message) => {
         if (message.event === 'activity_changed' || message.event === 'activity_read') {
           queryClient.invalidateQueries({ queryKey: ['project-activity', projectId] });
           queryClient.invalidateQueries({ queryKey: ['activity-attention'] });
           queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
+          if (message.event === 'activity_changed') {
+            for (const key of [['my-work-items'], ['design-releases', projectId], ['work-item-form'], ['work-item'], ['procurement'], ['procurement-detail']]) void queryClient.invalidateQueries({ queryKey: key });
+          }
           onChangedRef.current?.();
         }
       },
@@ -341,33 +363,53 @@ function ActivityThreadContent({
     setSearch('');
   }
 
+  function discussWork(item: WorkItem) {
+    clearFilters();
+    setKind('discussion');
+    setScopeFilter('work_item');
+    setScopeIdFilter(item.id);
+    setWorkScopeTitle(item.title);
+  }
+
   const hasFilters = Boolean(attention || scopeFilter || activityTypeFilter || visibilityFilter || actorFilter || deferredSearch);
 
   return (
+    <OpenDiscussionWork.Provider value={setOpenWorkItemId}>
     <div className="space-y-3">
-      <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
-        {attentionItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              className={clsx(
-                'inline-flex min-w-fit items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold',
-                attention === item.value ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600',
-              )}
-              onClick={() => selectAttention(item.value)}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {item.label}
-              <span className="rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-600">{summary[item.countKey] ?? 0}</span>
-            </button>
-          );
-        })}
-      </div>
-
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <section className="min-w-0 rounded-lg border border-line bg-white shadow-panel">
+        <div className="space-y-3 xl:col-start-2 xl:row-start-1">
+          {workflowAction ? (
+            <DiscussionWorkflowActionCard
+              projectId={projectId}
+              workflow={workflowAction}
+              onOpenWork={(item) => setOpenWorkItemId(item.id)}
+              onDiscuss={discussWork}
+            />
+          ) : null}
+          <DiscussionWorkRail projectId={projectId} onOpen={item => setOpenWorkItemId(item.id)} onDiscuss={discussWork} />
+          <div className="flex gap-2 overflow-x-auto pb-1 xl:hidden">
+            {attentionItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={clsx(
+                    'inline-flex min-w-fit items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold',
+                    attention === item.value ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600',
+                  )}
+                  onClick={() => selectAttention(item.value)}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                  <span className="rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-600">{summary[item.countKey] ?? 0}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <section className="min-w-0 rounded-lg border border-line bg-white shadow-panel xl:col-start-1 xl:row-start-1 xl:row-span-2">
+          {scopeFilter === 'work_item' && scopeIdFilter && workScopeTitle ? <div className="flex items-center gap-2 border-b border-blue-100 bg-blue-50 p-3 text-sm text-blue-800"><span className="flex-1">Trao đổi: {workScopeTitle}</span><button className="font-semibold underline" onClick={() => { setScopeFilter(''); setScopeIdFilter(''); setWorkScopeTitle(''); }}>Xem toàn công trình</button></div> : null}
           <div className="border-b border-line p-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex gap-1 overflow-x-auto">
@@ -469,6 +511,7 @@ function ActivityThreadContent({
                   key={[attention, scopeFilter, scopeIdFilter, activityTypeFilter, visibilityFilter, actorFilter, deferredSearch].join(':')}
                   rows={rows}
                   currentUserId={user?.id}
+                  currentUser={user ?? undefined}
                   projectId={projectId}
                   hasOlder={Boolean(activity.hasNextPage)}
                   loadingOlder={activity.isFetchingNextPage}
@@ -556,7 +599,7 @@ function ActivityThreadContent({
           )}
         </section>
 
-        <aside className="hidden space-y-3 xl:block">
+        <aside className="hidden space-y-3 xl:col-start-2 xl:row-start-2 xl:block">
           <section className="rounded-lg border border-line bg-white p-3 shadow-panel">
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -624,7 +667,9 @@ function ActivityThreadContent({
       >
         <p className="text-sm leading-6 text-slate-600">Tin nhắn đã thu hồi không thể khôi phục hoặc tiếp tục nhận phản hồi và reaction.</p>
       </Dialog>
+      {openWorkItemId ? <Suspense fallback={<p role="status">Đang mở công việc…</p>}><DiscussionWorkDialog key={`${projectId}:${openWorkItemId}`} projectId={projectId} workItemId={openWorkItemId} onClose={() => setOpenWorkItemId(null)} /></Suspense> : null}
     </div>
+    </OpenDiscussionWork.Provider>
   );
 }
 
@@ -645,6 +690,7 @@ function ActivityError({ onRetry }: { onRetry: () => void }) {
 function ChatDiscussion({
   rows,
   currentUserId,
+  currentUser,
   projectId,
   hasOlder,
   loadingOlder,
@@ -662,6 +708,7 @@ function ChatDiscussion({
 }: {
   rows: WorkItemActivity[];
   currentUserId?: string;
+  currentUser?: User;
   projectId: string;
   hasOlder: boolean;
   loadingOlder: boolean;
@@ -765,6 +812,7 @@ function ChatDiscussion({
                     item={item}
                     projectId={projectId}
                     own={Boolean(currentUserId && item.actor_id === currentUserId)}
+                    currentUser={currentUser}
                     compact={sameChatAuthor(group.items[index - 1], item)}
                     marking={markingId === item.id}
                     resolving={resolvingId === item.id}
@@ -801,6 +849,7 @@ function ChatMessage({
   item,
   projectId,
   own,
+  currentUser,
   compact,
   marking,
   resolving,
@@ -816,6 +865,7 @@ function ChatMessage({
   item: WorkItemActivity;
   projectId: string;
   own: boolean;
+  currentUser?: User;
   compact: boolean;
   marking: boolean;
   resolving: boolean;
@@ -829,6 +879,7 @@ function ChatMessage({
   onReaction: (reaction: ActivityReactionSummary['reaction'], active: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const openWork = useContext(OpenDiscussionWork);
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -846,7 +897,7 @@ function ChatMessage({
     };
   }, [menuOpen]);
 
-  const system = !['comment', 'status', 'blocker', 'question', 'decision', 'reminder', 'file_note'].includes(item.activity_type);
+  const system = !['comment', 'status', 'blocker', 'question', 'decision', 'reminder', 'file_note', 'work_update'].includes(item.activity_type);
   const comment = workflowFormActivityComment(item);
   if (system) {
     return (
@@ -864,12 +915,14 @@ function ChatMessage({
   const ownBlueBubble = own && !['blocker', 'question', 'decision', 'reminder'].includes(item.activity_type) && !withdrawn;
   const metadata = item.metadata_json ?? {};
   return (
-    <article className={clsx('flex items-end gap-2', own ? 'justify-end' : 'justify-start', compact ? 'pt-0' : 'pt-2')}>
-      {!own ? (
+    <article className={clsx('flex items-end gap-2', own ? 'flex-row-reverse justify-start' : 'justify-start', compact ? 'pt-0' : 'pt-2')}>
+      {own && currentUser ? (
+        <UserAvatar user={currentUser} size="sm" decorative className={compact ? 'invisible' : undefined} />
+      ) : (
         <div className={clsx('flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-600', compact && 'invisible')}>
           {actorInitials(item.actor_name)}
         </div>
-      ) : null}
+      )}
       <div className={clsx('max-w-[82%] sm:max-w-[72%]', own && 'text-right')}>
         {!compact ? (
           <div className={clsx('mb-1 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500', own && 'justify-end')}>
@@ -900,7 +953,8 @@ function ChatMessage({
               </div>
             ) : null}
           </div>
-          {!withdrawn ? <ActivityTopicCard source={item} /> : null}
+          {!withdrawn && item.activity_type !== 'work_update' ? <ActivityTopicCard source={item} /> : null}
+          {!withdrawn && item.activity_type === 'work_update' ? <DiscussionWorkUpdateCard item={item} /> : null}
           {withdrawn ? <p className="text-sm italic leading-6">Tin nhắn đã được thu hồi</p> : comment ? <p className={clsx('whitespace-pre-wrap break-words text-sm leading-6', item.activity_type === 'comment' ? '' : 'mt-1.5')}>{comment}</p> : null}
           {!withdrawn && metadata.due_at ? <p className="mt-2 text-xs font-semibold">Hạn: {compactDateTime(metadata.due_at)}</p> : null}
           {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}
@@ -925,7 +979,7 @@ function ChatMessage({
                 {resolveLabel}
               </button>
             ) : null}
-            {item.work_item_id ? <Link className={clsx('text-xs font-semibold hover:underline', ownBlueBubble ? 'text-white' : 'text-blue-700')} to={`/projects/${projectId}/work-items/${item.work_item_id}`}>Mở đầu việc ↗</Link> : null}
+            {item.work_item_id && openWork ? <button type="button" className={clsx('text-xs font-semibold hover:underline', ownBlueBubble ? 'text-white' : 'text-blue-700')} onClick={() => openWork(item.work_item_id!)}>Mở công việc</button> : item.work_item_id ? <Link className="text-xs font-semibold underline" to={`/projects/${projectId}/work-items/${item.work_item_id}`}>Mở đầu việc ↗</Link> : null}
           </div>
           {!withdrawn ? <div className="mt-2">
             <ActivityReactionBar reactions={item.reactions} pendingReaction={pendingReaction} onToggle={onReaction} />

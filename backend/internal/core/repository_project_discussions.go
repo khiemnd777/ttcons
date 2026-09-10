@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const projectDiscussionActivityTypesSQL = "'comment','status','blocker','question','decision','reminder','file_note'"
+const projectDiscussionActivityTypesSQL = "'comment','status','blocker','question','decision','reminder','file_note','work_update'"
 
 func (r *Repository) MyProjectDiscussions(ctx context.Context, profile workItemAccessProfile, filter ProjectDiscussionFilter, offset int) ([]Record, int, int, error) {
 	args := projectOperationsScopeArgs(profile)

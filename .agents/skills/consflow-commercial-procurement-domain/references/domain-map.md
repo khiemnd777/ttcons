@@ -1,5 +1,12 @@
 # Commercial Procurement Domain Map
 
+## Procurement Actions In Discussion
+
+- Shared source owner: `ProcurementDialog.tsx` serves the canonical purchase page, procurement topic cards and supported responsible Work Item picker. `ProcurementDetail.tsx` owns the read-only composition; `ProcurementSnapshot.tsx` renders immutable historical header/line values. The next source action is submit, approve or order based on server actor/project capabilities and status; linked structured approval must be complete before purchase approval.
+- `procurement_workspace.go` owns detail capabilities, locked header updates and procurement snapshot composition. Header writes accept only title/supplier/PO/date, preserve source amount/budget/status/approval references, and reject a supplier that contradicts snapshotted BOQ/quotation lines. V139 `edit_version` and optional `expected_version` protect review-to-write consistency, including a header change between reviewing and approving. Version rejection does not erase the frontend draft.
+- Successful BOQ generation and submit/approve/order append exactly one source-event snapshot in the source transaction. Header saves, manual empty draft creation and draft creation from contract variations do not publish cards. Historic snapshots require current source view permission; source metadata in the feed carries no price or PO content. The existing receive/stock/accounting flows remain authoritative and are not performed by discussion replies.
+- When header save succeeds but a subsequent formal action fails, the UI retains the saved version and clearly reports that the action did not complete. Unsupported task families never opt into an unrelated Work Item auto-start. First searches: `ProcurementWorkspace|UpdateProcurementHeader|insertProcurementDiscussionUpdateTx|procurementMutationWorkItemId`. Checks: procurement workspace integration plus source generation/approval, snapshot visibility, concurrency, no stock/payable creation and frontend behavior/render tests.
+
 ## Exact Record Source Navigation
 
 - Quotation detail project authorization depends on `repository.go::safeTable("supplier_quotations")`; a missing exact table entry caused HTTP 500 before the existing project/permission check. Keep the bounded allowlist and handler permission checks intact.
@@ -11,7 +18,7 @@
 
 - Detail presentation uses shared `RecordSummary`/`RecordSection`; BOQ preserves all four tabs and optional caller-owned actions, Procurement owns its source status/value summary in both entry points, and supplier quotation detail adopts the same hierarchy. Procurement and quotation use container-responsive `RecordTable` cards below 48rem. Requested/accepted/stocked/awaiting quantities remain separate; `pending` item labels become `Chờ tiếp nhận`, waiver reasons remain accessible in a disclosure. Numeric BOQ/quotation quantity display normalizes number-shaped API values without changing quantity/price data. No new actions, source queries, approvals or stock/finance effects.
 
-- `ActivityTopicDetails.tsx` reuses exported `BOQPage::BOQDetail` (four read-only tabs, optional price-management callback omitted) and `ProcurementPage::ProcurementDetail` after exact source/project/status checks on the existing authenticated detail API. The ordinary BOQ page retains its price-management callback; chat never changes prices, approvals, procurement or warehouse quantities. The topic dialog does not navigate away from the draft. First searches: `ActivityTopicDetails|BOQDetail|ProcurementDetail|activityTopicRecord`.
+- `ActivityTopicDetails.tsx` reuses exported `BOQPage::BOQDetail` (four read-only tabs, optional price-management callback omitted) and `ProcurementDetail` after exact source/project/status checks. The ordinary BOQ page retains its price-management callback. Procurement topic opening is intercepted by `ActivityTopicProvider` to use the shared authorized action dialog above; the read-only detail renderer itself does not mutate any source. First searches: `ActivityTopicDetails|ActivityTopicProvider|BOQDetail|ProcurementDetail|activityTopicRecord`.
 
 ## Owners
 

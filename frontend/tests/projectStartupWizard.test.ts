@@ -75,3 +75,12 @@ test('setup shows the full saved team and whole-template operational role covera
   assert.match(domain, /export type ProjectStartupRoleCoverage/);
   assert.match(domain, /role_coverage\?: ProjectStartupRoleCoverage\[\]/);
 });
+
+test('project detail routes startup entrypoints through the shared wizard', async () => {
+  const projectDetail = await source('../src/modules/projects/ProjectDetailPage.tsx');
+
+  assert.match(projectDetail, /import \{ ProjectStartupWizard \} from '.\/ProjectStartupWizard';/);
+  assert.match(projectDetail, /const \[startupWizardOpen, setStartupWizardOpen\] = useState\(false\);/);
+  assert.match(projectDetail, /<ProjectStartupWizard[\s\S]*projectId=\{id\}/);
+  assert.doesNotMatch(projectDetail, /mutationFn: \(\) => post\(`\/projects\/\$\{id\}\/start-pipeline`/);
+});

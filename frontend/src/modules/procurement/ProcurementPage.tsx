@@ -1,21 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Check, ClipboardList, Clock3, Eye, Loader2, PackageCheck, Pencil, Search, Send, ShoppingCart, Truck } from 'lucide-react';
-import { get, post, put } from '../../lib/api/client';
-import { dateText } from '../../lib/utils/format';
-import type { Partner } from '../../lib/types/domain';
+import { AlertTriangle, Check, ClipboardList, Clock3, Eye, PackageCheck, Pencil, Search, Send, Truck } from 'lucide-react';
+import { get, post } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { CurrencyText } from '../../components/CurrencyText';
-import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordTable } from '../../components/RecordDetailLayout';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
-import { Dialog } from '../../components/Dialog';
 import { StatCard } from '../../components/StatCard';
-import { SimpleForm } from '../_shared/SimpleForm';
 import { ProjectSelector } from '../_shared/ProjectSelector';
-import { partnerOptions } from '../core-data/partnerUtils';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
 import {
@@ -25,7 +19,10 @@ import {
   type WorkItemMutationResult,
 } from '../work-items/workItemMutationContext';
 
-type ProcurementRow = Record<string, any>;
+import { ProcurementDialog } from './ProcurementDialog';
+import { ProcurementStatus } from './ProcurementDetail';
+import { procurementStatusLabels, numeric, formatQuantity, formatDate, type ProcurementRow } from './procurementWorkspace';
+export { ProcurementDetail } from './ProcurementDetail';
 type QueueView = 'attention' | 'delivery' | 'all';
 
 const procurementActionLabels: Record<string, string> = {
@@ -35,13 +32,6 @@ const procurementActionLabels: Record<string, string> = {
   receive: 'Đã đối soát khối lượng nghiệm thu đầu vào',
 };
 
-const procurementStatusLabels: Record<string, string> = {
-  draft: 'Nháp', waiting_approval: 'Chờ duyệt', submitted: 'Chờ duyệt', approved: 'Chờ đặt hàng',
-  ordered: 'Đang giao / nghiệm thu', partially_received: 'Đạt nghiệm thu một phần', received: 'Đã nghiệm thu đủ',
-  changes_requested: 'Cần chỉnh sửa',
-};
-
-import { RecordLink, RelatedRecords } from '../_shared/RecordLinks';
 import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 
 export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
@@ -56,22 +46,14 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
   const [supplierFilter, setSupplierFilter] = useState('all');
   const [viewId, setViewId] = useState('');
   const sourceLink = useRecordDeepLink({ kind: 'procurement_request', projectId: scoped ? id : undefined, onOpen: record => { setProjectId(record.project_id); setViewId(record.id); } });
-  const [editRecord, setEditRecord] = useState<ProcurementRow | null>(null);
   const queryClient = useQueryClient();
   const toast = useToast();
   const listPath = projectId ? `/procurement-requests?project_id=${encodeURIComponent(projectId)}` : '/procurement-requests';
   const requests = useQuery({ queryKey: ['procurement', projectId], queryFn: () => get<ProcurementRow[]>(listPath) });
-  const detail = useQuery({ queryKey: ['procurement-detail', viewId], queryFn: () => get<ProcurementRow>(`/procurement-requests/${viewId}`), enabled: Boolean(viewId) });
-  const partners = useQuery({ queryKey: ['partners', 'supplier', 'active'], queryFn: () => get<Partner[]>('/partners?status=active') });
   const invalidate = () => Promise.all([
     queryClient.invalidateQueries({ queryKey: ['procurement'] }),
     queryClient.invalidateQueries({ queryKey: ['procurement-detail'] }),
   ]);
-  const update = useMutation({
-    mutationFn: ({ requestId, values }: { requestId: string; values: ProcurementRow }) => put(`/procurement-requests/${requestId}`, values),
-    onSuccess: async () => { await invalidate(); setEditRecord(null); toast.success('Đã cập nhật thông tin thương mại yêu cầu mua'); },
-    onError: (error) => toast.error('Không cập nhật được yêu cầu mua', error),
-  });
   const action = useMutation({
     mutationFn: ({ requestId, name }: { requestId: string; name: string }) => post<WorkItemMutationResult>(`/procurement-requests/${requestId}/${name}`, withWorkItemMutationContext({}, taskId)),
     onSuccess: async (result, variables) => { await invalidate(); syncWorkItemMutationTransition(queryClient, result); toast.success(`${procurementActionLabels[variables.name] ?? 'Đã cập nhật yêu cầu mua'}.${workItemAutoStartedNotice(result)}`); },
@@ -89,18 +71,11 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       || (view === 'attention' && (!['received'].includes(row.status) || awaitingStock));
     return matchesQuery && matchesStatus && matchesSupplier && matchesView;
   }), [query, rows, statusFilter, supplierFilter, view]);
-  const supplierOptions = partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']);
+  const supplierOptions = Array.from(new Map(rows.filter(row => row.supplier_partner_id).map(row => [row.supplier_partner_id, { value: row.supplier_partner_id, label: row.supplier_name || 'Nhà cung cấp' }])).values());
   const waitingApproval = rows.filter((row) => ['waiting_approval', 'submitted'].includes(row.status)).length;
   const waitingOrder = rows.filter((row) => row.status === 'approved').length;
   const overdue = rows.filter(isOverdue).length;
   const waitingStock = rows.filter((row) => numeric(row.accepted_quantity) > numeric(row.stock_received_quantity) + 0.000001).length;
-
-  const fields = (record: ProcurementRow) => [
-    { name: 'title', label: 'Tiêu đề', defaultValue: record.title ?? '', required: true },
-    { name: 'supplier_partner_id', label: 'Nhà cung cấp', type: 'select' as const, defaultValue: record.supplier_partner_id ?? '', options: supplierOptions, helperText: 'Yêu cầu sinh từ BOQ đã được tách theo nhà cung cấp được chọn.' },
-    { name: 'order_reference', label: 'Số đơn đặt hàng / PO', defaultValue: record.order_reference ?? '', helperText: 'Bắt buộc trước khi ghi nhận đã đặt hàng.' },
-    { name: 'expected_delivery_date', label: 'Ngày giao dự kiến', type: 'date' as const, defaultValue: record.expected_delivery_date?.slice?.(0, 10) ?? '', helperText: 'Bắt buộc trước khi ghi nhận đã đặt hàng.' },
-  ];
 
   return <>
     {sourceLink.feedback}
@@ -138,19 +113,14 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
         { key: 'progress', header: 'Tiến trình', render: (row) => <ProcurementProgress row={row} /> },
         { key: 'total_estimated_amount', header: 'Giá trị từ dòng mua', align: 'right', sortable: true, sortValue: (row) => numeric(row.total_estimated_amount), render: (row) => <div><CurrencyText value={row.total_estimated_amount} /><div className="text-xs text-slate-400">Tự tổng hợp</div></div> },
         { key: 'delivery', header: 'Giao dự kiến', sortable: true, sortValue: (row) => row.expected_delivery_date, render: (row) => <div className={isOverdue(row) ? 'font-semibold text-rose-700' : ''}>{formatDate(row.expected_delivery_date)}{isOverdue(row) ? <div className="mt-1 flex items-center gap-1 text-xs"><AlertTriangle className="h-3.5 w-3.5" />Trễ giao</div> : null}</div> },
-        { key: 'next', header: 'Việc tiếp theo', action: true, align: 'right', render: (row) => <NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setEditRecord(row)} onAction={(name) => action.mutate({ requestId: row.id, name })} /> },
+        { key: 'next', header: 'Việc tiếp theo', action: true, align: 'right', render: (row) => <NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setViewId(row.id)} onAction={(name) => name === 'receive' ? action.mutate({ requestId: row.id, name }) : setViewId(row.id)} /> },
       ]} empty="Không có yêu cầu trong hàng đợi này" />
     </div>
     <div className="space-y-3 lg:hidden">
-      {requests.isLoading ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-slate-500">Đang tải dữ liệu...</div> : filteredRows.map((row) => <div key={row.id} className="rounded-lg border border-line bg-white p-4 shadow-panel"><div className="flex items-start justify-between gap-3"><div><button className="font-semibold text-blue-700" onClick={() => setViewId(row.id)}>{row.request_code}</button><p className="font-semibold text-ink">{row.title}</p><p className="text-xs text-slate-500">{row.supplier_name || 'Chưa gán'}</p></div><ProcurementStatus status={row.status} /></div><div className="my-3"><ProcurementProgress row={row} compact /></div><div className="flex items-end justify-between gap-3"><div className="text-sm"><CurrencyText value={row.total_estimated_amount} /><div className="text-xs text-slate-500">Giao {formatDate(row.expected_delivery_date)}</div></div><NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setEditRecord(row)} onAction={(name) => action.mutate({ requestId: row.id, name })} /></div></div>)}
+      {requests.isLoading ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-slate-500">Đang tải dữ liệu...</div> : filteredRows.map((row) => <div key={row.id} className="rounded-lg border border-line bg-white p-4 shadow-panel"><div className="flex items-start justify-between gap-3"><div><button className="font-semibold text-blue-700" onClick={() => setViewId(row.id)}>{row.request_code}</button><p className="font-semibold text-ink">{row.title}</p><p className="text-xs text-slate-500">{row.supplier_name || 'Chưa gán'}</p></div><ProcurementStatus status={row.status} /></div><div className="my-3"><ProcurementProgress row={row} compact /></div><div className="flex items-end justify-between gap-3"><div className="text-sm"><CurrencyText value={row.total_estimated_amount} /><div className="text-xs text-slate-500">Giao {formatDate(row.expected_delivery_date)}</div></div><NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setViewId(row.id)} onAction={(name) => name === 'receive' ? action.mutate({ requestId: row.id, name }) : setViewId(row.id)} /></div></div>)}
     </div>
 
-    <Dialog manageFocus open={Boolean(viewId)} title="Chi tiết yêu cầu mua" onClose={() => { setViewId(''); if (sourceLink.active) sourceLink.dismiss(); }} size="xl">
-      {detail.isLoading ? <div className="flex items-center gap-2 py-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Đang tải chi tiết...</div> : detail.error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">Không tải được chi tiết yêu cầu mua.</div> : detail.data ? <ProcurementDetail record={detail.data} /> : null}
-    </Dialog>
-    <Dialog open={Boolean(editRecord)} title="Thông tin thương mại & đặt hàng" description={editRecord ? `${editRecord.request_code} · ${editRecord.title}` : undefined} onClose={() => setEditRecord(null)} size="lg">
-      {editRecord ? <SimpleForm submitLabel="Lưu thông tin" fields={fields(editRecord)} onSubmit={(values) => update.mutateAsync({ requestId: editRecord.id, values: { ...values, project_id: editRecord.project_id, request_code: editRecord.request_code, status: editRecord.status, total_estimated_amount: editRecord.total_estimated_amount, budget_status: editRecord.budget_status, supplier_partner_id: values.supplier_partner_id || null } })} /> : null}
-    </Dialog>
+    {viewId ? <ProcurementDialog projectId={rows.find(row => row.id === viewId)?.project_id || projectId} requestId={viewId} taskId={taskId} onClose={() => { setViewId(''); if (sourceLink.active) sourceLink.dismiss(); }} /> : null}
   </>;
 }
 
@@ -175,44 +145,7 @@ function ProcurementProgress({ row, compact = false }: { row: ProcurementRow; co
 }
 
 function Step({ done, label }: { done: boolean; label: string }) { return <span className={`rounded-full border px-2 py-1 ${done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>{done ? '✓ ' : ''}{label}</span>; }
-function ProcurementStatus({ status }: { status: string }) { return <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">{procurementStatusLabels[status] ?? status}</span>; }
 function ViewButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" onClick={onClick} className={`rounded-md border px-3 py-2 text-sm font-semibold ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-line bg-white text-slate-600 hover:bg-slate-50'}`}>{children}</button>; }
 function IconButton({ title, onClick, icon }: { title: string; onClick: () => void; icon: React.ReactNode }) { return <button title={title} aria-label={title} className="rounded-md border border-line p-1.5 hover:bg-slate-100" onClick={onClick}>{icon}</button>; }
 
-export function ProcurementDetail({ record }: { record: ProcurementRow }) {
-  const items = record.items ?? [];
-  return <div className="space-y-6">
-    <RecordSummary eyebrow={record.request_code} title={record.title || 'Yêu cầu mua'} status={<ProcurementStatus status={record.status} />} value={record.total_estimated_amount == null ? '—' : <CurrencyText value={record.total_estimated_amount} />} valueLabel="Giá trị yêu cầu" icon={<ShoppingCart className="h-5 w-5" />} />
-    <RecordSection title="Thông tin đặt hàng"><RecordMetrics>
-      <RecordMetric label="Nhà cung cấp"><RecordLink target={record.supplier_partner_id ? { kind: 'partner', id: record.supplier_partner_id, partnerGroup: 'output' } : null}>{record.supplier_name || 'Chưa gán'}</RecordLink></RecordMetric>
-      <RecordMetric label="PO / Đơn hàng">{record.order_reference || 'Chưa lập'}</RecordMetric>
-      <RecordMetric label="Giao dự kiến">{formatDate(record.expected_delivery_date)}</RecordMetric>
-    </RecordMetrics></RecordSection>
-    <RecordSection title="Vật tư & tiếp nhận" aside={`${items.length} dòng hàng`} description="Khối lượng đạt nghiệm thu và khối lượng nhập kho được theo dõi riêng.">
-      <RecordTable<ProcurementRow> rows={items} rowKey={(item, index) => String(item.id ?? index)} empty="Yêu cầu chưa có dòng hàng; chưa đủ điều kiện gửi duyệt." columns={[
-        { key: 'material', label: 'Vật tư / căn cứ giá', render: item => <div className="min-w-0 space-y-2">
-          <div className="break-words font-semibold text-slate-900">{item.material_name || item.work_item_name}</div>
-          {item.boq_item_id ? <div className="text-xs"><RecordLink target={{ kind: 'boq_item', id: item.boq_item_id, projectId: record.project_id }}>Dòng BOQ nguồn</RecordLink></div> : null}
-          {item.supplier_name ? <p className="text-xs text-slate-500">{item.supplier_name}</p> : null}
-          <DeliveryStatus status={item.delivery_status} />
-          {item.quotation_code ? <div className="text-xs leading-5 text-slate-600"><RecordLink target={item.quotation_id ? { kind: 'supplier_quotation', id: item.quotation_id, projectId: record.project_id } : null}>Báo giá {item.quotation_code}</RecordLink>{item.valid_until ? <div>Hiệu lực đến {formatDate(item.valid_until)}</div> : null}</div>
-            : <details className="max-w-prose text-xs leading-5 text-amber-800"><summary className="cursor-pointer font-medium">Căn cứ miễn báo giá</summary><p className="mt-1 whitespace-pre-wrap break-words">{item.price_waiver_reason || 'Chưa có căn cứ'}</p></details>}
-        </div> },
-        { key: 'requested', label: 'Yêu cầu', align: 'right', render: item => <span className="whitespace-nowrap">{formatQuantity(item.quantity_requested)} {item.unit}</span> },
-        { key: 'accepted', label: 'Đạt nghiệm thu', align: 'right', render: item => <span className="whitespace-nowrap">{formatQuantity(item.accepted_quantity)} {item.unit}</span> },
-        { key: 'received', label: 'Đã nhập kho', align: 'right', render: item => <span className="whitespace-nowrap">{formatQuantity(item.stock_received_quantity)} {item.unit}</span> },
-        { key: 'awaiting', label: 'Chờ nhập kho', align: 'right', render: item => <span className="whitespace-nowrap font-semibold text-blue-800">{formatQuantity(item.awaiting_stock_quantity)} {item.unit}</span> },
-      ]} />
-    </RecordSection>
-    <RelatedRecords kind="procurement_request" record={{ ...record, supplier_partner_id: undefined }} />
-  </div>;
-}
-
-function DeliveryStatus({ status }: { status: string }) {
-  const label = ({ pending: 'Chờ tiếp nhận', partially_received: 'Nghiệm thu một phần', received: 'Đã nghiệm thu đủ' } as Record<string, string>)[status] ?? procurementStatusLabels[status] ?? status;
-  return <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{label || 'Chưa có trạng thái'}</span>;
-}
-function numeric(value: unknown) { return Number(value ?? 0); }
-function formatQuantity(value: unknown) { return numeric(value).toLocaleString('vi-VN', { maximumFractionDigits: 3 }); }
-function formatDate(value: unknown) { return dateText(String(value ?? '').slice(0, 10), 'Chưa chốt'); }
 function isOverdue(row: ProcurementRow) { const date = String(row.expected_delivery_date ?? '').slice(0, 10); return Boolean(date && date < new Date().toISOString().slice(0, 10) && !['received', 'cancelled'].includes(row.status)); }

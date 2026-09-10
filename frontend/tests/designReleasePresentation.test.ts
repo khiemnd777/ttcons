@@ -30,8 +30,11 @@ test('Preparation exposes immutable design package revisions and explicit PM han
   assert.match(panel, /Revision mới không tự thay revision PM đã bàn giao cho QS/);
   assert.match(panel, /BOQ và mua hàng giữ nguyên nguồn cũ/);
   assert.match(panel, /Bàn giao \{current\.revision_label\} cho QS/);
-  assert.match(panel, /multiple accept="application\/pdf,image\/png,image\/jpeg,image\/webp"/);
-  assert.match(panel, /postForm\(`\/design-releases\/\$\{release\.id\}\/files`/);
+  assert.match(panel, /<EvidenceUploader\b/);
+  assert.match(panel, /evidenceSupportedFileHint/);
+  assert.match(panel, /postFormWithProgress<DesignReleaseFile>\(`\/design-releases\/\$\{release\.id\}\/files`/);
+  assert.match(panel, /EvidenceReferenceViewButton/);
+  assert.match(panel, /queryKey: \['project-evidence', projectId\]/);
   assert.match(panel, /post\(`\/design-releases\/\$\{release\.id\}\/release`/);
   assert.match(panel, /Lưu nháp/);
   assert.match(panel, /Phát hành revision/);

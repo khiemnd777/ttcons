@@ -90,6 +90,7 @@ export function departmentLabel(value?: string) {
 }
 
 export function activityLabel(value?: string) {
+  if (value === 'work_update') return 'Cập nhật công việc';
   const key = String(value ?? '');
   return enumLabel('activity_type', key);
 }

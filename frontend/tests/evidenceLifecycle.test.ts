@@ -2,18 +2,26 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 const require = createRequire(import.meta.url);
 const react = require('react');
 const code = await build({
   stdin: { resolveDir: fileURLToPath(new URL('../src/', import.meta.url)), contents: `
-    export { useProtectedEvidencePreview, EvidenceDraftViewerDialog } from './modules/_shared/EvidenceRecordViewerDialog';
+    export { useProtectedEvidencePreview, EvidenceDraftViewerDialog, ProtectedDocumentViewerDialog } from './modules/_shared/EvidenceRecordViewerDialog';
+    export { DocumentReferenceViewButton } from './modules/_shared/DocumentReferenceViewer';
+    export { EvidenceReferenceViewButton, EvidenceReferenceViewer } from './modules/_shared/EvidenceReferenceViewer';
+    export { DesignReleaseFiles } from './modules/work-items/DesignReleasePanel';
+    export { DiscussionWorkUpdateCard } from './modules/work-items/DiscussionWorkUpdateCard';
     export { ConstructionEvidenceCapture } from './modules/_shared/EvidenceCapture';` },
   bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
   loader: { '.css': 'empty' }, define: { 'import.meta.env': '{}', 'import.meta.url': '"file:///fixture"' },
   plugins: [{ name: 'controlled-transport', setup(builder) {
-    builder.onLoad({ filter: /\/lib\/api\/client\.ts$/ }, () => ({ contents: 'export function downloadBlob(path) { return globalThis.__evidenceTestDownload(path); }', loader: 'js' }));
+    builder.onLoad({ filter: /\/lib\/api\/client\.ts$/ }, async ({ path }) => ({ contents: (await readFile(path, 'utf8')).replace('export async function downloadBlob(path: string) {', 'export async function downloadBlob(path: string) { return globalThis.__evidenceTestDownload(path);'), loader: 'ts' }));
+    builder.onLoad({ filter: /DesignReleasePanel\.tsx$/ }, async ({ path }) => ({ contents: await readFile(path, 'utf8') + '\nexport { DesignReleaseFiles };', loader: 'tsx' }));
+    builder.onLoad({ filter: /AuthContext\.tsx$/ }, () => ({ contents: 'export function useAuth() { return { user: globalThis.__previewActor ?? { id: "actor" }, hasPermission: () => false }; }', loader: 'js' }));
     builder.onLoad({ filter: /ToastProvider\.tsx$/ }, () => ({ contents: 'export function useToast() { return { warn() {}, error() {} }; }', loader: 'js' }));
   } }],
 });
@@ -41,7 +49,12 @@ function fixture() {
     },
   };
   const module = { exports: {} as Record<string, any> };
-  new Function('require', 'module', 'exports', code.outputFiles[0].text)((name: string) => name === 'react' ? hooks : require(name), module, module.exports);
+  new Function('require', 'module', 'exports', code.outputFiles[0].text)((name: string) => {
+    if (name === 'react') return hooks;
+    if (name === 'react-dom') return { ...require(name), createPortal: (children: any) => children };
+    if (name === '@tanstack/react-query') return { ...require(name), useQuery: () => (globalThis as any).__previewQuery ?? {} };
+    return require(name);
+  }, module, module.exports);
   return {
     render(name: string, ...args: any[]) { cursor = 0; effectCursor = 0; return module.exports[name](...args); },
     flush() { for (const effect of effects) if (effect.pending) { effect.cleanup?.(); effect.cleanup = effect.pending(); effect.pending = undefined; } },
@@ -56,7 +69,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 const record = (id: string) => ({ id, storage_provider: 'local', storage_key: `file/${id}`, updated_at: '2026-09-07' });
-const settle = async () => { await Promise.resolve(); await Promise.resolve(); };
+const settle = async () => { await new Promise(resolve => setImmediate(resolve)); };
 
 test('protected preview discards a late response, hides previous files immediately and revokes URLs on close', async (t) => {
   const requests = new Map<string, ReturnType<typeof deferred>>();
@@ -152,4 +165,116 @@ test('capture preserves source selection intent, enforces file caps, and never u
   uploader().props.removeUploadRow(drafts[0].id);
   assert.deepEqual(drafts, []);
   hooks.close();
+});
+
+function findElement(node: any, predicate: (element: any) => boolean): any {
+  if (!node || typeof node !== 'object') return undefined;
+  if (predicate(node)) return node;
+  for (const child of [node.props?.children].flat(Infinity)) {
+    const match = findElement(child, predicate);
+    if (match) return match;
+  }
+}
+
+test('historical design snapshots keep exact documents while canonical design files open exact evidence records', (t) => {
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', { configurable: true, value: { body: {} } });
+  t.after(() => {
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument); else delete (globalThis as any).document;
+    delete (globalThis as any).__previewQuery;
+    delete (globalThis as any).__previewActor;
+  });
+  const historical = { id: 'document-r01', name: 'old.pdf', mime_type: 'application/pdf', file_size: 1024 };
+  const current = {
+    id: 'evidence-r02', evidence_id: 'evidence-r02', reference_type: 'evidence', name: 'new.pdf',
+    mime_type: 'application/pdf', file_size: 1024, evidence_type: 'document', status: 'submitted',
+    work_item_id: 'design-work', project_id: 'project', storage_provider: 'local', storage_key: 'evidence/project/release/new.pdf',
+    submitted_by_name: 'Design', reviewed_by_name: '', work_item_title: 'Nộp hồ sơ thiết kế', run_node_name: 'Thiết kế',
+  };
+  (globalThis as any).__previewQuery = { data: { source_type: 'design_release', snapshot: { revision_label: 'R01', files: [historical] } } };
+  const cardHooks = fixture();
+  const props = { item: { id: 'activity', activity_type: 'work_update', metadata_json: { work_update: { source_type: 'design_release', revision_label: 'R01' } } } };
+  findElement(cardHooks.render('DiscussionWorkUpdateCard', props), node => node.type === 'button').props.onClick();
+  const oldEntry = findElement(cardHooks.render('DiscussionWorkUpdateCard', props), node => node.type?.name === 'DocumentReferenceViewButton');
+  const fileHooks = fixture();
+  const newEntry = findElement(fileHooks.render('DesignReleaseFiles', { files: [current], revisionLabel: 'R02' }), node => node.type?.name === 'EvidenceReferenceViewButton');
+  assert.ok(oldEntry, 'historical snapshot must render the shared document adapter');
+  assert.deepEqual(oldEntry.props.file, historical);
+  const historicalHooks = fixture();
+  let historicalTree = historicalHooks.render('DocumentReferenceViewButton', oldEntry.props);
+  findElement(historicalTree, node => node.type === 'button').props.onClick();
+  historicalTree = historicalHooks.render('DocumentReferenceViewButton', oldEntry.props);
+  const historicalViewer = findElement(historicalTree, node => node.type?.name === 'ProtectedDocumentViewerDialog');
+  assert.equal(historicalViewer.props.protectedFilePath, `/documents/${historical.id}/file`);
+  assert.match(historicalViewer.props.sourceLabel, /R01/);
+
+  assert.ok(newEntry, 'canonical design file must render the shared evidence entrypoint');
+  assert.equal(newEntry.props.reference.id, current.id);
+  assert.equal(newEntry.props.reference.record, current);
+  const evidenceHooks = fixture();
+  const evidenceViewer = findElement(evidenceHooks.render('EvidenceReferenceViewer', { reference: newEntry.props.reference, onClose() {} }), node => node.type?.name === 'EvidenceRecordViewerDialog');
+  assert.equal(evidenceViewer.props.record.id, current.id);
+  assert.equal(evidenceViewer.props.record.storage_key, current.storage_key);
+
+  assert.equal(findElement(cardHooks.render('DiscussionWorkUpdateCard', props), node => node.type?.name === 'DocumentReferenceViewButton').props.file.id, historical.id);
+  cardHooks.close(); fileHooks.close(); historicalHooks.close(); evidenceHooks.close();
+});
+
+test('protected documents render through existing photo/PDF/Office readers without fabricated evidence metadata', async () => {
+  const paths: string[] = [];
+  (globalThis as any).__evidenceTestDownload = async (path: string) => { paths.push(path); return new Blob(['file'], { type: 'application/octet-stream' }); };
+  for (const [name, mediaType] of [['photo.png', 'photo'], ['drawing.pdf', 'pdf'], ['spec.docx', 'word'], ['schedule.xlsx', 'spreadsheet'], ['drawing.dwg', 'document']]) {
+    const hooks = fixture();
+    const props = { name, protectedFilePath: `/documents/${name}/file`, sourceLabel: 'Hồ sơ thiết kế · R01', onClose() {} };
+    const initial = hooks.render('ProtectedDocumentViewerDialog', props);
+    assert.equal(initial.props.loading, true);
+    assert.equal(initial.props.mediaType, mediaType);
+    hooks.flush(); await settle();
+    const ready = hooks.render('ProtectedDocumentViewerDialog', props);
+    assert.equal(ready.type.name, 'EvidenceViewerDialog');
+    assert.equal(ready.props.loading, false);
+    assert.ok(ready.props.previewUrl?.startsWith('blob:'));
+    assert.ok(ready.props.fileBlob instanceof Blob);
+    const html = renderToStaticMarkup(ready);
+    assert.match(html, /Xem tệp/);
+    assert.match(html, /Hồ sơ thiết kế · R01/);
+    assert.doesNotMatch(html, /Người rà soát|Thời điểm rà soát|Chưa upload/);
+    if (mediaType === 'photo') assert.match(html, /<img/);
+    if (mediaType === 'pdf') assert.match(html, /<iframe/);
+    if (mediaType === 'document') assert.match(html, /Định dạng này chưa hỗ trợ đọc trực tiếp/);
+    hooks.close();
+  }
+  assert.deepEqual(paths, ['photo.png', 'drawing.pdf', 'spec.docx', 'schedule.xlsx', 'drawing.dwg'].map(name => `/documents/${name}/file`));
+});
+
+test('document preview ignores stale downloads, revokes old URLs and retries denied files through the same source', async (t) => {
+  const requests: ReturnType<typeof deferred>[] = [];
+  const paths: string[] = [];
+  (globalThis as any).__evidenceTestDownload = (path: string) => { paths.push(path); const request = deferred(); requests.push(request); return request.promise; };
+  const revoked: string[] = [];
+  let urls = 0;
+  t.mock.method(URL, 'createObjectURL', () => `blob:document-${++urls}`);
+  t.mock.method(URL, 'revokeObjectURL', (url: string) => revoked.push(url));
+  const hooks = fixture();
+  const old = { name: 'old.pdf', protectedFilePath: '/documents/old/file', onClose() {} };
+  const next = { ...old, name: 'new.pdf', protectedFilePath: '/documents/new/file' };
+  hooks.render('ProtectedDocumentViewerDialog', old); hooks.flush();
+  hooks.render('ProtectedDocumentViewerDialog', next); hooks.flush();
+  requests[0].resolve(new Blob(['old'])); await settle();
+  assert.equal(urls, 0);
+  requests[1].reject(new Error('403 forbidden')); await settle();
+  const denied = hooks.render('ProtectedDocumentViewerDialog', next);
+  assert.match(denied.props.error, /403 forbidden/);
+  assert.equal(denied.props.previewUrl, undefined);
+  assert.equal(denied.props.mediaAction, undefined);
+  denied.props.onRetry(); hooks.render('ProtectedDocumentViewerDialog', next); hooks.flush();
+  requests[2].resolve(new Blob(['new'])); await settle();
+  assert.equal(hooks.render('ProtectedDocumentViewerDialog', next).props.previewUrl, 'blob:document-1');
+  assert.equal(hooks.render('ProtectedDocumentViewerDialog', old).props.previewUrl, undefined);
+  hooks.flush();
+  assert.deepEqual(revoked, ['blob:document-1']);
+  hooks.close();
+  requests[3].resolve(new Blob(['late'])); await settle();
+  assert.equal(urls, 1);
+  assert.deepEqual(paths, ['/documents/old/file', '/documents/new/file', '/documents/new/file', '/documents/old/file']);
 });

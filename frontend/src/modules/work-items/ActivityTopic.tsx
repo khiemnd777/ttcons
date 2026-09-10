@@ -1,10 +1,12 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, lazy, Suspense, useContext, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUpRight, FileText } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { activityTopic, activityTopicTypes, type ActivityTopic, type ActivityTopicSource } from './activityTopicDomain';
 import ActivityTopicDetails from './ActivityTopicDetails';
+
+const ProcurementDialog = lazy(() => import('../procurement/ProcurementDialog').then(module => ({ default: module.ProcurementDialog })));
 
 const TopicContext = createContext<{ projectId: string; open: (topic: ActivityTopic) => void } | null>(null);
 
@@ -19,9 +21,9 @@ function TopicSession({ projectId, children }: { projectId: string; children: Re
     {children}
     {selected ? createPortal(
       <div className="relative z-[100]">
-        <Dialog open title={selected.scope === 'boq_item' ? 'Chi tiết dòng BOQ' : `Chi tiết ${activityTopicTypes[selected.scope].label.toLocaleLowerCase('vi')}`} size="xl" manageFocus onClose={() => setSelected(null)}>
+        {selected.scope === 'procurement_request' ? <Suspense fallback={<Dialog open title="Yêu cầu mua" onClose={() => setSelected(null)}><p role="status">Đang tải yêu cầu mua…</p></Dialog>}><ProcurementDialog projectId={projectId} requestId={selected.id} onClose={() => setSelected(null)} /></Suspense> : <Dialog open title={selected.scope === 'boq_item' ? 'Chi tiết dòng BOQ' : `Chi tiết ${activityTopicTypes[selected.scope].label.toLocaleLowerCase('vi')}`} size="xl" manageFocus onClose={() => setSelected(null)}>
           <ActivityTopicDetails key={`${selected.scope}:${selected.id}`} topic={selected} onClose={() => setSelected(null)} />
-        </Dialog>
+        </Dialog>}
       </div>, document.body,
     ) : null}
   </TopicContext.Provider>;

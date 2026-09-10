@@ -414,6 +414,12 @@ func (r *Repository) AddWorkItemEvidence(ctx context.Context, item Record, req W
 		return nil, sql.ErrNoRows
 	}
 	evidence := rows[0]
+	if err := insertDiscussionWorkUpdateTx(ctx, tx, projectID, workItemID, actorID, "evidence", cleanID(evidence["id"]), "uploaded", "Đã thêm minh chứng · "+req.Name, Record{
+		"title": req.Name, "status": "submitted", "evidence_id": evidence["id"],
+		"caption": comment, "revision_label": req.RevisionNo,
+	}); err != nil {
+		return nil, err
+	}
 	if _, err := tx.ExecContext(ctx, `UPDATE work_items SET updated_by=NULLIF($2,'')::uuid, updated_at=now() WHERE id=$1`, workItemID, actorID); err != nil {
 		return nil, err
 	}
@@ -1050,6 +1056,10 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 	if err != nil {
 		return nil, err
 	}
+	canViewDesign, err := r.CanAccessProjectPermission(ctx, userID, projectID, []string{"project.view"})
+	if err != nil {
+		return nil, err
+	}
 	workItems, err := r.ListProjectOperationsWorkItems(ctx, projectID, userID)
 	if err != nil {
 		return nil, err
@@ -1068,11 +1078,11 @@ func (r *Repository) ProjectOperations(ctx context.Context, projectID, userID st
 	if err != nil {
 		return nil, err
 	}
-	latestEvidence, err := r.ProjectOperationsEvidence(ctx, projectID, profile)
+	latestEvidence, err := r.ProjectOperationsEvidence(ctx, projectID, profile, canViewDesign)
 	if err != nil {
 		return nil, err
 	}
-	evidenceSummary, err := r.ProjectEvidenceSummary(ctx, projectID, profile)
+	evidenceSummary, err := r.ProjectEvidenceSummary(ctx, projectID, profile, canViewDesign)
 	if err != nil {
 		return nil, err
 	}
@@ -1354,8 +1364,8 @@ func (r *Repository) ProjectActivitySummary(ctx context.Context, projectID strin
 	return r.QueryOne(ctx, fmt.Sprintf(`
 		SELECT
 			COUNT(*) AS total,
-			COUNT(*) FILTER (WHERE wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note')) AS discussion,
-			COUNT(*) FILTER (WHERE wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note')) AS system,
+			COUNT(*) FILTER (WHERE wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note','work_update')) AS discussion,
+			COUNT(*) FILTER (WHERE wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note','work_update')) AS system,
 			COUNT(*) FILTER (WHERE wia.activity_type='decision') AS decisions,
 			COUNT(*) FILTER (WHERE %s) AS unread,
 			COUNT(*) FILTER (WHERE %s) AS discussion_unread,
@@ -1519,9 +1529,9 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 	}
 	switch filter.Kind {
 	case "discussion":
-		conditions = append(conditions, "wia.activity_type IN ('comment','status','blocker','question','decision','reminder','file_note')")
+		conditions = append(conditions, "wia.activity_type IN ("+projectDiscussionActivityTypesSQL+")")
 	case "system":
-		conditions = append(conditions, "wia.activity_type NOT IN ('comment','status','blocker','question','decision','reminder','file_note')")
+		conditions = append(conditions, "wia.activity_type NOT IN ("+projectDiscussionActivityTypesSQL+")")
 	case "decision":
 		conditions = append(conditions, "wia.activity_type='decision'")
 	}
@@ -1687,31 +1697,43 @@ func (r *Repository) ProjectOperationsApprovals(ctx context.Context, projectID s
 	`, workItemScopeSQL("wi", 3)), args...)
 }
 
-func (r *Repository) ProjectOperationsEvidence(ctx context.Context, projectID string, profile workItemAccessProfile) ([]Record, error) {
-	args := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
+func (r *Repository) ProjectOperationsEvidence(ctx context.Context, projectID string, profile workItemAccessProfile, canViewDesign bool) ([]Record, error) {
+	args := append([]any{projectID, canViewDesign}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT er.*, wi.title AS work_item_title,u.full_name AS submitted_by_name,
-			COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,d.name AS document_name
+			COALESCE(u.deleted_at IS NOT NULL,false) AS submitted_by_account_deleted,d.name AS document_name,
+			item.design_release_id,release.revision_label AS design_revision_label,
+			release.status AS design_release_status,release.change_reason AS design_change_reason
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN documents d ON d.id=er.document_id
+		LEFT JOIN design_release_items item ON item.evidence_id=er.id AND item.project_id=er.project_id
+		LEFT JOIN design_releases release ON release.id=item.design_release_id AND release.project_id=item.project_id
 		WHERE er.project_id=$1
 		  AND wi.status <> 'cancelled'
 		  AND er.status <> 'rejected'
 		  AND er.visibility IN ('internal','project')
-		  AND (%s)
+		  AND ((item.evidence_id IS NOT NULL AND $2::boolean) OR (item.evidence_id IS NULL AND (%s)))
 		ORDER BY er.created_at DESC
 		LIMIT 50
-	`, workItemScopeSQL("wi", 2)), args...)
+	`, workItemScopeSQL("wi", 3)), args...)
 }
 
-func projectEvidenceWhere(projectID string, profile workItemAccessProfile, filter ProjectEvidenceFilter, includeCursor bool) ([]string, []any) {
-	args := append([]any{projectID}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
+func projectEvidenceWaitingSQL() string {
+	return "((item.evidence_id IS NULL AND er.status IN ('draft','submitted')) OR (item.evidence_id IS NOT NULL AND release.status='released' AND er.status='submitted'))"
+}
+
+func projectEvidencePrioritySQL() string {
+	return "CASE WHEN " + projectEvidenceWaitingSQL() + " THEN 0 ELSE 1 END"
+}
+
+func projectEvidenceWhere(projectID string, profile workItemAccessProfile, canViewDesign bool, filter ProjectEvidenceFilter, includeCursor bool) ([]string, []any) {
+	args := append([]any{projectID, canViewDesign}, workItemScopeArgs(profile, profileCanObserveAllProjectWork(profile), true)...)
 	conditions := []string{
 		"er.project_id=$1",
 		"wi.status <> 'cancelled'",
-		fmt.Sprintf("(%s)", workItemScopeSQL("wi", 2)),
+		fmt.Sprintf("((item.evidence_id IS NOT NULL AND $2::boolean) OR (item.evidence_id IS NULL AND (%s)))", workItemScopeSQL("wi", 3)),
 	}
 	if profileIsClient(profile) && !profile.IsManager {
 		conditions = append(conditions, "er.visibility='client'")
@@ -1724,7 +1746,7 @@ func projectEvidenceWhere(projectID string, profile workItemAccessProfile, filte
 	}
 	switch filter.Status {
 	case "waiting":
-		conditions = append(conditions, "er.status IN ('draft','submitted')")
+		conditions = append(conditions, projectEvidenceWaitingSQL())
 	case "accepted", "rejected":
 		args = append(args, filter.Status)
 		conditions = append(conditions, fmt.Sprintf("er.status=$%d", len(args)))
@@ -1763,10 +1785,12 @@ func projectEvidenceWhere(projectID string, profile workItemAccessProfile, filte
 			OR wi.title ILIKE $%d
 			OR COALESCE(d.name, '') ILIKE $%d
 			OR COALESCE(u.full_name, '') ILIKE $%d
-		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
+			OR COALESCE(release.revision_label, '') ILIKE $%d
+			OR COALESCE(release.change_reason, '') ILIKE $%d
+		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
 	}
 	if includeCursor && filter.CursorCreatedAt != "" && filter.CursorID != "" {
-		priorityExpression := "CASE WHEN er.status IN ('draft','submitted') THEN 0 ELSE 1 END"
+		priorityExpression := projectEvidencePrioritySQL()
 		args = append(args, filter.CursorPriority, filter.CursorCreatedAt, filter.CursorID)
 		priorityPlaceholder := len(args) - 2
 		createdPlaceholder := len(args) - 1
@@ -1779,8 +1803,8 @@ func projectEvidenceWhere(projectID string, profile workItemAccessProfile, filte
 	return conditions, args
 }
 
-func (r *Repository) ListProjectEvidence(ctx context.Context, projectID string, profile workItemAccessProfile, filter ProjectEvidenceFilter) ([]Record, error) {
-	conditions, args := projectEvidenceWhere(projectID, profile, filter, true)
+func (r *Repository) ListProjectEvidence(ctx context.Context, projectID string, profile workItemAccessProfile, canViewDesign bool, filter ProjectEvidenceFilter) ([]Record, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, canViewDesign, filter, true)
 	args = append(args, filter.Limit)
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT er.*,
@@ -1794,27 +1818,37 @@ func (r *Repository) ListProjectEvidence(ctx context.Context, projectID string, 
 			reviewer.full_name AS reviewed_by_name,
 			COALESCE(reviewer.deleted_at IS NOT NULL,false) AS reviewed_by_account_deleted,
 			d.name AS document_name,
-			CASE WHEN er.status IN ('draft','submitted') THEN 0 ELSE 1 END AS review_priority
+			item.design_release_id,
+			CASE WHEN item.evidence_id IS NULL THEN NULL ELSE 'evidence' END AS reference_type,
+			COALESCE(item.document_type,er.document_type) AS design_document_type,
+			release.revision_label AS design_revision_label,
+			release.status AS design_release_status,
+			release.change_reason AS design_change_reason,
+			%s AS review_priority
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
 		LEFT JOIN pipeline_run_nodes rn ON rn.id=wi.run_node_id
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN users reviewer ON reviewer.id=er.reviewed_by
 		LEFT JOIN documents d ON d.id=er.document_id
+		LEFT JOIN design_release_items item ON item.evidence_id=er.id AND item.project_id=er.project_id
+		LEFT JOIN design_releases release ON release.id=item.design_release_id AND release.project_id=item.project_id
 		WHERE %s
 		ORDER BY review_priority, er.created_at DESC, er.id DESC
 		LIMIT $%d
-	`, strings.Join(conditions, " AND "), len(args)), args...)
+	`, projectEvidencePrioritySQL(), strings.Join(conditions, " AND "), len(args)), args...)
 }
 
-func (r *Repository) ProjectEvidenceCount(ctx context.Context, projectID string, profile workItemAccessProfile, filter ProjectEvidenceFilter) (int, error) {
-	conditions, args := projectEvidenceWhere(projectID, profile, filter, false)
+func (r *Repository) ProjectEvidenceCount(ctx context.Context, projectID string, profile workItemAccessProfile, canViewDesign bool, filter ProjectEvidenceFilter) (int, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, canViewDesign, filter, false)
 	row, err := r.QueryOne(ctx, fmt.Sprintf(`
 		SELECT COUNT(*) AS total
 		FROM evidence_records er
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN documents d ON d.id=er.document_id
+		LEFT JOIN design_release_items item ON item.evidence_id=er.id AND item.project_id=er.project_id
+		LEFT JOIN design_releases release ON release.id=item.design_release_id AND release.project_id=item.project_id
 		WHERE %s
 	`, strings.Join(conditions, " AND ")), args...)
 	if err != nil {
@@ -1823,12 +1857,12 @@ func (r *Repository) ProjectEvidenceCount(ctx context.Context, projectID string,
 	return int(number(row["total"])), nil
 }
 
-func (r *Repository) ProjectEvidenceSummary(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
-	conditions, args := projectEvidenceWhere(projectID, profile, ProjectEvidenceFilter{}, false)
+func (r *Repository) ProjectEvidenceSummary(ctx context.Context, projectID string, profile workItemAccessProfile, canViewDesign bool) (Record, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, canViewDesign, ProjectEvidenceFilter{}, false)
 	return r.QueryOne(ctx, fmt.Sprintf(`
 		SELECT
 			COUNT(*) AS total,
-			COUNT(*) FILTER (WHERE er.status IN ('draft','submitted')) AS waiting,
+			COUNT(*) FILTER (WHERE %s) AS waiting,
 			COUNT(*) FILTER (WHERE er.status='accepted') AS accepted,
 			COUNT(*) FILTER (WHERE er.status='rejected') AS rejected,
 			COUNT(*) FILTER (WHERE er.evidence_type='photo' OR COALESCE(er.mime_type, '') LIKE 'image/%%') AS photos,
@@ -1837,12 +1871,14 @@ func (r *Repository) ProjectEvidenceSummary(ctx context.Context, projectID strin
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN documents d ON d.id=er.document_id
+		LEFT JOIN design_release_items item ON item.evidence_id=er.id AND item.project_id=er.project_id
+		LEFT JOIN design_releases release ON release.id=item.design_release_id AND release.project_id=item.project_id
 		WHERE %s
-	`, strings.Join(conditions, " AND ")), args...)
+	`, projectEvidenceWaitingSQL(), strings.Join(conditions, " AND ")), args...)
 }
 
-func (r *Repository) ProjectEvidenceOptions(ctx context.Context, projectID string, profile workItemAccessProfile) (Record, error) {
-	conditions, args := projectEvidenceWhere(projectID, profile, ProjectEvidenceFilter{}, false)
+func (r *Repository) ProjectEvidenceOptions(ctx context.Context, projectID string, profile workItemAccessProfile, canViewDesign bool) (Record, error) {
+	conditions, args := projectEvidenceWhere(projectID, profile, canViewDesign, ProjectEvidenceFilter{}, false)
 	where := strings.Join(conditions, " AND ")
 	workItems, err := r.Query(ctx, fmt.Sprintf(`
 		SELECT wi.id, wi.title AS label
@@ -1850,6 +1886,8 @@ func (r *Repository) ProjectEvidenceOptions(ctx context.Context, projectID strin
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
 		LEFT JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN documents d ON d.id=er.document_id
+		LEFT JOIN design_release_items item ON item.evidence_id=er.id AND item.project_id=er.project_id
+		LEFT JOIN design_releases release ON release.id=item.design_release_id AND release.project_id=item.project_id
 		WHERE %s
 		GROUP BY wi.id, wi.title
 		ORDER BY lower(wi.title), wi.id
@@ -1863,6 +1901,8 @@ func (r *Repository) ProjectEvidenceOptions(ctx context.Context, projectID strin
 		JOIN work_items wi ON wi.id=er.work_item_id AND wi.project_id=er.project_id
 		JOIN users u ON u.id=er.submitted_by
 		LEFT JOIN documents d ON d.id=er.document_id
+		LEFT JOIN design_release_items item ON item.evidence_id=er.id AND item.project_id=er.project_id
+		LEFT JOIN design_releases release ON release.id=item.design_release_id AND release.project_id=item.project_id
 		WHERE %s
 		GROUP BY u.id, u.full_name
 		ORDER BY lower(u.full_name), u.id

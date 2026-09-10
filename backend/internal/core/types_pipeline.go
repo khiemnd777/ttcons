@@ -4,6 +4,8 @@ type ActionRequest struct {
 	Comment         string                  `json:"comment"`
 	Reason          string                  `json:"reason"`
 	WorkItemContext WorkItemMutationContext `json:"work_item_context"`
+	// Procurement callers pin the source version they reviewed before acting.
+	ExpectedVersion *int `json:"expected_version,omitempty"`
 }
 
 type WorkItemMutationContext struct {

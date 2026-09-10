@@ -474,6 +474,7 @@ func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_requests WHERE project_id=$1`, 1, projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE boq_item_id=$1`, 1, approvedBOQID)
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id=$1 AND source_type='procurement_request' AND source_snapshot_json->>'status'='waiting_approval'`, 1, requestID)
 	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE project_id=$1`, 0, projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM payables WHERE project_id=$1`, 0, projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM receivables WHERE project_id=$1`, 0, projectID)

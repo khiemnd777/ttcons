@@ -747,7 +747,7 @@ func (h *Handler) GetProcurement(c *fiber.Ctx) error {
 	if err := h.requireRecordProjectPermission(c, "procurement_requests", c.Params("id"), []string{"procurement.view"}); err != nil {
 		return err
 	}
-	req, err := h.service.repo.GetProcurementDetail(c.Context(), c.Params("id"))
+	req, err := h.service.ProcurementWorkspace(c.Context(), c.Params("id"), actorID(c))
 	if err != nil {
 		return err
 	}

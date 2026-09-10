@@ -178,7 +178,7 @@ func (s *Service) SetActivityReaction(ctx context.Context, activityID string, re
 	if err != nil {
 		return nil, err
 	}
-	if !userActivityTypes[strings.TrimSpace(fmt.Sprint(activity["activity_type"]))] {
+	if !userActivityTypes[strings.TrimSpace(fmt.Sprint(activity["activity_type"]))] && fmt.Sprint(activity["activity_type"]) != "work_update" {
 		return nil, validationError("Không thể phản ứng với sự kiện hệ thống")
 	}
 	if cleanID(activity["withdrawn_at"]) != "" {
@@ -350,7 +350,7 @@ func (s *Service) normalizeActivityReply(ctx context.Context, projectID string, 
 	if cleanID(parent["project_id"]) != cleanID(projectID) {
 		return req, validationError("Trao đổi được trả lời không thuộc công trình này")
 	}
-	if !userActivityTypes[strings.TrimSpace(fmt.Sprint(parent["activity_type"]))] {
+	if !userActivityTypes[strings.TrimSpace(fmt.Sprint(parent["activity_type"]))] && fmt.Sprint(parent["activity_type"]) != "work_update" {
 		return req, validationError("Không thể trả lời sự kiện hệ thống")
 	}
 	if cleanID(parent["withdrawn_at"]) != "" {
@@ -390,6 +390,7 @@ var userActivityTypes = map[string]bool{
 }
 
 var activityFilterTypes = map[string]bool{
+	"work_update":        true,
 	"created":            true,
 	"started":            true,
 	"completed":          true,
@@ -483,6 +484,9 @@ func validateActivityRequest(req WorkItemActivityRequest) (WorkItemActivityReque
 	metadata := req.Metadata
 	if metadata == nil {
 		metadata = Record{}
+	}
+	if _, exists := metadata["work_update"]; exists {
+		return req, validationError("Cập nhật nghiệp vụ chỉ được tạo từ hồ sơ nguồn")
 	}
 
 	if activityType == "reminder" {

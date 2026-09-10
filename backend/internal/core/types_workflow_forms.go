@@ -1,8 +1,9 @@
 package core
 
 type WorkflowFormSaveRequest struct {
-	Answers Record `json:"answers"`
-	Comment string `json:"comment"`
+	Answers         Record `json:"answers"`
+	Comment         string `json:"comment"`
+	ExpectedAnswers Record `json:"expected_answers"`
 }
 
 type WorkflowFormAmendRequest struct {

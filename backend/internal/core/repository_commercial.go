@@ -1021,6 +1021,9 @@ func (r *Repository) GenerateProcurementFromBOQ(ctx context.Context, projectID s
 		if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "material_requested", "procurement_request", requestID, "Sinh yêu cầu mua từ BOQ theo nhà cung cấp", Record{"total": total, "boq_price_source": "final", "supplier_partner_id": key, "item_count": len(groupRows)}); err != nil {
 			return nil, err
 		}
+		if err := insertProcurementDiscussionUpdateTx(ctx, tx, reqRows[0], cleanID(mutationContext.WorkItemID), "generated", actorID); err != nil {
+			return nil, err
+		}
 	}
 	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, mutationContext, boqProcurementWorkItemPolicy, "procurement_request", requestIDs[0], actorID, actorName)
 	if err != nil {
@@ -1048,7 +1051,7 @@ func (r *Repository) GetProcurementDetail(ctx context.Context, requestID string)
 	if err != nil {
 		return nil, err
 	}
-	items, _ := r.Query(ctx, `
+	items, err := r.Query(ctx, `
 		SELECT pri.*, m.name AS material_name, b.work_item_name, b.price_waiver_reason,
 			q.id AS quotation_id, q.quotation_code, q.quotation_date, q.valid_until, q.currency,
 			COALESCE(received.accepted_quantity,0) AS accepted_quantity,
@@ -1084,7 +1087,18 @@ func (r *Repository) GetProcurementDetail(ctx context.Context, requestID string)
 		WHERE pri.request_id=$1
 		ORDER BY pri.created_at
 	`, requestID)
+	if err != nil {
+		return nil, err
+	}
 	req["items"] = items
+	acceptances, err := r.Query(ctx, `SELECT id,work_item_id FROM incoming_acceptance_records WHERE procurement_request_id=$1 AND project_id=$2 AND status <> 'cancelled' ORDER BY created_at DESC,id DESC LIMIT 1`, requestID, req["project_id"])
+	if err != nil {
+		return nil, err
+	}
+	if len(acceptances) > 0 {
+		req["incoming_acceptance_id"] = acceptances[0]["id"]
+		req["incoming_acceptance_work_item_id"] = acceptances[0]["work_item_id"]
+	}
 	return req, nil
 }
 
@@ -1144,6 +1158,9 @@ func (r *Repository) ProcurementAction(ctx context.Context, id, action string, r
 	}
 	current := rows[0]
 	fromStatus := fmt.Sprint(current["status"])
+	if req.ExpectedVersion != nil && *req.ExpectedVersion != int(number(current["edit_version"])) {
+		return nil, procurementVersionConflict()
+	}
 	toStatus := ""
 	event := ""
 	if action == "submit" {
@@ -1227,7 +1244,7 @@ func (r *Repository) ProcurementAction(ctx context.Context, id, action string, r
 	}
 	updated, err := queryTx(ctx, tx, `
 		UPDATE procurement_requests
-		SET status=$2, ordered_at=CASE WHEN $4='order' THEN COALESCE(ordered_at,now()) ELSE ordered_at END, updated_at=now()
+		SET status=$2, ordered_at=CASE WHEN $4='order' THEN COALESCE(ordered_at,now()) ELSE ordered_at END, updated_at=now(), edit_version=edit_version+1
 		WHERE id=$1 AND status=$3
 		RETURNING *
 	`, id, toStatus, fromStatus, action)
@@ -1248,6 +1265,11 @@ func (r *Repository) ProcurementAction(ctx context.Context, id, action string, r
 	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, cleanID(current["project_id"]), req.WorkItemContext, inputContractProcurementWorkItemPolicy, "procurement_request", id, actorID, actorName)
 	if err != nil {
 		return nil, err
+	}
+	if statusIn(action, "submit", "approve", "order") {
+		if err := insertProcurementDiscussionUpdateTx(ctx, tx, updated[0], cleanID(req.WorkItemContext.WorkItemID), action, actorID); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
