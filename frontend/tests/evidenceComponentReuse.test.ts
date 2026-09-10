@@ -224,7 +224,7 @@ test('inventory locks capture, evidence references and the one legacy document e
     'operations/ConstructionActionDialogs.tsx': 3, 'operations/ConstructionCheckDialogs.tsx': 2,
     'work-items/IncomingAcceptancePanel.tsx': 1, 'work-items/MaterialSnapshotPanel.tsx': 2, 'work-items/OwnerClientReconciliationPanel.tsx': 1,
     'work-items/SubcontractorReconciliationPanel.tsx': 1, 'work-items/SurplusHandlingPanel.tsx': 1,
-    'work-items/DesignReleasePanel.tsx': 1, 'work-items/DiscussionWorkUpdateCard.tsx': 2, 'work-items/WorkflowFormPanel.tsx': 1,
+    'work-items/DesignReleasePanel.tsx': 1, 'work-items/DiscussionWorkUpdateCard.tsx': 3, 'work-items/WorkflowFormPanel.tsx': 1,
   });
   assert.deepEqual(documentCounts, { 'work-items/DiscussionWorkUpdateCard.tsx': 1 });
 });

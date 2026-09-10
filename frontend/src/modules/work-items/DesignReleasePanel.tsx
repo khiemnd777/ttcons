@@ -16,6 +16,9 @@ import { runEvidenceUploadQueue } from './evidenceUploadQueue';
 
 type PendingDesignFile = EvidenceUploadRow & {
   documentType: 'layout' | 'render_3d' | 'construction_drawing' | 'other';
+  uploadedRecord?: DesignReleaseFile;
+  discussionBatchId?: string;
+  discussionUpdateRecorded?: boolean;
 };
 
 const documentTypeOptions: Array<{ value: PendingDesignFile['documentType']; label: string }> = [
@@ -276,7 +279,7 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
   function requestClose() {
     if (submitting) return;
     const initial = openedDraft.current;
-    if (pendingFiles.some((row) => row.status !== 'success' && row.file) || revisionLabel !== (initial?.revision_label ?? '') || changeReason !== (initial?.change_reason ?? '') || notes !== (initial?.notes ?? '')) setDiscardOpen(true);
+    if (pendingFiles.some((row) => row.file && (row.status !== 'success' || !row.discussionUpdateRecorded)) || revisionLabel !== (initial?.revision_label ?? '') || changeReason !== (initial?.change_reason ?? '') || notes !== (initial?.notes ?? '')) setDiscardOpen(true);
     else onClose();
   }
 
@@ -305,6 +308,9 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
       status: 'queued',
       progress: 0,
       error: '',
+      uploadedRecord: undefined,
+      discussionBatchId: undefined,
+      discussionUpdateRecorded: undefined,
     });
     input.value = '';
   }
@@ -314,6 +320,8 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
   }
 
   async function uploadDesignFiles(release: DesignRelease, candidates: PendingDesignFile[]) {
+    if (!candidates.length) return;
+    const batchId = globalThis.crypto.randomUUID();
     const results = await runEvidenceUploadQueue(candidates, async (candidate) => {
       if (!candidate.file || !candidate.classification || candidate.fileIssue) throw new Error(candidate.fileIssue || 'Chưa chọn tệp hợp lệ.');
       setPendingFile(candidate.id, { status: 'uploading', progress: 0, error: '' });
@@ -321,22 +329,46 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
       form.append('file', candidate.file);
       form.append('name', candidate.name.trim() || candidate.file.name);
       form.append('document_type', candidate.documentType);
+      form.append('discussion_batch_id', batchId);
       try {
         const record = await postFormWithProgress<DesignReleaseFile>(`/design-releases/${release.id}/files`, form, ({ percent }) => {
           setPendingFile(candidate.id, { status: percent >= 100 ? 'processing' : 'uploading', progress: percent });
         });
-        setPendingFile(candidate.id, { status: 'success', progress: 100, error: '' });
-        return record;
+        setPendingFile(candidate.id, { status: 'success', progress: 100, error: '', uploadedRecord: record, discussionBatchId: batchId, discussionUpdateRecorded: false });
+        return { candidateId: candidate.id, record };
       } catch (error) {
         setPendingFile(candidate.id, { status: 'error', progress: 0, error: error instanceof Error ? error.message : 'Không tải được tệp.' });
         throw error;
       }
     }, 3);
+    const successful = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+    if (successful.length) await completeDiscussionBatch(release, batchId, successful);
     const failed = results.filter((result) => result.status === 'rejected');
     if (failed.length) {
       const first = (failed[0] as PromiseRejectedResult).reason;
       throw new Error(`${failed.length} tệp chưa tải được. Tệp đã tải thành công được giữ lại. ${first instanceof Error ? first.message : ''}`.trim());
     }
+  }
+
+  async function completeDiscussionBatch(release: DesignRelease, batchId: string, uploaded: Array<{ candidateId: string; record: DesignReleaseFile }>) {
+    await post(`/design-releases/${release.id}/file-upload-batches/${batchId}/complete`, {
+      evidence_ids: uploaded.map(({ record }) => record.id),
+    });
+    const completedRows = new Set(uploaded.map(({ candidateId }) => candidateId));
+    setPendingFiles((current) => current.map((row) => completedRows.has(row.id) && row.discussionBatchId === batchId
+      ? { ...row, discussionUpdateRecorded: true }
+      : row));
+  }
+
+  async function completePendingDiscussionBatches(release: DesignRelease) {
+    const pending = new Map<string, Array<{ candidateId: string; record: DesignReleaseFile }>>();
+    for (const row of pendingFiles) {
+      if (row.status !== 'success' || row.discussionUpdateRecorded || !row.discussionBatchId || !row.uploadedRecord) continue;
+      const group = pending.get(row.discussionBatchId) ?? [];
+      group.push({ candidateId: row.id, record: row.uploadedRecord });
+      pending.set(row.discussionBatchId, group);
+    }
+    for (const [batchId, uploaded] of pending) await completeDiscussionBatch(release, batchId, uploaded);
   }
 
   async function retryPendingFile(id: string) {
@@ -391,6 +423,7 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
         : await post<DesignRelease>(`/projects/${projectId}/design-releases`, payload);
       savedRelease.current = release;
 
+      await completePendingDiscussionBatches(release);
       await uploadDesignFiles(release, uploadable);
 
       if (releaseNow) {

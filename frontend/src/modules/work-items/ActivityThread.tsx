@@ -86,7 +86,7 @@ const emptySummary: ProjectActivitySummary = {
 };
 
 const kindTabs: Array<{ value: ActivityKind; label: string; countKey: keyof ProjectActivitySummary }> = [
-  { value: 'discussion', label: 'Thảo luận', countKey: 'discussion' },
+  { value: 'discussion', label: 'Thảo luận', countKey: 'discussion_unread' },
   { value: 'decision', label: 'Quyết định', countKey: 'decisions' },
   { value: 'system', label: 'Nhật ký hệ thống', countKey: 'system' },
 ];

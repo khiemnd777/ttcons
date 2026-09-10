@@ -176,6 +176,50 @@ function findElement(node: any, predicate: (element: any) => boolean): any {
   }
 }
 
+function findElements(node: any, predicate: (element: any) => boolean, matches: any[] = []): any[] {
+  if (!node || typeof node !== 'object') return matches;
+  if (predicate(node)) matches.push(node);
+  for (const child of [node.props?.children].flat(Infinity)) findElements(child, predicate, matches);
+  return matches;
+}
+
+function nodeText(node: any): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (!node || typeof node !== 'object') return '';
+  return [node.props?.children].flat(Infinity).map(nodeText).join(' ');
+}
+
+test('one design upload batch renders one ordered inline file list through the shared evidence viewer', (t) => {
+  t.after(() => { delete (globalThis as any).__previewQuery; });
+  (globalThis as any).__previewQuery = {
+    data: {
+      source_type: 'design_release',
+      snapshot: {
+        revision_label: 'R02',
+        files: [
+          { id: 'evidence-01', evidence_id: 'evidence-01', reference_type: 'evidence', name: 'file-01.pdf' },
+          { id: 'evidence-02', evidence_id: 'evidence-02', reference_type: 'evidence', name: 'file-02.png' },
+        ],
+      },
+    },
+    isFetching: false,
+    isError: false,
+  };
+  const hooks = fixture();
+  const tree = hooks.render('DiscussionWorkUpdateCard', {
+    item: {
+      id: 'activity-batch', activity_type: 'work_update', work_item_title: 'Nộp hồ sơ thiết kế',
+      metadata_json: { work_update: { source_type: 'design_release', event_key: 'files:batch-id', revision_label: 'R02', status: 'draft' } },
+    },
+  });
+  const viewers = findElements(tree, node => node.type?.name === 'EvidenceReferenceViewButton');
+  assert.equal(viewers.length, 2);
+  assert.deepEqual(viewers.map(viewer => viewer.props.reference.id), ['evidence-01', 'evidence-02']);
+  assert.match(nodeText(tree), /Đã thêm tệp thiết kế:/);
+  assert.ok(nodeText(tree).indexOf('file-01.pdf') < nodeText(tree).indexOf('file-02.png'));
+  hooks.close();
+});
+
 test('historical design snapshots keep exact documents while canonical design files open exact evidence records', (t) => {
   const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
   Object.defineProperty(globalThis, 'document', { configurable: true, value: { body: {} } });

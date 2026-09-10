@@ -31,10 +31,11 @@ export function DiscussionWorkUpdateCard({ item }: { item: WorkItemActivity }) {
   const [currentOpen, setCurrentOpen] = useState(false);
   const { user } = useAuth();
   const source = item.metadata_json?.work_update;
+  const designUploadBatch = source?.source_type === 'design_release' && String(source.event_key ?? '').startsWith('files:');
   const detail = useQuery({
     queryKey: ['discussion-work-update', user?.id, item.id],
     queryFn: () => get<WorkUpdate>(`/activities/${item.id}/work-update`),
-    enabled: open && Boolean(user?.id), retry: false, staleTime: 0, gcTime: 0,
+    enabled: (open || designUploadBatch) && Boolean(user?.id), retry: false, staleTime: 0, gcTime: 0,
   });
   if (item.activity_type !== 'work_update') return null;
   const snapshot = !detail.isFetching && !detail.isError ? detail.data?.snapshot : undefined;
@@ -47,6 +48,15 @@ export function DiscussionWorkUpdateCard({ item }: { item: WorkItemActivity }) {
       <span className="mt-1 block text-xs text-slate-600">{statusLabel}</span>
       <span className="mt-2 block text-xs font-semibold text-blue-700">Xem bản cập nhật</span>
     </button>
+    {designUploadBatch ? <div className="mt-2 space-y-2">
+      <p className="text-sm font-semibold">Đã thêm tệp thiết kế:</p>
+      {detail.isFetching ? <p role="status" className="text-xs text-slate-500">Đang tải danh sách tệp…</p> : null}
+      {detail.isError ? <p role="alert" className="text-xs text-rose-700">Không tải được danh sách tệp. <button type="button" className="font-semibold underline" onClick={() => void detail.refetch()}>Thử lại</button></p> : null}
+      {snapshot?.files?.map((file, index) => <div key={file.evidence_id || file.id} className="flex min-w-0 flex-col gap-2 rounded-md border border-white/50 bg-white/85 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <span className="min-w-0 break-words text-sm text-slate-700">{index + 1}. {file.name}</span>
+        <EvidenceReferenceViewButton reference={{ id: file.evidence_id || file.id, name: file.name }} label="Xem hồ sơ" />
+      </div>)}
+    </div> : null}
     {open ? createPortal(<div className="relative z-[100]"><Dialog open manageFocus mobileFullscreen size="xl" title={snapshot?.title || label} description={`Bản tại thời điểm cập nhật${snapshot?.revision_label ? ` · ${snapshot.revision_label}` : ''}`} onClose={() => { setOpen(false); setCurrentOpen(false); }}>
       {detail.isFetching ? <p role="status">Đang tải bản cập nhật…</p> : null}
       {detail.isError ? <p role="alert" className="text-sm text-rose-700">Không thể xem bản cập nhật. Quyền truy cập có thể đã thay đổi. <button className="underline" onClick={() => void detail.refetch()}>Thử lại</button></p> : null}

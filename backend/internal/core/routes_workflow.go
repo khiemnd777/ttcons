@@ -88,6 +88,7 @@ func registerWorkflowRoutes(protected fiber.Router, h *Handler) {
 	protected.Post("/work-items/:id/evidence/upload", h.UploadWorkItemEvidence)
 	protected.Put("/design-releases/:id", h.UpdateDesignReleaseDraft)
 	protected.Post("/design-releases/:id/files", h.UploadDesignReleaseFile)
+	protected.Post("/design-releases/:id/file-upload-batches/:batchId/complete", h.CompleteDesignReleaseUploadBatch)
 	protected.Post("/design-releases/:id/release", h.ReleaseDesignRelease)
 	protected.Post("/design-releases/:id/handoffs", h.HandoffDesignRelease)
 	protected.Post("/work-items/:id/activity", h.AddWorkItemActivity)

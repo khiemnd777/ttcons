@@ -94,6 +94,10 @@ func (s *Service) UpdateDesignReleaseDraft(ctx context.Context, releaseID string
 }
 
 func (s *Service) UploadDesignReleaseFile(ctx context.Context, releaseID, documentType, name string, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {
+	return s.uploadDesignReleaseFile(ctx, releaseID, documentType, name, "", fileHeader, actorID, actorName)
+}
+
+func (s *Service) uploadDesignReleaseFile(ctx context.Context, releaseID, documentType, name, discussionBatchID string, fileHeader *multipart.FileHeader, actorID, actorName string) (Record, error) {
 	releaseID = cleanID(releaseID)
 	release, err := s.repo.DesignReleaseByID(ctx, releaseID)
 	if err != nil {
@@ -107,19 +111,27 @@ func (s *Service) UploadDesignReleaseFile(ctx context.Context, releaseID, docume
 	if !designReleaseDocumentTypes[documentType] {
 		return nil, validationError("Nhóm tệp thiết kế không hợp lệ", Record{"document_type": documentType})
 	}
+	discussionBatchID = strings.TrimSpace(discussionBatchID)
+	if discussionBatchID != "" && !validActivityUUID(discussionBatchID) {
+		return nil, validationError("Mã lô tải hồ sơ không hợp lệ", Record{"discussion_batch_id": discussionBatchID})
+	}
 	workItemID := cleanID(release["work_item_id"])
 	if workItemID == "" {
 		return nil, validationError("Revision thiết kế phải liên kết với đầu việc Thiết kế trước khi tải hồ sơ")
+	}
+	payload := Record{
+		"source_type":       "design_release",
+		"design_release_id": releaseID,
+	}
+	if discussionBatchID != "" {
+		payload["discussion_batch_id"] = discussionBatchID
 	}
 	request := WorkItemEvidenceRequest{
 		DocumentType: documentType,
 		Name:         strings.TrimSpace(name),
 		RevisionNo:   strings.TrimSpace(fmt.Sprint(release["revision_label"])),
 		Visibility:   "internal",
-		Payload: Record{
-			"source_type":       "design_release",
-			"design_release_id": releaseID,
-		},
+		Payload:      payload,
 	}
 	storedObject, request, err := s.storeEvidenceUpload(ctx, Record{"project_id": projectID, "id": releaseID}, request, fileHeader)
 	if err != nil {
@@ -135,6 +147,35 @@ func (s *Service) UploadDesignReleaseFile(ctx context.Context, releaseID, docume
 	}
 	s.publishDiscussionWorkUpdate(projectID, cleanID(release["work_item_id"]), actorID)
 	return evidence, nil
+}
+
+func (s *Service) CompleteDesignReleaseUploadBatch(ctx context.Context, releaseID, batchID string, evidenceIDs []string, actorID string) (Record, error) {
+	releaseID = cleanID(releaseID)
+	batchID = strings.TrimSpace(batchID)
+	if !validActivityUUID(releaseID) || !validActivityUUID(batchID) {
+		return nil, validationError("Mã revision hoặc lô tải hồ sơ không hợp lệ")
+	}
+	if len(evidenceIDs) == 0 || len(evidenceIDs) > 10 {
+		return nil, validationError("Lô tải hồ sơ phải có từ 1 đến 10 tệp")
+	}
+	for _, evidenceID := range evidenceIDs {
+		if !validActivityUUID(evidenceID) {
+			return nil, validationError("Mã tệp hồ sơ không hợp lệ", Record{"evidence_id": evidenceID})
+		}
+	}
+	release, err := s.repo.DesignReleaseByID(ctx, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	projectID := cleanID(release["project_id"])
+	if err := s.requireDesignReleaseManager(ctx, projectID, actorID); err != nil {
+		return nil, err
+	}
+	result, err := s.repo.CompleteDesignReleaseUploadBatch(ctx, releaseID, batchID, evidenceIDs, actorID)
+	if err == nil {
+		s.publishDiscussionWorkUpdate(projectID, cleanID(release["work_item_id"]), actorID)
+	}
+	return result, err
 }
 
 func (s *Service) ReleaseDesignRelease(ctx context.Context, releaseID, actorID, actorName string) (Record, error) {

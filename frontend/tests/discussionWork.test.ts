@@ -73,7 +73,7 @@ test('discussion work dialog reuses required-condition navigation in direct edit
 const require = createRequire(import.meta.url);
 const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
 const bundle = await build({
-  stdin: { resolveDir: fileURLToPath(new URL('../src', import.meta.url)), contents: `export { WorkflowFormSnapshot } from './modules/work-items/WorkflowFormPanel'; export { DiscussionWorkUpdateCard } from './modules/work-items/DiscussionWorkUpdateCard'; export { DiscussionWorkflowActionCard } from './modules/work-items/DiscussionWorkflowActionCard'; export { WorkItemRequirementPanel } from './modules/work-items/WorkItemRequirementPanel'; export { ToastProvider } from './components/ToastProvider';` },
+  stdin: { resolveDir: fileURLToPath(new URL('../src', import.meta.url)), contents: `export { WorkflowFormSnapshot } from './modules/work-items/WorkflowFormPanel'; export { DiscussionWorkUpdateCard } from './modules/work-items/DiscussionWorkUpdateCard'; export { DiscussionWorkflowActionCard } from './modules/work-items/DiscussionWorkflowActionCard'; export { WorkItemRequirementPanel } from './modules/work-items/WorkItemRequirementPanel'; export { workflowFormActivityComment } from './modules/work-items/workItemPresentation'; export { ToastProvider } from './components/ToastProvider';` },
   bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
   loader: { '.css': 'empty' }, define: { 'import.meta.env': '{}', 'import.meta.url': '"file:///fixture"' },
   plugins: [{ name: 'test-actor', setup(builder) {
@@ -155,6 +155,19 @@ test('update cards distinguish uploaded drafts from released design packages', (
   assert.match(card('released'), /Hồ sơ thiết kế · R01/);
   assert.match(card('released'), /Xem bản cập nhật/);
   assert.doesNotMatch(card('released'), /Phê duyệt|Hoàn thành công việc/);
+});
+
+test('design batch card owns its inline file copy while retaining the persisted activity preview', () => {
+  assert.equal(module.exports.workflowFormActivityComment({
+    activity_type: 'work_update',
+    comment: 'Đã thêm 2 tệp thiết kế',
+    metadata_json: { work_update: { event_key: 'files:batch-id' } },
+  }), '');
+  assert.equal(module.exports.workflowFormActivityComment({
+    activity_type: 'work_update',
+    comment: 'Đã thêm tệp thiết kế · legacy.pdf',
+    metadata_json: { work_update: { event_key: 'file:evidence-id' } },
+  }), 'Đã thêm tệp thiết kế · legacy.pdf');
 });
 
 test('discussion workflow card renders the startup handoff without executing a transition', () => {

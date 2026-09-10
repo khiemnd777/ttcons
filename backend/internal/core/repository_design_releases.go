@@ -243,6 +243,16 @@ func (r *Repository) AddDesignReleaseFile(ctx context.Context, releaseID, docume
 	if workItemID == "" {
 		return nil, validationError("Revision thiết kế cần liên kết đầu việc trước khi tải hồ sơ")
 	}
+	batchID := cleanID(req.Payload["discussion_batch_id"])
+	if batchID != "" {
+		var completed bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM activity_work_updates WHERE source_event_key=$1)`, discussionWorkUpdateEventKey("design_release", releaseID, "files:"+batchID)).Scan(&completed); err != nil {
+			return nil, err
+		}
+		if completed {
+			return nil, conflictError("Lô tải hồ sơ đã được ghi nhận trong trao đổi")
+		}
+	}
 	payload := req.Payload
 	if payload == nil {
 		payload = Record{}
@@ -280,8 +290,10 @@ func (r *Repository) AddDesignReleaseFile(ctx context.Context, releaseID, docume
 	`, projectID, releaseID, evidenceID, documentType); err != nil {
 		return nil, err
 	}
-	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, "", "file:"+evidenceID, actorID, rows[0]); err != nil {
-		return nil, err
+	if batchID == "" {
+		if err := insertDesignDiscussionUpdateTx(ctx, tx, release, "", "file:"+evidenceID, actorID, rows[0]); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE work_items SET updated_by=NULLIF($2,'')::uuid,updated_at=now() WHERE id=$1
@@ -303,6 +315,61 @@ func (r *Repository) AddDesignReleaseFile(ctx context.Context, releaseID, docume
 	return finalizeStoredMutation(&tracker, func() (Record, error) {
 		return getEvidenceDetail(ctx, tx, evidenceID)
 	}, tx.Commit)
+}
+
+func (r *Repository) CompleteDesignReleaseUploadBatch(ctx context.Context, releaseID, batchID string, evidenceIDs []string, actorID string) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	releaseRows, err := queryTx(ctx, tx, `SELECT * FROM design_releases WHERE id=$1 FOR UPDATE`, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	if len(releaseRows) == 0 {
+		return nil, sql.ErrNoRows
+	}
+	release := releaseRows[0]
+	if fmt.Sprint(release["status"]) != "draft" {
+		return nil, validationError("Chỉ revision nháp mới được ghi nhận lô tệp", Record{"status": release["status"]})
+	}
+	rows, err := queryTx(ctx, tx, `
+		SELECT evidence.*
+		FROM design_release_items item
+		JOIN evidence_records evidence
+		  ON evidence.id=item.evidence_id
+		 AND evidence.project_id=item.project_id
+		WHERE item.project_id=$1
+		  AND item.design_release_id=$2
+		  AND evidence.payload_json->>'discussion_batch_id'=$3
+		  AND evidence.uploaded_by=$4
+	`, release["project_id"], releaseID, batchID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != len(evidenceIDs) {
+		return nil, validationError("Danh sách tệp thành công không khớp lô tải hồ sơ", Record{"expected": len(rows), "received": len(evidenceIDs)})
+	}
+	byID := make(map[string]Record, len(rows))
+	for _, row := range rows {
+		byID[cleanID(row["id"])] = row
+	}
+	ordered := make([]Record, 0, len(evidenceIDs))
+	for _, evidenceID := range evidenceIDs {
+		row, exists := byID[evidenceID]
+		if !exists {
+			return nil, validationError("Tệp không thuộc lô tải hồ sơ này", Record{"evidence_id": evidenceID})
+		}
+		ordered = append(ordered, row)
+	}
+	if err := insertDesignUploadBatchDiscussionUpdateTx(ctx, tx, release, batchID, actorID, ordered); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return Record{"batch_id": batchID, "file_count": len(ordered)}, nil
 }
 
 func (r *Repository) ReleaseDesignRelease(ctx context.Context, releaseID, actorID, actorName string) (Record, error) {

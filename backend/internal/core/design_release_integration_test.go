@@ -152,3 +152,58 @@ func TestValidateDesignReleaseDraftRequiresReason(t *testing.T) {
 		t.Fatalf("normalized draft=%q/%q/%q", label, reason, notes)
 	}
 }
+
+func TestDesignReleaseUploadBatchCreatesOneOrderedDiscussionUpdate(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	actorID := newID()
+	projectID := newID()
+	workItemID := newID()
+	batchID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Batch Upload Actor','active')`, actorID, "design-batch-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Design Batch Project',$2,'Client','planning')`, projectID, "DES-BATCH-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO work_items (id,project_id,source_type,source_id,title,work_type,status,created_by,updated_by) VALUES ($1,$2,'issue',$3,'Nộp hồ sơ thiết kế','document_upload','ready',$4,$4)`, workItemID, projectID, newID(), actorID)
+
+	release, err := repo.CreateDesignRelease(ctx, projectID, workItemID, "R02", "Bổ sung hồ sơ", "", actorID, "Batch Upload Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	upload := func(name, checksum string) Record {
+		evidence, uploadErr := repo.AddDesignReleaseFile(ctx, cleanID(release["id"]), "construction_drawing", name, WorkItemEvidenceRequest{
+			EvidenceType: "document", DocumentType: "construction_drawing", Name: name, Title: name, Visibility: "internal",
+			StorageProvider: "local", StorageKey: "tests/design/" + cleanID(release["id"]) + "/" + name, MIMEType: "application/pdf", FileSize: 100,
+			ChecksumSHA256: checksum, Payload: Record{"discussion_batch_id": batchID},
+		}, actorID, "Batch Upload Actor")
+		if uploadErr != nil {
+			t.Fatal(uploadErr)
+		}
+		return evidence
+	}
+	first := upload("file-01.pdf", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	second := upload("file-02.pdf", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id=$1`, 0, release["id"])
+
+	if _, err := repo.CompleteDesignReleaseUploadBatch(ctx, cleanID(release["id"]), batchID, []string{cleanID(second["id"]), cleanID(first["id"])}, actorID); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id=$1`, 1, release["id"])
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id=$1 AND source_event_key=$2 AND source_snapshot_json->'files'->0->>'name'='file-02.pdf' AND source_snapshot_json->'files'->1->>'name'='file-01.pdf'`, 1, release["id"], "design_release:"+cleanID(release["id"])+":files:"+batchID)
+
+	if _, err := repo.CompleteDesignReleaseUploadBatch(ctx, cleanID(release["id"]), batchID, []string{cleanID(second["id"]), cleanID(first["id"])}, actorID); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id=$1`, 1, release["id"])
+
+	if _, err := repo.AddDesignReleaseFile(ctx, cleanID(release["id"]), "construction_drawing", "late.pdf", WorkItemEvidenceRequest{
+		EvidenceType: "document", DocumentType: "construction_drawing", Name: "late.pdf", Title: "late.pdf", Visibility: "internal",
+		StorageProvider: "local", StorageKey: "tests/design/" + cleanID(release["id"]) + "/late.pdf", MIMEType: "application/pdf", FileSize: 100,
+		ChecksumSHA256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Payload: Record{"discussion_batch_id": batchID},
+	}, actorID, "Batch Upload Actor"); err == nil {
+		t.Fatal("completed discussion batch accepted another file")
+	}
+}

@@ -165,13 +165,15 @@ export function ProjectDetailPage() {
   const hasPipeline = Boolean(data.pipeline_run) || timeline.length > 0;
   const latestEvidence = asArray<EvidenceRecord>(data.latest_evidence);
   const attachmentOptions = buildActivityAttachmentOptions(latestEvidence);
-  const activityTotalCount = numberValue(data.activity_summary?.total);
+  // Keep the project shortcut aligned with the actor-scoped unread discussion
+  // cursor used by the full activity thread and Utility Dock.
+  const activityDiscussionCount = numberValue(data.activity_summary?.discussion_unread);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const tabs: Array<{ id: ProjectDetailTab; label: string; count?: number }> = [
     { id: 'overview', label: 'Tổng quan' },
     { id: 'workflow', label: 'Quy trình', count: timeline.length },
     { id: 'work', label: 'Danh sách công việc', count: allWorkItems.length },
-    { id: 'activity', label: 'Trao đổi', count: activityTotalCount },
+    { id: 'activity', label: 'Trao đổi', count: activityDiscussionCount },
     { id: 'files', label: 'Hồ sơ', count: numberValue(data.evidence_summary?.total ?? latestEvidence.length) },
     { id: 'audit', label: 'Nhật ký' },
     { id: 'members', label: 'Thành viên', count: members.data?.summary.active ?? 0 },

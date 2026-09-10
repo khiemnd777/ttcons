@@ -163,6 +163,8 @@ export function workflowFormEventLabel(value?: unknown) {
 export function workflowFormActivityComment(value?: { metadata_json?: Record<string, unknown>; activity_type?: string; comment?: string }) {
   const comment = String(value?.comment ?? '');
   const workflowFormVersionID = String(value?.metadata_json?.form_version_id ?? '').trim();
+  const workUpdate = value?.metadata_json?.work_update as Record<string, unknown> | undefined;
+  if (value?.activity_type === 'work_update' && String(workUpdate?.event_key ?? '').startsWith('files:')) return '';
   if (value?.activity_type === 'system_event' && workflowFormVersionID && comment === 'Đã gửi biểu mẫu quy trình') {
     return 'Đã chốt hồ sơ nghiệp vụ';
   }

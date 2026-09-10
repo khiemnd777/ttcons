@@ -33,6 +33,8 @@ test('Preparation exposes immutable design package revisions and explicit PM han
   assert.match(panel, /<EvidenceUploader\b/);
   assert.match(panel, /evidenceSupportedFileHint/);
   assert.match(panel, /postFormWithProgress<DesignReleaseFile>\(`\/design-releases\/\$\{release\.id\}\/files`/);
+  assert.match(panel, /form\.append\('discussion_batch_id', batchId\)/);
+  assert.match(panel, /file-upload-batches\/\$\{batchId\}\/complete/);
   assert.match(panel, /EvidenceReferenceViewButton/);
   assert.match(panel, /queryKey: \['project-evidence', projectId\]/);
   assert.match(panel, /post\(`\/design-releases\/\$\{release\.id\}\/release`/);

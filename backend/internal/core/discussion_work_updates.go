@@ -13,7 +13,7 @@ import (
 // Full snapshots stay out of the feed. Its metadata carries only stable source
 // identity; opening the snapshot rechecks current project/work-item visibility.
 func insertDiscussionWorkUpdateTx(ctx context.Context, tx *sql.Tx, projectID, workItemID, actorID, sourceType, sourceID, eventKey, comment string, snapshot Record) error {
-	key := sourceType + ":" + sourceID + ":" + eventKey
+	key := discussionWorkUpdateEventKey(sourceType, sourceID, eventKey)
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "discussion_update:"+key); err != nil {
 		return err
 	}
@@ -51,6 +51,10 @@ func insertDiscussionWorkUpdateTx(ctx context.Context, tx *sql.Tx, projectID, wo
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO activity_work_updates (activity_id,source_event_key,source_type,source_id,source_snapshot_json) VALUES ($1,$2,$3,$4,$5::jsonb)`, activityID, key, sourceType, sourceID, string(raw))
 	return err
+}
+
+func discussionWorkUpdateEventKey(sourceType, sourceID, eventKey string) string {
+	return sourceType + ":" + sourceID + ":" + eventKey
 }
 
 func insertWorkflowDiscussionUpdateTx(ctx context.Context, tx *sql.Tx, instance Record, answers Record, revision int, event, actorID string) error {
@@ -95,12 +99,7 @@ func insertDesignDiscussionUpdateTx(ctx context.Context, tx *sql.Tx, release Rec
 	status, comment := fmt.Sprint(release["status"]), "Đã phát hành hồ sơ thiết kế"
 	if document != nil {
 		comment = "Đã thêm tệp thiết kế · " + fmt.Sprint(document["name"])
-		files = []Record{{
-			"id": document["id"], "evidence_id": document["id"], "reference_type": "evidence",
-			"name": document["name"], "document_type": document["document_type"],
-			"mime_type": document["mime_type"], "file_size": document["file_size"],
-			"evidence_type": document["evidence_type"], "status": document["status"],
-		}}
+		files = designDiscussionFileSnapshots([]Record{document})
 	} else if event == "released" {
 		status = "released"
 	} else {
@@ -110,6 +109,48 @@ func insertDesignDiscussionUpdateTx(ctx context.Context, tx *sql.Tx, release Rec
 		"title": "Hồ sơ thiết kế", "revision_label": release["revision_label"], "revision_no": release["revision_no"],
 		"status": status, "change_reason": release["change_reason"], "notes": release["notes"], "files": files,
 	})
+}
+
+func insertDesignUploadBatchDiscussionUpdateTx(ctx context.Context, tx *sql.Tx, release Record, batchID, actorID string, documents []Record) error {
+	return insertDiscussionWorkUpdateTx(
+		ctx,
+		tx,
+		cleanID(release["project_id"]),
+		cleanID(release["work_item_id"]),
+		actorID,
+		"design_release",
+		cleanID(release["id"]),
+		"files:"+batchID,
+		fmt.Sprintf("Đã thêm %d tệp thiết kế", len(documents)),
+		Record{
+			"title":          "Hồ sơ thiết kế",
+			"revision_label": release["revision_label"],
+			"revision_no":    release["revision_no"],
+			"status":         release["status"],
+			"change_reason":  release["change_reason"],
+			"notes":          release["notes"],
+			"files":          designDiscussionFileSnapshots(documents),
+		},
+	)
+}
+
+func designDiscussionFileSnapshots(documents []Record) []Record {
+	files := make([]Record, 0, len(documents))
+	for _, document := range documents {
+		files = append(files, Record{
+			"id":             document["id"],
+			"evidence_id":    document["id"],
+			"reference_type": "evidence",
+			"name":           document["name"],
+			"document_type":  document["document_type"],
+			"mime_type":      document["mime_type"],
+			"file_size":      document["file_size"],
+			"evidence_type":  document["evidence_type"],
+			"status":         document["status"],
+			"created_at":     document["created_at"],
+		})
+	}
+	return files
 }
 
 func (s *Service) DiscussionWorkUpdate(ctx context.Context, activityID, actorID string) (Record, error) {
