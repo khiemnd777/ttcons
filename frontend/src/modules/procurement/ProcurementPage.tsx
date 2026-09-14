@@ -9,7 +9,7 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatCard } from '../../components/StatCard';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
 import {
@@ -84,7 +84,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       description="Theo dõi từ yêu cầu mua, đặt hàng, nghiệm thu đầu vào đến phiếu nhập kho."
       actions={<>
         {scoped ? <ProjectBackLink projectId={projectId} /> : null}
-        {!scoped ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
+        {!scoped ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/procurement-requests/projects" queryKey="procurement-project-options" emptyLabel="Tất cả công trình được phép xem" /></div> : null}
         {projectId ? <Link className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" to={`/projects/${projectId}/boq`}><ClipboardList className="h-4 w-4" />Mở BOQ & báo giá</Link> : null}
       </>}
     />

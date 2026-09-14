@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +14,18 @@ const bundle = await build({
 const module = { exports: {} as Record<string, any> };
 new Function('require', 'module', 'exports', bundle.outputFiles[0].text)(createRequire(import.meta.url), module, module.exports);
 const { procurementActionFor, procurementHeader, procurementMutationWorkItemId, procurementTaskVerificationQueryOptions, validateProcurementHeader, ProcurementApprovalPanel, ProcurementSnapshot, discussionWorkSurface } = module.exports;
+
+async function source(path: string) {
+  return readFile(new URL(path, import.meta.url), 'utf8');
+}
+
+test('global Procurement reuses the searchable, permission-scoped project picker', async () => {
+  const page = await source('../src/modules/procurement/ProcurementPage.tsx');
+
+  assert.match(page, /import \{ AsyncProjectPicker \} from '..\/_shared\/AsyncProjectPicker'/);
+  assert.match(page, /<AsyncProjectPicker[\s\S]*endpoint="\/procurement-requests\/projects"[\s\S]*queryKey="procurement-project-options"[\s\S]*emptyLabel="Tất cả công trình được phép xem"/);
+  assert.doesNotMatch(page, /ProjectSelector/);
+});
 
 test('the next action requires both source state and its explicit server capability', () => {
   const capabilities = { edit: true, submit: true, approve: true, order: true };

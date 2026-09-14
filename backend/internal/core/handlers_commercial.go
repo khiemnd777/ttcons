@@ -725,6 +725,21 @@ func (h *Handler) ListProcurement(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) ProcurementProjects(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"procurement.view"}); err != nil {
+		return err
+	}
+	req, err := projectOptionsRequest(c)
+	if err != nil {
+		return err
+	}
+	data, err := h.service.ProcurementProjects(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+
 func (h *Handler) CreateProcurement(c *fiber.Ctx) error {
 	body, err := bodyMap(c)
 	if err != nil {

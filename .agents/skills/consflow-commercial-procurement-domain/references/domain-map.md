@@ -39,7 +39,7 @@
 
 - BOQ: `/projects/:id/boq`, `GET|PUT /boq-items/:id`, `POST /boq-items/:id/revise`, `/boq-items/:id/unit-price/expected|lock-norm|lock-final`, `/projects/:id/boq/submit|approve|generate-procurement`
 - Supplier quotation: `/projects/:id/supplier-quotations`, `/projects/:id/supplier-quote-comparison`, `/supplier-quotations/:id`, `/supplier-quotations/:id/submit|qualify`, `/supplier-quotation-items/:id/select`
-- Procurement: `/procurement-requests`, `/procurement-requests/:id`, `/procurement-requests/:id/submit|approve|order|receive`
+- Procurement: `/procurement-requests`, paged project options `GET /procurement-requests/projects?search&cursor&limit&selected_id`, `/procurement-requests/:id`, `/procurement-requests/:id/submit|approve|order|receive`
 - Reconciliation: `/work-items/:id/subcontractor-reconciliation`, `/work-items/:id/owner-client-reconciliation`
 - Contracts: `/projects/:id/contracts`, `/contracts/:id` and version/milestone/variation/retention action routes
 
@@ -68,6 +68,7 @@
 - Ordering requires supplier, order reference, and expected delivery date. Partial/full receive status is derived from submitted incoming acceptance quantities and does not implicitly create stock movement.
 - Procurement receive is auditable and stock-aware: its acceptance-reconciliation audit event is distinct from the later warehouse receipt event, and list/detail contracts expose accepted quantity separately from explicitly stocked quantity.
 - The procurement workspace is action-first and permission-aware. It may link to the incoming-acceptance work item or create an explicit receipt from a submitted acceptance, but it must not label acceptance-derived `received` as already stocked. Total is presented read-only as a value derived from purchase lines; the primary form/filter does not ask users to re-enter total or `budget_status`, and compatibility update payloads preserve stored fields.
+- The global Procurement project picker is a read-only, searchable scope selector. Its options require `procurement.view` together with existing project access, exclude cancelled projects and preserve selected-id authorization; selecting a project only changes the list filter and never creates, approves, orders, receives or posts stock.
 - The procurement report remains a legacy/source aggregate and may group stored budget status after applying accessible-project and optional `project_id` scope; the operational Procurement workspace no longer promotes budget status as an editable or primary filter.
 - Subcontractor reconciliation maps confirmed quantity and variance to BOQ/work item evidence.
 - Owner/client reconciliation maps client decision and required action to acceptance/work item evidence.

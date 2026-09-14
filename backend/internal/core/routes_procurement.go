@@ -4,6 +4,7 @@ import "github.com/gofiber/fiber/v2"
 
 func registerProcurementRoutes(protected fiber.Router, h *Handler) {
 	protected.Get("/procurement-requests", h.ListProcurement)
+	protected.Get("/procurement-requests/projects", h.ProcurementProjects)
 	protected.Post("/procurement-requests", h.CreateProcurement)
 	protected.Get("/procurement-requests/:id", h.GetProcurement)
 	protected.Put("/procurement-requests/:id", h.UpdateProcurement)

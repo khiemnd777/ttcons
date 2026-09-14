@@ -344,6 +344,10 @@ func (s *Service) GenerateProcurementFromBOQ(ctx context.Context, projectID stri
 	return result, err
 }
 
+func (s *Service) ProcurementProjects(ctx context.Context, req ReportOptionsRequest, actorID string) (ReportOptionsResponse, error) {
+	return s.projectOptions(ctx, req, actorID, "procurement.view")
+}
+
 func (s *Service) CreateProcurement(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
 	normalized, err := s.normalizeProcurementHeader(ctx, body, true)
 	if err != nil {

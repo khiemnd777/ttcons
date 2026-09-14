@@ -24,6 +24,11 @@ test('standard shell exposes the permission-filtered navigation on mobile', asyn
   const myWorkIndex = appShell.indexOf("{ to: '/my-work'");
   assert.ok(dashboardIndex >= 0 && myWorkIndex >= 0, 'Dashboard and Bàn làm việc must both be registered');
   assert.ok(dashboardIndex < myWorkIndex, 'Dashboard must appear before Bàn làm việc');
+  assert.match(appShell, /to: '\/procurement', label: 'Mua sắm vật tư'.*permissions: \['procurement\.view'\]/);
+  const projectIndex = appShell.indexOf("{ to: '/projects', label: 'Công trình'");
+  const procurementIndex = appShell.indexOf("{ to: '/procurement', label: 'Mua sắm vật tư'");
+  const reportIndex = appShell.indexOf("{ to: '/reports', label: 'Báo cáo'");
+  assert.ok(projectIndex < procurementIndex && procurementIndex < reportIndex, 'Mua sắm vật tư must sit below Công trình');
   assert.match(appShell, /to: '\/audit', label: 'Audit nghiệp vụ'.*permissions: \['audit\.view'\]/);
   assert.match(appShell, /to: '\/event-logs', label: 'Nhật ký sự kiện'.*permissions: \['event_log\.view'\]/);
   assert.match(appShell, /to: '\/accounting', label: 'Bàn giao kế toán'.*accounting_handoff\.view/);
