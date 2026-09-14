@@ -1221,7 +1221,7 @@ function ProjectStartupActionCard({ action, selected, onSelect, onOpen }: { acti
         <p className="mt-1 text-xs font-medium text-slate-600">Phụ trách: {action.owner_name || 'Chưa xác định'}</p>
         <p className="mt-1 line-clamp-2 text-xs text-slate-500">{upcoming ? 'Anh/chị thuộc nhóm vai trò của bước đầu; theo dõi trước khi quy trình bắt đầu.' : action.ready_to_start ? 'Đã đủ điều kiện để bắt đầu quy trình.' : `Còn ${action.blockers.length} điều kiện cần hoàn tất.`}</p>
       </button>
-      <button type="button" className={clsx('mx-4 mb-3 inline-flex shrink-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold sm:my-3 sm:ml-0', upcoming ? 'border border-line bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700')} onClick={() => { onSelect(); onOpen(); }}>
+      <button type="button" className={clsx('mx-4 mb-3 inline-flex shrink-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold sm:my-3 sm:ml-0 sm:h-9 sm:self-center sm:py-0', upcoming ? 'border border-line bg-white text-blue-700 hover:bg-blue-50' : 'bg-blue-600 text-white hover:bg-blue-700')} onClick={() => { onSelect(); onOpen(); }}>
         <UserCog className="h-4 w-4" />{upcoming ? 'Xem thiết lập' : 'Tiếp tục thiết lập'}
       </button>
     </article>
@@ -1241,7 +1241,7 @@ function WorkflowActionCard({ action, selected, pending, onSelect, onRun }: { ac
       </button>
       <button
         type="button"
-        className="mx-4 mb-3 inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:my-3 sm:ml-0"
+        className="mx-4 mb-3 inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:my-3 sm:ml-0 sm:h-9 sm:self-center sm:py-0"
         disabled={pending}
         onClick={() => { onSelect(); onRun(); }}
       >

@@ -31,6 +31,19 @@ test('My Work renders compact semantic rows without nested interactive controls'
   assert.match(page, /<WorkItemCard key=\{key\} item=\{entry\.item\} selected=\{selectedId === entry\.item\.id\}/);
 });
 
+test('My Work keeps full-text row actions compact instead of stretching them to row height', async () => {
+  const page = await source('../src/modules/my-work/MyWorkPage.tsx');
+  const accounting = await source('../src/modules/my-work/AccountingWorkCard.tsx');
+  const startupCard = page.slice(page.indexOf('function ProjectStartupActionCard'), page.indexOf('function WorkflowActionCard'));
+  const workflowCard = page.slice(page.indexOf('function WorkflowActionCard'), page.indexOf('function WorkflowActionSkeleton'));
+
+  assert.match(startupCard, /sm:h-9 sm:self-center sm:py-0/);
+  assert.match(workflowCard, /sm:h-9 sm:self-center sm:py-0/);
+  assert.match(accounting, /sm:h-9 sm:self-center sm:py-0/);
+  assert.doesNotMatch(startupCard, /<button[^>]+self-stretch[^>]*>[^<]*(?:Tiếp tục|Xem) thiết lập/);
+  assert.doesNotMatch(workflowCard, /<button[^>]+self-stretch/);
+});
+
 test('My Work keeps detail copy in the desktop inspector and deduplicates header roles', async () => {
   const page = await myWorkPageSource();
 

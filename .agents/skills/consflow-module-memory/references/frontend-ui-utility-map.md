@@ -108,6 +108,12 @@
 - `FilterSelect.fieldLabel` opts into the 40px full-width labelled wrapper; its unlabelled approval-workspace caller retains the previous rendering. The async project picker is reused unchanged inside a local `leading-4` wrapper so its label aligns with native selectors; its loading, empty, unavailable and retry states remain intact, and helper text below it does not stretch sibling controls. Read-only My Work presentation/queue tests and frontend build remain the technical checks; they do not establish browser visual acceptance.
 - First searches: `my-work-filter|function FilterBar|fieldLabel|AsyncProjectPicker`. Update the central and triage maps when these sizing, ownership or responsive rules change. No backend/query/permission changes belong to this presentation surface.
 
+## My Work Compact Row Actions
+
+- Purpose: keep `/my-work` rows scannable by preventing a text CTA from visually occupying the row's full content height. Owners: `modules/my-work/MyWorkPage.tsx::{ProjectStartupActionCard,WorkflowActionCard}` and `AccountingWorkCard.tsx::AccountingWorkCard`; first searches: `items-stretch|sm:h-9|sm:self-center|sm:py-0`.
+- Project setup, ready-Giai đoạn transition and unified Accounting handoff actions keep their existing intrinsic mobile presentation and use `sm:h-9 sm:self-center sm:py-0` from the horizontal breakpoint. This gives desktop full-text actions an explicit 36px height while the left selection target continues to own the row content height. Labels, colors, icons, loading/disabled states, click handlers and queue semantics remain unchanged.
+- `modules/work-items/WorkItemCard.tsx` owns the distinct icon-only row opener and retains `self-stretch`; do not fold that affordance into the full-text action rule. Focused regression: `tests/myWorkListPresentation.test.ts`. Source/build checks are technical verification only; browser/UAT remains separate.
+
 ## My Work Attention List
 
 - `modules/my-work/MyWorkPage.tsx::ActivityAttentionPanel` owns the `/my-work?mode=attention` presentation. Its results use one full-width semantic `ul` with divided `AttentionListItem` rows on desktop and narrow screens; there is no per-record card border or two-column desktop grid. Unread rows keep a light-blue background while read rows share the list surface and hover treatment.

@@ -19,7 +19,7 @@ export function AccountingWorkCard({ item, selected, onSelect, onAcknowledge }: 
       <p className="mt-1 text-xs text-slate-600">{item.counterparty_name || 'Chưa xác định đối tác'} · Tham chiếu: <ReferenceAmount item={item} /></p>
       <p className="mt-1 text-xs text-slate-500">Nhóm Kế toán · hàng chờ chung</p>
     </button>
-    <button type="button" className="mx-4 my-3 flex shrink-0 items-center justify-center gap-1 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={onAcknowledge ?? onSelect}>
+    <button type="button" className="mx-4 my-3 flex shrink-0 items-center justify-center gap-1 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 sm:h-9 sm:self-center sm:py-0" onClick={onAcknowledge ?? onSelect}>
       {onAcknowledge ? 'Tiếp nhận' : 'Xem hồ sơ'}<ChevronRight className="h-4 w-4" />
     </button>
   </article>;
