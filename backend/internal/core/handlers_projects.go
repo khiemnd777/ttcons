@@ -17,6 +17,21 @@ func (h *Handler) ListProjects(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) ProjectOptions(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"project.view"}); err != nil {
+		return err
+	}
+	req, err := projectOptionsRequest(c)
+	if err != nil {
+		return err
+	}
+	data, err := h.service.ProjectOptions(c.Context(), req, actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+
 func (h *Handler) ProjectExplorer(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"project.view"}); err != nil {
 		return err

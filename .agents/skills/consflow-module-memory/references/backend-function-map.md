@@ -1,5 +1,9 @@
 # Consflow Backend Function Map
 
+## Shared Project Options
+
+- `GET /projects/options?search&cursor&limit&selected_id` is the ordinary `project.view` source for `AsyncProjectPicker`. `ProjectOptions` in `routes_projects.go` / `handlers_projects.go` parses the shared options request, requires `project.view`, and calls `Service.ProjectOptions`. The service reuses the paged project-options helper: `ProjectAccessFilter`, non-cancelled rows, code/name search, deterministic keyset paging and a separately authorized selected-ID lookup. It is read-only and does not change project, workflow, domain, stock, accounting or audit state. Domains with stricter permission semantics retain their own options endpoints. Regression: `TestProjectOptionsRespectScopePermissionAndCursor`.
+
 ## Procurement Required-Approval Work Item Gate
 
 - `Repository.automateClientInputProcurementGate` remains a project-wide read-only check over every non-cancelled procurement request. A blocked outcome now carries `procurement_not_approved`, the ordered `blocking_requests` facts/checks, and the first exact blocker as `target_type=procurement_request`/`target_id`; its route is the existing canonical Procurement deep link. The 400 hard-gate response from `RunRequiredWorkflowAutomationForWorkItem` therefore retains the actionable `details.reason` and exact target without changing the Work Item state.

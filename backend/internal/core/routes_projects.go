@@ -4,6 +4,7 @@ import "github.com/gofiber/fiber/v2"
 
 func registerProjectsRoutes(protected fiber.Router, h *Handler) {
 	protected.Get("/projects", h.ListProjects)
+	protected.Get("/projects/options", h.ProjectOptions)
 	protected.Get("/projects/explorer", h.ProjectExplorer)
 	protected.Get("/projects/explorer/stream", h.ProjectExplorerStream)
 	protected.Get("/projects/updates-summary", h.ProjectUpdatesSummary)

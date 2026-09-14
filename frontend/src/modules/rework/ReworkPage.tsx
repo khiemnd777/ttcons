@@ -18,7 +18,7 @@ import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { FilterBar, type FilterOption } from '../../components/FilterBar';
 import { ListSection } from '../../components/ListSection';
 import { RecordFormDialog } from '../_shared/RecordFormDialog';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { EnumChip } from '../../components/EnumChip';
 import { enumOptions } from '../../lib/utils/status';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -107,7 +107,7 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
         actions={
           <>
             {routeId ? <ProjectBackLink projectId={projectId} /> : null}
-            {!routeId ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
+            {!routeId ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div> : null}
             {canCreateReplanning ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" />Lập kế hoạch lại</button> : null}
             {canCreateRework ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" />Sửa lỗi</button> : null}
           </>

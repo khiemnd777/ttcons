@@ -9,7 +9,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -210,7 +210,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
           description="Soạn, kiểm tra và kết luận biên bản nghiệm thu theo checklist; mỗi trạng thái chỉ hiển thị hành động tiếp theo cần làm."
           actions={<>
             {!global ? <ProjectBackLink projectId={projectId} /> : null}
-            {global ? <ProjectSelector value={projectId} onChange={(value) => { setProjectId(value); setSelectedId(''); }} /> : null}
+            {global ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={(value) => { setProjectId(value); setSelectedId(''); }} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div> : null}
             {canCreate ? <button disabled={!projectId || Boolean(requestedTaskId && operations.isLoading)} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={openNewEditor}><Plus className="h-4 w-4" /> Tạo biên bản</button> : null}
           </>}
         />

@@ -13,7 +13,7 @@ import { ListSection } from '../../components/ListSection';
 import { RowActions } from '../../components/RowActions';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { dateText, percent } from '../../lib/utils/format';
 import type { PlanningDailyReportItem } from '../../lib/types/domain';
 import { currentReturnTo, workItemDetailPath } from '../work-items/workItemNavigation';
@@ -128,7 +128,7 @@ export function PlanningDailyReportsPage() {
 
       <section className="mb-4 rounded-lg border border-line bg-white p-4 shadow-panel">
         <div className="grid gap-3 xl:grid-cols-[220px_160px_160px_minmax(0,1fr)_minmax(0,1fr)_170px]">
-          <ProjectSelector value={filters.projectId} placeholder="Tất cả công trình" onChange={(value) => updateFilter('projectId', value)} />
+          <AsyncProjectPicker value={filters.projectId} onChange={(value) => updateFilter('projectId', value)} endpoint="/projects/options" queryKey="project-options" emptyLabel="Tất cả công trình" />
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Từ ngày
             <input

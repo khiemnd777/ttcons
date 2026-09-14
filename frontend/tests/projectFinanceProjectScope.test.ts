@@ -9,7 +9,7 @@ async function source(path: string) {
 test('global accounting handoff uses a draft/applied asynchronous project scope', async () => {
   const financePage = await source('../src/modules/project-finance/AccountingHandoffPage.tsx');
 
-  assert.doesNotMatch(financePage, /ProjectSelector|\/projects'\)|projects\.data\?\.\[0\]/);
+  assert.doesNotMatch(financePage, /\/projects'\)|projects\.data\?\.\[0\]/);
   assert.match(financePage, /const \[draftProjectId, setDraftProjectId\] = useState\(requestedProjectId\)/);
   assert.match(financePage, /const projectId = id \?\? \(global \? requestedProjectId : ''\)/);
   assert.match(financePage, /params\.set\('project', draftProjectId\)/);

@@ -17,7 +17,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
 import { get, post } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { AccountingBooksPanel, type AccountingBookView } from './AccountingBooksPanel';
 import { AccountingCreateDialog, type AccountingCreateMode } from './AccountingCreateDialog';
@@ -159,7 +159,7 @@ export function AccountingPage({ global = false }: { global?: boolean }) {
       <PageHeader
         title="Kế toán"
 		description="Ghi nhận chứng từ, kiểm soát ngân sách, đối chiếu công nợ và lập sổ kế toán theo nguyên tắc ghi Nợ – ghi Có."
-        actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}{pendingTaskCount ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => { setPaymentStatus('all'); setTab('tasks'); }}><Check className="h-4 w-4" />Xử lý {pendingTaskCount} việc</button> : canCreatePayment ? <button disabled={!projectId} type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setOpen('payment')}><Plus className="h-4 w-4" />Lập Phiếu thu/Phiếu chi</button> : null}</>}
+        actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div> : null}{pendingTaskCount ? <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={() => { setPaymentStatus('all'); setTab('tasks'); }}><Check className="h-4 w-4" />Xử lý {pendingTaskCount} việc</button> : canCreatePayment ? <button disabled={!projectId} type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setOpen('payment')}><Plus className="h-4 w-4" />Lập Phiếu thu/Phiếu chi</button> : null}</>}
       />
 
       <div className="mb-4 flex gap-1 overflow-x-auto border-b border-line">

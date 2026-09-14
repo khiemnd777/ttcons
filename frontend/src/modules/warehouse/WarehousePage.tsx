@@ -17,7 +17,7 @@ import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { StatCard } from '../../components/StatCard';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { RecordFormDialog } from '../_shared/RecordFormDialog';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { EnumChip } from '../../components/EnumChip';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { partnerOptions } from '../core-data/partnerUtils';
@@ -159,7 +159,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
       description="Tồn theo kho, phiếu nhập xuất, vật tư tại công trình và xử lý vật tư dư."
       actions={<>
         {scoped ? <ProjectBackLink projectId={projectId} /> : null}
-        {!scoped ? <ProjectSelector value={projectId} onChange={setProjectId} /> : null}
+        {!scoped ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/projects/options" queryKey="project-options" emptyLabel="Tất cả công trình" /></div> : null}
         {canCreateAnyDocument ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpenDocument(true)}><Plus className="h-4 w-4" />Tạo phiếu kho</button> : null}
       </>}
     />

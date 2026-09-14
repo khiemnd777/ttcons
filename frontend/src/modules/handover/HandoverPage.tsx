@@ -14,7 +14,7 @@ import { useToast } from '../../components/ToastProvider';
 import { get, post, put } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
-import { ProjectSelector } from '../_shared/ProjectSelector';
+import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { HandoverChecklistSourceDialog } from './HandoverChecklistSourceDialog';
 import { HandoverCreateDialog } from './HandoverCreateDialog';
@@ -119,7 +119,7 @@ export function HandoverPage() {
     <PageHeader
       title="Bàn giao"
       description="Hoàn tất hồ sơ bàn giao bằng readiness thật; mỗi điểm chặn dẫn về đúng module nguồn để xử lý."
-      actions={<>{id ? <ProjectBackLink projectId={projectId} /> : <ProjectSelector value={projectId} onChange={(value) => { setProjectId(value); setSelectedID(''); }} />}{canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Tạo hồ sơ</button> : null}</>}
+      actions={<>{id ? <ProjectBackLink projectId={projectId} /> : <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={(value) => { setProjectId(value); setSelectedID(''); }} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div>}{canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Tạo hồ sơ</button> : null}</>}
     />
 
     <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Tổng hồ sơ" value={summary.total} /><Metric label="Đang xử lý" value={summary.pending} /><Metric label="Đang bị chặn" value={summary.blocked} tone={summary.blocked ? 'amber' : 'slate'} /><Metric label="Đã bàn giao" value={summary.completed} tone="green" /></div>

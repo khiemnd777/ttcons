@@ -24,7 +24,6 @@ test('global Procurement reuses the searchable, permission-scoped project picker
 
   assert.match(page, /import \{ AsyncProjectPicker \} from '..\/_shared\/AsyncProjectPicker'/);
   assert.match(page, /<AsyncProjectPicker[\s\S]*endpoint="\/procurement-requests\/projects"[\s\S]*queryKey="procurement-project-options"[\s\S]*emptyLabel="Tất cả công trình được phép xem"/);
-  assert.doesNotMatch(page, /ProjectSelector/);
 });
 
 test('the next action requires both source state and its explicit server capability', () => {

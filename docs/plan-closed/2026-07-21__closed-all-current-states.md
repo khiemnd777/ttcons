@@ -88,7 +88,7 @@ Done:
 - Người dùng đã duyệt review package và Mockup as Text bằng `Approve`.
 - Đã tải mandatory central/frontend/backend/root-cause/reporting mappings cùng frontend, backend, diagnosis, impact-analysis và source-domain guardrails.
 - Đã xác nhận root cause query: join issue×approval trước COUNT, join stock movement×site balance trước SUM, và `SUM(DISTINCT amount)` trong accounting; staff report bỏ qua project scope.
-- Đã xác nhận route `/reports` dùng any-permission nhưng trang hiện gọi mọi endpoint; finance ProjectSelector gọi `/projects` ngoài contract báo cáo.
+- Đã xác nhận route `/reports` dùng any-permission nhưng trang hiện gọi mọi endpoint; finance từng gọi `/projects` ngoài contract báo cáo.
 - Worktree đang chứa thay đổi người dùng ở AppShell, Dashboard, Projects, domain types, mappings và docs; implementation sẽ chỉnh hẹp và bảo toàn các thay đổi đó.
 - Backend đã thêm `/reports/options`, optional `project_id` và CSV parity cho năm báo cáo vận hành; handler và service cùng kiểm tra permission/project scope.
 - Aggregate đã được tách đúng nguồn: project dùng subquery issue/approval độc lập; kho dùng CTE movement/site balance; accounting dùng CTE AP/AR/budget với `SUM` thường; staff chỉ join active membership của accessible project.

@@ -13,6 +13,10 @@ func (s *Service) ListProjects(ctx context.Context, actorID string) ([]Record, e
 	return s.repo.ListProjects(ctx, actorID)
 }
 
+func (s *Service) ProjectOptions(ctx context.Context, req ReportOptionsRequest, actorID string) (ReportOptionsResponse, error) {
+	return s.projectOptions(ctx, req, actorID, "")
+}
+
 func (s *Service) ProjectProgressBoard(ctx context.Context, actorID string) (Record, error) {
 	items, err := s.repo.ProjectProgressBoard(ctx, actorID)
 	if err != nil {
