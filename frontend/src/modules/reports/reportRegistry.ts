@@ -29,8 +29,8 @@ export const reportDefinitions: ReportDefinition[] = [
   {
     key: 'procurement',
     label: 'Mua sắm',
-    description: 'Giá trị yêu cầu theo trạng thái và ngân sách.',
-    basis: 'Số lượng và giá trị yêu cầu mua sắm theo trạng thái xử lý và trạng thái ngân sách.',
+    description: 'Giá trị yêu cầu theo công trình, trạng thái và ngân sách.',
+    basis: 'Số lượng và giá trị yêu cầu mua sắm theo công trình, trạng thái xử lý và trạng thái ngân sách.',
     fileName: 'thong-ke-mua-sam',
     group: 'operations',
     permissions: ['statistics.view'],

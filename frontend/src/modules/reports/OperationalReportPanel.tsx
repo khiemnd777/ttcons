@@ -113,16 +113,17 @@ function operationalTable(
       <DataTable<ProcurementReportRow>
         {...common}
         rows={rows as ProcurementReportRow[]}
-        searchPlaceholder="Tìm trạng thái mua sắm, ngân sách..."
+        searchPlaceholder="Tìm công trình, trạng thái mua sắm, ngân sách..."
         defaultSort={{ key: 'amount', direction: 'desc' }}
-        getRowKey={(row) => `${row.status}:${row.budget_status}`}
+        getRowKey={(row) => `${row.project_id}:${row.status}:${row.budget_status}`}
         renderMobileCard={(row) => <ProcurementReportCard row={row} />}
         columns={[
+          { key: 'project_name', header: 'Công trình', sortable: true, render: (row) => <ProjectReference code={row.project_code} name={row.project_name} /> },
           { key: 'status', header: 'Trạng thái', sortable: true, render: (row) => <StatusBadge status={row.status} /> },
           { key: 'budget_status', header: 'Ngân sách', render: (row) => <EnumChip group="budget_status" value={row.budget_status} /> },
           { key: 'total', header: 'Số yêu cầu', align: 'right', sortable: true },
           { key: 'amount', header: 'Giá trị', align: 'right', sortable: true, render: (row) => <CurrencyText value={row.amount} /> },
-          { key: 'action', header: '', align: 'right', render: () => <SourceLink to="/procurement" label="Mở mua sắm" permission="procurement.view" /> },
+          { key: 'action', header: '', align: 'right', render: (row) => <SourceLink to={procurementStatisticsSourcePath(row.project_id)} label="Mở mua sắm" permission="procurement.view" /> },
         ]}
       />
     );
@@ -208,7 +209,8 @@ function WarehouseReportCard({ row }: { row: WarehouseReportRow }) {
 function ProcurementReportCard({ row }: { row: ProcurementReportRow }) {
   return (
     <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2">
+      <ProjectReference code={row.project_code} name={row.project_name} />
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <StatusBadge status={row.status} />
         <EnumChip group="budget_status" value={row.budget_status} />
       </div>
@@ -216,7 +218,7 @@ function ProcurementReportCard({ row }: { row: ProcurementReportRow }) {
         <ReportMetric label="Số yêu cầu" value={row.total} />
         <ReportMetric label="Giá trị" value={<CurrencyText value={row.amount} />} />
       </div>
-      <SourceLink mobile to="/procurement" label="Mở mua sắm" permission="procurement.view" />
+      <SourceLink mobile to={procurementStatisticsSourcePath(row.project_id)} label="Mở mua sắm" permission="procurement.view" />
     </article>
   );
 }
@@ -253,6 +255,19 @@ function ReportMetric({ label, value }: { label: string; value: React.ReactNode 
       <div className="mt-1 text-base font-semibold text-ink">{value}</div>
     </div>
   );
+}
+
+function ProjectReference({ code, name }: { code: string; name: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate font-semibold text-ink">{name}</div>
+      <div className="mt-0.5 truncate text-xs text-slate-500">{code}</div>
+    </div>
+  );
+}
+
+export function procurementStatisticsSourcePath(projectId: string) {
+  return `/projects/${projectId}/procurement`;
 }
 
 function SourceLink({ to, label, permission, mobile = false }: { to: string; label: string; permission: string; mobile?: boolean }) {

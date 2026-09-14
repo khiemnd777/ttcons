@@ -106,6 +106,9 @@ export type WarehouseReportRow = AnyRecord & {
 };
 
 export type ProcurementReportRow = AnyRecord & {
+  project_id: string;
+  project_code: string;
+  project_name: string;
   status: string;
   budget_status: string;
   total: number;

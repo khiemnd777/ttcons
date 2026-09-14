@@ -22,6 +22,7 @@ test('statistics use one global project scope and report-specific responsive car
   const asyncProjectPicker = await source('../src/modules/_shared/AsyncProjectPicker.tsx');
   const projectScopeActions = await source('../src/modules/_shared/ProjectScopeActions.tsx');
   const reportPanel = await source('../src/modules/reports/OperationalReportPanel.tsx');
+  const reportRegistry = await source('../src/modules/reports/reportRegistry.ts');
   const reportFilters = await source('../src/modules/reports/ReportFilters.tsx');
 
   assert.match(reportsPage, />Loại thống kê</);
@@ -62,6 +63,12 @@ test('statistics use one global project scope and report-specific responsive car
   assert.match(reportPanel, /renderMobileCard=\{\(row\) => <WarehouseReportCard row=\{row\} \/>\}/);
   assert.match(reportPanel, /renderMobileCard=\{\(row\) => <ProcurementReportCard row=\{row\} \/>\}/);
   assert.match(reportPanel, /renderMobileCard=\{\(row\) => <StaffReportCard row=\{row\} \/>\}/);
+  assert.match(reportPanel, /getRowKey=\{\(row\) => `\$\{row\.project_id\}:\$\{row\.status\}:\$\{row\.budget_status\}`\}/);
+  assert.match(reportPanel, /key: 'project_name', header: 'Công trình', sortable: true/);
+  assert.match(reportPanel, /searchPlaceholder="Tìm công trình, trạng thái mua sắm, ngân sách..."/);
+  assert.match(reportPanel, /function procurementStatisticsSourcePath\(projectId: string\) \{\s+return `\/projects\/\$\{projectId\}\/procurement`;\s+\}/);
+  assert.equal((reportPanel.match(/procurementStatisticsSourcePath\(row\.project_id\)/g) ?? []).length, 2);
+  assert.match(reportRegistry, /Giá trị yêu cầu theo công trình, trạng thái và ngân sách/);
   assert.match(reportFilters, /<ProjectScopeActions/);
   assert.match(projectScopeActions, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
   assert.match(projectScopeActions, /bg-transparent/);

@@ -456,3 +456,51 @@ func TestProjectScopedStatisticsExcludeCentralWarehouseInventory(t *testing.T) {
 		t.Fatalf("project-scoped statistics leaked central inventory: %#v", central)
 	}
 }
+
+func TestProcurementStatisticGroupsByProjectAndKeepsLegacyAggregate(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(db), "test-secret")
+	fixture := setupProjectScopeFixture(t, db, []string{"statistics.view"})
+
+	// The actor can see both project sources; the Statistics response must still keep them separate.
+	mustExec(t, db, `INSERT INTO project_members (project_id, staff_id, role_ids, active) VALUES ($1,$2,'["Member"]'::jsonb,true)`, fixture.otherProjectID, fixture.staffID)
+	firstRequestID, secondRequestID := newID(), newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM procurement_requests WHERE id IN ($1,$2)`, firstRequestID, secondRequestID)
+	})
+	mustExec(t, db, `
+		INSERT INTO procurement_requests (id, project_id, request_code, title, status, budget_status, total_estimated_amount)
+		VALUES ($1,$2,$3,'Nguồn thống kê công trình một','draft','within_budget',100),
+		       ($4,$5,$6,'Nguồn thống kê công trình hai','draft','within_budget',200)
+	`, firstRequestID, fixture.projectID, "STAT-PROC-"+firstRequestID[:8], secondRequestID, fixture.otherProjectID, "STAT-PROC-"+secondRequestID[:8])
+
+	rows, err := service.Statistic(ctx, "procurement", OperationalReportRequest{}, fixture.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for projectID, wantAmount := range map[string]float64{fixture.projectID: 100, fixture.otherProjectID: 200} {
+		row := recordByID(rows, "project_id", projectID)
+		if row == nil || cleanOptionalText(row["project_name"]) == "" || cleanOptionalText(row["project_code"]) == "" || number(row["total"]) != 1 || number(row["amount"]) != wantAmount {
+			t.Fatalf("procurement statistic for project %s = %#v", projectID, row)
+		}
+	}
+	exported, err := service.ExportStatistic(ctx, "procurement", "csv", OperationalReportRequest{}, fixture.userID, "Scoped User")
+	if err != nil || !bytes.Contains(exported.Data, []byte("Mã công trình")) || !bytes.Contains(exported.Data, []byte("Batch4 Scoped")) || !bytes.Contains(exported.Data, []byte("Batch4 Other")) {
+		t.Fatalf("procurement statistics export = %q, err=%v", exported.Data, err)
+	}
+
+	legacyRows, err := service.repo.Report(ctx, "procurement", fixture.userID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range legacyRows {
+		if cleanOptionalText(row["status"]) == "draft" && cleanOptionalText(row["budget_status"]) == "within_budget" && number(row["amount"]) == 300 {
+			if _, includesProjectID := row["project_id"]; includesProjectID {
+				t.Fatalf("legacy procurement aggregate unexpectedly changed grain: %#v", row)
+			}
+			return
+		}
+	}
+	t.Fatalf("legacy procurement aggregate did not preserve combined row: %#v", legacyRows)
+}

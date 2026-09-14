@@ -275,14 +275,14 @@ func (r *Repository) projectOptions(ctx context.Context, userID string, req Repo
 }
 
 func (r *Repository) Report(ctx context.Context, kind, userID, projectID string) ([]Record, error) {
-	return r.report(ctx, kind, userID, projectID, "")
+	return r.report(ctx, kind, userID, projectID, "", false)
 }
 
 func (r *Repository) StatisticsReport(ctx context.Context, kind, userID, projectID string) ([]Record, error) {
-	return r.report(ctx, kind, userID, projectID, "statistics.view")
+	return r.report(ctx, kind, userID, projectID, "statistics.view", true)
 }
 
-func (r *Repository) report(ctx context.Context, kind, userID, projectID, requiredPermission string) ([]Record, error) {
+func (r *Repository) report(ctx context.Context, kind, userID, projectID, requiredPermission string, projectLevelProcurement bool) ([]Record, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, err
@@ -376,6 +376,17 @@ func (r *Repository) report(ctx context.Context, kind, userID, projectID, requir
 			ORDER BY m.category, m.name
 		`, movementScope, scopeSQL, balanceProjectFilter, materialVisibility), args...)
 	case "procurement":
+		if projectLevelProcurement {
+			return r.Query(ctx, fmt.Sprintf(`
+				SELECT p.id AS project_id, p.code AS project_code, p.name AS project_name,
+					pr.status, pr.budget_status, COUNT(*) AS total, COALESCE(SUM(pr.total_estimated_amount),0) AS amount
+				FROM procurement_requests pr
+				JOIN projects p ON p.id=pr.project_id
+				WHERE pr.status <> 'cancelled' AND p.status <> 'cancelled' AND %s%s
+				GROUP BY p.id, p.code, p.name, pr.status, pr.budget_status
+				ORDER BY p.name, pr.status, pr.budget_status
+			`, scopeSQL, projectFilter), args...)
+		}
 		return r.Query(ctx, fmt.Sprintf(`
 			SELECT pr.status, pr.budget_status, COUNT(*) AS total, COALESCE(SUM(pr.total_estimated_amount),0) AS amount
 			FROM procurement_requests pr

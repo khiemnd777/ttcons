@@ -48,7 +48,7 @@ func statisticDefinition(kind string) (tabularDefinition, error) {
 		},
 		"procurement": {
 			Title: "Thống kê mua sắm", FileSlug: "thong-ke-mua-sam",
-			Columns: []tabularColumn{{"status", "Trạng thái", false}, {"budget_status", "Ngân sách", false}, {"total", "Số yêu cầu", true}, {"amount", "Giá trị", true}},
+			Columns: []tabularColumn{{"project_code", "Mã công trình", false}, {"project_name", "Công trình", false}, {"status", "Trạng thái", false}, {"budget_status", "Ngân sách", false}, {"total", "Số yêu cầu", true}, {"amount", "Giá trị", true}},
 		},
 		"accounting": {
 			Title: "Thống kê công nợ", FileSlug: "thong-ke-cong-no",
