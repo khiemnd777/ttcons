@@ -1,5 +1,12 @@
 # Consflow Frontend UI And Utility Map
 
+## Canonical Workflow Terminology Presentation
+
+- User-approved labels are Node -> `Giai đoạn`, Step -> `Gói công việc`, Work Item -> `Đầu việc`, and the final workflow stage -> `Bàn giao công trình và hồ sơ kế toán`. The durable scope and exclusions are in `docs/workflow-terminology-agreement.md`.
+- Likely presentation owners are Pipeline Builder (`PipelineBuilderPage.tsx`, `NodeLibraryPanel.tsx`, `NodeInspectorPanel.tsx`, `EdgeInspectorPanel.tsx`, `diagram/NodeCard.tsx`), project startup/runtime navigation (`ProjectStartupWizard.tsx`, `ProjectWorkspaceLayout.tsx`, `ProjectDetailPage.tsx`, `PlanningPage.tsx`), Work Item context (`WorkItemPrimarySurface.tsx`, `workItemContext.ts`) and shared enum/status copy (`lib/utils/status.ts`). Update focused presentation tests with each adopted entrypoint.
+- Do not rename React/TypeScript symbols, API fields, query keys, route params or persisted technical values just to match display terminology. The standalone `ProjectFinancePage` title remains outside the final-stage rename unless separately approved.
+- Any UI rollout begins with `Mục đích chính`, a review package and Mockup as Text. Loading, empty, error, dialog, responsive and PDF/export wording must be checked at the affected entrypoints; browser/UAT remains explicit-only and skipped browser checks are `NOT UX ACCEPTED`.
+
 ## Work Item Procurement Blocker Navigation
 
 - Purpose: explain why `procurement.require_approved` blocks completion and open the exact source instead of returning to the same Complete button. Owners: `modules/work-items/{workItemRequirements,workItemDetailDomain,WorkItemDetailDialog,WorkItemRequirementPanel}.tsx/ts`; standard destination: `modules/procurement/ProcurementDialog.tsx` through `ProcurementPage` and `_shared/useRecordDeepLink.tsx`.

@@ -1,5 +1,12 @@
 # Workflow Orchestration Domain Map
 
+## Canonical User-Facing Workflow Terminology
+
+- The approved canonical Vietnamese vocabulary is `Giai đoạn` for Node, `Gói công việc` for Step and `Đầu việc` for Work Item. The official final workflow stage wording is `Bàn giao công trình và hồ sơ kế toán`; see `docs/workflow-terminology-agreement.md`.
+- These names control agent communication and proposed user-facing labels only. Runtime and definition contracts continue to use stable technical keys such as `pipeline_template_nodes`, `pipeline_template_steps`, `pipeline_run_nodes`, `pipeline_run_steps`, `work_items`, `run_node_id`, `run_step_id`, `handover_finance`, `financial_closure`, permissions, business codes and event types.
+- Applied migrations and historical template/run/work-item/form/audit/PDF snapshots are immutable. If the official current definition needs the renamed final stage, create an additive migration that publishes a new immutable revision and keep existing runs pinned; do not rewrite Rev8/Rev9 history.
+- The final-stage rename does not by itself rename the standalone project-finance workspace. First searches for rollout: `NodeInspectorPanel|NodeLibraryPanel|NodeCard|ProjectStartupWizard|ProjectWorkspaceLayout|WorkItemPrimarySurface|pipelinePDFStepSemanticsNote|Khóa tài chính công trình|Tài chính công trình`.
+
 ## Required Procurement Automation Recovery
 
 - Runtime Work Item completion still invokes `RunRequiredWorkflowAutomationForWorkItem` before any terminal state write. For `procurement.require_approved`, official engine-2 legacy runtime steps now receive the same read-only `business_source` recovery contract needed to explain that hard gate; this does not rebind, republish or mutate their template/run snapshots.

@@ -14,6 +14,14 @@
 - Use `apply_patch` for manual source edits.
 - Do not launch or run Browser, browser-use, Playwright, or headless browser verification unless the user explicitly requests it in that turn. For frontend changes, use non-browser checks by default and report browser verification as skipped.
 
+## Canonical Workflow Terminology Agreement
+
+- The user-approved workflow terminology agreement is recorded in `docs/workflow-terminology-agreement.md` and applies to agent communication, plans, review packages, Mockup as Text, documentation, and proposed user-facing labels.
+- Use `Giai đoạn` for Node, `Gói công việc` for Step, and `Đầu việc` for Work Item in user-facing Vietnamese workflow contexts.
+- Use `Bàn giao công trình và hồ sơ kế toán` for the workflow's final stage previously described as `Tài chính công trình`. Do not infer that this renames the separate project-finance workspace or every finance-domain label.
+- Preserve stable technical identifiers and contracts such as `node`, `step`, `work_item`, `pipeline_*`, `run_node_id`, `run_step_id`, `work_items`, `handover_finance`, `financial_closure`, `project_finance.*`, API fields, database columns, event keys, permissions, and business codes.
+- Never edit applied migrations or rewrite historical template/run/work-item/form/audit/PDF snapshots solely to enforce terminology. Product rollout requires the normal review and implementation gates, with an additive migration or immutable new template revision when persisted current definitions must change.
+
 ## Mandatory Mapping Bootstrap And Maintenance
 
 - Agents and subagents must treat Consflow mapping as a mandatory bootstrap for repository work. Before broad scans, diagnosis, review, implementation planning, or code edits, read `.agents/skills/consflow-module-memory/SKILL.md` and `.agents/skills/consflow-module-memory/references/module-keyword-map.md`.

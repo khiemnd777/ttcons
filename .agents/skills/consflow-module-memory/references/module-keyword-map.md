@@ -1,5 +1,13 @@
 # Consflow Module Keyword Map
 
+## Canonical Workflow Terminology Agreement
+
+- Keywords: đổi tên workflow, thuật ngữ pipeline, Node, Step, Work Item, Tài chính công trình, Giai đoạn, Gói công việc, Đầu việc, Bàn giao công trình và hồ sơ kế toán. Matched domains: Workflow Orchestration, Project Planning, frontend workflow presentation and persisted official template definitions. First searches: `rg -n "Node|Step|Work Item|Tài chính công trình|Khóa tài chính công trình" frontend/src backend/internal/core backend/seed backend/migrations frontend/tests` and then classify each match as user-facing copy, current persisted definition, immutable history or technical identifier.
+- User-approved wording is Node -> `Giai đoạn`, Step -> `Gói công việc`, Work Item -> `Đầu việc`, and the final workflow stage formerly described as `Tài chính công trình` -> `Bàn giao công trình và hồ sơ kế toán`. The durable agreement is `docs/workflow-terminology-agreement.md`.
+- This is a presentation and communication contract, not a bulk symbol rename. Preserve `node`, `step`, `work_item`, `pipeline_*`, run/template IDs, database/API fields, permissions, business codes and event keys. Do not edit applied migrations or historical template/run/work-item/form/audit/PDF snapshots.
+- The finance wording is scoped to the final workflow stage. The standalone `Tài chính công trình` workspace keeps its existing name unless a separately reviewed decision proves the broader rename is semantically correct.
+- Any rollout that changes UI or persisted current definitions must first provide the normal review package and Mockup as Text, then wait for explicit implementation approval. Prefer an immutable new official template revision for the final-stage name and keep existing runs pinned.
+
 ## Procurement Completion Hard-Gate Recovery
 
 - Keywords: `Tự động hóa nghiệp vụ bắt buộc`, `procurement.require_approved`, bấm Hoàn tất quay lại Hoàn tất, không thấy yêu cầu mua đang chặn. Matched domains: Workflow Orchestration and Commercial Procurement. First searches: `WorkflowBusinessSourceForWorkItem|automateClientInputProcurementGate|requiredAutomationPresentation|businessSourceNavigationPath|useRecordDeepLink`.
