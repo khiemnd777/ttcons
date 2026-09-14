@@ -749,6 +749,7 @@ export function MyWorkPage() {
           markingId={markAttentionRead.isPending ? markAttentionRead.variables : undefined}
           onSelectQueue={(value) => updateParams({ attention: value === 'all' ? null : value })}
           onMarkRead={(activityId) => markAttentionRead.mutate(activityId)}
+          onRetry={() => void activityAttention.refetch()}
         />
       )}
 
@@ -1321,9 +1322,9 @@ function ProjectStartupNextPanel({ action, onOpen }: { action: ProjectStartupAct
   );
 }
 
-function ActivityAttentionPanel({ rows, loading, error, selectedQueue, streamStatus, returnTo, markingId, onSelectQueue, onMarkRead }: {
+function ActivityAttentionPanel({ rows, loading, error, selectedQueue, streamStatus, returnTo, markingId, onSelectQueue, onMarkRead, onRetry }: {
   rows: ActivityAttentionItem[]; loading: boolean; error: unknown; selectedQueue: AttentionQueueKey; streamStatus: StreamStatus; returnTo: string; markingId?: string;
-  onSelectQueue: (queue: AttentionQueueKey) => void; onMarkRead: (activityId: string) => void;
+  onSelectQueue: (queue: AttentionQueueKey) => void; onMarkRead: (activityId: string) => void; onRetry: () => void;
 }) {
   const counts = useMemo(() => attentionQueues.reduce<Record<AttentionQueueKey, number>>((acc, item) => { acc[item.key] = rows.filter((row) => inAttentionQueue(row, item.key)).length; return acc; }, { all: 0, mentions: 0, questions: 0, blockers: 0, reminders: 0, unread: 0 }), [rows]);
   const visibleRows = rows.filter((item) => inAttentionQueue(item, selectedQueue));
@@ -1331,25 +1332,46 @@ function ActivityAttentionPanel({ rows, loading, error, selectedQueue, streamSta
     <section className="mt-4 rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="flex flex-col gap-3 border-b border-line pb-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-semibold text-ink">Trao đổi cần phản hồi</h2><p className="mt-1 text-sm text-slate-500">Nhắc đến, câu hỏi, điểm chặn và nhắc hạn</p></div><LiveStatusBadge status={streamStatus} /></div>
       <div className="my-3 flex gap-2 overflow-x-auto">{attentionQueues.map((item) => { const Icon = item.icon; return <button key={item.key} className={clsx('inline-flex min-w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold', selectedQueue === item.key ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line text-slate-700 hover:bg-slate-50')} onClick={() => onSelectQueue(item.key)}><Icon className="h-4 w-4" />{item.label}<span className="rounded-md bg-white px-2 py-0.5 text-xs text-slate-600">{counts[item.key]}</span></button>; })}</div>
-      {loading ? <LoadingSpinner /> : null}
-      {error ? <SourceError title="Không tải được trao đổi cần phản hồi" /> : null}
+      {loading ? <AttentionListSkeleton /> : null}
+      {error ? <SourceError title="Không tải được trao đổi cần phản hồi" onRetry={onRetry} /> : null}
       {!loading && !error && !visibleRows.length ? <EmptyState title="Không có trao đổi cần phản hồi trong nhóm này" /> : null}
-      {visibleRows.length ? <div className="grid gap-2 xl:grid-cols-2">{visibleRows.map((item) => <AttentionCard key={item.id} item={item} returnTo={returnTo} marking={markingId === item.id} onMarkRead={onMarkRead} />)}</div> : null}
+      {visibleRows.length ? <ul aria-label="Danh sách trao đổi cần phản hồi" className="divide-y divide-line overflow-hidden rounded-md border border-line bg-white">{visibleRows.map((item) => <AttentionListItem key={item.id} item={item} returnTo={returnTo} marking={markingId === item.id} onMarkRead={onMarkRead} />)}</ul> : null}
     </section>
   );
 }
 
-function AttentionCard({ item, returnTo, marking, onMarkRead }: { item: ActivityAttentionItem; returnTo: string; marking: boolean; onMarkRead: (id: string) => void }) {
+function AttentionListSkeleton() {
+  return (
+    <div className="divide-y divide-line overflow-hidden rounded-md border border-line bg-white" role="status" aria-label="Đang tải trao đổi cần phản hồi">
+      {[0, 1, 2].map((item) => (
+        <div key={item} className="animate-pulse px-3 py-4 sm:px-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="h-5 w-32 rounded bg-slate-200" />
+              <div className="mt-3 h-4 w-48 max-w-full rounded bg-slate-200" />
+              <div className="mt-2 h-3 w-80 max-w-full rounded bg-slate-100" />
+              <div className="mt-3 h-4 w-full max-w-xl rounded bg-slate-100" />
+            </div>
+            <div className="h-7 w-16 shrink-0 rounded bg-slate-100" />
+          </div>
+        </div>
+      ))}
+      <span className="sr-only">Đang tải trao đổi cần phản hồi...</span>
+    </div>
+  );
+}
+
+function AttentionListItem({ item, returnTo, marking, onMarkRead }: { item: ActivityAttentionItem; returnTo: string; marking: boolean; onMarkRead: (id: string) => void }) {
   const target = item.work_item_id ? workItemDetailPath(item.work_item_id, returnTo, item.project_id) : item.project_id ? `/projects/${item.project_id}` : '';
   return (
-    <article className={clsx('rounded-md border p-3', item.is_unread ? 'border-blue-200 bg-blue-50' : 'border-line bg-slate-50')}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap gap-1">{item.is_unread ? <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Chưa đọc</span> : null}{item.mentioned_me ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">@tôi</span> : null}{asArray<string>(item.queue_types).slice(0, 3).map((queue) => <span key={queue} className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{attentionQueueLabel(queue)}</span>)}</div><p className="mt-2 text-sm font-semibold text-ink">{activityLabel(item.activity_type)}</p><p className="mt-1 text-xs text-slate-500">{identityReferenceText(item.actor_name, item.actor_account_deleted, 'Hệ thống')} · {item.target_label ?? item.work_item_title ?? (item.scope_type ? scopeTypeLabel(item.scope_type) : 'Công trình')} · {compactDateTime(item.created_at)}</p></div>{item.is_unread ? <button className="shrink-0 rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 disabled:opacity-60" disabled={marking} onClick={() => onMarkRead(item.id)}>Đã đọc</button> : null}</div>
+    <li className={clsx('px-3 py-4 transition-colors sm:px-4', item.is_unread ? 'bg-blue-50/70' : 'bg-white hover:bg-slate-50/70')}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0 flex-1"><div className="flex flex-wrap gap-1">{item.is_unread ? <span className="rounded-md bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">Chưa đọc</span> : null}{item.mentioned_me ? <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">@tôi</span> : null}{asArray<string>(item.queue_types).slice(0, 3).map((queue) => <span key={queue} className="rounded-md bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{attentionQueueLabel(queue)}</span>)}</div><p className="mt-2 text-sm font-semibold text-ink">{activityLabel(item.activity_type)}</p><p className="mt-1 text-xs text-slate-500">{identityReferenceText(item.actor_name, item.actor_account_deleted, 'Hệ thống')} · {item.target_label ?? item.work_item_title ?? (item.scope_type ? scopeTypeLabel(item.scope_type) : 'Công trình')} · {compactDateTime(item.created_at)}</p></div>{item.is_unread ? <button className="self-start shrink-0 rounded-md border border-blue-200 bg-white px-2 py-1 text-xs font-semibold text-blue-700 disabled:opacity-60" disabled={marking} onClick={() => onMarkRead(item.id)}>Đã đọc</button> : null}</div>
       <ActivityReplyQuote replyTo={item.reply_to} />
       {item.comment ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.comment}</p> : null}
       <ActivityAttachments attachments={item.attachments} compact />
       {item.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={item.reactions} /></div> : null}
       {target ? <Link to={target} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800">{item.work_item_id ? 'Mở đúng công việc' : 'Mở công trình'} <ChevronRight className="h-3.5 w-3.5" /></Link> : null}
-    </article>
+    </li>
   );
 }
 

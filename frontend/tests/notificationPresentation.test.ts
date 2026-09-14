@@ -16,9 +16,13 @@ test('notification platform uses server-owned presentation, safe routes, and one
   const myWork = await source('../src/modules/my-work/MyWorkPage.tsx');
 
   assert.match(panel, /get<NotificationPage>\(`\/me\/notifications\?/);
-  assert.match(panel, /put\(`\/me\/notifications\/\$\{notificationID\}\/read`\)/);
-  assert.match(panel, /post\('\/me\/notifications\/read-all'\)/);
-  assert.match(panel, /put\(`\/me\/notifications\/\$\{notificationID\}\/archive`\)/);
+  assert.match(panel, /`\/me\/notifications\/\$\{notification\.id\}\/read`/);
+  assert.match(panel, /'\/me\/notifications\/read-all'/);
+  assert.match(panel, /`\/me\/notifications\/\$\{notification\.id\}\/archive`/);
+  assert.match(panel, /applyNotificationReadCache/);
+  assert.match(panel, /applyNotificationArchiveCache/);
+  assert.match(panel, /listState === 'stale-error'/);
+  assert.match(panel, /Danh sách gần nhất vẫn được giữ/);
   assert.doesNotMatch(panel, /work_report_(submitted|resubmitted|needs_changes|acknowledged)/);
   assert.doesNotMatch(panel, /action_key ===/);
   assert.match(panel, /safeNotificationHref\(notification\.action_href\)/);
@@ -35,6 +39,10 @@ test('notification platform uses server-owned presentation, safe routes, and one
   assert.match(realtime, /streamSSE\('\/me\/activity-attention\/stream'/);
   assert.match(realtime, /status !== 'connected'/);
   assert.match(realtime, /message\.event === 'notification_changed'/);
+  assert.match(realtime, /createNotificationInvalidationScheduler/);
+  assert.match(realtime, /notificationInvalidations\.schedule\(\)/);
+  assert.match(realtime, /previous\?\.actor_revision === current\.actor_revision/);
+  assert.doesNotMatch(realtime, /message\.event === 'notification_changed'[\s\S]{0,240}invalidateQueries\(\{ queryKey: \['notifications'/);
   assert.match(realtime, /message\.event === 'work_report_changed'[\s\S]*?\['my-work-navigation-summary', actorID\]/);
   assert.doesNotMatch(myWork, /streamSSE\('\/me\/activity-attention\/stream'/);
 
@@ -42,6 +50,8 @@ test('notification platform uses server-owned presentation, safe routes, and one
   assert.match(page, /\/me\/notifications\/projects/);
   assert.match(page, /\/me\/notifications\/preferences/);
   assert.match(page, /\['action_required', 'Cần xử lý'/);
+  assert.match(page, /listState === 'stale-error'/);
+  assert.match(page, /Danh sách gần nhất vẫn được giữ/);
   assert.match(router, /path: '\/notifications'/);
   assert.match(myWork, /searchParams\.get\('task'\)/);
 });

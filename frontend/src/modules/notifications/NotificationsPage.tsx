@@ -18,6 +18,12 @@ import type {
   UserNotification,
 } from '../../lib/types/domain';
 import { NotificationItem } from './NotificationItem';
+import {
+  applyAllNotificationsReadCache,
+  applyNotificationArchiveCache,
+  applyNotificationReadCache,
+  notificationListState,
+} from './notificationCache';
 import { safeNotificationHref } from './notificationPresentation';
 
 type NotificationState = 'all' | 'action_required' | 'unread' | 'archived';
@@ -57,13 +63,24 @@ export function NotificationsPage() {
     retry: false,
   });
 
-  const invalidateNotifications = () => {
-    void queryClient.invalidateQueries({ queryKey: ['notification-summary', actorID] });
-    void queryClient.invalidateQueries({ queryKey: ['notifications', actorID] });
-  };
-  const markRead = useMutation({ mutationFn: (id: string) => put(`/me/notifications/${id}/read`), onSuccess: invalidateNotifications, onError: (error) => toast.error('Không cập nhật được trạng thái thông báo', error) });
-  const markAll = useMutation({ mutationFn: () => post('/me/notifications/read-all'), onSuccess: () => { invalidateNotifications(); toast.success('Đã đánh dấu tất cả thông báo là đã đọc'); }, onError: (error) => toast.error('Không đánh dấu được tất cả thông báo', error) });
-  const archive = useMutation({ mutationFn: (id: string) => put(`/me/notifications/${id}/archive`), onSuccess: invalidateNotifications, onError: (error) => toast.error('Không lưu trữ được thông báo', error) });
+  const markRead = useMutation({
+    mutationFn: (notification: UserNotification) => put<{ id: string; read_at: string }>(`/me/notifications/${notification.id}/read`),
+    onSuccess: (result, notification) => applyNotificationReadCache(queryClient, actorID, notification, result.read_at),
+    onError: (error) => toast.error('Không cập nhật được trạng thái thông báo', error),
+  });
+  const markAll = useMutation({
+    mutationFn: () => post<{ updated_count: number }>('/me/notifications/read-all'),
+    onSuccess: (result) => {
+      applyAllNotificationsReadCache(queryClient, actorID, new Date().toISOString(), result.updated_count);
+      toast.success('Đã đánh dấu tất cả thông báo là đã đọc');
+    },
+    onError: (error) => toast.error('Không đánh dấu được tất cả thông báo', error),
+  });
+  const archive = useMutation({
+    mutationFn: (notification: UserNotification) => put<{ id: string; archived_at: string; read_at: string }>(`/me/notifications/${notification.id}/archive`),
+    onSuccess: (_result, notification) => applyNotificationArchiveCache(queryClient, actorID, notification),
+    onError: (error) => toast.error('Không lưu trữ được thông báo', error),
+  });
 
   const categories = useMemo(() => {
     const values = new Map<string, string>();
@@ -71,9 +88,10 @@ export function NotificationsPage() {
     return Array.from(values, ([key, label]) => ({ key, label })).sort((left, right) => left.label.localeCompare(right.label, 'vi'));
   }, [catalog.data]);
   const rows = notifications.data?.pages.flatMap((page) => page.items) ?? [];
+  const listState = notificationListState(notifications.isLoading, notifications.isError, Boolean(notifications.data));
 
   async function openNotification(notification: UserNotification) {
-    if (!notification.read_at) await markRead.mutateAsync(notification.id).catch(() => undefined);
+    if (!notification.read_at) await markRead.mutateAsync(notification).catch(() => undefined);
     navigate(safeNotificationHref(notification.action_href));
   }
 
@@ -116,12 +134,13 @@ export function NotificationsPage() {
           </form>
 
           <div className="overflow-hidden rounded-lg border border-line bg-white">
-            {notifications.isLoading ? <div className="grid min-h-56 place-items-center"><LoadingSpinner /></div> : notifications.isError ? (
+            {listState === 'stale-error' ? <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="alert"><span>Chưa đồng bộ được dữ liệu mới nhất. Danh sách gần nhất vẫn được giữ.</span><button type="button" className="font-semibold underline" onClick={() => void notifications.refetch()}>Thử lại</button></div> : null}
+            {listState === 'loading' ? <div className="grid min-h-56 place-items-center"><LoadingSpinner /></div> : listState === 'initial-error' ? (
               <div className="p-8 text-center"><CircleAlert className="mx-auto h-6 w-6 text-rose-600" /><p className="mt-2 text-sm text-rose-700">Không tải được danh sách thông báo.</p><button type="button" className="mt-3 rounded-md border border-line px-3 py-2 text-sm font-semibold" onClick={() => void notifications.refetch()}>Thử lại</button></div>
-            ) : rows.length ? rows.map((notification) => <NotificationItem key={notification.id} notification={notification} busy={(markRead.isPending && markRead.variables === notification.id) || (archive.isPending && archive.variables === notification.id)} onOpen={() => void openNotification(notification)} onArchive={applied.state === 'archived' ? undefined : () => archive.mutate(notification.id)} />) : (
+            ) : rows.length ? rows.map((notification) => <NotificationItem key={notification.id} notification={notification} busy={(markRead.isPending && markRead.variables?.id === notification.id) || (archive.isPending && archive.variables?.id === notification.id)} onOpen={() => void openNotification(notification)} onArchive={applied.state === 'archived' ? undefined : () => archive.mutate(notification)} />) : (
               <div className="p-5"><EmptyState title={applied.state === 'unread' ? 'Bạn đã đọc tất cả thông báo' : applied.state === 'action_required' ? 'Không có thông báo cần xử lý' : 'Không có thông báo phù hợp bộ lọc'} /></div>
             )}
-            {notifications.hasNextPage ? <div className="border-t border-line p-4 text-center"><button type="button" disabled={notifications.isFetchingNextPage} className="inline-flex items-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50" onClick={() => void notifications.fetchNextPage()}>{notifications.isFetchingNextPage ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm</button></div> : null}
+            {listState !== 'initial-error' && notifications.hasNextPage ? <div className="border-t border-line p-4 text-center"><button type="button" disabled={notifications.isFetchingNextPage} className="inline-flex items-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50" onClick={() => void notifications.fetchNextPage()}>{notifications.isFetchingNextPage ? <RefreshCw className="h-4 w-4 animate-spin" /> : null}Tải thêm</button></div> : null}
           </div>
         </section>
       </div>

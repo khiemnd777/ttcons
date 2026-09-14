@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { get, streamSSE, type StreamStatus } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { NotificationSummary } from '../../lib/types/domain';
+import { createNotificationInvalidationScheduler } from './notificationCache';
 
 const ActorRealtimeStatusContext = createContext<StreamStatus>('offline');
 
@@ -25,10 +26,7 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
         staleTime: 0,
       }).catch(() => undefined);
       if (!current || previous?.actor_revision === current.actor_revision) return;
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['notifications', actorID] }),
-        queryClient.invalidateQueries({ queryKey: ['notification-projects', actorID] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ['notifications', actorID] });
     };
     let updatesTimer: number | undefined;
     const invalidateProjectUpdates = () => {
@@ -38,20 +36,24 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
         void queryClient.invalidateQueries({ queryKey: ['project-update-feed', actorID] });
       }, 300);
     };
+    const notificationInvalidations = createNotificationInvalidationScheduler(() => {
+      invalidateProjectUpdates();
+      void queryClient.invalidateQueries({ queryKey: ['notification-projects', actorID] });
+      void reconcileNotifications();
+    });
     const stop = streamSSE('/me/activity-attention/stream', {
       onStatus: (status) => {
         setStatus(status);
         if (status !== 'connected') return;
         for (const key of [['project-discussions'], ['utility-project-activity'], ['activity-attention'], ['my-work-items'], ['procurement'], ['procurement-detail']]) void queryClient.invalidateQueries({ queryKey: key });
         invalidateProjectUpdates();
+        void queryClient.invalidateQueries({ queryKey: ['notification-projects', actorID] });
         void reconcileNotifications();
       },
       onEvent: (message) => {
-        if (['notification_changed', 'work_report_changed', 'work_queue_changed', 'work_item_changed', 'attention_changed'].includes(message.event)) invalidateProjectUpdates();
+        if (['work_report_changed', 'work_queue_changed', 'work_item_changed', 'attention_changed'].includes(message.event)) invalidateProjectUpdates();
         if (message.event === 'notification_changed') {
-          void queryClient.invalidateQueries({ queryKey: ['notification-summary', actorID] });
-          void queryClient.invalidateQueries({ queryKey: ['notifications', actorID] });
-          void queryClient.invalidateQueries({ queryKey: ['notification-projects', actorID] });
+          notificationInvalidations.schedule();
         }
         if (message.event === 'work_report_changed') {
           void queryClient.invalidateQueries({ queryKey: ['work-report-summary'] });
@@ -78,6 +80,7 @@ export function ActorRealtimeProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       stop();
+      notificationInvalidations.cancel();
       if (updatesTimer !== undefined) window.clearTimeout(updatesTimer);
     };
   }, [actorID, queryClient, user?.must_change_password]);

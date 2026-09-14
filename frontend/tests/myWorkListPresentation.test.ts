@@ -52,6 +52,21 @@ test('My Work provides compact loading and stale-data states', async () => {
   assert.match(page, />Thử lại<\/button>/);
 });
 
+test('My Work attention uses one divided semantic list instead of a card grid', async () => {
+  const page = await myWorkPageSource();
+  const attention = page.slice(page.indexOf('function ActivityAttentionPanel'), page.indexOf('function attentionQueueLabel'));
+
+  assert.match(attention, /<ul aria-label="Danh sách trao đổi cần phản hồi" className="divide-y divide-line/);
+  assert.match(attention, /function AttentionListItem/);
+  assert.match(attention, /<li className=\{clsx\('px-3 py-4 transition-colors sm:px-4'/);
+  assert.match(attention, /flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between/);
+  assert.match(attention, /self-start shrink-0 rounded-md border border-blue-200/);
+  assert.match(attention, /function AttentionListSkeleton/);
+  assert.match(attention, /<SourceError title="Không tải được trao đổi cần phản hồi" onRetry=\{onRetry\}/);
+  assert.match(attention, /<ActivityReplyQuote[\s\S]*<ActivityAttachments[\s\S]*<ActivityReactionBar/);
+  assert.doesNotMatch(attention, /xl:grid-cols-2|AttentionCard/);
+});
+
 test('My Work tab count follows the selected scope summary instead of the selected bucket', async () => {
   const page = await myWorkPageSource();
 

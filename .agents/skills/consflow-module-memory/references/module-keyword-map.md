@@ -84,6 +84,12 @@
 - The search panel has a full-width labelled keyword row with a separate blue `Tìm` button, followed by labelled project/optional record-kind controls and the advanced-filter toggle. All panel controls are 40px tall with 12px column gaps. A named container query follows the panel's available width rather than the viewport: below 36rem primary filters stack; advanced filters use two columns from 28rem and full-width sorting. The dropdown stays above result rows via the panel's local stacking level.
 - First searches: `my-work-filter|function FilterBar|fieldLabel|AsyncProjectPicker`. Load frontend and root-cause detail maps. Search submit, immediate filter changes, URL/query contracts, accounting visibility and project-picker loading/error/unavailable states retain their existing semantics; this is presentation-only with no API/schema changes.
 
+## My Work Attention List Presentation
+
+- Keywords: `Trao đổi cần phản hồi`, hiển thị dạng list, bỏ attention cards, nhắc đến, câu hỏi, điểm chặn, nhắc hạn. Owner: `frontend/src/modules/my-work/MyWorkPage.tsx::ActivityAttentionPanel|AttentionListItem|AttentionListSkeleton`; focused contract: `frontend/tests/myWorkListPresentation.test.ts`.
+- The attention mode renders one full-width semantic list with shared dividers at every breakpoint, rather than a two-column card grid. Unread emphasis belongs to the row background; badges, reply quote, comment, attachments, reactions, explicit mark-read action and canonical Work Item/project link retain their existing hierarchy and behavior. Loading uses list-row skeletons; transport failure exposes the existing retry action; the filtered empty state remains explicit.
+- This is presentation-only. `/me/activity-attention` ordering and visibility, summary/detail loading boundary, queue counts, read mutation, SSE invalidation, actor/project/work-item/client scope and activity history are unchanged. First searches: `ActivityAttentionPanel|AttentionListItem|attentionQueues|activity-attention`.
+
 ## Shared Date And Time Display
 
 - Keywords: format date, ngày giờ, `dd-mm-yyyy`, `HH:mm`, thời gian có giây, ngày lệch múi giờ. Owner: `frontend/src/lib/utils/format.ts`; tests: `frontend/tests/dateFormatting.test.ts` and `dashboardActivity.test.ts`.
@@ -137,6 +143,12 @@ Use this as the mandatory central routing cache. It is not a replacement for rea
 ## Notification Recipient Wording
 
 - Notification wording `Anh/chị → Bạn`: `frontend/src/modules/notifications/notificationPresentation.tsx::notificationDisplayText` and shared `NotificationItem.tsx` format title/message snapshots at display time; `NotificationPanel.tsx`/`NotificationsPage.tsx` own empty-state copy. First search: `notificationDisplayText|Anh/chị|anh/chị` in that module. Old/new notifications share this display convention; stored templates/snapshots and notification behavior are unchanged. See frontend map `Notification Recipient Wording`.
+
+## Notification Archive Burst Stability
+
+- Keywords: xóa/lưu trữ thông báo liên tiếp, xóa giữa chừng, `Không tải được danh sách thông báo`, HTTP 429, danh sách biến mất sau archive. Owners: `frontend/src/modules/notifications/notificationCache.ts` plus `{NotificationsPage,NotificationPanel,ActorRealtimeProvider}.tsx`; focused regressions: `frontend/tests/{notificationCache,notificationPresentation}.test.ts`. First searches: `applyNotificationArchiveCache|notificationListState|notification_changed|createNotificationInvalidationScheduler|reconcileNotifications`.
+- Successful read/archive/read-all mutations update every cached actor notification list and the actor summary immediately, then mark list/project-filter caches stale without an eager refetch. The actor SSE stream coalesces a notification burst for 750ms and fetches the authoritative summary revision once; it refreshes list rows only when that revision differs, so the local event echo does not duplicate the mutation refresh while remote actor changes still reconcile.
+- A failed background refetch keeps the last cached rows and shows an inline retry warning. The full `Không tải được...` error remains only for an initial load with no cached data. This is a frontend request/cache and error-presentation correction only: backend rate limits, notification API/schema, RBAC, recipient rules, source resolution and action semantics remain unchanged. See frontend/root-cause maps `Notification Archive Burst Stability`.
 
 ## Project Chat Input And Popup Dismissal
 
