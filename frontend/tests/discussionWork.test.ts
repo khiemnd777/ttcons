@@ -18,6 +18,8 @@ import type { WorkItem } from '../src/lib/types/domain.ts';
 
 const item = (extra: Partial<WorkItem> = {}) => ({ id: 'task', project_id: 'project', title: 'Checklist thiết kế', status: 'ready', can_act: true, execution_target: { kind: 'capture', workspace: 'planning' }, ...extra } as WorkItem);
 const discussionWorkDialogSource = readFileSync(new URL('../src/modules/work-items/DiscussionWorkDialog.tsx', import.meta.url), 'utf8');
+const workItemDetailSource = readFileSync(new URL('../src/modules/work-items/WorkItemDetailDialog.tsx', import.meta.url), 'utf8');
+const workItemPrimarySurfaceSource = readFileSync(new URL('../src/modules/work-items/WorkItemPrimarySurface.tsx', import.meta.url), 'utf8');
 
 test('discussion routes only supported source editors and preserves domain boundaries', () => {
   assert.equal(discussionWorkSurface(item()), 'form');
@@ -51,10 +53,14 @@ test('project workflow action labels separate execution, decision, blocker, and 
   assert.equal(discussionWorkflowActionLabel(item({ readiness: 'upcoming' })), 'Xem công việc');
 });
 
-test('discussion work dialog rechecks warm cache and keeps loading, ready, and error mutually exclusive', () => {
+test('discussion work dialog rechecks warm cache and opens the full workspace directly', () => {
   assert.match(discussionWorkDialogSource, /refetchOnMount:\s*'always'/);
-  assert.match(discussionWorkDialogSource, /Xem toàn bộ & lịch sử/);
-  assert.match(discussionWorkDialogSource, /Quay lại hồ sơ/);
+  assert.match(discussionWorkDialogSource, /size="workspace"/);
+  assert.match(discussionWorkDialogSource, /<WorkItemDetailWorkspace/);
+  assert.match(discussionWorkDialogSource, /onDirtyChange=\{setDirty\}/);
+  assert.match(discussionWorkDialogSource, /onBusyChange=\{setBusy\}/);
+  assert.doesNotMatch(discussionWorkDialogSource, /Xem toàn bộ & lịch sử/);
+  assert.doesNotMatch(discussionWorkDialogSource, /Quay lại hồ sơ/);
   assert.doesNotMatch(discussionWorkDialogSource, /Điều kiện & chốt công việc/);
   assert.equal(discussionWorkDetailLoadState({ isFetchedAfterMount: false, isFetching: false, isError: false, projectId: 'project' }, 'project'), 'loading');
   assert.equal(discussionWorkDetailLoadState({ isFetchedAfterMount: false, isFetching: true, isError: true, projectId: 'project' }, 'project'), 'loading');
@@ -63,11 +69,20 @@ test('discussion work dialog rechecks warm cache and keeps loading, ready, and e
   assert.equal(discussionWorkDetailLoadState({ isFetchedAfterMount: true, isFetching: false, isError: false, projectId: 'another-project' }, 'project'), 'error');
 });
 
-test('discussion work dialog reuses required-condition navigation in direct editors', () => {
-  assert.match(discussionWorkDialogSource, /<WorkItemRequirementPanel rows=\{requirementRows\} onNavigate=\{navigateToRequirement\} openWhenBlocked \/>/);
-  assert.match(discussionWorkDialogSource, /buildRequirementRows\(item, evidence, actions, readOnly\)/);
-  assert.match(discussionWorkDialogSource, /navigationRequest=\{navigationRequest\}/);
-  assert.match(discussionWorkDialogSource, /Lưu hoặc bỏ thay đổi trước khi mở toàn bộ điều kiện và lịch sử/);
+test('discussion work dialog preserves the procurement source dialog and its explicit work-detail path', () => {
+  assert.match(discussionWorkDialogSource, /surface === 'procurement' && !showProcurementWorkDetails/);
+  assert.match(discussionWorkDialogSource, /<ProcurementDialog/);
+  assert.match(discussionWorkDialogSource, /onShowWorkDetails=\{\(\) => setShowProcurementWorkDetails\(true\)\}/);
+  assert.match(discussionWorkDialogSource, /Quay lại yêu cầu mua/);
+});
+
+test('full discussion workspace owns requirement navigation and propagates editor guards', () => {
+  assert.match(workItemDetailSource, /<WorkItemRequirementPanel rows=\{requirementRows\} onNavigate=\{navigateToRequirement\} \/>/);
+  assert.match(workItemDetailSource, /buildRequirementRows\(detailItem, evidence, actions, futureReadOnly\)/);
+  assert.match(workItemDetailSource, /onDirtyChange=\{guardEditing \? setPrimaryDirty : undefined\}/);
+  assert.match(workItemDetailSource, /onBusyChange=\{guardEditing \? setSupportBusy : undefined\}/);
+  assert.match(workItemPrimarySurfaceSource, /onDirtyChange=\{onDirtyChange\}/);
+  assert.match(workItemPrimarySurfaceSource, /onBusyChange=\{onBusyChange\}/);
 });
 
 const require = createRequire(import.meta.url);

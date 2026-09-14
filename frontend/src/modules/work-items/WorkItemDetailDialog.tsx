@@ -131,12 +131,16 @@ export function WorkItemDetailWorkspace({
   workflowNavigation,
   onClose,
   onChanged,
+  onDirtyChange,
+  onBusyChange,
 }: {
   item?: WorkItem | null;
   workItemId?: string;
   workflowNavigation?: WorkItemWorkflowNavigation;
   onClose?: () => void;
   onChanged?: (item: WorkItem) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [actionText, setActionText] = useState('');
   const [pendingAction, setPendingAction] = useState<WorkItemActionKey | null>(null);
@@ -159,6 +163,13 @@ export function WorkItemDetailWorkspace({
   const [amendmentDialogOpen, setAmendmentDialogOpen] = useState(false);
   const [amendmentReason, setAmendmentReason] = useState('');
   const [amendmentReasonAttempted, setAmendmentReasonAttempted] = useState(false);
+  const [designDirty, setDesignDirty] = useState(false);
+  const [designBusy, setDesignBusy] = useState(false);
+  const [primaryDirty, setPrimaryDirty] = useState(false);
+  const [primaryBusy, setPrimaryBusy] = useState(false);
+  const [supportDirty, setSupportDirty] = useState(false);
+  const [supportBusy, setSupportBusy] = useState(false);
+  const guardEditing = Boolean(onDirtyChange || onBusyChange);
   const workDetail = useQuery({
     queryKey: ['work-item', selectedWorkId],
     queryFn: () => get<WorkItem>(`/work-items/${selectedWorkId}`),
@@ -316,7 +327,23 @@ export function WorkItemDetailWorkspace({
     setAmendmentDialogOpen(false);
     setAmendmentReason('');
     setAmendmentReasonAttempted(false);
+    setDesignDirty(false);
+    setDesignBusy(false);
+    setPrimaryDirty(false);
+    setPrimaryBusy(false);
+    setSupportDirty(false);
+    setSupportBusy(false);
   }, [selectedWorkId]);
+
+  useEffect(() => {
+    if (!guardEditing) return;
+    onDirtyChange?.(designDirty || primaryDirty || supportDirty);
+  }, [designDirty, guardEditing, onDirtyChange, primaryDirty, supportDirty]);
+
+  useEffect(() => {
+    if (!guardEditing) return;
+    onBusyChange?.(designBusy || primaryBusy || supportBusy || workAction.isPending || activityAction.isPending);
+  }, [activityAction.isPending, designBusy, guardEditing, onBusyChange, primaryBusy, supportBusy, workAction.isPending]);
 
   const actions = permittedActions(detailItem, workflowFormActionState?.submitted);
   const evidence = asArray<EvidenceRecord>(detailItem?.evidence);
@@ -368,7 +395,7 @@ export function WorkItemDetailWorkspace({
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <main className="min-w-0 space-y-4">
               <WorkItemStartRequirementPanel item={detailItem} />
-              {detailItem.project_id && isDesignReleaseWorkItem(detailItem) ? <DesignReleasePanel projectId={detailItem.project_id} workItems={[detailItem]} readOnly={futureReadOnly || skippedHistory} /> : null}
+              {detailItem.project_id && isDesignReleaseWorkItem(detailItem) ? <DesignReleasePanel projectId={detailItem.project_id} workItems={[detailItem]} readOnly={futureReadOnly || skippedHistory} onDirtyChange={guardEditing ? setDesignDirty : undefined} onBusyChange={guardEditing ? setDesignBusy : undefined} /> : null}
               {skippedHistory ? (
                 <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-panel">
                   <p className="font-semibold text-ink">Hồ sơ lịch sử chỉ đọc</p>
@@ -392,6 +419,8 @@ export function WorkItemDetailWorkspace({
                       navigationRequest={navigationRequest}
                       workflowFormActionRef={workflowFormActionRef}
                       onWorkflowFormActionStateChange={handleWorkflowFormActionStateChange}
+                      onDirtyChange={guardEditing ? setPrimaryDirty : undefined}
+                      onBusyChange={guardEditing ? setPrimaryBusy : undefined}
                     />
                   ) : null}
                 </>
@@ -410,6 +439,8 @@ export function WorkItemDetailWorkspace({
                   primarySurfaceKind={primarySurface?.kind}
                   navigationRequest={navigationRequest}
                   readOnly={futureReadOnly}
+                  onDirtyChange={guardEditing ? setSupportDirty : undefined}
+                  onBusyChange={guardEditing ? setSupportBusy : undefined}
                   onSubmitActivity={(payload) => {
                     if (!detailItem.id) return Promise.resolve();
                     return activityAction.mutateAsync({ workItemId: detailItem.id, payload }).then(() => undefined);
@@ -1158,6 +1189,8 @@ function WorkItemSupportingTabs({
   primarySurfaceKind,
   navigationRequest,
   readOnly,
+  onDirtyChange,
+  onBusyChange,
   onSubmitActivity,
 }: {
   item: WorkItem;
@@ -1169,9 +1202,22 @@ function WorkItemSupportingTabs({
   primarySurfaceKind?: WorkItemPrimarySurfaceKind;
   navigationRequest: WorkItemRequirementNavigationRequest | null;
   readOnly: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
 }) {
   const [selectedTab, setSelectedTab] = useState<SupportTabKey>('evidence');
+  const [contentDirty, setContentDirty] = useState(false);
+  const [contentBusy, setContentBusy] = useState(false);
+  const guardEditing = Boolean(onDirtyChange || onBusyChange);
+  const handleDirtyChange = useCallback((value: boolean) => {
+    setContentDirty(value);
+    onDirtyChange?.(value);
+  }, [onDirtyChange]);
+  const handleBusyChange = useCallback((value: boolean) => {
+    setContentBusy(value);
+    onBusyChange?.(value);
+  }, [onBusyChange]);
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const pendingEvidence = evidence.filter((record) => ['draft', 'submitted', 'pending'].includes(String(record.status)));
   const hasWorkflowForm = hasWorkflowFormSummary(item);
@@ -1212,14 +1258,21 @@ function WorkItemSupportingTabs({
   }, [item.id]);
 
   useEffect(() => {
+    setContentDirty(false);
+    setContentBusy(false);
+    onDirtyChange?.(false);
+    onBusyChange?.(false);
+  }, [item.id, onBusyChange, onDirtyChange]);
+
+  useEffect(() => {
     if (!navigationRequest) return;
     const requestedTab = navigationRequest.target.kind === 'evidence'
       ? 'evidence'
       : navigationRequest.target.kind === 'workflow_form'
         ? 'form'
         : null;
-    if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) setSelectedTab(requestedTab);
-  }, [navigationRequest?.requestId]);
+    if (requestedTab && tabs.some((tab) => tab.id === requestedTab) && !contentDirty && !contentBusy) setSelectedTab(requestedTab);
+  }, [contentBusy, contentDirty, navigationRequest?.requestId]);
 
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
@@ -1233,9 +1286,11 @@ function WorkItemSupportingTabs({
               id={`work-item-support-tab-${tab.id}`}
               aria-selected={activeTab === tab.id}
               aria-controls={`work-item-support-panel-${tab.id}`}
+              disabled={guardEditing && activeTab !== tab.id && (contentDirty || contentBusy)}
               className={clsx(
                 'inline-flex min-h-10 shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-semibold transition',
                 activeTab === tab.id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-ink',
+                'disabled:cursor-not-allowed disabled:opacity-40',
               )}
               onClick={() => setSelectedTab(tab.id)}
             >
@@ -1254,7 +1309,7 @@ function WorkItemSupportingTabs({
         aria-labelledby={`work-item-support-tab-${activeTab}`}
         className="bg-white p-4"
       >
-        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} variant="embedded" /> : null}
+        {activeTab === 'evidence' ? <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} variant="embedded" onDirtyChange={guardEditing ? handleDirtyChange : undefined} onBusyChange={guardEditing ? handleBusyChange : undefined} /> : null}
         {activeTab === 'activity' ? (
           <WorkItemActivityPanel
             key={item.id}
@@ -1271,7 +1326,7 @@ function WorkItemSupportingTabs({
             onSubmit={onSubmitActivity}
           />
         ) : null}
-        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} navigationRequest={navigationRequest} /> : null}
+        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} navigationRequest={navigationRequest} onDirtyChange={guardEditing ? handleDirtyChange : undefined} onBusyChange={guardEditing ? handleBusyChange : undefined} /> : null}
       </div>
     </section>
   );

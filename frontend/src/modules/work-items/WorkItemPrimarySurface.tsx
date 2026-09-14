@@ -50,6 +50,8 @@ export function WorkItemPrimarySurface({
   navigationRequest,
   workflowFormActionRef,
   onWorkflowFormActionStateChange,
+  onDirtyChange,
+  onBusyChange,
 }: {
   item: WorkItem;
   evidence: EvidenceRecord[];
@@ -58,6 +60,8 @@ export function WorkItemPrimarySurface({
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
   workflowFormActionRef?: Ref<WorkflowFormActionHandle>;
   onWorkflowFormActionStateChange?: (state: WorkflowFormActionState | null) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   return (
     <section className="space-y-3">
@@ -71,6 +75,8 @@ export function WorkItemPrimarySurface({
         navigationRequest,
         workflowFormActionRef,
         onWorkflowFormActionStateChange,
+        onDirtyChange,
+        onBusyChange,
       )}
     </section>
   );
@@ -352,6 +358,8 @@ function renderPrimaryPanel(
   navigationRequest?: WorkItemRequirementNavigationRequest | null,
   workflowFormActionRef?: Ref<WorkflowFormActionHandle>,
   onWorkflowFormActionStateChange?: (state: WorkflowFormActionState | null) => void,
+  onDirtyChange?: (dirty: boolean) => void,
+  onBusyChange?: (busy: boolean) => void,
 ) {
   switch (kind) {
     case 'workflow_form':
@@ -366,12 +374,14 @@ function renderPrimaryPanel(
           externalActions
           actionRef={workflowFormActionRef}
           onActionStateChange={onWorkflowFormActionStateChange}
+          onDirtyChange={onDirtyChange}
+          onBusyChange={onBusyChange}
         />
       );
     case 'evidence':
-      return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} navigationRequest={navigationRequest} variant="primary" />;
+      return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} variant="primary" onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />;
     case 'approval':
-      return <ApprovalPrimaryPanel item={item} evidence={evidence} navigationRequest={navigationRequest} />;
+      return <ApprovalPrimaryPanel item={item} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />;
     case 'incoming_acceptance':
       return <IncomingAcceptancePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />;
     case 'material_snapshot':
@@ -460,11 +470,17 @@ function PrimarySurfaceHeader({ surface, item }: { surface: WorkItemPrimarySurfa
 function ApprovalPrimaryPanel({
   item,
   evidence,
+  readOnly,
   navigationRequest,
+  onDirtyChange,
+  onBusyChange,
 }: {
   item: WorkItem;
   evidence: EvidenceRecord[];
+  readOnly: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   return (
     <section className="space-y-3">
@@ -487,7 +503,7 @@ function ApprovalPrimaryPanel({
         </div>
       </div>
       {hasWorkflowFormSummary(item) ? (
-        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} navigationRequest={navigationRequest} />
+        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} navigationRequest={navigationRequest} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />
       ) : (
         <EmptyState title="Không có hồ sơ nghiệp vụ gắn với phê duyệt này." />
       )}
