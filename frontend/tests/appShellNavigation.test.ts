@@ -87,3 +87,12 @@ test('focus sidebars reuse the approved home brand link', async () => {
   assert.match(projectWorkspace, /<NotificationPanel summary=\{indicators\.notifications\.data\}/);
   assert.doesNotMatch(projectWorkspace, /user\?\.roles\?\.join\(', '\)/);
 });
+
+test('project workspace reuses the standard account avatar and profile action', async () => {
+  const projectWorkspace = await source('../src/modules/projects/ProjectWorkspaceLayout.tsx');
+
+  assert.match(projectWorkspace, /import \{ UserAvatar \} from '\.\.\/\.\.\/components\/UserAvatar';/);
+  assert.match(projectWorkspace, /aria-label="Mở hồ sơ cá nhân"/);
+  assert.match(projectWorkspace, /onClick=\{\(\) => navigate\('\/profile'\)\}/);
+  assert.match(projectWorkspace, /<UserAvatar user=\{user\} size="sm" decorative \/>/);
+});

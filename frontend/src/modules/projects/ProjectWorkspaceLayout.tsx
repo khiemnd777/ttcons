@@ -22,6 +22,7 @@ import { BrandHomeLink } from '../../components/BrandLogo';
 import { PoweredBySignature } from '../../components/PoweredBySignature';
 import { SampleDataBadge } from '../../components/SampleDataBadge';
 import { StatusBadge } from '../../components/StatusBadge';
+import { UserAvatar } from '../../components/UserAvatar';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -112,10 +113,18 @@ export function ProjectWorkspaceLayout() {
             </div>
             <div className="flex shrink-0 items-center gap-3">
               <NotificationPanel summary={indicators.notifications.data} />
-              <div className="hidden min-w-0 text-right sm:block">
-                <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
-                <p className="truncate text-xs text-slate-500">{userRoleSummary}</p>
-              </div>
+              <button
+                type="button"
+                className="hidden items-center gap-2 rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex"
+                onClick={() => navigate('/profile')}
+                aria-label="Mở hồ sơ cá nhân"
+              >
+                {user ? <UserAvatar user={user} size="sm" decorative /> : null}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-ink">{user?.full_name}</span>
+                  <span className="block truncate text-xs text-slate-500">{userRoleSummary}</span>
+                </span>
+              </button>
               <button
                 aria-label="Đăng xuất"
                 className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
