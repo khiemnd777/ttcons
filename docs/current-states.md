@@ -1,29 +1,48 @@
 # Current States
 
-## Canonical Workflow Terminology Rollout
+## My Work Attention List Presentation
 
-Status: AGREEMENT RECORDED; IMPLEMENTATION PLAN PREPARED; PRODUCT CHANGES NOT IMPLEMENTED; NOT UX ACCEPTED.
-
-Matched feature/domain: Pipeline Template Builder, Pipeline Runtime, Work Item execution and official client workflow final-stage definition. Likely owners: Pipeline Builder presentation, project startup/runtime workspaces, Work Item context/status presentation, pipeline-template PDF/export, workflow validation/error copy, official template seed plus a future additive migration. First searches: `Node|Step|Work Item|work item|Tài chính công trình|Khóa tài chính công trình`, followed by per-match classification as display copy, current persisted definition, immutable history or technical contract.
+Status: TECHNICALLY VERIFIED; NOT UX ACCEPTED.
 
 Will be done:
 
-- Before product edits, prepare a review package and a `Mục đích chính`-first Mockup as Text covering Pipeline Builder, project startup, runtime navigation, Work Item detail/context and final-stage presentation; wait for explicit implementation confirmation.
-- Build and preserve a reviewed occurrence inventory. Change only user-facing workflow labels and human-readable validation, activity, notification, PDF and export copy; exclude code symbols, types, API fields, DB columns, query keys, route params, permissions, business codes and event keys.
-- Update Pipeline Builder presentation in `frontend/src/modules/pipeline-builder/PipelineBuilderPage.tsx`, `components/NodeLibraryPanel.tsx`, `components/NodeInspectorPanel.tsx`, `components/EdgeInspectorPanel.tsx` and `components/diagram/NodeCard.tsx` so the interface consistently says `Giai đoạn` and `Gói công việc`.
-- Update project/runtime presentation in `frontend/src/modules/projects/ProjectStartupWizard.tsx`, `ProjectWorkspaceLayout.tsx`, `ProjectDetailPage.tsx`, `frontend/src/modules/planning/PlanningPage.tsx`, relevant Operations messages, `frontend/src/modules/work-items/WorkItemPrimarySurface.tsx`, `workItemContext.ts`, `frontend/src/modules/planning-daily-reports/PlanningDailyReportsPage.tsx` and `frontend/src/lib/utils/status.ts` so user-facing workflow text consistently says `Giai đoạn`, `Gói công việc` and `Đầu việc`.
-- Update backend user-facing text and generated artifacts in the exact owners confirmed by review, led by `backend/internal/core/pipeline_template_pdf.go`, `pipeline_template_pdf_diagram.go`, `project_startup.go`, `service_pipeline_runtime.go`, `repository_pipeline.go`, `repository_construction_quality.go` and workflow-definition Excel presentation. Keep response field names and workbook machine contracts stable unless an explicit compatibility decision says otherwise.
-- Publish the renamed official final stage through the next available additive migration, expected to follow V143 at implementation time, as a new immutable template revision based on Rev9. Update `backend/seed/seed.sql` for canonical seed parity. Do not edit V83, V105, V131 or any other applied migration; do not rewrite active or historical Pipeline Runs, Work Items, forms, audits or generated PDFs.
-- Keep the standalone `frontend/src/modules/project-finance/ProjectFinancePage.tsx` workspace and its source-module labels unchanged unless a separate review confirms that `Bàn giao công trình và hồ sơ kế toán` accurately names the whole finance workspace rather than only the workflow's final stage.
-- Update focused frontend and backend assertions for every changed entrypoint, including Pipeline Builder labels, startup/runtime wording, Work Item context, status labels, template PDF/diagram text and the new official template revision. Add a regression scan that fails on disallowed legacy user-facing workflow terms while allowing approved technical and historical occurrences.
-- Run focused frontend Node tests, focused Go tests, `cd frontend && npm run build`, `cd backend && go test ./...` when feasible, migration/seed parity checks, `git diff --check`, and a final categorized terminology scan. Browser/UAT will run only if explicitly authorized; without it, report the UI as `NOT UX ACCEPTED`.
-- Update the central, frontend, backend and Workflow Orchestration mappings in the same implementation turn for the final owner list, new revision and verified behavior.
+- No remaining implementation work in the approved scope.
+- Browser/UAT may be run later only with explicit authorization; until then the UI remains `NOT UX ACCEPTED`.
 
 Done:
 
-- Recorded the user-approved agreement dated 2026-09-14 in `docs/workflow-terminology-agreement.md` and anchored it in `AGENTS.md`, the central module map, frontend UI map and Workflow Orchestration domain map.
-- Confirmed the exact shared vocabulary: Node -> `Giai đoạn`; Step -> `Gói công việc`; Work Item -> `Đầu việc`; final workflow stage `Tài chính công trình` -> `Bàn giao công trình và hồ sơ kế toán`.
-- Loaded the mandatory central, frontend, backend and Workflow Orchestration maps and inspected local source before forming this plan.
-- Confirmed current mixed presentation evidence: Pipeline Builder still exposes `Node`, `node` and `step`; Project Startup still exposes `Node đầu`, `bước` and `Work Item`; runtime surfaces include residual `Node`/`bước`; template PDF metadata and tables still use `node`/`step`.
-- Confirmed the current official Rev9 source preserves Rev8 topology and changes only the final work package to `Xác nhận bàn giao hồ sơ kế toán`; older applied migrations and runtime snapshots remain historical evidence, not replacement targets.
-- Classified stable technical identifiers and historical snapshots as protected exclusions. No product source, UI, API, database schema, seed or migration was changed while preparing this plan.
+- Loaded the mandatory module, frontend, Project Planning, and Workflow Orchestration maps.
+- Confirmed the current owner is `frontend/src/modules/my-work/MyWorkPage.tsx` and the existing desktop presentation is `xl:grid-cols-2` with per-item cards.
+- Captured user approval for the one-column divided-list mockup.
+- Replaced the attention card grid with one semantic divided list across breakpoints.
+- Added list-shaped loading skeletons and an explicit retry action while preserving existing empty, unread, reply, attachment, reaction, mark-read, and navigation behavior.
+- Added the focused presentation contract and updated the central/frontend mapping files.
+- After the final responsive adjustment, `node --experimental-strip-types --test tests/myWorkAttentionLoading.test.ts tests/myWorkListPresentation.test.ts` passed 19/19 tests on the current source on 2026-09-10.
+- On that same final source, `npm run build` completed successfully on 2026-09-10 (`tsc --noEmit` plus Vite production build, 1,947 modules transformed in 4.67s).
+- No backend, API, database, migration, permission, or activity-state contract changed. Browser and user acceptance checks were skipped.
+
+## Notification Archive Burst Stability
+
+Status: TECHNICALLY VERIFIED FOR THE NOTIFICATION SCOPE; REPOSITORY-WIDE FRONTEND TEST SUITE HAS ONE UNRELATED EXISTING FAILURE; NOT UX ACCEPTED.
+
+Will be done:
+
+- No remaining implementation work in the approved notification scope.
+- Browser/UAT may be run later only with explicit authorization; until then the UI remains `NOT UX ACCEPTED`.
+- The unrelated `project evidence list separates file, stage and work item columns` contract failure remains outside this notification plan.
+
+Done:
+
+- Loaded the mandatory central/frontend/backend/root-cause/Admin Governance mappings and the diagnosis/frontend workflow skills.
+- Confirmed from the supplied UI and local backend logs that fourteen successful archive mutations between 12:03:13 and 12:03:18 caused twenty-seven successful list refetches before a list refetch received HTTP 429.
+- Confirmed the duplicate invalidation owners are the local notification mutation handlers and the app-level `notification_changed` SSE handler.
+- Confirmed the current full-screen `isError` branches hide still-cached rows after a background refetch failure.
+- Received explicit user approval to implement the reviewed frontend-only repair without changing backend rate-limit, API, schema, permission, or notification source behavior.
+- Added `notificationCache.ts` as the single owner for successful read/archive/read-all actor-cache transitions, stale-data presentation state, and trailing notification-event coalescing.
+- Updated the full notification page and bell panel to retain cached rows on background refresh failure, expose inline retry, and reserve the blocking error for an initial no-data failure.
+- Updated the actor realtime provider to coalesce a notification burst for 750ms, fetch the authoritative summary revision once, and refresh notification rows only when the actor revision differs.
+- Added focused cache/presentation regressions and updated the central, frontend, root-cause, and Admin Governance maps. The backend map required no update because no backend route, handler, service, repository, API contract, rate limit or data behavior changed.
+- On the current notification source, `node --experimental-strip-types --test tests/notificationCache.test.ts tests/notificationPresentation.test.ts` passed 6/6 tests on 2026-09-10.
+- On the current source, `npm run build` completed successfully on 2026-09-10 (`tsc --noEmit` plus Vite production build, 1,948 modules transformed in 3.96s).
+- The repository-wide `npm test` run passed 462/463 tests; its sole failure is `tests/projectEvidenceColumns.test.ts`, whose source and target `EvidenceGallery.tsx` have no working-tree diff and are unrelated to notifications.
+- `git diff --check` passed. Browser/UAT was skipped; no backend, database, migration, RBAC, recipient, source-action or resolution behavior changed.
