@@ -48,6 +48,12 @@
 - Creating project activity remains membership-scoped through `CanMutateProjectActivity`; viewing all project activity does not authorize comments or workflow mutations.
 - `ProjectWorkspaceLayout.tsx` displays the explicit all-company/read-only Accounting banner so “thấy hết quy trình” is not mistaken for PM/Admin operating authority.
 
+## Compact Project Workspace Page Chrome
+
+- Mục đích chính: reserve vertical space for operational content without losing project or current-surface context. `ProjectWorkspaceLayout.tsx` is the single visible owner of project code/name, client, PM, status and the compact Developer Sample Data badge. Project-scoped business pages use the opt-in compact `PageHeader`; global counterparts retain standard density.
+- `ProjectDetailPage.tsx` keeps an assistive-only page h1, combines the existing horizontally scrollable seven-view switcher with the secondary `Mở kế hoạch` action, and does not repeat project identity. The primary lifecycle CTA remains solely in `Cần làm tiếp theo`; permissions, route state, counts, loading/error/empty behavior and workflow transitions are unchanged.
+- Owners: `frontend/src/components/PageHeader.tsx`, `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx`, `ProjectDetailPage.tsx`, and project-scoped callers under Planning, BOQ, Contracts, Procurement, Warehouse, Operations, Acceptance, Handover, Project Finance and Audit. Focused contracts: `frontend/tests/projectDetailTabs.test.ts`, `projectWorkspaceCompactHeader.test.ts`. First searches: `data-page-header-density|data-project-overview-toolbar|density="compact"|SampleDataBadge`.
+
 ## Owners
 
 - Frontend modules: `frontend/src/modules/projects`, `frontend/src/modules/planning` including `ConstructionHandoffPanel.tsx`, `frontend/src/modules/planning-daily-reports`, `frontend/src/modules/meeting-minutes`, `frontend/src/modules/planning-checklists`

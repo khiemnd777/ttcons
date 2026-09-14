@@ -80,6 +80,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
   return <>
     {sourceLink.feedback}
     <PageHeader
+      density={scoped ? 'compact' : 'standard'}
       title="Mua sắm vật tư"
       description="Theo dõi từ yêu cầu mua, đặt hàng, nghiệm thu đầu vào đến phiếu nhập kho."
       actions={<>

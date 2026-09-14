@@ -8,6 +8,7 @@ import { DataTable, type Column } from '../../components/DataTable';
 import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { ListSection } from '../../components/ListSection';
+import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
@@ -158,8 +159,7 @@ function LegacyProjectFinancePage({ global = false }: { global?: boolean }) {
 
   return (
     <div className="space-y-5">
-      {id ? <ProjectBackLink /> : null}
-      <header className="border-b border-line pb-5">
+      {global ? <header className="border-b border-line pb-5">
         <div className={clsx('grid gap-4', global && 'xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8')}>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Tài chính công trình</h1>
@@ -186,7 +186,14 @@ function LegacyProjectFinancePage({ global = false }: { global?: boolean }) {
             </div>
           </section> : null}
         </div>
-      </header>
+      </header> : (
+        <PageHeader
+          density="compact"
+          title="Tài chính công trình"
+          description="Ghi nhận chi phí mua vật tư, theo dõi hồ sơ đề nghị thu/chi và cung cấp số liệu quản trị cho Ban giám đốc. Không thay thế MISA, sổ kế toán hoặc kê khai thuế."
+          actions={id ? <ProjectBackLink /> : undefined}
+        />
+      )}
 
       {!projectId ? <EmptyState title="Chọn công trình để xem tài chính công trình." /> : <>
         <div className="flex flex-col gap-3 border-b border-line sm:flex-row sm:items-end sm:justify-between">

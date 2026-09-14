@@ -42,12 +42,12 @@ test('sample data profile flow exposes approved progress and confirmation semant
 
 test('sample identity is visible in project and operational-report presentation', async () => {
   const projects = await source('../src/modules/projects/ProjectsPage.tsx');
-  const projectDetail = await source('../src/modules/projects/ProjectDetailPage.tsx');
+  const projectWorkspace = await source('../src/modules/projects/ProjectWorkspaceLayout.tsx');
   const reports = await source('../src/modules/reports/OperationalReportPanel.tsx');
   const staff = await source('../src/modules/staff/StaffPage.tsx');
 
   assert.match(projects, /project\.is_sample \? <SampleDataBadge/);
-  assert.match(projectDetail, /project\.is_sample \? 'Dữ liệu mẫu'/);
+  assert.match(projectWorkspace, /project\?\.is_sample \? <SampleDataBadge compact \/>/);
   assert.match(reports, /row\.is_sample \? <SampleDataBadge/);
   assert.match(staff, /row\.is_sample \? <SampleDataBadge compact/);
   assert.match(staff, /disabled=\{!row\.user_id \|\| row\.is_sample\}/);

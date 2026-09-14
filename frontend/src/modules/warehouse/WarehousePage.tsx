@@ -139,6 +139,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   if (!canViewWarehouse) {
     return <>
       <PageHeader
+        density={scoped ? 'compact' : 'standard'}
         title="Vật tư"
         description="Tra cứu danh mục vật tư phục vụ thiết kế. Số liệu tồn kho và nghiệp vụ kho không nằm trong phạm vi truy cập."
         actions={scoped ? <ProjectBackLink projectId={projectId} /> : undefined}
@@ -155,6 +156,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
 
   return <>
     <PageHeader
+      density={scoped ? 'compact' : 'standard'}
       title="Kho vật tư"
       description="Tồn theo kho, phiếu nhập xuất, vật tư tại công trình và xử lý vật tư dư."
       actions={<>

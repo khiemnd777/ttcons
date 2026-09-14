@@ -249,6 +249,7 @@ export function BOQPage() {
   return (
     <>
       <PageHeader
+        density="compact"
         title="Dự toán & báo giá"
         description="Quản lý dòng dự toán, thu thập báo giá và chốt giá trước khi chuyển sang mua sắm."
         actions={

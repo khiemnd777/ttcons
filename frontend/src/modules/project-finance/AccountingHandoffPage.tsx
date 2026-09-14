@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable, type Column } from '../../components/DataTable';
 import { EmptyState } from '../../components/EmptyState';
+import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
@@ -152,8 +153,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
 
   return (
     <div className="space-y-5">
-      {id ? <ProjectBackLink /> : null}
-      <header className="border-b border-line pb-5">
+      {global ? <header className="border-b border-line pb-5">
         <div className={clsx('grid gap-4', global && 'xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8')}>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Hồ sơ bàn giao kế toán</h1>
@@ -166,7 +166,14 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
             </div>
           </section> : null}
         </div>
-      </header>
+      </header> : (
+        <PageHeader
+          density="compact"
+          title="Hồ sơ bàn giao kế toán"
+          description="Theo dõi hồ sơ nghiệp vụ từ Mua sắm và Hợp đồng đến lúc Kế toán tiếp nhận. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA."
+          actions={id ? <ProjectBackLink /> : undefined}
+        />
+      )}
 
       {!projectId ? <EmptyState title="Chọn công trình để xem hồ sơ bàn giao kế toán." /> : <>
         <div className="flex flex-wrap gap-2" aria-label="Lọc trạng thái bàn giao">

@@ -336,6 +336,7 @@ export function ContractsPage() {
     <>
       {sourceLink.feedback}
       <PageHeader
+        density="compact"
         title="Hợp đồng"
         description="Theo dõi giá trị, ký duyệt, thanh toán, phụ lục và khoản giữ lại của công trình."
         actions={(

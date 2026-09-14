@@ -143,6 +143,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
   return (
     <>
       <PageHeader
+        density="compact"
         title={mode === 'pipeline' ? 'Quy trình' : 'Kế hoạch công việc'}
         description={run.data ? `${run.data.project_name} · Mẫu: ${run.data.template_name}` : 'Chưa có quy trình đang chạy cho công trình này.'}
         actions={

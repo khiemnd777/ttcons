@@ -14,3 +14,17 @@ test('project-detail tabs pair every project workspace surface with its Lucide i
   assert.match(projectDetail, /\{ id: 'members', label: 'Thành viên', icon: Users, count: members\.data\?\.summary\.active \?\? 0 \}/);
   assert.match(projectDetail, /<Icon className="h-4 w-4 shrink-0" aria-hidden="true" \/>/);
 });
+
+test('project overview uses one compact toolbar without repeating project identity or lifecycle actions', async () => {
+  const projectDetail = await readFile(new URL('../src/modules/projects/ProjectDetailPage.tsx', import.meta.url), 'utf8');
+
+  assert.match(projectDetail, /<h1 className="sr-only">\{activeTabLabel\} · \{project\.code/);
+  assert.match(projectDetail, /data-project-overview-toolbar/);
+  assert.match(projectDetail, /role="group" aria-label="Nội dung công trình"/);
+  assert.match(projectDetail, /aria-pressed=\{active\}/);
+  assert.match(projectDetail, /actions=\{activeTab === 'workflow' \? undefined/);
+  assert.match(projectDetail, />\s*Mở kế hoạch\s*<\/Link>/);
+  assert.match(projectDetail, /<ProjectOverviewActionBand/);
+  assert.doesNotMatch(projectDetail, /function HeaderActions/);
+  assert.doesNotMatch(projectDetail, /title=\{`\$\{project\.code/);
+});

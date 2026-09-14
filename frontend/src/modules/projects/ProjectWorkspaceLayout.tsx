@@ -20,6 +20,7 @@ import {
 import clsx from 'clsx';
 import { BrandHomeLink } from '../../components/BrandLogo';
 import { PoweredBySignature } from '../../components/PoweredBySignature';
+import { SampleDataBadge } from '../../components/SampleDataBadge';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { get } from '../../lib/api/client';
@@ -94,9 +95,12 @@ export function ProjectWorkspaceLayout() {
                 Công trình
               </button>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">
-                  {project ? `${project.code} · ${project.name}` : operations.isLoading ? 'Đang tải công trình...' : 'Không gian công trình'}
-                </p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="truncate text-sm font-semibold text-ink">
+                    {project ? `${project.code} · ${project.name}` : operations.isLoading ? 'Đang tải công trình...' : 'Không gian công trình'}
+                  </p>
+                  {project?.is_sample ? <SampleDataBadge compact /> : null}
+                </div>
                 <p className="truncate text-xs text-slate-500">
                   {[
                     project?.client_name ? `Chủ đầu tư: ${project.client_name}` : null,

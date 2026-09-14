@@ -182,33 +182,25 @@ export function ProjectDetailPage() {
     { id: 'audit', label: 'Nhật ký', icon: ScrollText },
     { id: 'members', label: 'Thành viên', icon: Users, count: members.data?.summary.active ?? 0 },
   ];
+  const activeTabLabel = tabs.find((tab) => tab.id === activeTab)?.label ?? 'Tổng quan';
 
   return (
     <>
-      <PageHeader
-        title={`${project.code ?? data.project.code} · ${project.name ?? data.project.name}`}
-        description={
-          [
-            project.client_name ? `Chủ đầu tư: ${project.client_name}` : null,
-            project.pm_name ? `Phụ trách: ${identityReferenceText(project.pm_name, project.pm_account_deleted)}${project.pm_account_deleted ? ' · Cần phân công lại' : ''}` : null,
-            project.status ? `Trạng thái: ${statusLabel(project.status)}` : null,
-            project.is_sample ? 'Dữ liệu mẫu' : null,
-            project.planned_end_date ? `Kết thúc: ${dateText(project.planned_end_date)}` : null,
-          ].filter(Boolean).join(' · ')
-        }
+      <h1 className="sr-only">{activeTabLabel} · {project.code ?? data.project.code} · {project.name ?? data.project.name}</h1>
+      <ProjectDetailTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
         actions={activeTab === 'workflow' ? undefined : (
-          <HeaderActions
-            hasPipeline={hasPipeline}
-            showLifecycleAction={activeTab !== 'activity'}
-            primaryWork={primaryWork}
-            onStartPipeline={() => setStartupWizardOpen(true)}
-            onOpenWork={openWorkItem}
-            projectId={id}
-          />
+          <Link
+            to={`/projects/${id}/planning`}
+            className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-line px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            <GitBranch className="h-4 w-4" />
+            Mở kế hoạch
+          </Link>
         )}
       />
-
-      <ProjectDetailTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
       <div className="mt-5">
         {activeTab === 'overview' ? (
@@ -299,51 +291,6 @@ export function ProjectDetailPage() {
   );
 }
 
-function HeaderActions({
-  hasPipeline,
-  showLifecycleAction,
-  primaryWork,
-  onStartPipeline,
-  onOpenWork,
-  projectId,
-}: {
-  hasPipeline: boolean;
-  showLifecycleAction: boolean;
-  primaryWork?: WorkItem;
-  onStartPipeline: () => void;
-  onOpenWork: (item: WorkItem) => void;
-  projectId: string;
-}) {
-  return (
-    <>
-      {showLifecycleAction && !hasPipeline ? (
-        <button
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          onClick={onStartPipeline}
-        >
-          <Play className="h-4 w-4" />
-          Hoàn tất thiết lập
-        </button>
-      ) : showLifecycleAction && primaryWork ? (
-        <button
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-          onClick={() => onOpenWork(primaryWork)}
-        >
-          {primaryWork.status === 'blocked' ? <AlertTriangle className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
-          {projectPriorityActionLabel(primaryWork)}
-        </button>
-      ) : null}
-      <Link
-        to={`/projects/${projectId}/planning`}
-        className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-      >
-        <GitBranch className="h-4 w-4" />
-        Mở kế hoạch
-      </Link>
-    </>
-  );
-}
-
 type ProjectDetailTabDefinition = {
   id: ProjectDetailTab;
   label: string;
@@ -355,43 +302,48 @@ function ProjectDetailTabs({
   tabs,
   activeTab,
   onChange,
+  actions,
 }: {
   tabs: ProjectDetailTabDefinition[];
   activeTab: ProjectDetailTab;
   onChange: (tab: ProjectDetailTab) => void;
+  actions?: ReactNode;
 }) {
   return (
-    <div className="mt-5 overflow-x-auto border-b border-line">
-      <div className="flex min-w-max gap-1">
-        {tabs.map((tab) => {
-          const active = tab.id === activeTab;
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              className={clsx(
-                'inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition focus-ring',
-                active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-ink',
-              )}
-              aria-pressed={active}
-              onClick={() => onChange(tab.id)}
-            >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {tab.label}
-              {typeof tab.count === 'number' ? (
-                <span className={clsx(
-                  'rounded px-1.5 py-0.5 text-xs',
-                  active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500',
+    <div className="flex min-w-0 items-end gap-2 border-b border-line" data-project-overview-toolbar>
+      <div className="min-w-0 flex-1 overflow-x-auto">
+        <div className="flex min-w-max gap-1" role="group" aria-label="Nội dung công trình">
+          {tabs.map((tab) => {
+            const active = tab.id === activeTab;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                className={clsx(
+                  'inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition focus-ring',
+                  active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-ink',
                 )}
-                >
-                  {tab.count}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+                aria-pressed={active}
+                onClick={() => onChange(tab.id)}
+              >
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {tab.label}
+                {typeof tab.count === 'number' ? (
+                  <span className={clsx(
+                    'rounded px-1.5 py-0.5 text-xs',
+                    active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500',
+                  )}
+                  >
+                    {tab.count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
+      {actions ? <div className="flex shrink-0 items-center pb-1">{actions}</div> : null}
     </div>
   );
 }
@@ -1418,6 +1370,7 @@ function ProjectOperationsError({ error, onRetry }: { error: unknown; onRetry: (
   return (
     <>
       <PageHeader
+        density="compact"
         title="Điều hành công trình"
         description="Tổng quan vận hành và công việc cần xử lý"
         actions={

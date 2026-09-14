@@ -36,7 +36,7 @@ test('new accounting handoff is source-backed and contains no duplicate accounti
   assert.match(financePage, /<AccountingHandoffActionDialog/);
   assert.doesNotMatch(financePage, /Ghi nhận chi phí vật tư|Lập đề nghị thu\/chi|Báo cáo quản trị|provisional_profit|amount_before_vat|vat_amount/);
   assert.match(compatibilityWrapper, /mode\.data\?\.mode === 'legacy'/);
-  assert.match(financePage, /\{id \? <ProjectBackLink \/> : null\}/);
+  assert.match(financePage, /actions=\{id \? <ProjectBackLink \/> : undefined\}/);
   assert.match(financePage, /\{global \? <section/);
 });
 

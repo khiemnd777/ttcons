@@ -52,5 +52,6 @@ test('project discussion leads with the lifecycle action while preserving the pe
   assert.match(projectDetail, /<ProjectStartupWizard/);
   assert.match(projectDetail, /workflowAction=\{\{ hasPipeline, pipelineStatus, currentNode, primaryWork, onOpenStartup \}\}/);
   assert.doesNotMatch(projectDetail, /post\(`\/projects\/\$\{id\}\/start-pipeline`/);
-  assert.match(projectDetail, /showLifecycleAction=\{activeTab !== 'activity'\}/);
+  assert.match(projectDetail, /<ProjectOverviewActionBand/);
+  assert.doesNotMatch(projectDetail, /function HeaderActions/);
 });

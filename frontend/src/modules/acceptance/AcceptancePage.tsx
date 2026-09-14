@@ -206,6 +206,7 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
       {sourceLink.feedback}
       <div className="mx-auto w-full max-w-[1180px]">
         <PageHeader
+          density={global ? 'standard' : 'compact'}
           title="Nghiệm thu"
           description="Soạn, kiểm tra và kết luận biên bản nghiệm thu theo checklist; mỗi trạng thái chỉ hiển thị hành động tiếp theo cần làm."
           actions={<>
