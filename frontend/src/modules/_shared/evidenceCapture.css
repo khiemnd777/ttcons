@@ -1,5 +1,5 @@
 @media (max-width: 767px) {
-  .evidence-uploader input { min-width: 0; font-size: 16px; }
+  .evidence-uploader input { min-width: 0; }
   .evidence-camera-content,
   .evidence-camera-content .evidence-camera-frame { height: 100%; min-height: 160px; }
   .evidence-camera-content .evidence-camera-frame { aspect-ratio: auto; }

@@ -39,6 +39,12 @@
 - Only successful evidence/design uploads and formal form submit/amend/design release/handoff create `work_update` cards. Draft field saves stay outside discussion. The Design editor assigns one UUID to each settled upload attempt; the protected batch-complete route validates the exact ordered Evidence IDs and creates one immutable `files:<batch_id>` snapshot/card for all successful files. A partial attempt records its successes once, while later retries use a new batch/card; legacy uploads without a batch ID retain per-file compatibility. Batch cards load the authorized snapshot inline and list every file through `EvidenceReferenceViewButton`; release/handoff and historical cards are unchanged. Feed metadata carries identity/status only; `GET /activities/:id/work-update` rechecks current source visibility. Replies inherit original scope and visibility. Reactions/read cursors never execute a workflow transition. No historical backfill.
 - Ordinary forms retain local edits during refetch; canonical saves send `expected_answers` and amendments pin their starting revision. Design draft editing retains its open session and successful file receipts, sending `expected_values` for metadata conflicts. Closing focused work edits warns about unsaved data. This is in-memory editing, not offline persistence or transport-level upload idempotency.
 
+## Mobile Form Focus Zoom Guard
+
+- Keywords: mobile focus auto-zoom, field tự phóng to, input zoom, Safari focus zoom, font input mobile. Matched surface: shared frontend form-control typography. Owner: `frontend/src/index.css`; regression owner: `frontend/tests/mobileInputZoom.test.ts`. First searches: `rg -n "font-size: 16px|text-sm|maximum-scale|user-scalable|pointer: coarse" frontend/src frontend/index.html frontend/tests`.
+- Narrow viewports and primary-touch devices enforce 16px text for editable `input`, `select` and `textarea` controls so browser focus does not enlarge sub-16px fields. Checkbox, radio, range, button-like and hidden inputs stay outside the rule. Existing field components and module forms inherit this single global behavior; do not add another feature-local font override.
+- Preserve user-controlled pinch zoom and natural keyboard viewport scrolling. Do not add `maximum-scale=1` or `user-scalable=no`, and do not change desktop/mouse typography. Source tests prove the CSS/viewport contract only; physical device and browser UX remains a separate acceptance gate.
+
 
 ## Mobile Construction Report Capture
 

@@ -20,6 +20,12 @@
 - V140 backfilled legacy design documents by reusing their exact storage provider/key/checksum without copying bytes. Old immutable discussion snapshots with `reference_type=document` must keep `/documents/:id/file`; new snapshots use `reference_type=evidence` and exact `/evidence/:id` metadata/file access. Never pass a historical document ID as an Evidence ID or replace an old revision snapshot with current metadata.
 - Verify with DB-backed design-release/project-evidence integration tests, `evidenceComponentReuse`, `evidenceLifecycle`, PDF/Office/reference/file-type tests, migration checks and frontend build. Controlled render/hook checks prove only technical integration; nested focus, stacking and physical mobile behavior require separately authorized browser acceptance.
 
+## Mobile Field Focus Auto-Zoom
+
+- Symptom: focusing a text, numeric, date, password, select or textarea field on mobile enlarges the page and leaves surrounding layout zoomed. Owner: `frontend/src/index.css`; representative consumers: `_shared/SimpleForm.tsx`, `components/{CurrencyInput,PasswordInput}.tsx`, Workflow forms and module-local controls. First searches: `rg -n "font-size: 16px|text-sm|maximum-scale|user-scalable|pointer: coarse|zoom" frontend/src frontend/index.html frontend/tests`.
+- Winning cause: mobile/WebKit focus zoom is triggered by editable controls rendered below 16px while Consflow commonly assigns Tailwind `text-sm`. The shared fix applies 16px at narrow viewports and primary-touch devices, excluding controls that do not accept text. Do not patch every component or add JavaScript focus/scale handlers.
+- Keep `width=device-width, initial-scale=1.0` without `maximum-scale=1` or `user-scalable=no`; pinch zoom is an accessibility capability, while keyboard-driven viewport resize/scroll remains valid. Run `mobileInputZoom.test.ts`, the frontend suite and build. Static tests do not replace physical portrait/landscape device acceptance.
+
 ## Construction Report Mobile Width And Continuous Camera
 
 - Symptoms: clipped report on mobile, oversized footer, horizontally scrolling resource inputs, camera reopening after each photo, or query refresh erasing a draft. Owners: `ConstructionReportFormDialog.tsx/constructionReport.css`, `Dialog.tsx/dialog.css`, `EvidenceCapture.tsx/evidenceCapture.css`, `cameraCaptureSession.ts`. Load central/frontend/Construction Operations maps. First searches: `mobileFullscreen|EvidenceUploader|ReportDisclosure|min-w-0|report-resource-table|captureSession|initialized|discardOpen`.

@@ -34,6 +34,12 @@
 - Verification: `discussionWork.test.ts`, `projectActivityTabs.test.ts` and `projectStartupWizard.test.ts` cover source boundary/readiness/action labels, warm-cache detail gating/refetch, lifecycle-before-personal rail composition, Work Item discussion scoping and shared-wizard startup integration; shared evidence inventory/render tests cover both reference consumers. These are non-browser checks, not UX acceptance.
 - Reconnect reconciliation: ActivityThread refreshes the project feed and personal work queue on connection; `modules/notifications/ActorRealtimeProvider.tsx` refreshes dock discussions/feed, attention and Work Items after actor-stream reconnection. A failed source refresh hides stale content while keeping focused editor components mounted so retry does not discard local drafts.
 
+## Shared Mobile Form Focus Typography
+
+- `frontend/src/index.css` is the sole owner of the mobile/touch focus-zoom guard. At viewports below 768px or when the primary pointer is coarse and has no hover, editable `input`, `select` and `textarea` controls render at 16px even when their component uses Tailwind `text-sm`; checkbox, radio, range, button-like and hidden inputs are excluded.
+- The rule covers shared `SimpleForm`, `CurrencyInput`, `PasswordInput`, Workflow forms and module-local controls without changing their JSX, payload, validation, focus ring or disabled/error behavior. Construction Report and Evidence Capture retain only their scoped layout/min-width/touch-target rules rather than duplicating the font override.
+- `frontend/index.html` must continue to allow user pinch zoom; never repair focus zoom with `maximum-scale=1` or `user-scalable=no`. Focused source coverage is `frontend/tests/mobileInputZoom.test.ts`; it does not establish physical iOS/Android acceptance. First searches: `font-size: 16px|text-sm|maximum-scale|user-scalable|pointer: coarse`.
+
 
 ## Mobile Construction Report Form
 

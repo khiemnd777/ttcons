@@ -16,6 +16,16 @@ button, input, select, textarea {
   font: inherit;
 }
 
+/* Mobile browsers may zoom focused form fields rendered below 16px. Keep the
+   readable field size without disabling user-controlled page zoom. */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* Keep column labels visible without changing a table's data or interaction contract. */
 :root {
   --consflow-table-sticky-top: 4rem;
