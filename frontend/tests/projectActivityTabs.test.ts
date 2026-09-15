@@ -60,3 +60,13 @@ test('project discussion leads with the lifecycle action while preserving the pe
   assert.match(projectDetail, /<ProjectOverviewActionBand/);
   assert.doesNotMatch(projectDetail, /function HeaderActions/);
 });
+
+test('project discussion starts with operational content without a visible local title block', async () => {
+  const projectDiscussion = await source('../src/modules/projects/ProjectDiscussionPage.tsx');
+
+  assert.match(projectDiscussion, /<h1 className="sr-only">Trao đổi · \{project\.code/);
+  assert.match(projectDiscussion, /<\/h1>\s*<ActivityThread/);
+  assert.doesNotMatch(projectDiscussion, /<h2 className="font-semibold text-ink">Trao đổi<\/h2>/);
+  assert.doesNotMatch(projectDiscussion, /Phối hợp, quyết định và theo dõi các vấn đề của công trình\./);
+  assert.doesNotMatch(projectDiscussion, /h-10 w-64 animate-pulse/);
+});

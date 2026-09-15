@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, MessageSquare, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertCircle, RefreshCw, ShieldAlert } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { EmptyState } from '../../components/EmptyState';
 import { ApiError, get } from '../../lib/api/client';
@@ -72,30 +72,21 @@ export function ProjectDiscussionPage() {
   return (
     <>
       <h1 className="sr-only">Trao đổi · {project.code ?? data.project.code} · {project.name ?? data.project.name}</h1>
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-blue-700" />
-          <div>
-            <h2 className="font-semibold text-ink">Trao đổi</h2>
-            <p className="mt-0.5 text-sm text-slate-500">Phối hợp, quyết định và theo dõi các vấn đề của công trình.</p>
-          </div>
-        </div>
-        <ActivityThread
-          projectId={id}
-          targetOptions={activityTargets}
-          attachmentOptions={attachmentOptions}
-          workflowAction={{
-            hasPipeline,
-            pipelineStatus: String(data.pipeline_run?.status ?? ''),
-            currentNode,
-            primaryWork,
-            onOpenStartup: () => setStartupWizardOpen(true),
-          }}
-          onChanged={() => {
-            void queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
-          }}
-        />
-      </div>
+      <ActivityThread
+        projectId={id}
+        targetOptions={activityTargets}
+        attachmentOptions={attachmentOptions}
+        workflowAction={{
+          hasPipeline,
+          pipelineStatus: String(data.pipeline_run?.status ?? ''),
+          currentNode,
+          primaryWork,
+          onOpenStartup: () => setStartupWizardOpen(true),
+        }}
+        onChanged={() => {
+          void queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
+        }}
+      />
       <ProjectStartupWizard
         open={startupWizardOpen}
         projectId={id}
@@ -112,14 +103,11 @@ export function ProjectDiscussionPage() {
 
 function ProjectDiscussionSkeleton() {
   return (
-    <div className="space-y-4" role="status" aria-label="Đang tải trao đổi công trình">
-      <div className="h-10 w-64 animate-pulse rounded-md bg-slate-100" />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="h-[620px] animate-pulse rounded-lg border border-line bg-white shadow-panel" />
-        <div className="space-y-3">
-          <div className="h-44 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
-          <div className="h-56 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
-        </div>
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]" role="status" aria-label="Đang tải trao đổi công trình">
+      <div className="h-[620px] animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+      <div className="space-y-3">
+        <div className="h-44 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
+        <div className="h-56 animate-pulse rounded-lg border border-line bg-white shadow-panel" />
       </div>
     </div>
   );
