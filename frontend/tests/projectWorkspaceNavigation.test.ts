@@ -144,4 +144,7 @@ test('project workspace sidebar renders configured icons instead of generic fold
   assert.match(workspaceNode, /const ChildIcon = child\.icon/);
   assert.match(workspaceNode, /<ChildIcon aria-hidden="true"/);
   assert.doesNotMatch(workspaceNode, /<Folder\b/);
+  assert.match(workspaceNode, /\{group\.children\.length \? <ChevronDown className="h-4 w-4 shrink-0"\s*\/> : null\}/);
+  assert.match(workspaceNode, /ml-8 flex w-\[calc\(100%-2rem\)\]/);
+  assert.doesNotMatch(workspaceNode, /border-l border-slate-200/);
 });

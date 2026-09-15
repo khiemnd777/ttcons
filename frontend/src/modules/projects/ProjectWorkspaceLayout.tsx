@@ -691,7 +691,7 @@ function WorkspaceGroupNode({
               : 'text-slate-700 hover:bg-slate-50 hover:text-ink',
         )}
       >
-        <ChevronDown className="h-4 w-4 shrink-0" />
+        {group.children.length ? <ChevronDown className="h-4 w-4 shrink-0" /> : null}
         <GroupIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{group.label}</span>
         {typeof badgeCount === 'number' && badgeCount > 0 ? (
@@ -715,7 +715,7 @@ function WorkspaceGroupNode({
                 to={childTarget}
                 aria-current={active ? 'page' : undefined}
                 className={clsx(
-                  'ml-8 flex w-[calc(100%-2rem)] items-center gap-2 border-l border-slate-200 px-4 py-1.5 text-sm focus-ring',
+                  'ml-8 flex w-[calc(100%-2rem)] items-center gap-2 px-4 py-1.5 text-sm focus-ring',
                   active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700',
                 )}
               >
