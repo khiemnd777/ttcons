@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, ExternalLink, RotateCcw, Send, Undo2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Inbox, ListFilter, RotateCcw, Send, Undo2 } from 'lucide-react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { CurrencyText } from '../../components/CurrencyText';
@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import { get, post } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { AccountingHandoffItem, AccountingHandoffWorkspace } from '../../lib/types/domain';
@@ -31,13 +32,13 @@ import { invalidateAccountingWork } from './accountingWorkActions';
 
 type HandoffFilter = 'all' | 'needs_attention' | 'ready' | 'handed_off' | 'acknowledged' | 'returned';
 
-const filterLabels: Array<{ value: HandoffFilter; label: string; countKey?: keyof AccountingHandoffWorkspace['summary'] }> = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'needs_attention', label: 'Cần bổ sung', countKey: 'needs_attention_count' },
-  { value: 'ready', label: 'Sẵn sàng', countKey: 'ready_count' },
-  { value: 'handed_off', label: 'Đã bàn giao', countKey: 'handed_off_count' },
-  { value: 'acknowledged', label: 'Đã tiếp nhận', countKey: 'acknowledged_count' },
-  { value: 'returned', label: 'Bị trả lại', countKey: 'returned_count' },
+const filterLabels: Array<WorkspaceTabItem<HandoffFilter> & { countKey?: keyof AccountingHandoffWorkspace['summary'] }> = [
+  { id: 'all', label: 'Tất cả', icon: ListFilter },
+  { id: 'needs_attention', label: 'Cần bổ sung', icon: AlertTriangle, countKey: 'needs_attention_count' },
+  { id: 'ready', label: 'Sẵn sàng', icon: CheckCircle2, countKey: 'ready_count' },
+  { id: 'handed_off', label: 'Đã bàn giao', icon: Send, countKey: 'handed_off_count' },
+  { id: 'acknowledged', label: 'Đã tiếp nhận', icon: Inbox, countKey: 'acknowledged_count' },
+  { id: 'returned', label: 'Bị trả lại', icon: Undo2, countKey: 'returned_count' },
 ];
 
 export function AccountingHandoffPage({ global = false }: { global?: boolean }) {
@@ -176,9 +177,12 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
       )}
 
       {!projectId ? <EmptyState title="Chọn công trình để xem hồ sơ bàn giao kế toán." /> : <>
-        <div className="flex flex-wrap gap-2" aria-label="Lọc trạng thái bàn giao">
-          {filterLabels.map((item) => <button key={item.value} className={clsx('rounded-md border px-3 py-2 text-sm font-semibold', filter === item.value ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600 hover:bg-slate-50')} onClick={() => setFilter(item.value)}>{item.label}{item.countKey ? <span className="ml-2 rounded-full bg-white px-1.5 py-0.5 text-xs ring-1 ring-inset ring-slate-200">{data?.summary[item.countKey] ?? 0}</span> : null}</button>)}
-        </div>
+        <WorkspaceTabs
+          tabs={filterLabels.map(({ countKey, ...tab }) => ({ ...tab, count: countKey ? data?.summary[countKey] ?? 0 : undefined }))}
+          activeTab={filter}
+          onChange={setFilter}
+          ariaLabel="Lọc trạng thái bàn giao"
+        />
         <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
           Consflow chỉ kiểm tra hồ sơ nguồn và ghi nhận bàn giao/tiếp nhận. Giá trị hiển thị là tham chiếu từ hồ sơ nghiệp vụ, không phải số liệu kế toán.
         </div>

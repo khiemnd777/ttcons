@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Ban, CheckCircle2, ChevronDown, ClipboardList, GitBranch, Play, Search, Send, Settings2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Ban, CheckCircle2, ChevronDown, ClipboardList, Clock3, GitBranch, ListFilter, Play, Search, Send, Settings2 } from 'lucide-react';
 import { ApiError, get, post } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -11,6 +11,7 @@ import { useToast } from '../../components/ToastProvider';
 import { EnumChip } from '../../components/EnumChip';
 import { Dialog } from '../../components/Dialog';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import type { ProjectOperationsResponse, ProjectOperationsTimelineNode, WorkItem } from '../../lib/types/domain';
 import { enumLabel, statusLabel } from '../../lib/utils/status';
 import { ProjectWorkflowWorkspace } from '../projects/ProjectDetailPage';
@@ -571,12 +572,12 @@ function PlanningActionWorkspace({
   onOpenRow: (row: PlanningWorkRow) => void;
   onOpenPipeline: () => void;
 }) {
-  const queueTabs: Array<{ id: PlanningQueueFilter; label: string; count: number }> = [
-    { id: 'actionable', label: 'Cần xử lý', count: metrics.actionable },
-    { id: 'waiting', label: 'Chờ duyệt', count: metrics.waiting },
-    { id: 'future', label: 'Sắp tới', count: metrics.future },
-    { id: 'completed', label: 'Hoàn tất', count: metrics.completed },
-    { id: 'all', label: 'Tất cả', count: metrics.total },
+  const queueTabs: WorkspaceTabItem<PlanningQueueFilter>[] = [
+    { id: 'actionable', label: 'Cần xử lý', icon: AlertTriangle, count: metrics.actionable },
+    { id: 'waiting', label: 'Chờ duyệt', icon: Send, count: metrics.waiting },
+    { id: 'future', label: 'Sắp tới', icon: Clock3, count: metrics.future },
+    { id: 'completed', label: 'Hoàn tất', icon: CheckCircle2, count: metrics.completed },
+    { id: 'all', label: 'Tất cả', icon: ListFilter, count: metrics.total },
   ];
   const workTypeOptions = [...new Set(rows.map((row) => row.workType).filter(Boolean))]
     .map((value) => [value, enumLabel('step_type', value)] as const)
@@ -681,18 +682,13 @@ function PlanningActionWorkspace({
             </div>
           </div>
 
-          <div className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Lọc hàng đợi công việc">
-            {queueTabs.map((tab) => (
-              <button
-                key={tab.id}
-                aria-pressed={queueFilter === tab.id}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${queueFilter === tab.id ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-600 hover:bg-slate-50'}`}
-                onClick={() => onQueueFilterChange(tab.id)}
-              >
-                {tab.label} <span className="ml-1">{tab.count}</span>
-              </button>
-            ))}
-          </div>
+          <WorkspaceTabs
+            className="mb-4"
+            tabs={queueTabs}
+            activeTab={queueFilter}
+            onChange={onQueueFilterChange}
+            ariaLabel="Lọc hàng đợi công việc"
+          />
 
           <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_170px_180px]">
             <label className="relative block">

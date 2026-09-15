@@ -15,6 +15,7 @@ import { RecordSummary, RecordSection, RecordMetrics, RecordMetric, RecordTable 
 import { RelatedRecords } from '../_shared/RecordLinks';
 import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import { StatCard } from '../../components/StatCard';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { RecordFormDialog } from '../_shared/RecordFormDialog';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
@@ -30,6 +31,13 @@ import {
 
 type WarehouseTab = 'stock' | 'documents' | 'site' | 'materials';
 type RecordRow = Record<string, any>;
+
+const warehouseTabs: WorkspaceTabItem<WarehouseTab>[] = [
+  { id: 'stock', label: 'Tồn theo kho', icon: WarehouseIcon },
+  { id: 'documents', label: 'Phiếu kho', icon: ClipboardList },
+  { id: 'site', label: 'Tại công trình & dư', icon: Boxes },
+  { id: 'materials', label: 'Danh mục vật tư', icon: PackageCheck },
+];
 
 export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
@@ -172,12 +180,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
       <StatCard label="Vật tư dư chưa xử lý" value={pendingSurplus} icon={<Boxes className="h-4 w-4" />} />
     </div>
     <div className="mb-4 rounded-lg border border-line bg-white p-3 shadow-panel">
-      <div className="flex flex-wrap gap-2 border-b border-line pb-3">
-        <TabButton active={tab === 'stock'} onClick={() => setTab('stock')} icon={<WarehouseIcon className="h-4 w-4" />}>Tồn theo kho</TabButton>
-        <TabButton active={tab === 'documents'} onClick={() => setTab('documents')} icon={<ClipboardList className="h-4 w-4" />}>Phiếu kho</TabButton>
-        <TabButton active={tab === 'site'} onClick={() => setTab('site')} icon={<Boxes className="h-4 w-4" />}>Tại công trình & dư</TabButton>
-        <TabButton active={tab === 'materials'} onClick={() => setTab('materials')} icon={<PackageCheck className="h-4 w-4" />}>Danh mục vật tư</TabButton>
-      </div>
+      <WorkspaceTabs tabs={warehouseTabs} activeTab={tab} onChange={setTab} ariaLabel="Không gian kho vật tư" />
       <div className="grid gap-2 pt-3 lg:grid-cols-[minmax(240px,1fr)_180px_180px_160px]">
         <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm vật tư, kho hoặc mã phiếu..." /></label>
         {tab === 'stock' ? <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)}><option value="all">Tất cả kho</option>{(warehouses.data ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select> : <span />}
@@ -436,7 +439,6 @@ function StockDocumentDetail({ record }: { record: StockDocument }) {
 const controlClass = 'w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50';
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>{children}</label>; }
 function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) { return <div><p className="text-xs font-semibold uppercase text-slate-500">{label}</p><div className="mt-1 text-sm font-semibold text-ink">{value}</div></div>; }
-function TabButton({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) { return <button className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-line bg-white text-slate-600 hover:bg-slate-50'}`} onClick={onClick}>{icon}{children}</button>; }
 function emptyLine(): DraftLine { return { key: `${Date.now()}-${Math.random()}`, material_id: '', quantity: 1, unit: '', reason: '' }; }
 function groupReceiptOptions(rows: WarehouseReceiptOption[]) { const groups = new Map<string, WarehouseReceiptOption[]>(); rows.forEach((row) => groups.set(row.incoming_acceptance_id, [...(groups.get(row.incoming_acceptance_id) ?? []), row])); return groups; }
 function validTab(value: string | null): WarehouseTab { return value === 'documents' || value === 'site' || value === 'materials' ? value : 'stock'; }

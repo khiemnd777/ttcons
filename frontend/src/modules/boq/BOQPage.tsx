@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CheckCircle2, DollarSign, Eye, History, Loader2, Lock, Plus, Send, ShoppingCart, ThumbsUp } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardList, DollarSign, Eye, History, Loader2, Lock, Plus, Send, ShoppingCart, ThumbsUp } from 'lucide-react';
 import clsx from 'clsx';
 import { get, post, put } from '../../lib/api/client';
 import type { BOQItem, BOQProcurementResult, BOQUnitPriceEvent } from '../../lib/types/domain';
@@ -17,6 +17,7 @@ import { useToast } from '../../components/ToastProvider';
 import { RowActions } from '../../components/RowActions';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { Dialog } from '../../components/Dialog';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { SimpleForm } from '../_shared/SimpleForm';
 import { currency, dateTimeText as compactDateTime } from '../../lib/utils/format';
@@ -40,6 +41,12 @@ type PriceFormState = {
 };
 
 type WorkspaceTab = 'estimate' | 'quotes' | 'compare';
+
+const workspaceTabs: WorkspaceTabItem<WorkspaceTab>[] = [
+  { id: 'estimate', label: 'Dòng dự toán', icon: ClipboardList },
+  { id: 'quotes', label: 'Báo giá nhà cung cấp', icon: DollarSign },
+  { id: 'compare', label: 'So sánh & chốt giá', icon: ShoppingCart },
+];
 
 export function BOQPage() {
   const { id = '' } = useParams();
@@ -263,11 +270,7 @@ export function BOQPage() {
         }
       />
 
-      <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg border border-line bg-white p-1">
-        <TabButton active={activeTab === 'estimate'} onClick={() => setActiveTab('estimate')}>Dòng dự toán</TabButton>
-        <TabButton active={activeTab === 'quotes'} onClick={() => setActiveTab('quotes')}>Báo giá nhà cung cấp</TabButton>
-        <TabButton active={activeTab === 'compare'} onClick={() => setActiveTab('compare')}>So sánh & chốt giá</TabButton>
-      </div>
+      <WorkspaceTabs className="mb-4" tabs={workspaceTabs} activeTab={activeTab} onChange={setActiveTab} ariaLabel="Nội dung dự toán và báo giá" />
 
       <div className="mb-4 grid gap-3 md:grid-cols-3">
         <MetricCard label="Tổng dự toán hiệu lực" value={total} tone="blue" />
@@ -377,10 +380,6 @@ export function BOQPage() {
       />
     </>
   );
-}
-
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} className={clsx('whitespace-nowrap rounded-md px-4 py-2 text-sm font-semibold', active ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50')}>{children}</button>;
 }
 
 function LoadingState() {

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ChevronDown, ChevronRight, FileCheck2, Search } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clock3, FileCheck2, ListFilter, Search } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { StatusBadge } from '../../components/StatusBadge';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import { get } from '../../lib/api/client';
 import type { ProjectOperationsResponse, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
@@ -157,27 +158,13 @@ export function PreparationPage() {
             <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{counts.all}</span>
           </div>
 
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Lọc hồ sơ theo trạng thái">
-            {preparationFilterOptions(counts).map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={filter === option.value}
-                className={clsx(
-                  'inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold',
-                  filter === option.value
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-line bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700',
-                )}
-                onClick={() => setFilter(option.value)}
-              >
-                {option.label}
-                <span className={clsx('rounded-full px-1.5 py-0.5 text-xs', filter === option.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600')}>
-                  {option.count}
-                </span>
-              </button>
-            ))}
-          </div>
+          <WorkspaceTabs
+            className="mt-3"
+            tabs={preparationFilterOptions(counts)}
+            activeTab={filter}
+            onChange={setFilter}
+            ariaLabel="Lọc hồ sơ theo trạng thái"
+          />
 
           <label className="relative mt-3 block">
             <span className="sr-only">Tìm hồ sơ</span>
@@ -414,12 +401,12 @@ function preparationCounts(items: WorkItem[]) {
   };
 }
 
-function preparationFilterOptions(counts: ReturnType<typeof preparationCounts>): { value: PreparationFilter; label: string; count: number }[] {
+function preparationFilterOptions(counts: ReturnType<typeof preparationCounts>): WorkspaceTabItem<PreparationFilter>[] {
   return [
-    { value: 'need_action', label: 'Cần xử lý', count: counts.needAction },
-    { value: 'upcoming', label: 'Sắp tới', count: counts.upcoming },
-    { value: 'done', label: 'Hoàn tất', count: counts.done },
-    { value: 'all', label: 'Tất cả', count: counts.all },
+    { id: 'need_action', label: 'Cần xử lý', icon: AlertTriangle, count: counts.needAction },
+    { id: 'upcoming', label: 'Sắp tới', icon: Clock3, count: counts.upcoming },
+    { id: 'done', label: 'Hoàn tất', icon: CheckCircle2, count: counts.done },
+    { id: 'all', label: 'Tất cả', icon: ListFilter, count: counts.all },
   ];
 }
 

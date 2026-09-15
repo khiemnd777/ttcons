@@ -4,6 +4,7 @@ import test from 'node:test';
 
 test('project-detail tabs pair every project workspace surface with its Lucide icon', async () => {
   const projectDetail = await readFile(new URL('../src/modules/projects/ProjectDetailPage.tsx', import.meta.url), 'utf8');
+  const workspaceTabs = await readFile(new URL('../src/components/WorkspaceTabs.tsx', import.meta.url), 'utf8');
 
   assert.match(projectDetail, /\{ id: 'overview', label: 'Tổng quan', icon: LayoutDashboard \}/);
   assert.match(projectDetail, /\{ id: 'workflow', label: 'Quy trình', icon: GitBranch, count: timeline\.length \}/);
@@ -12,7 +13,8 @@ test('project-detail tabs pair every project workspace surface with its Lucide i
   assert.match(projectDetail, /\{ id: 'files', label: 'Hồ sơ', icon: FileText, count: numberValue\(data\.evidence_summary\?\.total \?\? latestEvidence\.length\) \}/);
   assert.match(projectDetail, /\{ id: 'audit', label: 'Nhật ký', icon: ScrollText \}/);
   assert.match(projectDetail, /\{ id: 'members', label: 'Thành viên', icon: Users, count: members\.data\?\.summary\.active \?\? 0 \}/);
-  assert.match(projectDetail, /<Icon className="h-4 w-4 shrink-0" aria-hidden="true" \/>/);
+  assert.match(projectDetail, /<WorkspaceTabs/);
+  assert.match(workspaceTabs, /<Icon className="h-4 w-4 shrink-0" aria-hidden="true" \/>/);
 });
 
 test('project overview uses one compact toolbar without repeating project identity or lifecycle actions', async () => {
@@ -20,8 +22,7 @@ test('project overview uses one compact toolbar without repeating project identi
 
   assert.match(projectDetail, /<h1 className="sr-only">\{activeTabLabel\} · \{project\.code/);
   assert.match(projectDetail, /data-project-overview-toolbar/);
-  assert.match(projectDetail, /role="group" aria-label="Nội dung công trình"/);
-  assert.match(projectDetail, /aria-pressed=\{active\}/);
+  assert.match(projectDetail, /ariaLabel="Nội dung công trình"/);
   assert.match(projectDetail, /pathname: `\/projects\/\$\{id\}\/discussion`/);
   assert.match(projectDetail, /nextParams\.delete\('tab'\)/);
   assert.match(projectDetail, /actions=\{activeTab === 'workflow' \? undefined/);

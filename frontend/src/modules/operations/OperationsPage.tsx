@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, GitPullRequestArrow, Plus } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Eye, GitPullRequestArrow, Plus, ScrollText } from 'lucide-react';
 import { get, post, postFormWithProgress, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { useToast } from '../../components/ToastProvider';
@@ -10,6 +10,7 @@ import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { dateText } from '../../lib/utils/format';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { ConstructionActionItem, ConstructionCheck, ConstructionVariationContext, ConstructionWorkspace } from '../../lib/types/domain';
 import { ConstructionReportDetailDialog } from './ConstructionReportDetailDialog';
@@ -65,13 +66,13 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const variationRows = variationContext.data?.variations ?? [];
   const openVariations = variationRows.filter((variation) => !['rejected', 'incorporated'].includes(variation.status));
   const constructionActive = Boolean(construction.data?.runtime.construction_active);
-  const tabs = useMemo(() => [
-    canViewOperations ? { key: 'timeline' as const, label: 'Nhật ký' } : null,
-    canViewFieldWorkspace ? { key: 'checks' as const, label: `Kiểm tra${pendingChecks ? ` (${pendingChecks})` : ''}` } : null,
-    canViewFieldWorkspace ? { key: 'actions' as const, label: `Cần xử lý${activeActions ? ` (${activeActions})` : ''}` } : null,
-  ].filter((tab): tab is { key: OperationsTab; label: string } => Boolean(tab)), [activeActions, canViewFieldWorkspace, canViewOperations, pendingChecks]);
+  const tabs = useMemo<WorkspaceTabItem<OperationsTab>[]>(() => [
+    ...(canViewOperations ? [{ id: 'timeline' as const, label: 'Nhật ký', icon: ScrollText }] : []),
+    ...(canViewFieldWorkspace ? [{ id: 'checks' as const, label: 'Kiểm tra', icon: ClipboardCheck, count: pendingChecks }] : []),
+    ...(canViewFieldWorkspace ? [{ id: 'actions' as const, label: 'Cần xử lý', icon: AlertTriangle, count: activeActions }] : []),
+  ], [activeActions, canViewFieldWorkspace, canViewOperations, pendingChecks]);
   const requestedTab = normalizeTab(searchParams.get('tab'));
-  const activeTab: OperationsTab = requestedTab && tabs.some((tab) => tab.key === requestedTab) ? requestedTab : tabs[0]?.key ?? 'timeline';
+  const activeTab: OperationsTab = requestedTab && tabs.some((tab) => tab.id === requestedTab) ? requestedTab : tabs[0]?.id ?? 'timeline';
 
   useEffect(() => {
     if (!tabs.length || searchParams.get('tab') === activeTab) return;
@@ -255,7 +256,7 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   return <>
     <PageHeader density={global ? 'standard' : 'compact'} title="Thi công" description="Ghi nhật ký, kiểm tra chất lượng và xử lý việc phát sinh ngay tại công trường." actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div> : null}{canReport ? <button disabled={!projectId || !constructionActive} title={!constructionActive ? 'Chỉ lập báo cáo khi quy trình đang ở Node Thi công' : undefined} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => constructionActive && setOpenReport(true)}><Plus className="h-4 w-4" /> Báo cáo hôm nay</button> : null}</>} />
     {construction.data && !constructionActive ? <ConstructionRuntimeBanner workspace={construction.data} /> : null}
-    <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg border border-line bg-white p-1" role="tablist" aria-label="Không gian thi công">{tabs.map((tab) => <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} className={`shrink-0 rounded-md px-4 py-2 text-sm font-semibold transition ${activeTab === tab.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`} onClick={() => changeTab(tab.key)}>{tab.label}</button>)}</div>
+    <WorkspaceTabs className="mb-4" tabs={tabs} activeTab={activeTab} onChange={changeTab} ariaLabel="Không gian thi công" />
     {openVariations.length > 0 ? <ConstructionVariationStatus projectId={projectId} openCount={openVariations.length} urgentCount={openVariations.filter((variation) => variation.priority === 'urgent').length} canViewContracts={canViewContracts} /> : null}
     {activeTab === 'timeline' && canViewOperations ? <DailyTimeline rows={timelineRows} workspace={canViewFieldWorkspace ? construction.data : undefined} loading={reports.isLoading} error={reports.error} createEnabled={constructionActive} onRetry={() => reports.refetch()} onCreate={() => constructionActive && setOpenReport(true)} onView={(record) => setDialog({ type: 'report', mode: 'view', record })} /> : null}
     {activeTab === 'checks' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="checks" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} /> : null}

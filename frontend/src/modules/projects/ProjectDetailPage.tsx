@@ -5,6 +5,7 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowUpRight,
+  Ban,
   CheckCircle2,
   ChevronRight,
   CircleDot,
@@ -33,6 +34,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { DataTable } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
 import { IdentityReferenceLabel, identityReferenceText } from '../../components/IdentityReferenceLabel';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import { dateText, percent } from '../../lib/utils/format';
 import { statusLabel } from '../../lib/utils/status';
 import type {
@@ -165,7 +167,7 @@ export function ProjectDetailPage() {
   const hasPipeline = Boolean(data.pipeline_run) || timeline.length > 0;
   const latestEvidence = asArray<EvidenceRecord>(data.latest_evidence);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
-  const tabs: ProjectDetailTabDefinition[] = [
+  const tabs: WorkspaceTabItem<ProjectDetailTab>[] = [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'workflow', label: 'Quy trình', icon: GitBranch, count: timeline.length },
     { id: 'work', label: 'Danh sách công việc', icon: ListTodo, count: allWorkItems.length },
@@ -178,20 +180,23 @@ export function ProjectDetailPage() {
   return (
     <>
       <h1 className="sr-only">{activeTabLabel} · {project.code ?? data.project.code} · {project.name ?? data.project.name}</h1>
-      <ProjectDetailTabs
-        tabs={tabs}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-        actions={activeTab === 'workflow' ? undefined : (
-          <Link
-            to={`/projects/${id}/planning`}
-            className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-line px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-          >
-            <GitBranch className="h-4 w-4" />
-            Mở kế hoạch
-          </Link>
-        )}
-      />
+      <div data-project-overview-toolbar>
+        <WorkspaceTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          ariaLabel="Nội dung công trình"
+          actions={activeTab === 'workflow' ? undefined : (
+            <Link
+              to={`/projects/${id}/planning`}
+              className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-line px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            >
+              <GitBranch className="h-4 w-4" />
+              Mở kế hoạch
+            </Link>
+          )}
+        />
+      </div>
 
       <div className="mt-5">
         {activeTab === 'overview' ? (
@@ -263,63 +268,6 @@ export function ProjectDetailPage() {
         }}
       />
     </>
-  );
-}
-
-type ProjectDetailTabDefinition = {
-  id: ProjectDetailTab;
-  label: string;
-  icon: typeof LayoutDashboard;
-  count?: number;
-};
-
-function ProjectDetailTabs({
-  tabs,
-  activeTab,
-  onChange,
-  actions,
-}: {
-  tabs: ProjectDetailTabDefinition[];
-  activeTab: ProjectDetailTab;
-  onChange: (tab: ProjectDetailTab) => void;
-  actions?: ReactNode;
-}) {
-  return (
-    <div className="flex min-w-0 items-end gap-2 border-b border-line" data-project-overview-toolbar>
-      <div className="min-w-0 flex-1 overflow-x-auto">
-        <div className="flex min-w-max gap-1" role="group" aria-label="Nội dung công trình">
-          {tabs.map((tab) => {
-            const active = tab.id === activeTab;
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                className={clsx(
-                  'inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold transition focus-ring',
-                  active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-ink',
-                )}
-                aria-pressed={active}
-                onClick={() => onChange(tab.id)}
-              >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {tab.label}
-                {typeof tab.count === 'number' ? (
-                  <span className={clsx(
-                    'rounded px-1.5 py-0.5 text-xs',
-                    active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500',
-                  )}
-                  >
-                    {tab.count}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      {actions ? <div className="flex shrink-0 items-center pb-1">{actions}</div> : null}
-    </div>
   );
 }
 
@@ -943,22 +891,12 @@ function WorkflowWorkPanel({
 
       {rows.length ? (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2" aria-label="Lọc công việc quy trình">
-            {workflowWorkFilterOptions(counts).map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={clsx(
-                  'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition focus-ring',
-                  filter === option.id ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-line bg-white text-slate-600 hover:border-blue-300',
-                )}
-                aria-pressed={filter === option.id}
-                onClick={() => setFilter(option.id)}
-              >
-                {option.label} {option.count}
-              </button>
-            ))}
-          </div>
+          <WorkspaceTabs
+            tabs={workflowWorkFilterOptions(counts)}
+            activeTab={filter}
+            onChange={setFilter}
+            ariaLabel="Lọc công việc quy trình"
+          />
 
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -1169,14 +1107,14 @@ function workflowWorkCounts(rows: WorkItem[]) {
   };
 }
 
-function workflowWorkFilterOptions(counts: ReturnType<typeof workflowWorkCounts>): Array<{ id: WorkflowWorkFilter; label: string; count: number }> {
+function workflowWorkFilterOptions(counts: ReturnType<typeof workflowWorkCounts>): WorkspaceTabItem<WorkflowWorkFilter>[] {
   return [
-    { id: 'open', label: 'Cần xử lý', count: counts.open },
-    { id: 'waiting', label: 'Chờ duyệt', count: counts.waiting },
-    { id: 'blocked', label: 'Bị chặn', count: counts.blocked },
-    { id: 'completed', label: 'Hoàn tất', count: counts.completed },
-    { id: 'skipped', label: 'Đã bỏ qua', count: counts.skipped },
-    { id: 'all', label: 'Tất cả', count: counts.all },
+    { id: 'open', label: 'Cần xử lý', icon: AlertTriangle, count: counts.open },
+    { id: 'waiting', label: 'Chờ duyệt', icon: Clock3, count: counts.waiting },
+    { id: 'blocked', label: 'Bị chặn', icon: ShieldAlert, count: counts.blocked },
+    { id: 'completed', label: 'Hoàn tất', icon: CheckCircle2, count: counts.completed },
+    { id: 'skipped', label: 'Đã bỏ qua', icon: Ban, count: counts.skipped },
+    { id: 'all', label: 'Tất cả', icon: ListTodo, count: counts.all },
   ];
 }
 

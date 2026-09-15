@@ -9,6 +9,7 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { useToast } from '../../components/ToastProvider';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatCard } from '../../components/StatCard';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { workItemDetailPath } from '../work-items/workItemNavigation';
@@ -24,6 +25,12 @@ import { ProcurementStatus } from './ProcurementDetail';
 import { procurementStatusLabels, numeric, formatQuantity, formatDate, type ProcurementRow } from './procurementWorkspace';
 export { ProcurementDetail } from './ProcurementDetail';
 type QueueView = 'attention' | 'delivery' | 'all';
+
+const queueTabs: WorkspaceTabItem<QueueView>[] = [
+  { id: 'attention', label: 'Cần xử lý', icon: AlertTriangle },
+  { id: 'delivery', label: 'Đang giao & nghiệm thu', icon: Truck },
+  { id: 'all', label: 'Tất cả', icon: ClipboardList },
+];
 
 const procurementActionLabels: Record<string, string> = {
   submit: 'Đã gửi yêu cầu mua để duyệt',
@@ -96,11 +103,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       <StatCard label="Chờ nhập kho" value={waitingStock} icon={<Truck className="h-4 w-4" />} sub="Đã đạt nghiệm thu nhưng chưa ghi đủ phiếu nhập" />
     </div>
     <div className="mb-4 rounded-lg border border-line bg-white p-3 shadow-panel">
-      <div className="flex flex-wrap gap-2 border-b border-line pb-3">
-        <ViewButton active={view === 'attention'} onClick={() => setView('attention')}>Cần xử lý</ViewButton>
-        <ViewButton active={view === 'delivery'} onClick={() => setView('delivery')}>Đang giao & nghiệm thu</ViewButton>
-        <ViewButton active={view === 'all'} onClick={() => setView('all')}>Tất cả</ViewButton>
-      </div>
+      <WorkspaceTabs tabs={queueTabs} activeTab={view} onChange={setView} ariaLabel="Hàng đợi mua sắm" />
       <div className="grid gap-2 pt-3 md:grid-cols-[minmax(220px,1fr)_180px_180px]">
         <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm" placeholder="Tìm mã, yêu cầu, nhà cung cấp..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">Tất cả trạng thái</option>{Object.entries(procurementStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
@@ -146,7 +149,6 @@ function ProcurementProgress({ row, compact = false }: { row: ProcurementRow; co
 }
 
 function Step({ done, label }: { done: boolean; label: string }) { return <span className={`rounded-full border px-2 py-1 ${done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>{done ? '✓ ' : ''}{label}</span>; }
-function ViewButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" onClick={onClick} className={`rounded-md border px-3 py-2 text-sm font-semibold ${active ? 'border-blue-600 bg-blue-600 text-white' : 'border-line bg-white text-slate-600 hover:bg-slate-50'}`}>{children}</button>; }
 function IconButton({ title, onClick, icon }: { title: string; onClick: () => void; icon: React.ReactNode }) { return <button title={title} aria-label={title} className="rounded-md border border-line p-1.5 hover:bg-slate-100" onClick={onClick}>{icon}</button>; }
 
 function isOverdue(row: ProcurementRow) { const date = String(row.expected_delivery_date ?? '').slice(0, 10); return Boolean(date && date < new Date().toISOString().slice(0, 10) && !['received', 'cancelled'].includes(row.status)); }
