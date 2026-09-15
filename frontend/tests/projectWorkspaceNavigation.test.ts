@@ -137,7 +137,9 @@ test('project workspace sidebar renders configured icons instead of generic fold
   const projectSidebar = source.slice(source.indexOf('function ProjectNavigationSidebar'), source.indexOf('function WorkflowSidebar'));
   const workspaceNode = source.slice(source.indexOf('function WorkspaceGroupNode'), source.indexOf('function isProjectWorkItemDetailPath'));
 
-  assert.match(projectSidebar, /<Building2 aria-hidden="true"/);
+  assert.doesNotMatch(projectSidebar, /<Building2 aria-hidden="true"/);
+  assert.doesNotMatch(projectSidebar, /\bprojectName\b/);
+  assert.doesNotMatch(projectSidebar, /\bprojectCode\b/);
   assert.doesNotMatch(projectSidebar, /<Folder(?:Open)?\b/);
   assert.match(workspaceNode, /const GroupIcon = group\.icon/);
   assert.match(workspaceNode, /<GroupIcon aria-hidden="true"/);

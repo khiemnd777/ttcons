@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeft,
-  Building2,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -168,8 +167,6 @@ export function ProjectWorkspaceLayout() {
             ) : (
               <ProjectNavigationSidebar
                 projectId={id}
-                projectName={project?.name ?? 'Công trình'}
-                projectCode={project?.code ?? id}
                 visibleGroups={visibleGroups}
                 discussionUnread={discussionUnread}
               />
@@ -202,14 +199,10 @@ export function ProjectWorkspaceLayout() {
 
 function ProjectNavigationSidebar({
   projectId,
-  projectName,
-  projectCode,
   visibleGroups,
   discussionUnread,
 }: {
   projectId: string;
-  projectName: string;
-  projectCode: string;
   visibleGroups: ProjectWorkspaceGroup[];
   discussionUnread: number;
 }) {
@@ -222,17 +215,6 @@ function ProjectNavigationSidebar({
         </div>
       </div>
       <nav className="px-3 py-3">
-        <div className="mb-2 rounded-md border border-line bg-slate-50 px-3 py-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
-            <Building2 aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-700" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-ink">{projectName}</p>
-              <p className="truncate text-xs text-slate-500">{projectCode}</p>
-            </div>
-          </div>
-        </div>
-
         <div className="space-y-1">
           {visibleGroups.map((group) => (
             <WorkspaceGroupNode
