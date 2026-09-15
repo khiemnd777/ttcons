@@ -28,9 +28,9 @@ test('statistics use one global project scope and report-specific responsive car
   assert.match(reportsPage, />Loại thống kê</);
   assert.doesNotMatch(reportsPage, /Phạm vi báo cáo|Công trình đã áp dụng được giữ khi/);
   assert.ok(reportsPage.indexOf('<ReportProjectPicker') < reportsPage.indexOf('lg:grid-cols-[16rem_minmax(0,1fr)]'));
-  assert.ok(reportsPage.indexOf('<ReportProjectPicker') < reportsPage.indexOf('</header>'));
-  assert.match(reportsPage, /xl:grid-cols-\[minmax\(0,1fr\)_36rem\]/);
-  assert.match(reportsPage, /border-t border-line pt-4 xl:border-0 xl:pt-0/);
+  assert.ok(reportsPage.indexOf('<ReportProjectPicker') < reportsPage.indexOf('<div className="mb-4 lg:hidden">'));
+  assert.match(reportsPage, /<PageHeader[\s\S]*horizontalFrom="xl"/);
+  assert.match(reportsPage, /w-full min-w-0 border-t border-line pt-4 xl:w-\[36rem\] xl:border-0 xl:pt-0/);
   assert.doesNotMatch(reportsPage, /rounded-lg border border-line bg-white p-4 shadow-panel/);
   assert.match(reportsPage, /aria-label="Bộ lọc công trình thống kê"/);
   assert.match(reportsPage, /<ReportScopeActions/);

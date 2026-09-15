@@ -1212,7 +1212,6 @@ function ProjectOperationsError({ error, onRetry }: { error: unknown; onRetry: (
   return (
     <>
       <PageHeader
-        density="compact"
         title="Điều hành công trình"
         description="Tổng quan vận hành và công việc cần xử lý"
         actions={

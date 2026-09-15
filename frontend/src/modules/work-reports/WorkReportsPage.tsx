@@ -180,14 +180,17 @@ export function WorkReportsPage() {
 
   return (
     <div className="space-y-5">
-      <header className="border-b border-line pb-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <header className="mb-3 border-b border-line pb-2">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Trao đổi công việc có xác nhận</p>
-            <h1 className="mt-1 text-2xl font-semibold text-ink">Báo cáo</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              Nhân sự lập báo cáo từ dữ liệu công việc thực tế, gửi đúng người quản lý và lưu lịch sử từng lần phản hồi.
-            </p>
+            <div className="mt-1 min-w-0 md:flex md:items-baseline md:gap-2">
+              <h1 className="max-w-full truncate text-lg font-semibold leading-6 tracking-normal text-ink md:max-w-[42%] md:shrink-0" title="Báo cáo">Báo cáo</h1>
+              <span className="hidden text-xs text-slate-300 md:inline" aria-hidden="true">·</span>
+              <p className="line-clamp-2 min-w-0 text-xs leading-[18px] text-slate-500 md:block md:truncate" title="Nhân sự lập báo cáo từ dữ liệu công việc thực tế, gửi đúng người quản lý và lưu lịch sử từng lần phản hồi.">
+                Nhân sự lập báo cáo từ dữ liệu công việc thực tế, gửi đúng người quản lý và lưu lịch sử từng lần phản hồi.
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {canExport ? (

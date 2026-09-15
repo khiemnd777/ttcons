@@ -159,14 +159,12 @@ function LegacyProjectFinancePage({ global = false }: { global?: boolean }) {
 
   return (
     <div className="space-y-5">
-      {global ? <header className="border-b border-line pb-5">
-        <div className={clsx('grid gap-4', global && 'xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8')}>
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Tài chính công trình</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Ghi nhận chi phí mua vật tư, theo dõi hồ sơ đề nghị thu/chi và cung cấp số liệu quản trị cho Ban giám đốc. Không thay thế MISA, sổ kế toán hoặc kê khai thuế.</p>
-          </div>
-
-          {global ? <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình tài chính">
+      <PageHeader
+        title="Tài chính công trình"
+        description="Ghi nhận chi phí mua vật tư, theo dõi hồ sơ đề nghị thu/chi và cung cấp số liệu quản trị cho Ban giám đốc. Không thay thế MISA, sổ kế toán hoặc kê khai thuế."
+        horizontalFrom={global ? 'xl' : 'md'}
+        actions={global ? (
+          <section className="w-full min-w-0 border-t border-line pt-4 xl:w-[36rem] xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình tài chính">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <AsyncProjectPicker
                 value={draftProjectId}
@@ -184,16 +182,9 @@ function LegacyProjectFinancePage({ global = false }: { global?: boolean }) {
                 onReset={resetProjectScope}
               />
             </div>
-          </section> : null}
-        </div>
-      </header> : (
-        <PageHeader
-          density="compact"
-          title="Tài chính công trình"
-          description="Ghi nhận chi phí mua vật tư, theo dõi hồ sơ đề nghị thu/chi và cung cấp số liệu quản trị cho Ban giám đốc. Không thay thế MISA, sổ kế toán hoặc kê khai thuế."
-          actions={id ? <ProjectBackLink /> : undefined}
-        />
-      )}
+          </section>
+        ) : id ? <ProjectBackLink /> : undefined}
+      />
 
       {!projectId ? <EmptyState title="Chọn công trình để xem tài chính công trình." /> : <>
         <div className="flex flex-col gap-3 border-b border-line sm:flex-row sm:items-end sm:justify-between">

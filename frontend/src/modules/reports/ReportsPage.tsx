@@ -4,6 +4,7 @@ import { Navigate, NavLink, useNavigate, useParams, useSearchParams } from 'reac
 import clsx from 'clsx';
 import { ChevronRight, ShieldAlert } from 'lucide-react';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { PageHeader } from '../../components/PageHeader';
 import type { DataTableSort } from '../../components/DataTable';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get } from '../../lib/api/client';
@@ -120,17 +121,12 @@ export function StatisticsPage() {
 
   return (
     <>
-      <header className="mb-4 border-b border-line pb-4 md:mb-5 md:pb-5">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Thống kê</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              <span className="md:hidden">Xem số liệu tổng hợp và xuất dữ liệu theo cùng phạm vi quyền.</span>
-              <span className="hidden md:inline">Theo dõi số liệu tổng hợp từ dữ liệu vận hành; PDF, Excel và CSV dùng cùng phạm vi lọc và quyền truy cập.</span>
-            </p>
-          </div>
-
-          <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình thống kê">
+      <PageHeader
+        title="Thống kê"
+        description="Theo dõi số liệu tổng hợp từ dữ liệu vận hành; PDF, Excel và CSV dùng cùng phạm vi lọc và quyền truy cập."
+        horizontalFrom="xl"
+        actions={(
+          <section className="w-full min-w-0 border-t border-line pt-4 xl:w-[36rem] xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình thống kê">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <ReportProjectPicker
                 value={draftProjectId}
@@ -144,8 +140,8 @@ export function StatisticsPage() {
               />
             </div>
           </section>
-        </div>
-      </header>
+        )}
+      />
 
       <div className="mb-4 lg:hidden">
         <label className="block">

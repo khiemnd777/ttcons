@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ExternalLink, Inbox, ListFilter, RotateCcw, Send, Undo2 } from 'lucide-react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import clsx from 'clsx';
 import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable, type Column } from '../../components/DataTable';
 import { EmptyState } from '../../components/EmptyState';
@@ -154,27 +153,19 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
 
   return (
     <div className="space-y-5">
-      {global ? <header className="border-b border-line pb-5">
-        <div className={clsx('grid gap-4', global && 'xl:grid-cols-[minmax(0,1fr)_36rem] xl:items-end xl:gap-8')}>
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-normal text-ink md:text-2xl">Hồ sơ bàn giao kế toán</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Theo dõi hồ sơ nghiệp vụ từ Mua sắm và Hợp đồng đến lúc Kế toán tiếp nhận. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA.</p>
-          </div>
-          {global ? <section className="min-w-0 border-t border-line pt-4 xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình bàn giao kế toán">
+      <PageHeader
+        title="Hồ sơ bàn giao kế toán"
+        description="Theo dõi hồ sơ nghiệp vụ từ Mua sắm và Hợp đồng đến lúc Kế toán tiếp nhận. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA."
+        horizontalFrom={global ? 'xl' : 'md'}
+        actions={global ? (
+          <section className="w-full min-w-0 border-t border-line pt-4 xl:w-[36rem] xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình bàn giao kế toán">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <AsyncProjectPicker value={draftProjectId} onChange={setDraftProjectId} endpoint="/project-finance/projects" queryKey="accounting-handoff-project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} />
               <ProjectScopeActions applying={workspace.isFetching} applyDisabled={!draftProjectId || draftProjectId === projectId} resetDisabled={workspace.isFetching || (!draftProjectId && !projectId)} onApply={applyProjectScope} onReset={resetProjectScope} />
             </div>
-          </section> : null}
-        </div>
-      </header> : (
-        <PageHeader
-          density="compact"
-          title="Hồ sơ bàn giao kế toán"
-          description="Theo dõi hồ sơ nghiệp vụ từ Mua sắm và Hợp đồng đến lúc Kế toán tiếp nhận. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA."
-          actions={id ? <ProjectBackLink /> : undefined}
-        />
-      )}
+          </section>
+        ) : id ? <ProjectBackLink /> : undefined}
+      />
 
       {!projectId ? <EmptyState title="Chọn công trình để xem hồ sơ bàn giao kế toán." /> : <>
         <WorkspaceTabs

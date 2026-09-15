@@ -140,7 +140,6 @@ export function PreparationPage() {
   return (
     <div data-preparation-mode="queue">
       <PageHeader
-        density="compact"
         title="Hồ sơ chuẩn bị"
         description="Hồ sơ tiếp nhận, khảo sát và thiết kế cần chuẩn bị."
         actions={<Link className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50" to={pipelinePath}>Quy trình</Link>}

@@ -91,7 +91,6 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
   return (
     <>
       <PageHeader
-        density={scoped ? 'compact' : 'standard'}
         title={scoped ? 'Audit công trình' : 'Audit toàn hệ thống'}
         description={scoped
           ? 'Tra cứu ai đã thao tác, thời điểm, đối tượng và dữ liệu chi tiết của thay đổi trong công trình.'
