@@ -128,7 +128,7 @@ export function ProjectsPage() {
   );
 
   const visibleFolders = useMemo(
-    () => visibleProjectWorkspaceGroups(hasAnyPermission),
+    () => visibleProjectWorkspaceGroups(hasAnyPermission, 'explorer'),
     [hasAnyPermission],
   );
   const statusOptions = projects.data?.options.statuses ?? [];

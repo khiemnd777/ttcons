@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   ListTodo,
   Loader2,
-  MessageSquare,
   PackageCheck,
   Play,
   RefreshCw,
@@ -46,14 +45,17 @@ import type {
   ProjectMembersResponse,
   WorkItem,
 } from '../../lib/types/domain';
-import type { ActivityAttachmentOption } from '../work-items/ActivityComposer';
-import { ActivityThread } from '../work-items/ActivityThread';
 import { currentReturnTo } from '../work-items/workItemNavigation';
 import { executionTargetPath } from '../work-items/workItemExecutionTarget';
 import { ProjectEvidencePanel } from './ProjectEvidencePanel';
 import { ProjectMembersPanel } from './ProjectMembersPanel';
 import { ProjectStartupWizard } from './ProjectStartupWizard';
 import { ProjectWorkTab } from './ProjectWorkTab';
+import {
+  currentTimelineNode,
+  isOpenProjectWorkItem,
+  selectProjectPriorityWork,
+} from './projectOperationsDomain';
 import {
   asArray,
   compactDateTime,
@@ -63,15 +65,8 @@ import {
   prioritizeWorkItems,
 } from '../work-items/workItemPresentation';
 
-type ProjectDetailTab = 'overview' | 'workflow' | 'work' | 'activity' | 'files' | 'audit' | 'members';
+type ProjectDetailTab = 'overview' | 'workflow' | 'work' | 'files' | 'audit' | 'members';
 type WorkflowWorkFilter = 'all' | 'open' | 'waiting' | 'blocked' | 'completed' | 'skipped';
-
-function currentTimelineNode(nodes: ProjectOperationsTimelineNode[]) {
-  return nodes.find((node) => node.status === 'in_progress')
-    ?? nodes.find((node) => node.status === 'blocked' || node.status === 'waiting_approval')
-    ?? nodes.find((node) => !['completed', 'cancelled', 'skipped'].includes(node.status))
-    ?? nodes[nodes.length - 1];
-}
 
 function nodeStatusDotTone(status?: string) {
   if (status === 'completed') return 'bg-emerald-500';
@@ -80,10 +75,6 @@ function nodeStatusDotTone(status?: string) {
   if (status === 'in_progress') return 'bg-blue-600';
   if (status === 'skipped' || status === 'cancelled') return 'bg-slate-300';
   return 'bg-slate-400';
-}
-
-function isOpenWorkItem(item: WorkItem) {
-  return item.status !== 'completed' && item.status !== 'cancelled';
 }
 
 function workOwner(item: WorkItem) {
@@ -119,16 +110,10 @@ export function ProjectDetailPage() {
   });
   const data = operations.data;
   const allWorkItems = useMemo(() => asArray<WorkItem>(data?.work_items), [data?.work_items]);
-  const openWorkItems = useMemo(() => allWorkItems.filter(isOpenWorkItem), [allWorkItems]);
+  const openWorkItems = useMemo(() => allWorkItems.filter(isOpenProjectWorkItem), [allWorkItems]);
   const priorityWork = useMemo(() => prioritizeWorkItems(openWorkItems), [openWorkItems]);
   const blockers = useMemo(() => prioritizeWorkItems(asArray<WorkItem>(data?.blockers)), [data?.blockers]);
   const timeline = useMemo(() => asArray<ProjectOperationsTimelineNode>(data?.workflow_timeline), [data?.workflow_timeline]);
-  const activityTargets = useMemo(() => allWorkItems.map((item) => ({
-    scope_type: 'work_item',
-    scope_id: item.id,
-    work_item_id: item.id,
-    label: `${item.project_code ? `${item.project_code} · ` : ''}${item.title}`,
-  })), [allWorkItems]);
   const currentNode = useMemo(() => currentTimelineNode(timeline), [timeline]);
   const primaryWork = useMemo(() => selectProjectPriorityWork(priorityWork, blockers), [blockers, priorityWork]);
 
@@ -143,10 +128,21 @@ export function ProjectDetailPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'overview' || tab === 'workflow' || tab === 'work' || tab === 'activity' || tab === 'files' || tab === 'audit' || tab === 'members') {
+    if (tab === 'activity') {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('tab');
+      const nextSearch = nextParams.toString();
+      navigate({
+        pathname: `/projects/${id}/discussion`,
+        search: nextSearch ? `?${nextSearch}` : '',
+        hash: location.hash,
+      }, { replace: true });
+      return;
+    }
+    if (tab === 'overview' || tab === 'workflow' || tab === 'work' || tab === 'files' || tab === 'audit' || tab === 'members') {
       setActiveTab(tab);
     }
-  }, [searchParams]);
+  }, [id, location.hash, navigate, searchParams]);
 
   function openWorkItem(item: WorkItem) {
     navigate(executionTargetPath(item, currentReturnTo(location)));
@@ -168,16 +164,11 @@ export function ProjectDetailPage() {
   const project = data.project_summary ?? data.project;
   const hasPipeline = Boolean(data.pipeline_run) || timeline.length > 0;
   const latestEvidence = asArray<EvidenceRecord>(data.latest_evidence);
-  const attachmentOptions = buildActivityAttachmentOptions(latestEvidence);
-  // Keep the project shortcut aligned with the actor-scoped unread discussion
-  // cursor used by the full activity thread and Utility Dock.
-  const activityDiscussionCount = numberValue(data.activity_summary?.discussion_unread);
   const auditRecent = asArray<ProjectOperationsRecord>(data.audit_summary?.recent);
   const tabs: ProjectDetailTabDefinition[] = [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'workflow', label: 'Quy trình', icon: GitBranch, count: timeline.length },
     { id: 'work', label: 'Danh sách công việc', icon: ListTodo, count: allWorkItems.length },
-    { id: 'activity', label: 'Trao đổi', icon: MessageSquare, count: activityDiscussionCount },
     { id: 'files', label: 'Hồ sơ', icon: FileText, count: numberValue(data.evidence_summary?.total ?? latestEvidence.length) },
     { id: 'audit', label: 'Nhật ký', icon: ScrollText },
     { id: 'members', label: 'Thành viên', icon: Users, count: members.data?.summary.active ?? 0 },
@@ -243,22 +234,6 @@ export function ProjectDetailPage() {
 
         {activeTab === 'work' ? (
           <ProjectWorkTab rows={allWorkItems} onOpenWork={openWorkItem} />
-        ) : null}
-
-        {activeTab === 'activity' ? (
-          <ProjectActivityPanel
-            projectId={id}
-            activityTargets={activityTargets}
-            attachmentOptions={attachmentOptions}
-            hasPipeline={hasPipeline}
-            pipelineStatus={String(data.pipeline_run?.status ?? '')}
-            currentNode={currentNode}
-            primaryWork={primaryWork}
-            onOpenStartup={() => setStartupWizardOpen(true)}
-            onChanged={() => {
-              queryClient.invalidateQueries({ queryKey: ['project-operations', id] });
-            }}
-          />
         ) : null}
 
         {activeTab === 'files' ? <ProjectEvidencePanel projectId={id} /> : null}
@@ -1151,12 +1126,6 @@ function workflowFormRequirementLabel(item: WorkItem) {
   return 'Không yêu cầu hồ sơ';
 }
 
-function selectProjectPriorityWork(priorityWork: WorkItem[], blockers: WorkItem[]) {
-  return blockers[0]
-    ?? priorityWork.find((item) => item.status === 'waiting_approval' || item.status === 'waiting_review')
-    ?? priorityWork[0];
-}
-
 function projectPriorityActionLabel(item: WorkItem) {
   if (item.status === 'blocked') return 'Xử lý vướng mắc';
   if (item.status === 'waiting_approval' || item.status === 'waiting_review') return 'Mở yêu cầu duyệt';
@@ -1164,7 +1133,7 @@ function projectPriorityActionLabel(item: WorkItem) {
 }
 
 function selectNextWorkflowWork(rows: WorkItem[]) {
-  const prioritized = prioritizeWorkItems(rows.filter(isOpenWorkItem));
+  const prioritized = prioritizeWorkItems(rows.filter(isOpenProjectWorkItem));
   return prioritized.find((item) => item.status === 'blocked')
     ?? prioritized.find((item) => item.status === 'waiting_approval' || item.status === 'waiting_review')
     ?? prioritized[0];
@@ -1192,7 +1161,7 @@ function workflowProgressSummary(nodes: ProjectOperationsTimelineNode[]) {
 function workflowWorkCounts(rows: WorkItem[]) {
   return {
     all: rows.length,
-    open: rows.filter((item) => isOpenWorkItem(item)).length,
+    open: rows.filter((item) => isOpenProjectWorkItem(item)).length,
     waiting: rows.filter((item) => item.status === 'waiting_approval' || item.status === 'waiting_review').length,
     blocked: rows.filter((item) => item.status === 'blocked').length,
     completed: rows.filter((item) => item.status === 'completed').length,
@@ -1213,52 +1182,11 @@ function workflowWorkFilterOptions(counts: ReturnType<typeof workflowWorkCounts>
 
 function matchesWorkflowWorkFilter(item: WorkItem, filter: WorkflowWorkFilter) {
   if (filter === 'all') return true;
-  if (filter === 'open') return isOpenWorkItem(item);
+  if (filter === 'open') return isOpenProjectWorkItem(item);
   if (filter === 'waiting') return item.status === 'waiting_approval' || item.status === 'waiting_review';
   if (filter === 'blocked') return item.status === 'blocked';
   if (filter === 'completed') return item.status === 'completed';
   return item.status === 'cancelled';
-}
-
-function ProjectActivityPanel({
-  projectId,
-  activityTargets,
-  attachmentOptions,
-  hasPipeline,
-  pipelineStatus,
-  currentNode,
-  primaryWork,
-  onOpenStartup,
-  onChanged,
-}: {
-  projectId: string;
-  activityTargets: Array<{ scope_type: string; scope_id: string; label: string; work_item_id?: string }>;
-  attachmentOptions: ActivityAttachmentOption[];
-  hasPipeline: boolean;
-  pipelineStatus?: string;
-  currentNode?: ProjectOperationsTimelineNode;
-  primaryWork?: WorkItem;
-  onOpenStartup: () => void;
-  onChanged: () => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="mb-4 flex items-center gap-2">
-        <MessageSquare className="h-5 w-5 text-blue-700" />
-        <div>
-          <h2 className="font-semibold text-ink">Trao đổi</h2>
-          <p className="mt-0.5 text-sm text-slate-500">Phối hợp, quyết định và theo dõi các vấn đề của công trình.</p>
-        </div>
-      </div>
-      <ActivityThread
-        projectId={projectId}
-        targetOptions={activityTargets}
-        attachmentOptions={attachmentOptions}
-        workflowAction={{ hasPipeline, pipelineStatus, currentNode, primaryWork, onOpenStartup }}
-        onChanged={onChanged}
-      />
-    </div>
-  );
 }
 
 function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; initialRows: ProjectOperationsRecord[] }) {
@@ -1315,30 +1243,6 @@ function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; init
       ) : null}
     </div>
   );
-}
-
-function buildActivityAttachmentOptions(evidence: EvidenceRecord[]): ActivityAttachmentOption[] {
-  const options: ActivityAttachmentOption[] = [];
-  evidence.forEach((record) => {
-    const label = record.name ?? record.title ?? record.document_name ?? record.id;
-    options.push({
-      type: 'evidence',
-      id: record.id,
-      label,
-      status: record.status,
-      visibility: record.visibility,
-    });
-    if (record.document_id) {
-      options.push({
-        type: 'document',
-        id: record.document_id,
-        label: record.document_name ?? label,
-        status: record.status,
-        visibility: record.visibility,
-      });
-    }
-  });
-  return options;
 }
 
 function ProjectOperationsSkeleton() {

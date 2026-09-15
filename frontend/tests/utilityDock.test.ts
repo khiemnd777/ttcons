@@ -91,6 +91,7 @@ test('Utility Dock keeps discussion unread separate and reuses canonical work so
   assert.match(dock, /\/me\/project-discussions\?limit=50/);
   assert.match(dock, /\/projects\/\$\{projectID\}\/activity\?kind=discussion&limit=30/);
   assert.match(dock, /\/projects\/\$\{projectID\}\/activity\/read-through/);
+  assert.match(dock, /\/projects\/\$\{encodeURIComponent\(projectID\)\}\/discussion/);
   assert.match(dock, /item\.is_discussion_unread/);
   assert.match(dock, /enabled: Boolean\(project\.can_post\)/);
   assert.match(dock, /variant="chat"\s+density="compact"/);

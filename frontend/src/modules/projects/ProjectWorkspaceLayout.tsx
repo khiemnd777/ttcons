@@ -5,12 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeft,
+  Building2,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Circle,
   Clock3,
-  Folder,
   FolderOpen,
   GitBranch,
   Loader2,
@@ -66,7 +66,8 @@ export function ProjectWorkspaceLayout() {
   });
 
   const project = operations.data?.project_summary ?? operations.data?.project;
-  const visibleGroups = visibleProjectWorkspaceGroups(hasAnyPermission);
+  const visibleGroups = visibleProjectWorkspaceGroups(hasAnyPermission, 'workspace');
+  const discussionUnread = projectWorkspaceDiscussionUnread(operations.data);
   const isAccountingObserver = hasAnyPermission(['project.reconciliation.view']);
   const userRoleSummary = roleSummary(user?.roles);
   const indicators = useShellIndicators();
@@ -170,6 +171,7 @@ export function ProjectWorkspaceLayout() {
                 projectName={project?.name ?? 'Công trình'}
                 projectCode={project?.code ?? id}
                 visibleGroups={visibleGroups}
+                discussionUnread={discussionUnread}
               />
             )}
           </div>
@@ -203,11 +205,13 @@ function ProjectNavigationSidebar({
   projectName,
   projectCode,
   visibleGroups,
+  discussionUnread,
 }: {
   projectId: string;
   projectName: string;
   projectCode: string;
   visibleGroups: ProjectWorkspaceGroup[];
+  discussionUnread: number;
 }) {
   return (
     <>
@@ -221,7 +225,7 @@ function ProjectNavigationSidebar({
         <div className="mb-2 rounded-md border border-line bg-slate-50 px-3 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
-            <FolderOpen className="h-4 w-4 shrink-0 text-blue-700" />
+            <Building2 aria-hidden="true" className="h-4 w-4 shrink-0 text-blue-700" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{projectName}</p>
               <p className="truncate text-xs text-slate-500">{projectCode}</p>
@@ -231,7 +235,12 @@ function ProjectNavigationSidebar({
 
         <div className="space-y-1">
           {visibleGroups.map((group) => (
-            <WorkspaceGroupNode key={group.key} group={group} projectId={projectId} />
+            <WorkspaceGroupNode
+              key={group.key}
+              group={group}
+              projectId={projectId}
+              badgeCount={group.badge === 'discussion_unread' ? discussionUnread : undefined}
+            />
           ))}
         </div>
       </nav>
@@ -649,8 +658,17 @@ function activeNodeIdForWorkItem(nodes: Record<string, any>[], activeWorkItemId:
   return '';
 }
 
-function WorkspaceGroupNode({ group, projectId }: { group: ProjectWorkspaceGroup; projectId: string }) {
+function WorkspaceGroupNode({
+  group,
+  projectId,
+  badgeCount,
+}: {
+  group: ProjectWorkspaceGroup;
+  projectId: string;
+  badgeCount?: number;
+}) {
   const location = useLocation();
+  const GroupIcon = group.icon;
   const groupTarget = projectWorkspaceGroupPath(projectId, group);
   const currentTarget = `${location.pathname}${location.search}`;
   const groupActive = group.children.length
@@ -658,7 +676,7 @@ function WorkspaceGroupNode({ group, projectId }: { group: ProjectWorkspaceGroup
       const childTarget = projectWorkspacePath(projectId, child.to);
       return childTarget.includes('?') ? currentTarget === childTarget : location.pathname === childTarget;
     })
-    : currentTarget === groupTarget;
+    : groupTarget.includes('?') ? currentTarget === groupTarget : location.pathname === groupTarget;
   return (
     <div>
       <Link
@@ -674,14 +692,23 @@ function WorkspaceGroupNode({ group, projectId }: { group: ProjectWorkspaceGroup
         )}
       >
         <ChevronDown className="h-4 w-4 shrink-0" />
-        <Folder className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 truncate">{group.label}</span>
+        <GroupIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        {typeof badgeCount === 'number' && badgeCount > 0 ? (
+          <span className={clsx(
+            'rounded px-1.5 py-0.5 text-xs tabular-nums',
+            groupActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600',
+          )}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        ) : null}
       </Link>
       {group.children.length ? (
         <div className="mb-1">
           {group.children.map((child) => {
             const childTarget = projectWorkspacePath(projectId, child.to);
             const active = childTarget.includes('?') ? currentTarget === childTarget : location.pathname === childTarget;
+            const ChildIcon = child.icon;
             return (
               <Link
                 key={`${group.key}-${child.label}`}
@@ -692,7 +719,7 @@ function WorkspaceGroupNode({ group, projectId }: { group: ProjectWorkspaceGroup
                   active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-700',
                 )}
               >
-                <Folder className="h-3.5 w-3.5 shrink-0" />
+                <ChildIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
                 <span className="min-w-0 truncate">{child.label}</span>
               </Link>
             );
@@ -747,6 +774,11 @@ function clampPercent(value: number) {
 function sortIndex(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
+function projectWorkspaceDiscussionUnread(operations?: ProjectWorkspaceOperations) {
+  const value = Number(operations?.activity_summary?.discussion_unread ?? 0);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
 function stepStatusIcon(status: string, active: boolean) {

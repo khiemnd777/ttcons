@@ -11,6 +11,7 @@ const DashboardPage = lazy(() => import('../modules/dashboard/DashboardPage').th
 const ProjectsPage = lazy(() => import('../modules/projects/ProjectsPage').then(({ ProjectsPage }) => ({ default: ProjectsPage })));
 const ProjectProgressPage = lazy(() => import('../modules/projects/ProjectProgressPage').then(({ ProjectProgressPage }) => ({ default: ProjectProgressPage })));
 const ProjectDetailPage = lazy(() => import('../modules/projects/ProjectDetailPage').then(({ ProjectDetailPage }) => ({ default: ProjectDetailPage })));
+const ProjectDiscussionPage = lazy(() => import('../modules/projects/ProjectDiscussionPage').then(({ ProjectDiscussionPage }) => ({ default: ProjectDiscussionPage })));
 const ProjectWorkspaceLayout = lazy(() => import('../modules/projects/ProjectWorkspaceLayout').then(({ ProjectWorkspaceLayout }) => ({ default: ProjectWorkspaceLayout })));
 const MyWorkPage = lazy(() => import('../modules/my-work/MyWorkPage').then(({ MyWorkPage }) => ({ default: MyWorkPage })));
 const ProfilePage = lazy(() => import('../modules/profile/ProfilePage').then(({ ProfilePage }) => ({ default: ProfilePage })));
@@ -113,6 +114,7 @@ export const router = createBrowserRouter([
         element: guarded(<ProjectWorkspaceLayout />, ['project.view'], true),
         children: [
           { index: true, element: guarded(<ProjectDetailPage />) },
+          { path: 'discussion', element: guarded(<ProjectDiscussionPage />, ['project.view']) },
           { path: 'work-items/:workItemId', element: guarded(<WorkItemDetailPage />) },
           { path: 'pipeline', element: guarded(<PlanningPage mode="pipeline" />, ['pipeline.view']) },
           { path: 'preparation', element: guarded(<PreparationPage />, ['project.view']) },

@@ -92,7 +92,7 @@ export function ProjectUpdatesDialog({ project, initialKind, summary, onClose }:
   return (
     <Dialog open title={`Cập nhật · ${project.code} — ${project.name}`} size="lg" manageFocus onClose={onClose}
       footer={<div className="flex flex-wrap items-center justify-between gap-3">
-        <Link className="text-sm font-semibold text-blue-700 focus-ring" to={`/projects/${project.id}?tab=activity`} onClick={onClose}>Mở trao đổi đầy đủ</Link>
+        <Link className="text-sm font-semibold text-blue-700 focus-ring" to={`/projects/${project.id}/discussion`} onClick={onClose}>Mở trao đổi đầy đủ</Link>
         <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 focus-ring" disabled={!canRead} onClick={() => markRead.mutate({ kind, activityID: readBoundary, notificationIDs: notices.filter((item) => !item.read_at).map((item) => item.id) })}>{markRead.isPending ? 'Đang đánh dấu…' : 'Đánh dấu phần đang xem đã đọc'}</button>
       </div>}>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Nhóm cập nhật">
@@ -116,7 +116,7 @@ export function ProjectUpdatesDialog({ project, initialKind, summary, onClose }:
 }
 
 function ProjectUpdateActivity({ item, projectID, unread, onOpen }: { item: WorkItemActivity; projectID: string; unread: boolean; onOpen: () => void }) {
-  const href = item.work_item_id ? `/projects/${projectID}/work-items/${item.work_item_id}` : `/projects/${projectID}?tab=activity`;
+  const href = item.work_item_id ? `/projects/${projectID}/work-items/${item.work_item_id}` : `/projects/${projectID}/discussion`;
   return <article className={`border-b border-line p-4 last:border-0 ${unread ? 'bg-blue-50/60' : ''}`}>
     <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
       {unread ? <span className="h-2 w-2 rounded-full bg-blue-600" aria-label="Chưa xem" /> : null}

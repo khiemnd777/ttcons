@@ -801,7 +801,7 @@ function ProjectConversationContent({ project }: { project: ProjectDiscussionPro
           />
         </div>
       ) : <p className="shrink-0 border-t border-line bg-amber-50 px-3 py-2 text-xs text-amber-800">Anh có quyền xem nhưng không có quyền gửi trao đổi trong công trình này.</p>}
-      <Link className="flex shrink-0 items-center justify-center gap-1 border-t border-line px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${encodeURIComponent(projectID)}?tab=activity`}>Mở trao đổi đầy đủ <ArrowRight className="h-3.5 w-3.5" /></Link>
+      <Link className="flex shrink-0 items-center justify-center gap-1 border-t border-line px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${encodeURIComponent(projectID)}/discussion`}>Mở trao đổi đầy đủ <ArrowRight className="h-3.5 w-3.5" /></Link>
     </div>
   );
 }

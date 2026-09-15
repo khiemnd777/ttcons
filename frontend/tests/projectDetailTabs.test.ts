@@ -8,7 +8,7 @@ test('project-detail tabs pair every project workspace surface with its Lucide i
   assert.match(projectDetail, /\{ id: 'overview', label: 'Tổng quan', icon: LayoutDashboard \}/);
   assert.match(projectDetail, /\{ id: 'workflow', label: 'Quy trình', icon: GitBranch, count: timeline\.length \}/);
   assert.match(projectDetail, /\{ id: 'work', label: 'Danh sách công việc', icon: ListTodo, count: allWorkItems\.length \}/);
-  assert.match(projectDetail, /\{ id: 'activity', label: 'Trao đổi', icon: MessageSquare, count: activityDiscussionCount \}/);
+  assert.doesNotMatch(projectDetail, /id: 'activity'/);
   assert.match(projectDetail, /\{ id: 'files', label: 'Hồ sơ', icon: FileText, count: numberValue\(data\.evidence_summary\?\.total \?\? latestEvidence\.length\) \}/);
   assert.match(projectDetail, /\{ id: 'audit', label: 'Nhật ký', icon: ScrollText \}/);
   assert.match(projectDetail, /\{ id: 'members', label: 'Thành viên', icon: Users, count: members\.data\?\.summary\.active \?\? 0 \}/);
@@ -22,6 +22,8 @@ test('project overview uses one compact toolbar without repeating project identi
   assert.match(projectDetail, /data-project-overview-toolbar/);
   assert.match(projectDetail, /role="group" aria-label="Nội dung công trình"/);
   assert.match(projectDetail, /aria-pressed=\{active\}/);
+  assert.match(projectDetail, /pathname: `\/projects\/\$\{id\}\/discussion`/);
+  assert.match(projectDetail, /nextParams\.delete\('tab'\)/);
   assert.match(projectDetail, /actions=\{activeTab === 'workflow' \? undefined/);
   assert.match(projectDetail, />\s*Mở kế hoạch\s*<\/Link>/);
   assert.match(projectDetail, /<ProjectOverviewActionBand/);

@@ -27,6 +27,6 @@ test('detail navigation only accepts internal project and work item identifiers'
   const work = '20000000-0000-0000-0000-000000000001';
   const item = { project_id: project, work_item_id: work } as DashboardActivity;
   assert.equal(dashboardActivityHref(item), `/projects/${project}/work-items/${work}`);
-  assert.equal(dashboardActivityHref({ ...item, work_item_id: '' }), `/projects/${project}?tab=activity`);
+  assert.equal(dashboardActivityHref({ ...item, work_item_id: '' }), `/projects/${project}/discussion`);
   assert.equal(dashboardActivityHref({ ...item, project_id: '//external' }), '');
 });

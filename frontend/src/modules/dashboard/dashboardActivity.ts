@@ -44,5 +44,5 @@ export function dashboardActivityGroups(items: DashboardActivity[]) {
 export function dashboardActivityHref(item: DashboardActivity) {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuid.test(item.project_id)) return '';
-  return uuid.test(item.work_item_id) ? `/projects/${item.project_id}/work-items/${item.work_item_id}` : `/projects/${item.project_id}?tab=activity`;
+  return uuid.test(item.work_item_id) ? `/projects/${item.project_id}/work-items/${item.work_item_id}` : `/projects/${item.project_id}/discussion`;
 }

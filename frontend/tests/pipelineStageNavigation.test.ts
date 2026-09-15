@@ -5,6 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { executionTargetPath } from '../src/modules/work-items/workItemExecutionTarget.ts';
 import { projectPipelinePath, projectPipelineReturnTo } from '../src/modules/work-items/workItemNavigation.ts';
+import { currentTimelineNode } from '../src/modules/projects/projectOperationsDomain.ts';
 import type { WorkItem } from '../src/lib/types/domain.ts';
 
 function source(path: string) {
@@ -52,10 +53,6 @@ const nodes = Object.freeze([
   Object.freeze({ id: 'fixture-construction', name: 'Thi công', status: 'in_progress' }),
   Object.freeze({ id: 'fixture-finance', name: 'Tài chính & Công nợ', status: 'pending' }),
 ]);
-const currentNodeFunction = project.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === 'currentTimelineNode');
-assert.ok(currentNodeFunction);
-const currentTimelineNode = vm.runInNewContext(`${ts.transpile(currentNodeFunction.getText(project))}\ncurrentTimelineNode;`);
-
 // Exercise the actual page selection expressions without running a browser or React effects.
 function selectedStage(path: string) {
   const location = new URL(path, 'http://localhost');

@@ -10,6 +10,8 @@ test('authenticated pages stay lazy and below the permission boundary', async ()
   assert.ok(lazyImports.length >= 20, `expected at least 20 lazy page imports, received ${lazyImports.length}`);
   assert.match(source, /import \{ LoginPage \} from '\.\.\/modules\/auth\/LoginPage';/);
   assert.doesNotMatch(source, /lazy\(\(\) => import\('\.\.\/modules\/auth\/LoginPage'\)/);
+  assert.match(source, /lazy\(\(\) => import\('\.\.\/modules\/projects\/ProjectDiscussionPage'\)/);
+  assert.match(source, /path: 'discussion', element: guarded\(<ProjectDiscussionPage \/>, \['project\.view'\]\)/);
   assert.match(
     guardedFunction,
     /<RequirePermission permissions=\{permissions\} excludePermissions=\{excludePermissions\}>[\s\S]*<RouteModuleBoundary focus=\{focus\}>\{element\}<\/RouteModuleBoundary>[\s\S]*<\/RequirePermission>/,

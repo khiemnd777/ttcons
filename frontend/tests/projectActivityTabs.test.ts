@@ -6,11 +6,12 @@ async function source(path: string) {
   return readFile(new URL(path, import.meta.url), 'utf8');
 }
 
-test('project activity exposes only three activity kinds, opens discussion first, and keeps one page composer', async () => {
-  const [thread, workItemDetail, projectDetail] = await Promise.all([
+test('project discussion route exposes only three activity kinds, opens discussion first, and keeps one page composer', async () => {
+  const [thread, workItemDetail, projectDetail, projectDiscussion] = await Promise.all([
     source('../src/modules/work-items/ActivityThread.tsx'),
     source('../src/modules/work-items/WorkItemDetailDialog.tsx'),
     source('../src/modules/projects/ProjectDetailPage.tsx'),
+    source('../src/modules/projects/ProjectDiscussionPage.tsx'),
   ]);
   const tabs = thread.slice(thread.indexOf('const kindTabs'), thread.indexOf('const attentionItems'));
 
@@ -27,17 +28,19 @@ test('project activity exposes only three activity kinds, opens discussion first
   assert.match(thread, /kind === 'discussion'[\s\S]*variant="chat"/);
   assert.doesNotMatch(thread, /kind !== 'discussion'/);
   assert.match(workItemDetail, /<ActivityComposer[\s\S]*mode="work_item"[\s\S]*defaultExpanded/);
-  assert.match(projectDetail, /const activityDiscussionCount = numberValue\(data\.activity_summary\?\.discussion_unread\);/);
-  assert.match(projectDetail, /\{ id: 'activity', label: 'Trao đổi', icon: MessageSquare, count: activityDiscussionCount \}/);
+  assert.doesNotMatch(projectDetail, /id: 'activity'/);
+  assert.match(projectDiscussion, /<ActivityThread/);
+  assert.match(projectDiscussion, /buildActivityAttachmentOptions/);
   assert.doesNotMatch(projectDetail, /activity_summary\?\.discussion\) - numberValue\(data\.activity_summary\?\.decisions/);
   assert.doesNotMatch(projectDetail, /activity_summary\?\.total/);
 });
 
 test('project discussion leads with the lifecycle action while preserving the personal work queue', async () => {
-  const [thread, actionCard, projectDetail] = await Promise.all([
+  const [thread, actionCard, projectDetail, projectDiscussion] = await Promise.all([
     source('../src/modules/work-items/ActivityThread.tsx'),
     source('../src/modules/work-items/DiscussionWorkflowActionCard.tsx'),
     source('../src/modules/projects/ProjectDetailPage.tsx'),
+    source('../src/modules/projects/ProjectDiscussionPage.tsx'),
   ]);
 
   assert.match(thread, /<DiscussionWorkflowActionCard/);
@@ -49,8 +52,10 @@ test('project discussion leads with the lifecycle action while preserving the pe
   assert.match(actionCard, /discussionWorkflowActionLabel\(currentWork\)/);
   assert.doesNotMatch(actionCard, /\bpost\(|\bput\(/);
 
-  assert.match(projectDetail, /<ProjectStartupWizard/);
-  assert.match(projectDetail, /workflowAction=\{\{ hasPipeline, pipelineStatus, currentNode, primaryWork, onOpenStartup \}\}/);
+  assert.match(projectDiscussion, /<ProjectStartupWizard/);
+  assert.match(projectDiscussion, /workflowAction=\{\{/);
+  assert.match(projectDiscussion, /currentNode,/);
+  assert.match(projectDiscussion, /primaryWork,/);
   assert.doesNotMatch(projectDetail, /post\(`\/projects\/\$\{id\}\/start-pipeline`/);
   assert.match(projectDetail, /<ProjectOverviewActionBand/);
   assert.doesNotMatch(projectDetail, /function HeaderActions/);
