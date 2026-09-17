@@ -409,7 +409,7 @@ func procurementItemColumns() []ColumnSpec {
 }
 
 func materialColumns() []ColumnSpec {
-	return []ColumnSpec{col("code"), col("name"), col("unit"), col("category"), col("default_supplier_partner_id"), col("default_supplier"), col("standard_price"), col("active")}
+	return []ColumnSpec{col("code"), col("name"), col("unit"), col("category"), col("default_supplier_partner_id"), col("default_supplier"), col("standard_price"), col("active"), col("tracking_mode"), col("form_factor")}
 }
 
 func warehouseColumns() []ColumnSpec {

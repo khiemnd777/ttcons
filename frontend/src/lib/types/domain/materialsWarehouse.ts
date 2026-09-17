@@ -13,6 +13,9 @@ export type MaterialCatalogItem = ProjectOperationsRecord & {
   default_supplier?: string;
   standard_price?: number;
   active?: boolean;
+	tracking_mode?: 'aggregate' | 'physical_unit' | string;
+	form_factor?: 'segment' | 'roll' | 'bar' | 'sheet' | string;
+	physical_tracking_initialized_at?: string;
 };
 
 export type ProjectMaterialBalance = ProjectOperationsRecord & {
@@ -26,6 +29,11 @@ export type ProjectMaterialBalance = ProjectOperationsRecord & {
   used_quantity?: number;
   surplus_quantity?: number;
   surplus_status?: string;
+	waste_quantity?: number;
+	tracking_mode?: 'aggregate' | 'physical_unit' | string;
+	form_factor?: string;
+	physical_available_quantity?: number;
+	physical_unit_count?: number;
 };
 
 export type MaterialSnapshotItem = ProjectOperationsRecord & {
@@ -54,6 +62,16 @@ export type MaterialSnapshotItem = ProjectOperationsRecord & {
   condition: 'usable' | 'damaged' | 'mixed' | 'unknown' | string;
   comment?: string;
   payload_json?: AnyRecord;
+	stock_unit_usage_json?: Array<{
+		stock_unit_id: string;
+		used_quantity: number;
+		waste_quantity: number;
+		remaining_code?: string;
+		remaining_length_mm?: number;
+		remaining_width_mm?: number;
+		remaining_thickness_mm?: number;
+		condition?: string;
+	}>;
 };
 
 export type MaterialSnapshotRecord = ProjectOperationsRecord & {
@@ -104,6 +122,84 @@ export type StockPosition = ProjectOperationsRecord & {
   unit: string;
   category?: string;
   stock_quantity: number;
+	tracking_mode?: 'aggregate' | 'physical_unit' | string;
+	form_factor?: string;
+	physical_available_quantity?: number;
+	physical_quarantined_quantity?: number;
+	physical_unit_count?: number;
+};
+
+export type MaterialStockUnitEvent = ProjectOperationsRecord & {
+	stock_unit_id: string;
+	event_type: string;
+	quantity: number;
+	before_quantity: number;
+	after_quantity: number;
+	from_location_type?: string;
+	to_location_type?: string;
+	from_warehouse_name?: string;
+	to_warehouse_name?: string;
+	from_project_name?: string;
+	to_project_name?: string;
+	source_type: string;
+	source_id?: string;
+	actor_name?: string;
+	created_at?: string;
+};
+
+export type MaterialStockUnit = ProjectOperationsRecord & {
+	unit_code: string;
+	material_id: string;
+	material_code?: string;
+	material_name?: string;
+	tracking_mode?: string;
+	form_factor?: string;
+	root_unit_id?: string;
+	root_unit_code?: string;
+	parent_unit_id?: string;
+	parent_unit_code?: string;
+	location_type: 'warehouse' | 'project' | 'external' | 'consumed' | string;
+	warehouse_id?: string;
+	warehouse_name?: string;
+	project_id?: string;
+	project_name?: string;
+	quantity: number;
+	unit: string;
+	length_mm?: number;
+	width_mm?: number;
+	thickness_mm?: number;
+	condition: 'usable' | 'damaged' | 'mixed' | 'unknown' | string;
+	status: 'available' | 'issued' | 'consumed' | 'quarantined' | 'external' | 'cancelled' | string;
+	custody_location?: string;
+	version?: number;
+	events?: MaterialStockUnitEvent[];
+};
+
+export type StockUnitAllocation = {
+	stock_unit_id: string;
+	unit_code?: string;
+	quantity: number;
+	result_unit_code?: string;
+	length_mm?: number;
+	width_mm?: number;
+	thickness_mm?: number;
+	remaining_length_mm?: number;
+	remaining_width_mm?: number;
+	remaining_thickness_mm?: number;
+	condition?: string;
+	custody_location?: string;
+	status?: string;
+};
+
+export type MaterialStockUnitInput = {
+	unit_code: string;
+	quantity: number;
+	unit: string;
+	length_mm?: number;
+	width_mm?: number;
+	thickness_mm?: number;
+	condition: string;
+	custody_location?: string;
 };
 
 export type StockDocumentItem = ProjectOperationsRecord & {
@@ -117,6 +213,10 @@ export type StockDocumentItem = ProjectOperationsRecord & {
   source_line_type?: string;
   source_line_id?: string;
   movement_code?: string;
+	tracking_mode?: string;
+	form_factor?: string;
+	stock_units?: MaterialStockUnitInput[];
+	stock_unit_allocations?: StockUnitAllocation[];
 };
 
 export type StockDocument = ProjectOperationsRecord & {
@@ -190,6 +290,7 @@ export type SurplusHandlingRecord = ProjectOperationsRecord & {
   comment?: string;
   submitted_by?: string;
   submitted_at?: string;
+	stock_unit_allocations_json?: StockUnitAllocation[];
 };
 
 export type SurplusHandlingResponse = {

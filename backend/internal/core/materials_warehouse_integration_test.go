@@ -6,6 +6,97 @@ import (
 	"testing"
 )
 
+func TestTrackedMaterialPartialReturnAndReissuePreservesBalanceAndLineage(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(db)
+
+	actorID := newID()
+	projectID := newID()
+	warehouseID := newID()
+	materialID := newID()
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movement_unit_allocations WHERE stock_unit_id IN (SELECT id FROM material_stock_units WHERE material_id=$1)`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM material_stock_unit_events WHERE stock_unit_id IN (SELECT id FROM material_stock_units WHERE material_id=$1)`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM material_stock_units WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE target_id IN (SELECT id FROM stock_movements WHERE material_id=$1) OR target_id IN (SELECT id FROM stock_documents WHERE project_id=$2)`, materialID, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_movements WHERE material_id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM stock_documents WHERE project_id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM site_material_balances WHERE project_id=$1 AND material_id=$2`, projectID, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM materials WHERE id=$1`, materialID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM warehouses WHERE id=$1`, warehouseID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
+	})
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Tracked Material Actor','active')`, actorID, "tracked-material-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status) VALUES ($1,'Tracked Material Project',$2,'Client','active')`, projectID, "TMP-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO warehouses (id,name,location,type,active) VALUES ($1,'Tracked Warehouse','A','central',true)`, warehouseID)
+	mustExec(t, db, `INSERT INTO materials (id,code,name,unit,category,tracking_mode,form_factor,active) VALUES ($1,$2,'Tracked Cable','m','Electrical','physical_unit','roll',true)`, materialID, "TMC-"+materialID[:8])
+
+	receipt, err := repo.CreateStockDocument(ctx, StockDocumentRequest{
+		ProjectID: projectID, MovementType: "receive", TargetWarehouseID: warehouseID, DocumentDate: "2026-09-16",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 10, Unit: "m", StockUnits: []MaterialStockUnitInput{{UnitCode: "ROLL-001", Quantity: 10, Unit: "m", Condition: "usable"}}}},
+	}, actorID, "Tracked Material Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt["id"] == nil {
+		t.Fatalf("receipt = %#v, want id", receipt)
+	}
+	root, err := repo.QueryOne(ctx, `SELECT * FROM material_stock_units WHERE material_id=$1 AND unit_code='ROLL-001'`, materialID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.CreateStockDocument(ctx, StockDocumentRequest{
+		ProjectID: projectID, MovementType: "issue", SourceWarehouseID: warehouseID, DocumentDate: "2026-09-16",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 6, Unit: "m", StockUnitAllocations: []StockUnitAllocationRequest{{StockUnitID: cleanID(root["id"]), Quantity: 6, ResultUnitCode: "ROLL-001-SITE", Condition: "usable"}}}},
+	}, actorID, "Tracked Material Actor"); err != nil {
+		t.Fatal(err)
+	}
+	issued, err := repo.QueryOne(ctx, `SELECT * FROM material_stock_units WHERE material_id=$1 AND unit_code='ROLL-001-SITE'`, materialID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.CreateStockDocument(ctx, StockDocumentRequest{
+		ProjectID: projectID, MovementType: "return_to_warehouse", TargetWarehouseID: warehouseID, DocumentDate: "2026-09-16",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 4, Unit: "m", StockUnitAllocations: []StockUnitAllocationRequest{{StockUnitID: cleanID(issued["id"]), Quantity: 4, ResultUnitCode: "ROLL-001-RETURN", Condition: "usable"}}}},
+	}, actorID, "Tracked Material Actor"); err != nil {
+		t.Fatal(err)
+	}
+	returned, err := repo.QueryOne(ctx, `SELECT * FROM material_stock_units WHERE material_id=$1 AND unit_code='ROLL-001-RETURN'`, materialID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.CreateStockDocument(ctx, StockDocumentRequest{
+		ProjectID: projectID, MovementType: "issue", SourceWarehouseID: warehouseID, DocumentDate: "2026-09-16",
+		Items: []StockDocumentItemRequest{{MaterialID: materialID, Quantity: 3, Unit: "m", StockUnitAllocations: []StockUnitAllocationRequest{{StockUnitID: cleanID(returned["id"]), Quantity: 3, ResultUnitCode: "ROLL-001-REISSUE", Condition: "usable"}}}},
+	}, actorID, "Tracked Material Actor"); err != nil {
+		t.Fatal(err)
+	}
+
+	var warehousePhysical, projectPhysical, warehouseLedger, siteIssued float64
+	if err := db.QueryRowContext(ctx, `SELECT COALESCE(SUM(quantity),0)::float8 FROM material_stock_units WHERE material_id=$1 AND location_type='warehouse' AND status='available'`, materialID).Scan(&warehousePhysical); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COALESCE(SUM(quantity),0)::float8 FROM material_stock_units WHERE material_id=$1 AND project_id=$2 AND location_type='project' AND status='issued'`, materialID, projectID).Scan(&projectPhysical); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COALESCE(SUM(CASE WHEN movement_type IN ('receive','return_to_warehouse','adjustment_in') THEN quantity WHEN movement_type IN ('issue','transfer','loss','adjustment_out') THEN -quantity ELSE 0 END),0)::float8 FROM stock_movements WHERE material_id=$1 AND warehouse_id=$2`, materialID, warehouseID).Scan(&warehouseLedger); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT issued_quantity::float8 FROM site_material_balances WHERE project_id=$1 AND material_id=$2`, projectID, materialID).Scan(&siteIssued); err != nil {
+		t.Fatal(err)
+	}
+	if warehousePhysical != 5 || projectPhysical != 5 || warehouseLedger != 5 || siteIssued != 5 {
+		t.Fatalf("balances = warehouse physical %.3f, project physical %.3f, ledger %.3f, site %.3f; want 5/5/5/5", warehousePhysical, projectPhysical, warehouseLedger, siteIssued)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM material_stock_units WHERE material_id=$1 AND parent_unit_id IS NOT NULL`, 3, materialID)
+	assertCount(t, db, `SELECT COUNT(*) FROM material_stock_unit_events event JOIN material_stock_units unit ON unit.id=event.stock_unit_id WHERE unit.material_id=$1 AND event.event_type='split'`, 3, materialID)
+}
+
 func TestBatch7StockMovementGuardsWarehouseAndSiteBalances(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

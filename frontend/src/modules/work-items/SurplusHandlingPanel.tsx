@@ -10,10 +10,12 @@ import { get, post, put } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import type {
   EvidenceRecord,
+	MaterialStockUnit,
   ProjectMaterialBalance,
   SurplusHandlingRecord,
   SurplusHandlingResponse,
   Warehouse,
+	StockUnitAllocation,
 } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
@@ -30,6 +32,7 @@ type Draft = {
   condition: string;
   evidence_id: string;
   comment: string;
+	stock_unit_allocations: StockUnitAllocation[];
 };
 
 type SurplusPayload = {
@@ -42,6 +45,7 @@ type SurplusPayload = {
   condition: string;
   evidence_id: string;
   comment: string;
+	stock_unit_allocations: StockUnitAllocation[];
 };
 
 const allHandlingOptions = [
@@ -78,6 +82,11 @@ export function SurplusHandlingPanel({
     enabled: Boolean(workItemId),
     retry: false,
   });
+	const stockUnitsQuery = useQuery({
+		queryKey: ['material-stock-units', 'project', projectId],
+		queryFn: () => get<MaterialStockUnit[]>(`/stock/units?project_id=${encodeURIComponent(projectId ?? '')}&status=issued`),
+		enabled: Boolean(projectId),
+	});
 
   const balances = handlingQuery.data?.material_balances ?? [];
   const warehouses = handlingQuery.data?.warehouses ?? [];
@@ -112,6 +121,8 @@ export function SurplusHandlingPanel({
     queryClient.invalidateQueries({ queryKey: ['work-item', workItemId] });
     queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
     queryClient.invalidateQueries({ queryKey: ['stock'] });
+		queryClient.invalidateQueries({ queryKey: ['stock-positions'] });
+		queryClient.invalidateQueries({ queryKey: ['material-stock-units'] });
     if (projectId) {
       queryClient.invalidateQueries({ queryKey: ['material-balances', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
@@ -136,6 +147,10 @@ export function SurplusHandlingPanel({
     if (!draft.warehouse_id) invalid.push('Kho');
     if (requireComplete && !draft.custody_location.trim()) invalid.push('Vị trí lưu/trả');
     if (requireComplete && !draft.evidence_id) invalid.push('Minh chứng');
+		if (balance.tracking_mode === 'physical_unit' && (requireComplete || draft.stock_unit_allocations.length > 0)) {
+			const allocated = draft.stock_unit_allocations.reduce((sum, allocation) => sum + Number(allocation.quantity ?? 0), 0);
+			if (!draft.stock_unit_allocations.length || Math.abs(allocated - quantity) > 0.000001) invalid.push('Phân bổ Đoạn/Cuộn/Cây/Tấm');
+		}
     if (invalid.length) {
       toast.warn({ title: 'Dữ liệu xử lý vật tư dư chưa hợp lệ', description: invalid.join(', ') });
       const prefix = `balance.${balance.id}`;
@@ -164,6 +179,7 @@ export function SurplusHandlingPanel({
       condition: draft.condition,
       evidence_id: draft.evidence_id,
       comment: draft.comment.trim(),
+			stock_unit_allocations: draft.stock_unit_allocations.map((allocation) => ({ ...allocation, condition: draft.condition, custody_location: draft.custody_location.trim() })),
     };
   }
 
@@ -261,6 +277,7 @@ export function SurplusHandlingPanel({
                   warehouses={warehouses}
                   evidence={evidenceOptions}
                   handlingOptions={handlingOptions}
+							stockUnits={(stockUnitsQuery.data ?? []).filter((unit) => unit.material_id === balance.material_id)}
                   invalidKey={invalidKey}
                   disabled={actionPending}
                   onChange={(patch) => {
@@ -314,6 +331,7 @@ function SurplusRow({
   warehouses,
   evidence,
   handlingOptions,
+	stockUnits,
   invalidKey,
   disabled,
   onChange,
@@ -327,6 +345,7 @@ function SurplusRow({
   warehouses: Warehouse[];
   evidence: EvidenceRecord[];
   handlingOptions: typeof allHandlingOptions;
+	stockUnits: MaterialStockUnit[];
   invalidKey: string;
   disabled: boolean;
   onChange: (patch: Partial<Draft>) => void;
@@ -428,6 +447,7 @@ function SurplusRow({
             ))}
           </select>
         </label>
+				{balance.tracking_mode === 'physical_unit' ? <div className="col-span-2"><SurplusStockUnitAllocationEditor units={stockUnits} quantity={quantity} condition={draft.condition} disabled={disabled} allocations={draft.stock_unit_allocations} onChange={(stock_unit_allocations) => onChange({ stock_unit_allocations })} /></div> : null}
       </div>
 
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
@@ -490,6 +510,37 @@ function SurplusRow({
   );
 }
 
+function SurplusStockUnitAllocationEditor({ units, quantity, condition, disabled, allocations, onChange }: { units: MaterialStockUnit[]; quantity: number; condition: string; disabled: boolean; allocations: StockUnitAllocation[]; onChange: (allocations: StockUnitAllocation[]) => void }) {
+	const selected = new Map(allocations.map((allocation) => [allocation.stock_unit_id, allocation]));
+	const toggle = (unit: MaterialStockUnit) => {
+		if (selected.has(unit.id)) return onChange(allocations.filter((allocation) => allocation.stock_unit_id !== unit.id));
+		const remaining = Math.max(quantity - allocations.reduce((sum, allocation) => sum + Number(allocation.quantity ?? 0), 0), 0);
+		onChange([...allocations, { stock_unit_id: unit.id, unit_code: unit.unit_code, quantity: Math.min(Number(unit.quantity ?? 0), remaining || Number(unit.quantity ?? 0)), condition }]);
+	};
+	const update = (stockUnitId: string, patch: Partial<StockUnitAllocation>) => onChange(allocations.map((allocation) => allocation.stock_unit_id === stockUnitId ? { ...allocation, ...patch } : allocation));
+	return <div className="rounded-md border border-blue-200 bg-blue-50 p-2 normal-case tracking-normal">
+		<p className="text-xs font-semibold text-blue-900">Đơn vị vật lý hoàn/trả</p>
+		{units.length ? <div className="mt-2 space-y-1.5">{units.map((unit) => {
+			const allocation = selected.get(unit.id);
+			return <div key={unit.id} className="grid grid-cols-[auto_1fr_90px] items-center gap-2 rounded border border-blue-100 bg-white p-2">
+				<input type="checkbox" checked={Boolean(allocation)} disabled={disabled} onChange={() => toggle(unit)} aria-label={`Chọn ${unit.unit_code}`} />
+				<span className="min-w-0 truncate text-xs text-slate-700">{unit.unit_code} · còn {formatQty(Number(unit.quantity ?? 0))} {unit.unit}</span>
+				<input className="h-8 rounded border border-line px-2 text-right text-xs" type="number" min="0.001" max={unit.quantity} step="0.001" value={allocation?.quantity ?? ''} disabled={disabled || !allocation} onChange={(event) => update(unit.id, { quantity: Number(event.target.value), condition })} aria-label={`Số lượng ${unit.unit_code}`} />
+				{allocation ? <div className="col-span-full grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+					<input className="h-8 rounded border border-line px-2 text-xs" value={allocation.result_unit_code ?? ''} disabled={disabled} onChange={(event) => update(unit.id, { result_unit_code: event.target.value })} placeholder="Mã phần hoàn (tự sinh nếu trống)" aria-label={`Mã phần hoàn từ ${unit.unit_code}`} />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={allocation.length_mm ?? ''} disabled={disabled} onChange={(event) => update(unit.id, { length_mm: optionalAllocationNumber(event.target.value) })} placeholder="Dài phần hoàn (mm)" />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={allocation.remaining_length_mm ?? ''} disabled={disabled} onChange={(event) => update(unit.id, { remaining_length_mm: optionalAllocationNumber(event.target.value) })} placeholder="Dài còn tại site (mm)" />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={allocation.width_mm ?? ''} disabled={disabled} onChange={(event) => update(unit.id, { width_mm: optionalAllocationNumber(event.target.value) })} placeholder="Rộng phần hoàn (mm)" />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={allocation.remaining_width_mm ?? ''} disabled={disabled} onChange={(event) => update(unit.id, { remaining_width_mm: optionalAllocationNumber(event.target.value) })} placeholder="Rộng còn tại site (mm)" />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={allocation.thickness_mm ?? ''} disabled={disabled} onChange={(event) => update(unit.id, { thickness_mm: optionalAllocationNumber(event.target.value) })} placeholder="Dày phần hoàn (mm)" />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={allocation.remaining_thickness_mm ?? ''} disabled={disabled} onChange={(event) => update(unit.id, { remaining_thickness_mm: optionalAllocationNumber(event.target.value) })} placeholder="Dày còn tại site (mm)" />
+				</div> : null}
+			</div>;
+		})}</div> : <p className="mt-2 text-xs text-amber-800">Không còn đơn vị vật lý tại công trình.</p>}
+		<p className="mt-2 text-right text-[11px] font-semibold text-blue-900">Đã chọn {formatQty(allocations.reduce((sum, allocation) => sum + Number(allocation.quantity ?? 0), 0))} / {formatQty(quantity)}</p>
+	</div>;
+}
+
 function defaultDraft(balance: ProjectMaterialBalance, handlingOptions: typeof allHandlingOptions): Draft {
   return {
     id: '',
@@ -502,6 +553,7 @@ function defaultDraft(balance: ProjectMaterialBalance, handlingOptions: typeof a
     condition: 'usable',
     evidence_id: '',
     comment: '',
+		stock_unit_allocations: [],
   };
 }
 
@@ -521,6 +573,7 @@ function draftFromRecord(record: SurplusHandlingRecord, handlingOptions: typeof 
     condition: record.condition || 'usable',
     evidence_id: record.evidence_id ?? '',
     comment: record.comment ?? '',
+		stock_unit_allocations: record.stock_unit_allocations_json ?? [],
   };
 }
 
@@ -528,6 +581,10 @@ function numberInput(value: string) {
   if (value.trim() === '') return 0;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : Number.NaN;
+}
+
+function optionalAllocationNumber(value: string) {
+	return value.trim() === '' ? undefined : Number(value);
 }
 
 function formatQty(value: number) {

@@ -139,31 +139,35 @@ func (r *Repository) SaveMaterialSnapshot(ctx context.Context, item Record, head
 	}
 	for _, row := range items {
 		rawPayload, _ := json.Marshal(row["payload_json"])
-		if _, err := tx.ExecContext(ctx, `
+		rawStockUnitUsage, _ := json.Marshal(row["stock_unit_usage"])
+		inserted, err := queryOneRecord(ctx, tx, `
 			INSERT INTO material_before_after_snapshot_items (
 				snapshot_id, project_id, work_item_id, item_index,
 				material_id, material_code, material_name, unit, source,
 				before_quantity, added_quantity, after_quantity, waste_quantity, used_quantity,
 				affects_site_balance, site_balance_id, before_evidence_id, after_evidence_id,
-				construction_area, condition, comment, payload_json
+				construction_area, condition, comment, payload_json, stock_unit_usage_json
 			)
 			VALUES (
 				$1, $2, $3, $4,
 				NULLIF($5,'')::uuid, NULLIF($6,''), $7, $8, $9,
 				$10, $11, $12, $13, $14,
 				$15, NULLIF($16,'')::uuid, NULLIF($17,'')::uuid, NULLIF($18,'')::uuid,
-				NULLIF($19,''), $20, NULLIF($21,''), $22::jsonb
+				NULLIF($19,''), $20, NULLIF($21,''), $22::jsonb, $23::jsonb
 			)
+			RETURNING id
 		`, snapshotID, projectID, workItemID, row["item_index"],
 			cleanID(row["material_id"]), row["material_code"], row["material_name"], row["unit"], row["source"],
 			row["before_quantity"], row["added_quantity"], row["after_quantity"], row["waste_quantity"], row["used_quantity"],
 			row["affects_site_balance"], cleanID(row["site_balance_id"]), cleanID(row["before_evidence_id"]), cleanID(row["after_evidence_id"]),
-			row["construction_area"], row["condition"], row["comment"], string(rawPayload)); err != nil {
+			row["construction_area"], row["condition"], row["comment"], string(rawPayload), string(rawStockUnitUsage))
+		if err != nil {
 			return err
 		}
+		row["snapshot_item_id"] = inserted["id"]
 	}
 	if submit {
-		if err := r.applyMaterialSnapshotToSiteBalanceTx(ctx, tx, projectID, items); err != nil {
+		if err := r.applyMaterialSnapshotToSiteBalanceTx(ctx, tx, projectID, items, actorID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `
@@ -211,7 +215,7 @@ func (r *Repository) SaveMaterialSnapshot(ctx context.Context, item Record, head
 	return tx.Commit()
 }
 
-func (r *Repository) applyMaterialSnapshotToSiteBalanceTx(ctx context.Context, tx *sql.Tx, projectID string, items []Record) error {
+func (r *Repository) applyMaterialSnapshotToSiteBalanceTx(ctx context.Context, tx *sql.Tx, projectID string, items []Record, actorID string) error {
 	for _, item := range items {
 		if !boolValue(item["affects_site_balance"]) {
 			continue
@@ -234,24 +238,36 @@ func (r *Repository) applyMaterialSnapshotToSiteBalanceTx(ctx context.Context, t
 			return validationError("Không tìm thấy số dư vật tư tại công trình", Record{"item_index": item["item_index"], "material_id": materialID})
 		}
 		usedQuantity := number(item["used_quantity"])
-		if materialSnapshotQuantityExceeds(usedQuantity, materialBalanceAvailable(balanceRows[0])) {
-			return validationError("Số lượng sử dụng vượt vật tư còn tại công trình", Record{
+		wasteQuantity := number(item["waste_quantity"])
+		consumedQuantity := usedQuantity + wasteQuantity
+		if materialSnapshotQuantityExceeds(consumedQuantity, materialBalanceAvailable(balanceRows[0])) {
+			return validationError("Số lượng sử dụng và hao hụt vượt vật tư còn tại công trình", Record{
 				"item_index":  item["item_index"],
 				"material_id": materialID,
 				"available":   materialBalanceAvailable(balanceRows[0]),
-				"quantity":    usedQuantity,
+				"quantity":    consumedQuantity,
 			})
 		}
-		if usedQuantity <= 0 {
+		if cleanOptionalText(item["tracking_mode"]) == "physical_unit" {
+			usage, err := decodeStockUnitUsage(item["stock_unit_usage"])
+			if err != nil {
+				return validationError("Phân bổ sử dụng đơn vị vật lý không hợp lệ", Record{"item_index": item["item_index"]})
+			}
+			if err := applyMaterialStockUnitUsageTx(ctx, tx, projectID, materialID, cleanID(item["snapshot_item_id"]), usage, actorID); err != nil {
+				return err
+			}
+		}
+		if consumedQuantity <= 0 {
 			continue
 		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE site_material_balances
 			SET used_quantity = used_quantity + $2,
-				surplus_quantity = GREATEST(issued_quantity - (used_quantity + $2), 0),
+				waste_quantity = waste_quantity + $3,
+				surplus_quantity = GREATEST(issued_quantity - (used_quantity + $2) - (waste_quantity + $3), 0),
 				updated_at = now()
 			WHERE id=$1
-		`, balanceID, usedQuantity); err != nil {
+		`, balanceID, usedQuantity, wasteQuantity); err != nil {
 			return err
 		}
 	}
@@ -316,6 +332,7 @@ func (r *Repository) SaveSurplusHandling(ctx context.Context, item Record, handl
 		"material_code":           row["material_code"],
 		"surplus_before_handling": row["surplus_before_handling"],
 	})
+	rawStockUnitAllocations, _ := json.Marshal(row["stock_unit_allocations"])
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -357,13 +374,14 @@ func (r *Repository) SaveSurplusHandling(ctx context.Context, item Record, handl
 				evidence_id=NULLIF($12,'')::uuid,
 				comment=NULLIF($13,''),
 				payload_json=$14::jsonb,
-				updated_by=NULLIF($15,'')::uuid,
+				stock_unit_allocations_json=$15::jsonb,
+				updated_by=NULLIF($16,'')::uuid,
 				updated_at=now()
 			WHERE id=$1
 			RETURNING id
 		`, handlingID, row["site_balance_id"], row["material_id"], cleanID(row["material_snapshot_id"]), cleanID(row["material_snapshot_item_id"]),
 			row["handling_type"], row["quantity"], row["unit"], cleanID(row["warehouse_id"]), row["custody_location"], row["condition"],
-			cleanID(row["evidence_id"]), row["comment"], string(rawPayload), actorID)
+			cleanID(row["evidence_id"]), row["comment"], string(rawPayload), string(rawStockUnitAllocations), actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -377,19 +395,19 @@ func (r *Repository) SaveSurplusHandling(ctx context.Context, item Record, handl
 				handling_code, project_id, work_item_id, site_balance_id, material_id,
 				material_snapshot_id, material_snapshot_item_id, status, handling_type,
 				quantity, unit, warehouse_id, custody_location, condition, evidence_id,
-				comment, payload_json, created_by, updated_by
+				comment, payload_json, stock_unit_allocations_json, created_by, updated_by
 			)
 			VALUES (
 				$1, $2, $3, $4, $5,
 				NULLIF($6,'')::uuid, NULLIF($7,'')::uuid, 'draft', $8,
 				$9, $10, NULLIF($11,'')::uuid, NULLIF($12,''), $13, NULLIF($14,'')::uuid,
-				NULLIF($15,''), $16::jsonb, NULLIF($17,'')::uuid, NULLIF($17,'')::uuid
+				NULLIF($15,''), $16::jsonb, $17::jsonb, NULLIF($18,'')::uuid, NULLIF($18,'')::uuid
 			)
 			RETURNING id
 		`, code, projectID, workItemID, row["site_balance_id"], row["material_id"],
 			cleanID(row["material_snapshot_id"]), cleanID(row["material_snapshot_item_id"]), row["handling_type"],
 			row["quantity"], row["unit"], cleanID(row["warehouse_id"]), row["custody_location"], row["condition"], cleanID(row["evidence_id"]),
-			row["comment"], string(rawPayload), actorID)
+			row["comment"], string(rawPayload), string(rawStockUnitAllocations), actorID)
 		if err != nil {
 			return nil, err
 		}
@@ -526,12 +544,31 @@ func (r *Repository) SubmitSurplusHandling(ctx context.Context, handlingID strin
 		return nil, sql.ErrNoRows
 	}
 	movement := movementRows[0]
+	allocations, err := decodeStockUnitAllocations(handling["stock_unit_allocations_json"])
+	if err != nil {
+		return nil, validationError("Phân bổ đơn vị vật lý đã lưu không hợp lệ", Record{"surplus_handling_id": handlingID})
+	}
+	if len(allocations) > 0 {
+		stockReq := StockDocumentRequest{ProjectID: projectID, MovementType: handlingType, TargetWarehouseID: warehouseID, SourceWarehouseID: warehouseID}
+		stockItem := StockDocumentItemRequest{MaterialID: materialID, Quantity: quantity, Unit: unit, StockUnitAllocations: allocations}
+		if err := applyStockUnitMovementTx(ctx, tx, stockReq, stockItem, "", movement, actorID); err != nil {
+			return nil, err
+		}
+	} else {
+		material, err := materialTrackingTx(ctx, tx, materialID)
+		if err != nil {
+			return nil, err
+		}
+		if cleanOptionalText(material["tracking_mode"]) == "physical_unit" {
+			return nil, validationError("Vật tư theo dõi từng đơn vị thiếu phân bổ Đoạn/Cuộn/Cây/Tấm", Record{"surplus_handling_id": handlingID})
+		}
+	}
 	updatedBalance, err := queryTx(ctx, tx, `
 		UPDATE site_material_balances
-		SET issued_quantity = GREATEST(issued_quantity - $3, 0),
-			surplus_quantity = GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity, 0),
-			surplus_status = CASE
-				WHEN GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity, 0) > 0.000001 THEN 'partial'
+			SET issued_quantity = GREATEST(issued_quantity - $3, 0),
+				surplus_quantity = GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity - waste_quantity, 0),
+				surplus_status = CASE
+					WHEN GREATEST(GREATEST(issued_quantity - $3, 0) - used_quantity - waste_quantity, 0) > 0.000001 THEN 'partial'
 				ELSE 'handled'
 			END,
 			updated_at = now()

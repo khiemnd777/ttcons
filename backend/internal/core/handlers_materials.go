@@ -129,6 +129,52 @@ func (h *Handler) StockMovements(c *fiber.Ctx) error {
 	return response.OK(c, rows)
 }
 
+func (h *Handler) MaterialStockUnits(c *fiber.Ctx) error {
+	projectID := cleanID(c.Query("project_id"))
+	if projectID != "" {
+		if err := h.requireProjectPermission(c, projectID, []string{"warehouse.view", "operation.report", "warehouse.surplus_handle"}); err != nil {
+			return err
+		}
+	} else if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
+		return err
+	}
+	rows, err := h.service.repo.ListMaterialStockUnits(c.Context(), actorID(c), cleanID(c.Query("material_id")), cleanID(c.Query("warehouse_id")), projectID, strings.TrimSpace(c.Query("status")), strings.TrimSpace(c.Query("q")))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, rows)
+}
+
+func (h *Handler) GetMaterialStockUnit(c *fiber.Ctx) error {
+	row, err := h.service.repo.GetMaterialStockUnit(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	if projectID := cleanID(row["project_id"]); projectID != "" {
+		if err := h.requireProjectPermission(c, projectID, []string{"warehouse.view", "operation.report", "warehouse.surplus_handle"}); err != nil {
+			return err
+		}
+	} else if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
+		return err
+	}
+	return response.OK(c, row)
+}
+
+func (h *Handler) InitializeMaterialStockUnits(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"warehouse.adjust"}); err != nil {
+		return err
+	}
+	var req InitializeMaterialStockUnitsRequest
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu khởi tạo đơn vị vật lý không hợp lệ")
+	}
+	row, err := h.service.InitializeMaterialStockUnits(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.Created(c, row)
+}
+
 func (h *Handler) StockDocuments(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"warehouse.view"}); err != nil {
 		return err

@@ -12,6 +12,7 @@ import { dateText } from '../../lib/utils/format';
 import type {
   EvidenceRecord,
   MaterialCatalogItem,
+	MaterialStockUnit,
   MaterialSnapshotItem,
   MaterialSnapshotResponse,
   ProjectMaterialBalance,
@@ -36,6 +37,18 @@ type RowDraft = {
   construction_area: string;
   condition: string;
   comment: string;
+	stock_unit_usage: StockUnitUsageDraft[];
+};
+
+type StockUnitUsageDraft = {
+	stock_unit_id: string;
+	used_quantity: string;
+	waste_quantity: string;
+	remaining_code: string;
+	remaining_length_mm: string;
+	remaining_width_mm: string;
+	remaining_thickness_mm: string;
+	condition: string;
 };
 
 type MaterialSnapshotPayload = {
@@ -58,6 +71,16 @@ type MaterialSnapshotPayload = {
     construction_area: string;
     condition: string;
     comment: string;
+		stock_unit_usage: Array<{
+			stock_unit_id: string;
+			used_quantity: number;
+			waste_quantity: number;
+			remaining_code: string;
+			remaining_length_mm?: number;
+			remaining_width_mm?: number;
+			remaining_thickness_mm?: number;
+			condition: string;
+		}>;
   }>;
 };
 
@@ -100,6 +123,11 @@ export function MaterialSnapshotPanel({
     enabled: Boolean(workItemId),
     retry: false,
   });
+	const stockUnitsQuery = useQuery({
+		queryKey: ['material-stock-units', 'project', projectId],
+		queryFn: () => get<MaterialStockUnit[]>(`/stock/units?project_id=${encodeURIComponent(projectId ?? '')}&status=issued`),
+		enabled: Boolean(projectId),
+	});
 
   function resetFromResponse(response?: MaterialSnapshotResponse) {
     const record = response?.snapshot;
@@ -125,6 +153,7 @@ export function MaterialSnapshotPanel({
     queryClient.invalidateQueries({ queryKey: ['material-snapshot', workItemId] });
     queryClient.invalidateQueries({ queryKey: ['work-item', workItemId] });
     queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
+		queryClient.invalidateQueries({ queryKey: ['material-stock-units'] });
     if (projectId) {
       queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
       queryClient.invalidateQueries({ queryKey: ['material-balances', projectId] });
@@ -155,8 +184,23 @@ export function MaterialSnapshotPanel({
       if (row.affects_site_balance && !balanceByMaterialId.has(row.material_id)) invalid.push(`${label}: chưa có tồn công trình`);
       if (requireComplete && row.affects_site_balance) {
         const available = balanceAvailable(balanceByMaterialId.get(row.material_id));
-        if (used > available + 0.000001) invalid.push(`${label}: vượt tồn công trình`);
+				if (used + waste > available + 0.000001) invalid.push(`${label}: vượt tồn công trình`);
       }
+			const stockUnitUsage = row.stock_unit_usage.map((usage) => ({
+				stock_unit_id: usage.stock_unit_id,
+				used_quantity: numberInput(usage.used_quantity),
+				waste_quantity: numberInput(usage.waste_quantity),
+				remaining_code: usage.remaining_code.trim(),
+				remaining_length_mm: usage.remaining_length_mm.trim() ? numberInput(usage.remaining_length_mm) : undefined,
+				remaining_width_mm: usage.remaining_width_mm.trim() ? numberInput(usage.remaining_width_mm) : undefined,
+				remaining_thickness_mm: usage.remaining_thickness_mm.trim() ? numberInput(usage.remaining_thickness_mm) : undefined,
+				condition: usage.condition,
+			}));
+			if (material?.tracking_mode === 'physical_unit' && row.affects_site_balance && (requireComplete || stockUnitUsage.length > 0)) {
+				const allocatedUsed = stockUnitUsage.reduce((sum, usage) => sum + usage.used_quantity, 0);
+				const allocatedWaste = stockUnitUsage.reduce((sum, usage) => sum + usage.waste_quantity, 0);
+				if (Math.abs(allocatedUsed - used) > 0.000001 || Math.abs(allocatedWaste - waste) > 0.000001) invalid.push(`${label}: phân bổ Đoạn/Cuộn/Cây/Tấm chưa khớp`);
+			}
 
       return {
         item_index: row.item_index,
@@ -174,6 +218,7 @@ export function MaterialSnapshotPanel({
         construction_area: row.construction_area.trim(),
         condition: row.condition,
         comment: row.comment.trim(),
+				stock_unit_usage: stockUnitUsage,
       };
     });
 
@@ -373,6 +418,7 @@ export function MaterialSnapshotPanel({
                 materialById={materialById}
                 balance={balanceByMaterialId.get(row.material_id)}
                 evidence={evidenceOptions}
+						stockUnits={(stockUnitsQuery.data ?? []).filter((unit) => unit.material_id === row.material_id)}
                 invalidKey={invalidKey}
                 disabled={locked || actionPending}
                 onChange={(patch) => {
@@ -422,6 +468,7 @@ function MaterialSnapshotRow({
   materialById,
   balance,
   evidence,
+	stockUnits,
   invalidKey,
   disabled,
   onChange,
@@ -433,6 +480,7 @@ function MaterialSnapshotRow({
   materialById: Map<string, MaterialCatalogItem>;
   balance?: ProjectMaterialBalance;
   evidence: EvidenceRecord[];
+	stockUnits: MaterialStockUnit[];
   invalidKey: string;
   disabled: boolean;
   onChange: (patch: Partial<RowDraft>) => void;
@@ -479,6 +527,7 @@ function MaterialSnapshotRow({
               material_id: event.target.value,
               material_name: selected?.name ?? '',
               unit: selected?.unit ?? row.unit,
+							stock_unit_usage: [],
             });
           }}
           disabled={disabled}
@@ -564,6 +613,7 @@ function MaterialSnapshotRow({
         <div className={clsx('mt-2 rounded-md px-3 py-2 text-sm font-semibold', used < 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-700')}>
           KL dùng: {formatQty(Math.max(used, 0))} {row.unit || material?.unit || ''}
         </div>
+				{material?.tracking_mode === 'physical_unit' && row.affects_site_balance ? <MaterialStockUnitUsageEditor row={row} units={stockUnits} disabled={disabled} onChange={(stock_unit_usage) => onChange({ stock_unit_usage })} /> : null}
         <input
           name={keyFor('unit')}
           data-validation-key={keyFor('unit')}
@@ -638,6 +688,36 @@ function MaterialSnapshotRow({
 
     </div>
   );
+}
+
+function MaterialStockUnitUsageEditor({ row, units, disabled, onChange }: { row: RowDraft; units: MaterialStockUnit[]; disabled: boolean; onChange: (usage: StockUnitUsageDraft[]) => void }) {
+	const usage = row.stock_unit_usage;
+	const selected = new Map(usage.map((item) => [item.stock_unit_id, item]));
+	const toggle = (unit: MaterialStockUnit) => {
+		if (selected.has(unit.id)) return onChange(usage.filter((item) => item.stock_unit_id !== unit.id));
+		const usedRemaining = Math.max(computedUsed(row) - usage.reduce((sum, item) => sum + numberInput(item.used_quantity), 0), 0);
+		const wasteRemaining = Math.max(numberInput(row.waste_quantity) - usage.reduce((sum, item) => sum + numberInput(item.waste_quantity), 0), 0);
+		onChange([...usage, { stock_unit_id: unit.id, used_quantity: String(Math.min(Number(unit.quantity ?? 0), usedRemaining)), waste_quantity: String(Math.min(Math.max(Number(unit.quantity ?? 0) - usedRemaining, 0), wasteRemaining)), remaining_code: unit.unit_code, remaining_length_mm: unit.length_mm === undefined ? '' : String(unit.length_mm), remaining_width_mm: unit.width_mm === undefined ? '' : String(unit.width_mm), remaining_thickness_mm: unit.thickness_mm === undefined ? '' : String(unit.thickness_mm), condition: unit.condition }]);
+	};
+	const update = (stockUnitId: string, patch: Partial<StockUnitUsageDraft>) => onChange(usage.map((item) => item.stock_unit_id === stockUnitId ? { ...item, ...patch } : item));
+	return <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 p-2">
+		<p className="text-xs font-semibold text-blue-900">Chọn Đoạn/Cuộn/Cây/Tấm đã dùng</p>
+		{units.length ? <div className="mt-2 space-y-2">{units.map((unit) => {
+			const item = selected.get(unit.id);
+			return <div key={unit.id} className="rounded-md border border-blue-100 bg-white p-2">
+				<label className="flex items-center gap-2 text-xs font-semibold text-slate-800"><input type="checkbox" checked={Boolean(item)} disabled={disabled} onChange={() => toggle(unit)} />{unit.unit_code} · còn {formatQty(Number(unit.quantity ?? 0))} {unit.unit}</label>
+				{item ? <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-3">
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0" step="0.001" value={item.used_quantity} disabled={disabled} onChange={(event) => update(unit.id, { used_quantity: event.target.value })} placeholder="Đã dùng" aria-label={`Đã dùng ${unit.unit_code}`} />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0" step="0.001" value={item.waste_quantity} disabled={disabled} onChange={(event) => update(unit.id, { waste_quantity: event.target.value })} placeholder="Hư hao" aria-label={`Hư hao ${unit.unit_code}`} />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={item.remaining_length_mm} disabled={disabled} onChange={(event) => update(unit.id, { remaining_length_mm: event.target.value })} placeholder="Dài còn lại (mm)" aria-label={`Chiều dài còn lại ${unit.unit_code}`} />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={item.remaining_width_mm} disabled={disabled} onChange={(event) => update(unit.id, { remaining_width_mm: event.target.value })} placeholder="Rộng còn lại (mm)" aria-label={`Chiều rộng còn lại ${unit.unit_code}`} />
+					<input className="h-8 rounded border border-line px-2 text-xs" type="number" min="0.001" step="0.001" value={item.remaining_thickness_mm} disabled={disabled} onChange={(event) => update(unit.id, { remaining_thickness_mm: event.target.value })} placeholder="Dày còn lại (mm)" aria-label={`Chiều dày còn lại ${unit.unit_code}`} />
+					<select className="h-8 rounded border border-line bg-white px-2 text-xs" value={item.condition} disabled={disabled} onChange={(event) => update(unit.id, { condition: event.target.value })}><option value="usable">Dùng được</option><option value="damaged">Hư hỏng</option><option value="mixed">Lẫn tình trạng</option><option value="unknown">Chưa rõ</option></select>
+				</div> : null}
+			</div>;
+		})}</div> : <p className="mt-2 text-xs text-amber-800">Không còn đơn vị vật lý ở công trình.</p>}
+		<p className="mt-2 text-right text-[11px] font-semibold text-blue-900">Đã phân bổ dùng {formatQty(usage.reduce((sum, item) => sum + numberInput(item.used_quantity), 0))}; hư hao {formatQty(usage.reduce((sum, item) => sum + numberInput(item.waste_quantity), 0))}</p>
+	</div>;
 }
 
 function QuantityInput({
@@ -730,7 +810,12 @@ function firstMaterialSnapshotInvalidKey({
     if (invalidNumber) return keyFor(invalidNumber[0]);
     if (computedUsed(row) < -0.000001) return keyFor('after_quantity');
     if (row.affects_site_balance && !balanceByMaterialId.has(row.material_id)) return keyFor('material_id');
-    if (requireComplete && row.affects_site_balance && computedUsed(row) > balanceAvailable(balanceByMaterialId.get(row.material_id)) + 0.000001) return keyFor('after_quantity');
+		if (requireComplete && row.affects_site_balance && computedUsed(row) + numberInput(row.waste_quantity) > balanceAvailable(balanceByMaterialId.get(row.material_id)) + 0.000001) return keyFor('after_quantity');
+		if (material?.tracking_mode === 'physical_unit' && row.affects_site_balance && (requireComplete || row.stock_unit_usage.length > 0)) {
+			const allocatedUsed = row.stock_unit_usage.reduce((sum, usage) => sum + numberInput(usage.used_quantity), 0);
+			const allocatedWaste = row.stock_unit_usage.reduce((sum, usage) => sum + numberInput(usage.waste_quantity), 0);
+			if (Math.abs(allocatedUsed - computedUsed(row)) > 0.000001 || Math.abs(allocatedWaste - numberInput(row.waste_quantity)) > 0.000001) return keyFor('after_quantity');
+		}
   }
   return undefined;
 }
@@ -752,6 +837,7 @@ function defaultRowDraft(itemIndex: number): RowDraft {
     construction_area: '',
     condition: 'usable',
     comment: '',
+		stock_unit_usage: [],
   };
 }
 
@@ -772,6 +858,16 @@ function rowDraftFromItem(item: MaterialSnapshotItem): RowDraft {
     construction_area: item.construction_area ?? '',
     condition: item.condition || 'usable',
     comment: item.comment ?? '',
+		stock_unit_usage: (item.stock_unit_usage_json ?? []).map((usage) => ({
+			stock_unit_id: usage.stock_unit_id,
+			used_quantity: String(usage.used_quantity ?? 0),
+			waste_quantity: String(usage.waste_quantity ?? 0),
+			remaining_code: usage.remaining_code ?? '',
+			remaining_length_mm: usage.remaining_length_mm === undefined ? '' : String(usage.remaining_length_mm),
+			remaining_width_mm: usage.remaining_width_mm === undefined ? '' : String(usage.remaining_width_mm),
+			remaining_thickness_mm: usage.remaining_thickness_mm === undefined ? '' : String(usage.remaining_thickness_mm),
+			condition: usage.condition ?? 'usable',
+		})),
   };
 }
 
@@ -791,7 +887,7 @@ function roundQty(value: number) {
 
 function balanceAvailable(balance?: ProjectMaterialBalance) {
   if (!balance) return 0;
-  const issuedMinusUsed = Number(balance.issued_quantity ?? 0) - Number(balance.used_quantity ?? 0);
+	const issuedMinusUsed = Number(balance.issued_quantity ?? 0) - Number(balance.used_quantity ?? 0) - Number(balance.waste_quantity ?? 0);
   const surplus = Number(balance.surplus_quantity ?? 0);
   return Math.max(issuedMinusUsed, surplus, 0);
 }

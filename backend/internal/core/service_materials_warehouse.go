@@ -34,7 +34,7 @@ func normalizeMaterialBody(body Record, creating bool) error {
 	if body == nil {
 		return validationError("Dữ liệu vật tư không hợp lệ")
 	}
-	for _, key := range []string{"code", "name", "unit", "category", "default_supplier"} {
+	for _, key := range []string{"code", "name", "unit", "category", "default_supplier", "tracking_mode", "form_factor"} {
 		if value, exists := body[key]; exists {
 			body[key] = cleanOptionalText(value)
 		}
@@ -49,7 +49,32 @@ func normalizeMaterialBody(body Record, creating bool) error {
 	} else {
 		delete(body, "active")
 	}
+	trackingMode := cleanOptionalText(body["tracking_mode"])
+	if trackingMode == "" {
+		trackingMode = "aggregate"
+	}
+	if !statusIn(trackingMode, "aggregate", "physical_unit") {
+		return validationError("Chế độ theo dõi vật tư không hợp lệ", Record{"tracking_mode": trackingMode})
+	}
+	formFactor := cleanOptionalText(body["form_factor"])
+	if formFactor != "" && !statusIn(formFactor, "segment", "roll", "bar", "sheet") {
+		return validationError("Dạng vật tư không hợp lệ", Record{"form_factor": formFactor})
+	}
+	if trackingMode == "physical_unit" && formFactor == "" {
+		return validationError("Dạng vật tư là bắt buộc khi theo dõi từng đơn vị vật lý", Record{"field": "form_factor"})
+	}
+	if trackingMode == "aggregate" {
+		formFactor = ""
+	}
+	body["tracking_mode"] = trackingMode
+	if formFactor == "" {
+		body["form_factor"] = nil
+	} else {
+		body["form_factor"] = formFactor
+	}
 	delete(body, "standard_price")
+	delete(body, "physical_tracking_initialized_at")
+	delete(body, "physical_tracking_initialized_by")
 	return nil
 }
 
@@ -324,14 +349,49 @@ func (s *Service) normalizeMaterialSnapshotItem(ctx context.Context, projectID, 
 			return nil, validationError("Chưa có số dư vật tư tại công trình cho dòng snapshot", Record{"item_index": itemIndex, "material_id": materialID})
 		}
 		siteBalanceID = cleanID(balance["id"])
-		if submit && materialSnapshotQuantityExceeds(usedQuantity, materialBalanceAvailable(balance)) {
-			return nil, validationError("Số lượng sử dụng vượt vật tư còn tại công trình", Record{
+		if submit && materialSnapshotQuantityExceeds(usedQuantity+wasteQuantity, materialBalanceAvailable(balance)) {
+			return nil, validationError("Số lượng sử dụng và hao hụt vượt vật tư còn tại công trình", Record{
 				"item_index":  itemIndex,
 				"material_id": materialID,
 				"available":   materialBalanceAvailable(balance),
-				"quantity":    usedQuantity,
+				"quantity":    usedQuantity + wasteQuantity,
 			})
 		}
+	}
+	stockUnitUsage := req.StockUnitUsage
+	if material != nil && cleanOptionalText(material["tracking_mode"]) == "physical_unit" && affectsSiteBalance {
+		usedAllocated := 0.0
+		wasteAllocated := 0.0
+		seenUnits := map[string]bool{}
+		for usageIndex := range stockUnitUsage {
+			usage := &stockUnitUsage[usageIndex]
+			usage.StockUnitID = cleanID(usage.StockUnitID)
+			usage.RemainingCode = strings.TrimSpace(usage.RemainingCode)
+			usage.Condition = strings.TrimSpace(usage.Condition)
+			if usage.StockUnitID == "" || usage.UsedQuantity < 0 || usage.WasteQuantity < 0 || math.IsNaN(usage.UsedQuantity) || math.IsNaN(usage.WasteQuantity) || math.IsInf(usage.UsedQuantity, 0) || math.IsInf(usage.WasteQuantity, 0) || usage.UsedQuantity+usage.WasteQuantity <= 0 {
+				return nil, validationError("Phân bổ sử dụng đơn vị vật lý không hợp lệ", Record{"item_index": itemIndex, "usage_index": usageIndex})
+			}
+			if seenUnits[usage.StockUnitID] {
+				return nil, validationError("Một đơn vị vật lý không được lặp trong cùng dòng ghi nhận", Record{"item_index": itemIndex, "stock_unit_id": usage.StockUnitID})
+			}
+			seenUnits[usage.StockUnitID] = true
+			if err := validateStockUnitDimensions(usage.RemainingLengthMM, usage.RemainingWidthMM, usage.RemainingThicknessMM, usageIndex); err != nil {
+				return nil, err
+			}
+			if usage.Condition != "" && !statusIn(usage.Condition, "usable", "damaged", "mixed", "unknown") {
+				return nil, validationError("Tình trạng phần còn lại không hợp lệ", Record{"item_index": itemIndex, "usage_index": usageIndex})
+			}
+			usedAllocated += usage.UsedQuantity
+			wasteAllocated += usage.WasteQuantity
+		}
+		if submit && usedQuantity+wasteQuantity > stockUnitQuantityTolerance && len(stockUnitUsage) == 0 {
+			return nil, validationError("Vật tư theo dõi từng đơn vị cần chọn đúng Đoạn/Cuộn/Cây/Tấm đã sử dụng", Record{"item_index": itemIndex})
+		}
+		if (submit || len(stockUnitUsage) > 0) && (math.Abs(usedAllocated-usedQuantity) > stockUnitQuantityTolerance || math.Abs(wasteAllocated-wasteQuantity) > stockUnitQuantityTolerance) {
+			return nil, validationError("Tổng sử dụng/hao hụt theo đơn vị vật lý phải khớp dòng ghi nhận", Record{"item_index": itemIndex, "used_quantity": usedQuantity, "allocated_used_quantity": usedAllocated, "waste_quantity": wasteQuantity, "allocated_waste_quantity": wasteAllocated})
+		}
+	} else if len(stockUnitUsage) > 0 {
+		return nil, validationError("Dòng vật tư theo dõi tổng hợp không nhận phân bổ đơn vị vật lý", Record{"item_index": itemIndex})
 	}
 
 	beforeEvidenceID, err := s.validateMaterialSnapshotEvidence(ctx, projectID, workItemID, req.BeforeEvidenceID, "before_evidence_id", itemIndex)
@@ -377,6 +437,8 @@ func (s *Service) normalizeMaterialSnapshotItem(ctx context.Context, projectID, 
 		"construction_area":    area,
 		"condition":            condition,
 		"comment":              comment,
+		"tracking_mode":        cleanOptionalText(material["tracking_mode"]),
+		"stock_unit_usage":     stockUnitUsage,
 		"payload_json": Record{
 			"source":                source,
 			"affects_site_balance":  affectsSiteBalance,
@@ -419,7 +481,7 @@ func materialSnapshotQuantityExceeds(quantity, available float64) bool {
 }
 
 func materialBalanceAvailable(balance Record) float64 {
-	issuedMinusUsed := number(balance["issued_quantity"]) - number(balance["used_quantity"])
+	issuedMinusUsed := number(balance["issued_quantity"]) - number(balance["used_quantity"]) - number(balance["waste_quantity"])
 	surplus := number(balance["surplus_quantity"])
 	available := math.Max(issuedMinusUsed, surplus)
 	if available < 0 {
@@ -540,6 +602,10 @@ func (s *Service) SubmitSurplusHandling(ctx context.Context, handlingID string, 
 		Condition:              cleanOptionalText(handling["condition"]),
 		EvidenceID:             cleanID(handling["evidence_id"]),
 		Comment:                cleanOptionalText(handling["comment"]),
+	}
+	req.StockUnitAllocations, err = decodeStockUnitAllocations(handling["stock_unit_allocations_json"])
+	if err != nil {
+		return nil, validationError("Phân bổ đơn vị vật lý đã lưu không hợp lệ", Record{"surplus_handling_id": handlingID})
 	}
 	quantity := number(handling["quantity"])
 	req.Quantity = &quantity
@@ -681,6 +747,46 @@ func (s *Service) normalizeSurplusHandlingRequest(ctx context.Context, item Reco
 	if !statusIn(condition, "usable", "damaged", "mixed", "unknown") {
 		return nil, validationError("Tình trạng vật tư dư không hợp lệ", Record{"condition": condition})
 	}
+	stockUnitAllocations := req.StockUnitAllocations
+	if cleanOptionalText(balance["tracking_mode"]) == "physical_unit" {
+		if submit && len(stockUnitAllocations) == 0 {
+			return nil, validationError("Vật tư theo dõi từng đơn vị cần chọn đúng Đoạn/Cuộn/Cây/Tấm còn tại công trình", Record{"site_balance_id": siteBalanceID})
+		}
+		allocatedQuantity := 0.0
+		seenUnits := map[string]bool{}
+		for index := range stockUnitAllocations {
+			allocation := &stockUnitAllocations[index]
+			allocation.StockUnitID = cleanID(allocation.StockUnitID)
+			allocation.ResultUnitCode = strings.TrimSpace(allocation.ResultUnitCode)
+			allocation.Condition = strings.TrimSpace(allocation.Condition)
+			allocation.CustodyLocation = strings.TrimSpace(allocation.CustodyLocation)
+			if allocation.Condition == "" {
+				allocation.Condition = condition
+			}
+			if allocation.CustodyLocation == "" {
+				allocation.CustodyLocation = custodyLocation
+			}
+			if allocation.StockUnitID == "" || allocation.Quantity <= 0 || math.IsNaN(allocation.Quantity) || math.IsInf(allocation.Quantity, 0) {
+				return nil, validationError("Phân bổ đơn vị vật lý không hợp lệ", Record{"allocation_index": index})
+			}
+			if err := validateStockUnitDimensions(allocation.LengthMM, allocation.WidthMM, allocation.ThicknessMM, index); err != nil {
+				return nil, err
+			}
+			if err := validateStockUnitDimensions(allocation.RemainingLengthMM, allocation.RemainingWidthMM, allocation.RemainingThicknessMM, index); err != nil {
+				return nil, err
+			}
+			if seenUnits[allocation.StockUnitID] {
+				return nil, validationError("Một đơn vị vật lý không được chọn lặp", Record{"allocation_index": index, "stock_unit_id": allocation.StockUnitID})
+			}
+			seenUnits[allocation.StockUnitID] = true
+			allocatedQuantity += allocation.Quantity
+		}
+		if (submit || len(stockUnitAllocations) > 0) && math.Abs(allocatedQuantity-quantity) > stockUnitQuantityTolerance {
+			return nil, validationError("Tổng phân bổ đơn vị vật lý phải bằng số lượng xử lý", Record{"quantity": quantity, "allocated_quantity": allocatedQuantity})
+		}
+	} else if len(stockUnitAllocations) > 0 {
+		return nil, validationError("Vật tư theo dõi tổng hợp không nhận phân bổ đơn vị vật lý", Record{"site_balance_id": siteBalanceID})
+	}
 	evidenceID := cleanID(req.EvidenceID)
 	if submit && evidenceID == "" {
 		return nil, validationError("Minh chứng/ảnh vật tư dư là bắt buộc khi gửi")
@@ -720,6 +826,7 @@ func (s *Service) normalizeSurplusHandlingRequest(ctx context.Context, item Reco
 		"material_name":             cleanOptionalText(balance["material_name"]),
 		"material_code":             cleanOptionalText(balance["code"]),
 		"surplus_before_handling":   surplusQuantity,
+		"stock_unit_allocations":    stockUnitAllocations,
 	}, nil
 }
 
@@ -777,6 +884,10 @@ func (s *Service) validateSurplusHandlingSnapshotLink(ctx context.Context, workI
 
 func (s *Service) CreateStockMovement(ctx context.Context, req StockActionRequest, actorID, actorName string) (Record, error) {
 	return s.repo.CreateStockMovement(ctx, req, actorID, actorName)
+}
+
+func (s *Service) InitializeMaterialStockUnits(ctx context.Context, materialID string, req InitializeMaterialStockUnitsRequest, actorID, actorName string) (Record, error) {
+	return s.repo.InitializeMaterialStockUnits(ctx, cleanID(materialID), req, actorID, actorName)
 }
 
 func (s *Service) CreateStockDocument(ctx context.Context, req StockDocumentRequest, actorID, actorName string) (Record, error) {

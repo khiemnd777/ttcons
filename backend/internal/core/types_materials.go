@@ -1,18 +1,19 @@
 package core
 
 type SurplusHandlingRequest struct {
-	SiteBalanceID          string                  `json:"site_balance_id"`
-	MaterialSnapshotID     string                  `json:"material_snapshot_id"`
-	MaterialSnapshotItemID string                  `json:"material_snapshot_item_id"`
-	HandlingType           string                  `json:"handling_type"`
-	Quantity               *float64                `json:"quantity"`
-	Unit                   string                  `json:"unit"`
-	WarehouseID            string                  `json:"warehouse_id"`
-	CustodyLocation        string                  `json:"custody_location"`
-	Condition              string                  `json:"condition"`
-	EvidenceID             string                  `json:"evidence_id"`
-	Comment                string                  `json:"comment"`
-	WorkItemContext        WorkItemMutationContext `json:"work_item_context"`
+	SiteBalanceID          string                       `json:"site_balance_id"`
+	MaterialSnapshotID     string                       `json:"material_snapshot_id"`
+	MaterialSnapshotItemID string                       `json:"material_snapshot_item_id"`
+	HandlingType           string                       `json:"handling_type"`
+	Quantity               *float64                     `json:"quantity"`
+	Unit                   string                       `json:"unit"`
+	WarehouseID            string                       `json:"warehouse_id"`
+	CustodyLocation        string                       `json:"custody_location"`
+	Condition              string                       `json:"condition"`
+	EvidenceID             string                       `json:"evidence_id"`
+	Comment                string                       `json:"comment"`
+	StockUnitAllocations   []StockUnitAllocationRequest `json:"stock_unit_allocations"`
+	WorkItemContext        WorkItemMutationContext      `json:"work_item_context"`
 }
 
 type IncomingAcceptanceRequest struct {
@@ -68,12 +69,45 @@ type StockActionRequest struct {
 }
 
 type StockDocumentItemRequest struct {
-	MaterialID     string  `json:"material_id"`
-	Quantity       float64 `json:"quantity"`
-	Unit           string  `json:"unit"`
-	Reason         string  `json:"reason"`
-	SourceLineType string  `json:"source_line_type"`
-	SourceLineID   string  `json:"source_line_id"`
+	MaterialID           string                       `json:"material_id"`
+	Quantity             float64                      `json:"quantity"`
+	Unit                 string                       `json:"unit"`
+	Reason               string                       `json:"reason"`
+	SourceLineType       string                       `json:"source_line_type"`
+	SourceLineID         string                       `json:"source_line_id"`
+	StockUnits           []MaterialStockUnitInput     `json:"stock_units"`
+	StockUnitAllocations []StockUnitAllocationRequest `json:"stock_unit_allocations"`
+}
+
+type MaterialStockUnitInput struct {
+	UnitCode        string   `json:"unit_code"`
+	WarehouseID     string   `json:"warehouse_id"`
+	Quantity        float64  `json:"quantity"`
+	Unit            string   `json:"unit"`
+	LengthMM        *float64 `json:"length_mm"`
+	WidthMM         *float64 `json:"width_mm"`
+	ThicknessMM     *float64 `json:"thickness_mm"`
+	Condition       string   `json:"condition"`
+	CustodyLocation string   `json:"custody_location"`
+}
+
+type StockUnitAllocationRequest struct {
+	StockUnitID          string   `json:"stock_unit_id"`
+	Quantity             float64  `json:"quantity"`
+	ResultUnitCode       string   `json:"result_unit_code"`
+	LengthMM             *float64 `json:"length_mm"`
+	WidthMM              *float64 `json:"width_mm"`
+	ThicknessMM          *float64 `json:"thickness_mm"`
+	RemainingLengthMM    *float64 `json:"remaining_length_mm"`
+	RemainingWidthMM     *float64 `json:"remaining_width_mm"`
+	RemainingThicknessMM *float64 `json:"remaining_thickness_mm"`
+	Condition            string   `json:"condition"`
+	CustodyLocation      string   `json:"custody_location"`
+}
+
+type InitializeMaterialStockUnitsRequest struct {
+	FormFactor string                   `json:"form_factor"`
+	Units      []MaterialStockUnitInput `json:"units"`
 }
 
 type StockDocumentRequest struct {

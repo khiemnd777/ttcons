@@ -155,7 +155,7 @@ export function AppShell() {
 
   if (location.pathname.startsWith('/pipeline-builder') || projectFocusMode) {
     return (
-      <div className={clsx('min-h-screen bg-surface', projectFocusMode && UTILITY_DOCK_CONTENT_CLEARANCE_CLASS)}>
+      <div className="min-h-screen bg-surface">
         <Outlet />
         <UtilityDock key="global-utility-dock" />
       </div>

@@ -59,7 +59,7 @@ func createStockMovementTx(ctx context.Context, tx *sql.Tx, req StockActionReque
 		return nil, validationError("Công trình là bắt buộc cho thao tác xuất/hoàn vật tư")
 	}
 
-	lockKeys := []string{"stock:" + req.WarehouseID + ":" + req.MaterialID}
+	lockKeys := []string{"material-tracking:" + req.MaterialID, "stock:" + req.WarehouseID + ":" + req.MaterialID}
 	if req.TargetWarehouseID != "" {
 		lockKeys = append(lockKeys, "stock:"+req.TargetWarehouseID+":"+req.MaterialID)
 	}
@@ -86,7 +86,7 @@ func createStockMovementTx(ctx context.Context, tx *sql.Tx, req StockActionReque
 			return nil, validationError("Kho không tồn tại hoặc đã ngưng hoạt động", Record{"warehouse_id": warehouseID})
 		}
 	}
-	materialRows, err := queryTx(ctx, tx, `SELECT id, unit FROM materials WHERE id=$1 AND active`, req.MaterialID)
+	materialRows, err := queryTx(ctx, tx, `SELECT id, unit, tracking_mode FROM materials WHERE id=$1 AND active`, req.MaterialID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +102,9 @@ func createStockMovementTx(ctx context.Context, tx *sql.Tx, req StockActionReque
 	materialUnit := strings.TrimSpace(fmt.Sprint(materialRows[0]["unit"]))
 	if materialUnit != "" && req.Unit != materialUnit {
 		return nil, validationError("ĐVT phiếu kho phải trùng ĐVT của vật tư", Record{"material_id": req.MaterialID, "expected_unit": materialUnit, "unit": req.Unit})
+	}
+	if cleanOptionalText(materialRows[0]["tracking_mode"]) == "physical_unit" && req.StockDocumentID == "" {
+		return nil, validationError("Vật tư theo dõi từng đơn vị phải ghi nhận qua phiếu kho có phân bổ Đoạn/Cuộn/Cây/Tấm", Record{"material_id": req.MaterialID})
 	}
 	if req.MovementType == "receive" && req.ReferenceType == "incoming_acceptance_item" && req.ReferenceID != "" {
 		sourceRows, err := queryTx(ctx, tx, `
@@ -183,9 +186,9 @@ func createStockMovementTx(ctx context.Context, tx *sql.Tx, req StockActionReque
 				VALUES ($1,$2,$3::numeric,GREATEST($3::numeric,0::numeric),'pending')
 				ON CONFLICT (project_id, material_id)
 				DO UPDATE SET issued_quantity = site_material_balances.issued_quantity + EXCLUDED.issued_quantity,
-					surplus_quantity = GREATEST(site_material_balances.issued_quantity + EXCLUDED.issued_quantity - site_material_balances.used_quantity, 0),
+					surplus_quantity = GREATEST(site_material_balances.issued_quantity + EXCLUDED.issued_quantity - site_material_balances.used_quantity - site_material_balances.waste_quantity, 0),
 					surplus_status = CASE
-						WHEN GREATEST(site_material_balances.issued_quantity + EXCLUDED.issued_quantity - site_material_balances.used_quantity, 0) > 0.000001 THEN 'pending'
+						WHEN GREATEST(site_material_balances.issued_quantity + EXCLUDED.issued_quantity - site_material_balances.used_quantity - site_material_balances.waste_quantity, 0) > 0.000001 THEN 'pending'
 						ELSE 'handled'
 					END,
 					updated_at=now()
@@ -196,9 +199,9 @@ func createStockMovementTx(ctx context.Context, tx *sql.Tx, req StockActionReque
 			updated, err := queryTx(ctx, tx, `
 				UPDATE site_material_balances
 				SET issued_quantity = GREATEST(issued_quantity - $3::numeric, 0::numeric),
-					surplus_quantity = GREATEST(GREATEST(issued_quantity - $3::numeric, 0::numeric) - used_quantity, 0::numeric),
+					surplus_quantity = GREATEST(GREATEST(issued_quantity - $3::numeric, 0::numeric) - used_quantity - waste_quantity, 0::numeric),
 					surplus_status = CASE
-						WHEN GREATEST(GREATEST(issued_quantity - $3::numeric, 0::numeric) - used_quantity, 0::numeric) > 0.000001 THEN 'partial'
+						WHEN GREATEST(GREATEST(issued_quantity - $3::numeric, 0::numeric) - used_quantity - waste_quantity, 0::numeric) > 0.000001 THEN 'partial'
 						ELSE 'handled'
 					END,
 					updated_at = now()
@@ -255,7 +258,7 @@ func warehouseMaterialAvailableTx(ctx context.Context, tx *sql.Tx, warehouseID, 
 
 func projectMaterialAvailableTx(ctx context.Context, tx *sql.Tx, projectID, materialID string) (float64, error) {
 	rows, err := queryTx(ctx, tx, `
-		SELECT GREATEST(issued_quantity - used_quantity, surplus_quantity, 0) AS available
+		SELECT GREATEST(issued_quantity - used_quantity - waste_quantity, surplus_quantity, 0) AS available
 		FROM site_material_balances
 		WHERE project_id=$1 AND material_id=$2
 		FOR UPDATE
@@ -494,12 +497,16 @@ func (r *Repository) createStockDocumentTx(ctx context.Context, tx *sql.Tx, req 
 		if req.MovementType == "transfer" {
 			movementTargetWarehouseID = req.TargetWarehouseID
 		}
-		if _, err := createStockMovementTx(ctx, tx, StockActionRequest{
+		movement, err := createStockMovementTx(ctx, tx, StockActionRequest{
 			ProjectID: req.ProjectID, WarehouseID: warehouseID, TargetWarehouseID: movementTargetWarehouseID,
 			MaterialID: item.MaterialID, MovementType: req.MovementType, Quantity: item.Quantity,
 			Unit: item.Unit, Reason: item.Reason, ReferenceType: movementReferenceType,
 			ReferenceID: movementReferenceID, StockDocumentID: documentID,
-		}, actorID, actorName); err != nil {
+		}, actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
+		if err := applyStockUnitMovementTx(ctx, tx, req, item, cleanID(itemRows[0]["id"]), movement, actorID); err != nil {
 			return nil, err
 		}
 	}
@@ -537,16 +544,21 @@ func (r *Repository) CreateStockAdjustment(ctx context.Context, req StockAdjustm
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, "stock:"+req.WarehouseID+":"+req.MaterialID); err != nil {
-		return nil, err
+	for _, lockKey := range []string{"material-tracking:" + req.MaterialID, "stock:" + req.WarehouseID + ":" + req.MaterialID} {
+		if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1)::bigint)`, lockKey); err != nil {
+			return nil, err
+		}
 	}
 	warehouse, err := queryOneRecord(ctx, tx, `SELECT id,name FROM warehouses WHERE id=$1 AND active`, req.WarehouseID)
 	if err != nil {
 		return nil, validationError("Kho không tồn tại hoặc đã ngưng hoạt động", Record{"warehouse_id": req.WarehouseID})
 	}
-	material, err := queryOneRecord(ctx, tx, `SELECT id,code,name,unit FROM materials WHERE id=$1 AND active`, req.MaterialID)
+	material, err := queryOneRecord(ctx, tx, `SELECT id,code,name,unit,tracking_mode FROM materials WHERE id=$1 AND active`, req.MaterialID)
 	if err != nil {
 		return nil, validationError("Vật tư không tồn tại hoặc đã ngưng hoạt động", Record{"material_id": req.MaterialID})
+	}
+	if cleanOptionalText(material["tracking_mode"]) == "physical_unit" {
+		return nil, validationError("Vật tư theo dõi từng Đoạn/Cuộn/Cây/Tấm phải điều chỉnh bằng phiếu kho có chọn đúng đơn vị vật lý", Record{"material_id": req.MaterialID})
 	}
 	currentQuantity, err := warehouseMaterialAvailableTx(ctx, tx, req.WarehouseID, req.MaterialID)
 	if err != nil {
@@ -635,6 +647,18 @@ func (r *Repository) UpdateStockDocument(ctx context.Context, documentID string,
 	if req.CorrectionReason == "" {
 		return nil, validationError("Lý do điều chỉnh phiếu là bắt buộc khi thay đổi dữ liệu tồn kho")
 	}
+	var trackedAllocationCount int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		FROM stock_movement_unit_allocations allocation
+		JOIN stock_movements movement ON movement.id=allocation.stock_movement_id
+		WHERE movement.stock_document_id=$1
+	`, documentID).Scan(&trackedAllocationCount); err != nil {
+		return nil, err
+	}
+	if trackedAllocationCount > 0 {
+		return nil, validationError("Phiếu có đơn vị vật lý chỉ cho sửa ngày/ghi chú; để đổi tồn cần lập phiếu hoàn/điều chuyển mới nhằm giữ nguyên lịch sử Đoạn/Cuộn/Cây/Tấm", Record{"document_id": documentID})
+	}
 	if len([]rune(req.CorrectionReason)) > 2000 {
 		return nil, validationError("Lý do điều chỉnh phiếu không được vượt quá 2000 ký tự")
 	}
@@ -690,6 +714,9 @@ func stockDocumentCoreChanged(current Record, currentItems []Record, req StockDo
 	}
 	for index, currentItem := range currentItems {
 		requestedItem := req.Items[index]
+		if len(requestedItem.StockUnits) > 0 || len(requestedItem.StockUnitAllocations) > 0 {
+			return true
+		}
 		if cleanID(currentItem["material_id"]) != requestedItem.MaterialID || math.Abs(number(currentItem["quantity"])-requestedItem.Quantity) > 0.000001 ||
 			cleanOptionalText(currentItem["unit"]) != requestedItem.Unit || cleanOptionalText(currentItem["reason"]) != requestedItem.Reason ||
 			cleanOptionalText(currentItem["source_line_type"]) != requestedItem.SourceLineType || cleanID(currentItem["source_line_id"]) != requestedItem.SourceLineID {
@@ -760,6 +787,7 @@ func adjustSiteIssuedQuantityTx(ctx context.Context, tx *sql.Tx, projectID, mate
 	previousIssued := number(current["issued_quantity"])
 	targetIssued := previousIssued + delta
 	usedQuantity := number(current["used_quantity"])
+	wasteQuantity := number(current["waste_quantity"])
 	if targetIssued < -0.000001 {
 		return validationError("Không thể điều chỉnh phiếu vì số dư công trình không đủ", Record{"issued_quantity": previousIssued, "target_issued_quantity": targetIssued})
 	}
@@ -769,9 +797,9 @@ func adjustSiteIssuedQuantityTx(ctx context.Context, tx *sql.Tx, projectID, mate
 	updated, err := queryOneRecord(ctx, tx, `
 		UPDATE site_material_balances
 		SET issued_quantity=$3::numeric,
-			surplus_quantity=GREATEST($3::numeric-used_quantity,0),
+			surplus_quantity=GREATEST($3::numeric-used_quantity-waste_quantity,0),
 			surplus_status=CASE
-				WHEN GREATEST($3::numeric-used_quantity,0)>0.000001 THEN CASE WHEN surplus_status='partial' THEN 'partial' ELSE 'pending' END
+				WHEN GREATEST($3::numeric-used_quantity-waste_quantity,0)>0.000001 THEN CASE WHEN surplus_status='partial' THEN 'partial' ELSE 'pending' END
 				ELSE 'handled'
 			END,
 			updated_at=now()
@@ -798,7 +826,7 @@ func adjustSiteIssuedQuantityTx(ctx context.Context, tx *sql.Tx, projectID, mate
 	}
 	return addAuditTx(ctx, tx, projectID, actorID, actorName, "site_material_issued_corrected", "site_material_adjustment", cleanID(adjustment["id"]), reason, Record{
 		"material_id": materialID, "before_issued_quantity": previousIssued, "target_issued_quantity": targetIssued,
-		"used_quantity": usedQuantity, "surplus_quantity": updated["surplus_quantity"], "source_id": sourceID,
+		"used_quantity": usedQuantity, "waste_quantity": wasteQuantity, "surplus_quantity": updated["surplus_quantity"], "source_id": sourceID,
 	})
 }
 
@@ -821,12 +849,12 @@ func validateStockDocumentCorrectionSiteBalancesTx(ctx context.Context, tx *sql.
 		}
 	}
 	for _, pair := range pairs {
-		rows, err := queryTx(ctx, tx, `SELECT issued_quantity,used_quantity FROM site_material_balances WHERE project_id=$1 AND material_id=$2 FOR UPDATE`, pair[0], pair[1])
+		rows, err := queryTx(ctx, tx, `SELECT issued_quantity,used_quantity,waste_quantity FROM site_material_balances WHERE project_id=$1 AND material_id=$2 FOR UPDATE`, pair[0], pair[1])
 		if err != nil {
 			return err
 		}
-		if len(rows) > 0 && number(rows[0]["issued_quantity"])+0.000001 < number(rows[0]["used_quantity"]) {
-			return validationError("Không thể điều chỉnh phiếu vì khối lượng đã dùng vượt khối lượng xuất sau điều chỉnh", Record{"project_id": pair[0], "material_id": pair[1], "issued_quantity": rows[0]["issued_quantity"], "used_quantity": rows[0]["used_quantity"]})
+		if len(rows) > 0 && number(rows[0]["issued_quantity"])+0.000001 < number(rows[0]["used_quantity"])+number(rows[0]["waste_quantity"]) {
+			return validationError("Không thể điều chỉnh phiếu vì khối lượng đã dùng/hao hụt vượt khối lượng xuất sau điều chỉnh", Record{"project_id": pair[0], "material_id": pair[1], "issued_quantity": rows[0]["issued_quantity"], "used_quantity": rows[0]["used_quantity"], "waste_quantity": rows[0]["waste_quantity"]})
 		}
 	}
 	return nil
@@ -855,17 +883,21 @@ func (r *Repository) AdjustSiteMaterialUsage(ctx context.Context, projectID, mat
 		return nil, err
 	}
 	current, err := queryOneRecord(ctx, tx, `
-		SELECT smb.*,m.code,m.name AS material_name,m.unit,m.category
+		SELECT smb.*,m.code,m.name AS material_name,m.unit,m.category,m.tracking_mode
 		FROM site_material_balances smb JOIN materials m ON m.id=smb.material_id AND m.active
 		WHERE smb.project_id=$1 AND smb.material_id=$2 FOR UPDATE OF smb
 	`, projectID, materialID)
 	if err != nil {
 		return nil, validationError("Không tìm thấy số dư vật tư tại công trình", Record{"project_id": projectID, "material_id": materialID})
 	}
+	if cleanOptionalText(current["tracking_mode"]) == "physical_unit" {
+		return nil, validationError("Vật tư theo dõi từng Đoạn/Cuộn/Cây/Tấm phải ghi nhận sử dụng từ đầu việc và chọn đúng đơn vị vật lý", Record{"project_id": projectID, "material_id": materialID})
+	}
 	issuedQuantity := number(current["issued_quantity"])
 	previousUsed := number(current["used_quantity"])
-	if req.TargetUsedQuantity > issuedQuantity+0.000001 {
-		return nil, validationError("Khối lượng đã dùng không được vượt khối lượng đã xuất công trình", Record{"issued_quantity": issuedQuantity, "target_used_quantity": req.TargetUsedQuantity})
+	wasteQuantity := number(current["waste_quantity"])
+	if req.TargetUsedQuantity+wasteQuantity > issuedQuantity+0.000001 {
+		return nil, validationError("Khối lượng đã dùng và hao hụt không được vượt khối lượng đã xuất công trình", Record{"issued_quantity": issuedQuantity, "waste_quantity": wasteQuantity, "target_used_quantity": req.TargetUsedQuantity})
 	}
 	delta := req.TargetUsedQuantity - previousUsed
 	if math.Abs(delta) <= 0.000001 {
@@ -874,9 +906,9 @@ func (r *Repository) AdjustSiteMaterialUsage(ctx context.Context, projectID, mat
 	updated, err := queryOneRecord(ctx, tx, `
 		UPDATE site_material_balances
 		SET used_quantity=$3::numeric,
-			surplus_quantity=GREATEST(issued_quantity-$3::numeric,0),
+			surplus_quantity=GREATEST(issued_quantity-$3::numeric-waste_quantity,0),
 			surplus_status=CASE
-				WHEN GREATEST(issued_quantity-$3::numeric,0)>0.000001 THEN CASE WHEN surplus_status='partial' THEN 'partial' ELSE 'pending' END
+				WHEN GREATEST(issued_quantity-$3::numeric-waste_quantity,0)>0.000001 THEN CASE WHEN surplus_status='partial' THEN 'partial' ELSE 'pending' END
 				ELSE 'handled'
 			END,
 			updated_at=now()
@@ -943,13 +975,23 @@ func (r *Repository) StockPositions(ctx context.Context, userID, warehouseID str
 			WHERE movement_type='transfer' AND target_warehouse_id IS NOT NULL
 		)
 		SELECT w.id AS warehouse_id, w.name AS warehouse_name, w.type AS warehouse_type, w.location,
-			m.id AS material_id, m.code, m.name, m.unit, m.category,
-			COALESCE(SUM(ledger.signed_quantity),0) AS stock_quantity
+			m.id AS material_id, m.code, m.name, m.unit, m.category, m.tracking_mode, m.form_factor,
+			COALESCE(SUM(ledger.signed_quantity),0) AS stock_quantity,
+			COALESCE(physical.available_quantity,0) AS physical_available_quantity,
+			COALESCE(physical.quarantined_quantity,0) AS physical_quarantined_quantity,
+			COALESCE(physical.unit_count,0) AS physical_unit_count
 		FROM ledger
 		JOIN warehouses w ON w.id=ledger.warehouse_id AND w.active
 		JOIN materials m ON m.id=ledger.material_id AND m.active
+		LEFT JOIN LATERAL (
+			SELECT SUM(quantity) FILTER (WHERE status='available' AND condition='usable') AS available_quantity,
+				SUM(quantity) FILTER (WHERE status='quarantined' OR condition<>'usable') AS quarantined_quantity,
+				COUNT(*) FILTER (WHERE status IN ('available','quarantined')) AS unit_count
+			FROM material_stock_units unit
+			WHERE unit.material_id=m.id AND unit.warehouse_id=w.id AND unit.location_type='warehouse'
+		) physical ON true
 		WHERE ($1::text='' OR w.id=$1::uuid)
-		GROUP BY w.id, m.id
+		GROUP BY w.id, m.id, physical.available_quantity, physical.quarantined_quantity, physical.unit_count
 		ORDER BY w.type, w.name, m.category, m.name
 	`, scopeSQL), args...)
 }
@@ -1024,8 +1066,20 @@ func (r *Repository) GetStockDocument(ctx context.Context, documentID string) (R
 		return nil, err
 	}
 	items, err := r.Query(ctx, `
-		SELECT sdi.*, m.code AS material_code, m.name AS material_name,
-			sm.id AS movement_id, sm.movement_code
+		SELECT sdi.*, m.code AS material_code, m.name AS material_name, m.tracking_mode, m.form_factor,
+			sm.id AS movement_id, sm.movement_code,
+			COALESCE((
+				SELECT jsonb_agg(jsonb_build_object(
+					'stock_unit_id', allocation.stock_unit_id,
+					'unit_code', unit.unit_code,
+					'quantity', allocation.quantity,
+					'condition', unit.condition,
+					'status', unit.status
+				) ORDER BY allocation.created_at, allocation.id)
+				FROM stock_movement_unit_allocations allocation
+				JOIN material_stock_units unit ON unit.id=allocation.stock_unit_id
+				WHERE allocation.stock_document_item_id=sdi.id
+			), '[]'::jsonb) AS stock_unit_allocations
 		FROM stock_document_items sdi
 		JOIN materials m ON m.id=sdi.material_id
 		LEFT JOIN LATERAL (
@@ -1084,9 +1138,17 @@ func (r *Repository) WarehouseReceiptOptions(ctx context.Context, projectID stri
 
 func (r *Repository) ProjectMaterialBalances(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
-		SELECT smb.*, m.code, m.name AS material_name, m.unit, m.category
+		SELECT smb.*, m.code, m.name AS material_name, m.unit, m.category, m.tracking_mode, m.form_factor,
+			COALESCE(physical.available_quantity,0) AS physical_available_quantity,
+			COALESCE(physical.unit_count,0) AS physical_unit_count
 		FROM site_material_balances smb
 		JOIN materials m ON m.id=smb.material_id
+		LEFT JOIN LATERAL (
+			SELECT SUM(quantity) FILTER (WHERE status='issued') AS available_quantity,
+				COUNT(*) FILTER (WHERE status='issued') AS unit_count
+			FROM material_stock_units unit
+			WHERE unit.material_id=m.id AND unit.project_id=smb.project_id AND unit.location_type='project'
+		) physical ON true
 		WHERE smb.project_id=$1 AND m.active
 		ORDER BY m.category, m.name
 	`, projectID)
@@ -1096,7 +1158,8 @@ func (r *Repository) ListActiveMaterials(ctx context.Context) ([]Record, error) 
 	return r.Query(ctx, `
 		SELECT m.id, m.code, m.name, m.unit, m.category, m.default_supplier_partner_id, m.default_supplier,
 			p.name AS default_supplier_partner_name, p.tax_code AS default_supplier_tax_code,
-			m.standard_price, m.active, m.created_at,
+			m.standard_price, m.active, m.tracking_mode, m.form_factor,
+			m.physical_tracking_initialized_at, m.physical_tracking_initialized_by, m.created_at,
 			(
 				EXISTS (SELECT 1 FROM stock_movements row WHERE row.material_id=m.id)
 				OR EXISTS (SELECT 1 FROM stock_document_items row WHERE row.material_id=m.id)
@@ -1139,16 +1202,16 @@ func (r *Repository) UpdateMaterial(ctx context.Context, materialID string, body
 	if err != nil {
 		return nil, err
 	}
-	if identityLocked && (cleanOptionalText(body["code"]) != cleanOptionalText(current["code"]) || cleanOptionalText(body["unit"]) != cleanOptionalText(current["unit"])) {
-		return nil, validationError("Mã vật tư và ĐVT đã khóa vì vật tư đã phát sinh nghiệp vụ", Record{"material_id": materialID, "identity_locked": true})
+	if identityLocked && (cleanOptionalText(body["code"]) != cleanOptionalText(current["code"]) || cleanOptionalText(body["unit"]) != cleanOptionalText(current["unit"]) || cleanOptionalText(body["tracking_mode"]) != cleanOptionalText(current["tracking_mode"]) || cleanOptionalText(body["form_factor"]) != cleanOptionalText(current["form_factor"])) {
+		return nil, validationError("Mã, ĐVT và chế độ theo dõi vật tư đã khóa vì vật tư đã phát sinh nghiệp vụ", Record{"material_id": materialID, "identity_locked": true})
 	}
 	updated, err := updateRecord(ctx, tx, "materials", materialColumns(), materialID, body)
 	if err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, "", actorID, actorName, "material_updated", "material", materialID, fmt.Sprintf("Cập nhật vật tư %s", updated["name"]), Record{
-		"before":          Record{"code": current["code"], "name": current["name"], "unit": current["unit"], "category": current["category"], "default_supplier_partner_id": current["default_supplier_partner_id"], "default_supplier": current["default_supplier"]},
-		"after":           Record{"code": updated["code"], "name": updated["name"], "unit": updated["unit"], "category": updated["category"], "default_supplier_partner_id": updated["default_supplier_partner_id"], "default_supplier": updated["default_supplier"]},
+		"before":          Record{"code": current["code"], "name": current["name"], "unit": current["unit"], "category": current["category"], "default_supplier_partner_id": current["default_supplier_partner_id"], "default_supplier": current["default_supplier"], "tracking_mode": current["tracking_mode"], "form_factor": current["form_factor"]},
+		"after":           Record{"code": updated["code"], "name": updated["name"], "unit": updated["unit"], "category": updated["category"], "default_supplier_partner_id": updated["default_supplier_partner_id"], "default_supplier": updated["default_supplier"], "tracking_mode": updated["tracking_mode"], "form_factor": updated["form_factor"]},
 		"identity_locked": identityLocked,
 	}); err != nil {
 		return nil, err

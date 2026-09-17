@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, Boxes, ClipboardList, PackageCheck, Plus, Search, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, ArrowLeftRight, Boxes, ClipboardList, PackageCheck, Plus, Recycle, Search, Trash2, Warehouse as WarehouseIcon } from 'lucide-react';
 import { get, post, put } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
-import type { Partner, StockDocument, StockDocumentItem, StockPosition, WarehouseReceiptOption } from '../../lib/types/domain';
+import type { MaterialStockUnit, MaterialStockUnitInput, Partner, StockDocument, StockDocumentItem, StockPosition, StockUnitAllocation, WarehouseReceiptOption } from '../../lib/types/domain';
 import { PageHeader } from '../../components/PageHeader';
 import { DataTable } from '../../components/DataTable';
 import { RowActions } from '../../components/RowActions';
@@ -29,13 +29,14 @@ import {
   type WorkItemMutationResult,
 } from '../work-items/workItemMutationContext';
 
-type WarehouseTab = 'stock' | 'documents' | 'site' | 'materials';
+type WarehouseTab = 'stock' | 'documents' | 'site' | 'units' | 'materials';
 type RecordRow = Record<string, any>;
 
 const warehouseTabs: WorkspaceTabItem<WarehouseTab>[] = [
   { id: 'stock', label: 'Tồn theo kho', icon: WarehouseIcon },
   { id: 'documents', label: 'Phiếu kho', icon: ClipboardList },
   { id: 'site', label: 'Tại công trình & dư', icon: Boxes },
+	{ id: 'units', label: 'Phần dư tái sử dụng', icon: Recycle },
   { id: 'materials', label: 'Danh mục vật tư', icon: PackageCheck },
 ];
 
@@ -54,8 +55,10 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const [stockState, setStockState] = useState('all');
   const [openMaterial, setOpenMaterial] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<RecordRow | null>(null);
+	const [initializingMaterial, setInitializingMaterial] = useState<RecordRow | null>(null);
   const [openDocument, setOpenDocument] = useState(false);
   const [documentId, setDocumentId] = useState('');
+	const [stockUnitId, setStockUnitId] = useState('');
   const sourceLink = useRecordDeepLink({ kind: 'stock_document', projectId: scoped ? id : undefined, onOpen: record => { setProjectId(record.project_id ?? ''); setTab('documents'); setDocumentId(record.id); } });
   const [editingDocumentId, setEditingDocumentId] = useState('');
   const [stockAdjustment, setStockAdjustment] = useState<StockPosition | null>(null);
@@ -66,6 +69,8 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const warehouses = useQuery({ queryKey: ['warehouses'], queryFn: () => get<RecordRow[]>('/warehouses'), enabled: canViewWarehouse });
   const partners = useQuery({ queryKey: ['partners', 'supplier', 'active'], queryFn: () => get<Partner[]>('/partners?status=active'), enabled: canViewWarehouse });
   const positions = useQuery({ queryKey: ['stock-positions'], queryFn: () => get<StockPosition[]>('/stock/positions'), enabled: canViewWarehouse });
+	const stockUnits = useQuery({ queryKey: ['material-stock-units'], queryFn: () => get<MaterialStockUnit[]>('/stock/units'), enabled: canViewWarehouse });
+	const stockUnitDetail = useQuery({ queryKey: ['material-stock-unit', stockUnitId], queryFn: () => get<MaterialStockUnit>(`/stock/units/${stockUnitId}`), enabled: canViewWarehouse && Boolean(stockUnitId) });
   const documentsPath = projectId ? `/stock/documents?project_id=${encodeURIComponent(projectId)}` : '/stock/documents';
   const documents = useQuery({ queryKey: ['stock-documents', projectId], queryFn: () => get<StockDocument[]>(documentsPath), enabled: canViewWarehouse });
   const documentDetail = useQuery({ queryKey: ['stock-document', documentId], queryFn: () => get<StockDocument>(`/stock/documents/${documentId}`), enabled: canViewWarehouse && Boolean(documentId) });
@@ -82,11 +87,17 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
     onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['materials'] }), queryClient.invalidateQueries({ queryKey: ['stock-positions'] }), queryClient.invalidateQueries({ queryKey: ['material-balances'] })]); setOpenMaterial(false); setEditingMaterial(null); toast.success('Đã cập nhật vật tư'); },
     onError: (error) => toast.error('Không cập nhật được vật tư', error),
   });
+	const initializeMaterialUnits = useMutation({
+		mutationFn: ({ materialId, values }: { materialId: string; values: RecordRow }) => post(`/materials/${materialId}/stock-units/initialize`, values),
+		onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['materials'] }), queryClient.invalidateQueries({ queryKey: ['material-stock-units'] }), queryClient.invalidateQueries({ queryKey: ['stock-positions'] })]); setInitializingMaterial(null); setTab('units'); toast.success('Đã khởi tạo theo dõi Đoạn/Cuộn/Cây/Tấm'); },
+		onError: (error) => toast.error('Không khởi tạo được đơn vị vật lý', error),
+	});
   const createDocument = useMutation({
     mutationFn: (values: RecordRow) => post<StockDocument & WorkItemMutationResult>('/stock/documents', withWorkItemMutationContext(values, taskId)),
     onSuccess: async (record) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['stock-positions'] }),
+				queryClient.invalidateQueries({ queryKey: ['material-stock-units'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-documents'] }),
         queryClient.invalidateQueries({ queryKey: ['material-balances'] }),
         queryClient.invalidateQueries({ queryKey: ['warehouse-receipt-options'] }),
@@ -137,6 +148,11 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   const documentRows = useMemo(() => (documents.data ?? []).filter((row) => !query.trim() || `${row.document_code} ${row.project_name ?? ''} ${row.source_warehouse_name ?? ''} ${row.target_warehouse_name ?? ''}`.toLocaleLowerCase('vi-VN').includes(query.trim().toLocaleLowerCase('vi-VN'))), [documents.data, query]);
   const balanceRows = useMemo(() => (balances.data ?? []).filter((row) => !query.trim() || `${row.material_name ?? ''} ${row.code ?? ''}`.toLocaleLowerCase('vi-VN').includes(query.trim().toLocaleLowerCase('vi-VN'))), [balances.data, query]);
   const materialRows = useMemo(() => (materials.data ?? []).filter((row) => !query.trim() || `${row.code ?? ''} ${row.name ?? ''} ${row.category ?? ''}`.toLocaleLowerCase('vi-VN').includes(query.trim().toLocaleLowerCase('vi-VN'))), [materials.data, query]);
+	const stockUnitRows = useMemo(() => (stockUnits.data ?? []).filter((row) => {
+		const searchText = `${row.unit_code} ${row.material_code ?? ''} ${row.material_name ?? ''} ${row.warehouse_name ?? ''} ${row.project_name ?? ''}`.toLocaleLowerCase('vi-VN');
+		return (!query.trim() || searchText.includes(query.trim().toLocaleLowerCase('vi-VN')))
+			&& (warehouseFilter === 'all' || row.warehouse_id === warehouseFilter);
+	}), [query, stockUnits.data, warehouseFilter]);
   const categories = useMemo(() => Array.from(new Set((materials.data ?? []).map((row) => String(row.category ?? '')).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'vi')), [materials.data]);
   const waitingReceiptCount = new Set((receiptOptions.data ?? []).map((row) => row.incoming_acceptance_id)).size;
   const zeroCount = (positions.data ?? []).filter((row) => numeric(row.stock_quantity) <= 0).length;
@@ -181,7 +197,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
       <WorkspaceTabs tabs={warehouseTabs} activeTab={tab} onChange={setTab} ariaLabel="Không gian kho vật tư" />
       <div className="grid gap-2 pt-3 lg:grid-cols-[minmax(240px,1fr)_180px_180px_160px]">
         <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input className="w-full rounded-md border border-line py-2 pl-9 pr-3 text-sm" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm vật tư, kho hoặc mã phiếu..." /></label>
-        {tab === 'stock' ? <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)}><option value="all">Tất cả kho</option>{(warehouses.data ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select> : <span />}
+        {tab === 'stock' || tab === 'units' ? <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)}><option value="all">Tất cả kho</option>{(warehouses.data ?? []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select> : <span />}
         {tab === 'stock' ? <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option value="all">Tất cả nhóm</option>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select> : <span />}
         {tab === 'stock' ? <select className="rounded-md border border-line bg-white px-3 py-2 text-sm" value={stockState} onChange={(event) => setStockState(event.target.value)}><option value="all">Tất cả tồn</option><option value="available">Có tồn</option><option value="zero">Hết tồn</option></select> : tab === 'materials' && hasPermission('warehouse.adjust') ? <button className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={() => { setEditingMaterial(null); setOpenMaterial(true); }}><Plus className="h-4 w-4" />Thêm vật tư</button> : <span />}
       </div>
@@ -190,16 +206,21 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
     {tab === 'stock' ? <StockTab rows={positionRows} loading={positions.isLoading} error={positions.error} onRetry={() => positions.refetch()} onAdjust={hasPermission('warehouse.adjust') ? setStockAdjustment : undefined} /> : null}
     {tab === 'documents' ? <DocumentsTab rows={documentRows} loading={documents.isLoading} error={documents.error} onRetry={() => documents.refetch()} onView={setDocumentId} hasPermission={hasPermission} onEdit={hasPermission('warehouse.adjust') ? (record) => setEditingDocumentId(record.id) : undefined} /> : null}
     {tab === 'site' ? <SiteTab rows={balanceRows} loading={balances.isLoading} error={balances.error} onRetry={() => balances.refetch()} projectId={projectId} onAdjust={projectId && hasPermission('warehouse.adjust') ? setSiteUsageAdjustment : undefined} /> : null}
-    {tab === 'materials' ? <MaterialsTab rows={materialRows} loading={materials.isLoading} error={materials.error} onRetry={() => materials.refetch()} onCreate={hasPermission('warehouse.adjust') ? () => { setEditingMaterial(null); setOpenMaterial(true); } : undefined} onEdit={hasPermission('warehouse.adjust') ? (record) => { setEditingMaterial(record); setOpenMaterial(true); } : undefined} /> : null}
+		{tab === 'units' ? <StockUnitsTab rows={stockUnitRows} loading={stockUnits.isLoading} error={stockUnits.error} onRetry={() => stockUnits.refetch()} onView={setStockUnitId} /> : null}
+		{tab === 'materials' ? <MaterialsTab rows={materialRows} loading={materials.isLoading} error={materials.error} onRetry={() => materials.refetch()} onCreate={hasPermission('warehouse.adjust') ? () => { setEditingMaterial(null); setOpenMaterial(true); } : undefined} onEdit={hasPermission('warehouse.adjust') ? (record) => { setEditingMaterial(record); setOpenMaterial(true); } : undefined} onInitialize={hasPermission('warehouse.adjust') ? setInitializingMaterial : undefined} /> : null}
 
-    <RecordFormDialog key={editingMaterial?.id ?? 'create-material'} open={openMaterial} title={editingMaterial ? 'Chỉnh sửa vật tư' : 'Thêm vật tư'} description={editingMaterial?.identity_locked ? 'Vật tư đã phát sinh nghiệp vụ; Mã và ĐVT được khóa để bảo toàn lịch sử.' : undefined} submitLabel={editingMaterial ? 'Lưu thay đổi' : 'Thêm vật tư'} onClose={() => { setOpenMaterial(false); setEditingMaterial(null); }} fields={[
+    <RecordFormDialog key={editingMaterial?.id ?? 'create-material'} open={openMaterial} title={editingMaterial ? 'Chỉnh sửa vật tư' : 'Thêm vật tư'} description={editingMaterial?.identity_locked ? 'Vật tư đã phát sinh nghiệp vụ; mã, ĐVT và chế độ theo dõi được khóa để bảo toàn lịch sử.' : undefined} submitLabel={editingMaterial ? 'Lưu thay đổi' : 'Thêm vật tư'} onClose={() => { setOpenMaterial(false); setEditingMaterial(null); }} fields={[
       { name: 'code', label: 'Mã vật tư', defaultValue: editingMaterial?.code ?? `MAT-${Date.now().toString().slice(-4)}`, required: true, disabledWhen: () => Boolean(editingMaterial?.identity_locked), helperText: editingMaterial?.identity_locked ? 'Đã phát sinh nghiệp vụ; tạo vật tư mới nếu cần đổi mã.' : undefined },
       { name: 'name', label: 'Tên vật tư', defaultValue: editingMaterial?.name ?? '', required: true },
       { name: 'unit', label: 'Đơn vị', defaultValue: editingMaterial?.unit ?? 'cái', required: true, disabledWhen: () => Boolean(editingMaterial?.identity_locked), helperText: editingMaterial?.identity_locked ? 'Đã phát sinh nghiệp vụ; tạo vật tư mới nếu cần đổi ĐVT.' : undefined },
       { name: 'category', label: 'Nhóm', defaultValue: editingMaterial?.category ?? 'Phụ kiện', required: true },
+			{ name: 'tracking_mode', label: 'Chế độ theo dõi', type: 'select', defaultValue: editingMaterial?.tracking_mode ?? 'aggregate', required: true, disabledWhen: () => Boolean(editingMaterial?.identity_locked), options: [{ value: 'aggregate', label: 'Theo tổng số lượng' }, { value: 'physical_unit', label: 'Theo từng đơn vị vật lý' }] },
+			{ name: 'form_factor', label: 'Dạng vật tư', type: 'select', defaultValue: editingMaterial?.form_factor ?? '', required: true, disabledWhen: () => Boolean(editingMaterial?.identity_locked), hiddenWhen: (values: RecordRow) => values.tracking_mode !== 'physical_unit', options: [{ value: 'segment', label: 'Đoạn' }, { value: 'roll', label: 'Cuộn' }, { value: 'bar', label: 'Cây' }, { value: 'sheet', label: 'Tấm' }] },
       { name: 'default_supplier_partner_id', label: 'Nhà cung cấp tham khảo', type: 'select', defaultValue: editingMaterial?.default_supplier_partner_id ?? '', placeholder: 'Chọn từ Danh mục đối tác', helperText: 'Dùng làm nguồn cung ban đầu; có thể thay đổi khi lấy báo giá.', options: partnerOptions(partners.data ?? [], ['supplier', 'service_provider', 'other']) },
       { name: 'default_supplier', label: 'Tên nhà cung cấp khác', defaultValue: editingMaterial?.default_supplier ?? '', placeholder: 'Nhập tên nhà cung cấp', helperText: 'Chỉ nhập khi nhà cung cấp chưa có trong Danh mục đối tác.', hiddenWhen: (values: RecordRow) => Boolean(values.default_supplier_partner_id) },
     ]} onSubmit={(values) => editingMaterial ? updateMaterial.mutateAsync({ id: editingMaterial.id, values }) : createMaterial.mutateAsync(values)} />
+
+		<InitializeMaterialStockUnitsDialog material={initializingMaterial} positions={(positions.data ?? []).filter((position) => position.material_id === initializingMaterial?.id && numeric(position.stock_quantity) > 0)} pending={initializeMaterialUnits.isPending} onClose={() => setInitializingMaterial(null)} onSubmit={(values) => initializingMaterial ? initializeMaterialUnits.mutateAsync({ materialId: initializingMaterial.id, values }) : Promise.resolve()} />
 
     <StockDocumentDialog open={openDocument} mode="create" projectId={projectId} receiptId={receiptParam} materials={materials.data ?? []} warehouses={warehouses.data ?? []} receiptOptions={receiptOptions.data ?? []} hasPermission={hasPermission} pending={createDocument.isPending} onClose={() => setOpenDocument(false)} onSubmit={(values) => createDocument.mutateAsync(values)} />
     <StockDocumentDialog open={Boolean(editingDocumentId)} mode="edit" projectId={editingDocumentDetail.data?.project_id ?? projectId} receiptId="" record={editingDocumentDetail.data} loading={editingDocumentDetail.isLoading} error={editingDocumentDetail.error} materials={materials.data ?? []} warehouses={warehouses.data ?? []} receiptOptions={receiptOptions.data ?? []} hasPermission={hasPermission} pending={updateDocument.isPending} onClose={() => setEditingDocumentId('')} onSubmit={(values) => updateDocument.mutateAsync({ id: editingDocumentId, values })} />
@@ -209,19 +230,24 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
     <Dialog manageFocus open={Boolean(documentId)} title="Chi tiết phiếu kho" onClose={() => { setDocumentId(''); if (sourceLink.active) sourceLink.dismiss(); }} size="xl">
       {documentDetail.isLoading ? <p className="py-6 text-sm text-slate-500">Đang tải phiếu kho...</p> : documentDetail.error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không tải được phiếu kho.</p> : documentDetail.data ? <StockDocumentDetail record={documentDetail.data} /> : null}
     </Dialog>
+		<Dialog manageFocus open={Boolean(stockUnitId)} title="Lịch sử đơn vị vật tư" onClose={() => setStockUnitId('')} size="xl">
+			{stockUnitDetail.isLoading ? <p className="py-6 text-sm text-slate-500">Đang tải lịch sử đơn vị...</p> : stockUnitDetail.error ? <p className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">Không tải được lịch sử đơn vị vật tư.</p> : stockUnitDetail.data ? <StockUnitDetail record={stockUnitDetail.data} /> : null}
+		</Dialog>
   </>;
 }
 
 function StockTab({ rows, loading, error, onRetry, onAdjust }: { rows: StockPosition[]; loading: boolean; error: unknown; onRetry: () => void; onAdjust?: (record: StockPosition) => void }) {
   return <><div className="hidden md:block"><DataTable rows={rows} loading={loading} error={error} onRetry={onRetry} pageSize={15} defaultSort={{ key: 'warehouse_name' }} columns={[
-    ...(onAdjust ? [{ key: 'actions', header: 'Thao tác', action: true, className: 'w-16', render: (row: StockPosition) => <RowActions onEdit={() => onAdjust(row)} /> }] : []),
+    ...(onAdjust ? [{ key: 'actions', header: 'Thao tác', action: true, className: 'w-16', render: (row: StockPosition) => row.tracking_mode === 'physical_unit' ? null : <RowActions onEdit={() => onAdjust(row)} /> }] : []),
     { key: 'warehouse_name', header: 'Kho', sortable: true, render: (row) => <div><span className="font-semibold text-ink">{row.warehouse_name}</span><div className="text-xs text-slate-500">{row.location || row.warehouse_type}</div></div> },
     { key: 'code', header: 'Mã vật tư', sortable: true },
     { key: 'name', header: 'Vật tư', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> },
     { key: 'category', header: 'Nhóm', sortable: true },
     { key: 'stock_quantity', header: 'Tồn sổ', align: 'right', sortable: true, sortValue: (row) => numeric(row.stock_quantity), render: (row) => <span className={numeric(row.stock_quantity) <= 0 ? 'font-semibold text-rose-700' : 'font-semibold text-ink'}>{formatQuantity(row.stock_quantity)}</span> },
+		{ key: 'physical_available_quantity', header: 'Tái xuất', align: 'right', sortable: true, sortValue: (row) => numeric(row.physical_available_quantity), render: (row) => row.tracking_mode === 'physical_unit' ? <span className="font-semibold text-emerald-700">{formatQuantity(row.physical_available_quantity)}</span> : '—' },
+		{ key: 'physical_quarantined_quantity', header: 'Cách ly', align: 'right', sortable: true, sortValue: (row) => numeric(row.physical_quarantined_quantity), render: (row) => row.tracking_mode === 'physical_unit' ? <span className={numeric(row.physical_quarantined_quantity) > 0 ? 'font-semibold text-amber-700' : ''}>{formatQuantity(row.physical_quarantined_quantity)}</span> : '—' },
     { key: 'unit', header: 'ĐVT' },
-  ]} empty="Chưa có biến động kho phù hợp bộ lọc" /></div><div className="space-y-3 md:hidden">{rows.map((row) => <div key={`${row.warehouse_id}-${row.material_id}`} className="rounded-lg border border-line bg-white p-4 shadow-panel"><div className="flex justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-slate-500">{row.warehouse_name}</p><p className="font-semibold text-ink">{row.name}</p><p className="text-xs text-slate-500">{row.code} · {row.category}</p></div><p className={numeric(row.stock_quantity) <= 0 ? 'font-semibold text-rose-700' : 'font-semibold text-ink'}>{formatQuantity(row.stock_quantity)} {row.unit}</p></div>{onAdjust ? <div className="mt-3 border-t border-line pt-3"><RowActions onEdit={() => onAdjust(row)} /></div> : null}</div>)}</div></>;
+  ]} empty="Chưa có biến động kho phù hợp bộ lọc" /></div><div className="space-y-3 md:hidden">{rows.map((row) => <div key={`${row.warehouse_id}-${row.material_id}`} className="rounded-lg border border-line bg-white p-4 shadow-panel"><div className="flex justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-slate-500">{row.warehouse_name}</p><p className="font-semibold text-ink">{row.name}</p><p className="text-xs text-slate-500">{row.code} · {row.category}</p>{row.tracking_mode === 'physical_unit' ? <p className="mt-1 text-xs text-emerald-700">Tái xuất {formatQuantity(row.physical_available_quantity)} · Cách ly {formatQuantity(row.physical_quarantined_quantity)}</p> : null}</div><p className={numeric(row.stock_quantity) <= 0 ? 'font-semibold text-rose-700' : 'font-semibold text-ink'}>{formatQuantity(row.stock_quantity)} {row.unit}</p></div>{onAdjust && row.tracking_mode !== 'physical_unit' ? <div className="mt-3 border-t border-line pt-3"><RowActions onEdit={() => onAdjust(row)} /></div> : null}</div>)}</div></>;
 }
 
 function DocumentsTab({ rows, loading, error, onRetry, onView, onEdit, hasPermission }: { rows: StockDocument[]; loading: boolean; error: unknown; onRetry: () => void; onView: (id: string) => void; onEdit?: (record: StockDocument) => void; hasPermission: (permission: string) => boolean }) {
@@ -239,24 +265,71 @@ function DocumentsTab({ rows, loading, error, onRetry, onView, onEdit, hasPermis
 }
 
 function SiteTab({ rows, loading, error, onRetry, projectId, onAdjust }: { rows: RecordRow[]; loading: boolean; error: unknown; onRetry: () => void; projectId: string; onAdjust?: (record: RecordRow) => void }) { return <DataTable rows={rows} loading={loading} error={error} onRetry={onRetry} pageSize={15} defaultSort={{ key: 'surplus_quantity', direction: 'desc' }} columns={[
-  ...(onAdjust ? [{ key: 'actions', header: 'Thao tác', action: true, className: 'w-16', render: (row: RecordRow) => <RowActions onEdit={() => onAdjust(row)} /> }] : []),
+  ...(onAdjust ? [{ key: 'actions', header: 'Thao tác', action: true, className: 'w-16', render: (row: RecordRow) => row.tracking_mode === 'physical_unit' ? null : <RowActions onEdit={() => onAdjust(row)} /> }] : []),
   { key: 'material_name', header: 'Vật tư', sortable: true, render: (row) => <div><span className="font-semibold text-ink">{row.material_name}</span><div className="text-xs text-slate-500">{row.code} · {row.category}</div></div> },
   { key: 'planned_quantity', header: 'Kế hoạch', align: 'right', sortable: true, sortValue: (row) => numeric(row.planned_quantity), render: (row) => formatQuantity(row.planned_quantity) },
   { key: 'issued_quantity', header: 'Đã xuất site', align: 'right', sortable: true, sortValue: (row) => numeric(row.issued_quantity), render: (row) => formatQuantity(row.issued_quantity) },
   { key: 'used_quantity', header: 'Đã dùng', align: 'right', sortable: true, sortValue: (row) => numeric(row.used_quantity), render: (row) => formatQuantity(row.used_quantity) },
+	{ key: 'waste_quantity', header: 'Hao hụt', align: 'right', sortable: true, sortValue: (row) => numeric(row.waste_quantity), render: (row) => formatQuantity(row.waste_quantity) },
   { key: 'surplus_quantity', header: 'Dư', align: 'right', sortable: true, sortValue: (row) => numeric(row.surplus_quantity), render: (row) => <span className={numeric(row.surplus_quantity) > 0 ? 'font-semibold text-amber-700' : ''}>{formatQuantity(row.surplus_quantity)}</span> },
   { key: 'unit', header: 'ĐVT' },
   { key: 'surplus_status', header: 'Xử lý', sortable: true, render: (row) => <EnumChip group="surplus_status" value={row.surplus_status} /> },
 ]} empty={projectId ? 'Chưa có vật tư tại công trình' : 'Chọn công trình để xem tồn tại site'} />; }
 
-function MaterialsTab({ rows, loading, error, onRetry, onCreate, onEdit }: { rows: RecordRow[]; loading: boolean; error: unknown; onRetry: () => void; onCreate?: () => void; onEdit?: (record: RecordRow) => void }) { return <DataTable rows={rows} loading={loading} error={error} onRetry={onRetry} pageSize={15} defaultSort={{ key: 'name' }} columns={[
-  ...(onEdit ? [{ key: 'actions', header: 'Thao tác', action: true, className: 'w-16', render: (row: RecordRow) => <RowActions onEdit={() => onEdit(row)} /> }] : []),
-  { key: 'code', header: 'Mã', sortable: true }, { key: 'name', header: 'Vật tư', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> }, { key: 'category', header: 'Nhóm', sortable: true }, { key: 'unit', header: 'ĐVT' }, { key: 'default_supplier_partner_name', header: 'Nhà cung cấp tham khảo' },
+function StockUnitsTab({ rows, loading, error, onRetry, onView }: { rows: MaterialStockUnit[]; loading: boolean; error: unknown; onRetry: () => void; onView: (id: string) => void }) { return <DataTable rows={rows} loading={loading} error={error} onRetry={onRetry} pageSize={15} defaultSort={{ key: 'updated_at', direction: 'desc' }} columns={[
+	{ key: 'actions', header: 'Thao tác', action: true, className: 'w-16', render: (row) => <RowActions onView={() => onView(row.id)} /> },
+	{ key: 'unit_code', header: 'Mã đơn vị', sortable: true, render: (row) => <button className="font-semibold text-blue-700 hover:underline" onClick={() => onView(row.id)}>{row.unit_code}</button> },
+	{ key: 'material_name', header: 'Vật tư', sortable: true, render: (row) => <div><p className="font-semibold text-ink">{row.material_name}</p><p className="text-xs text-slate-500">{row.material_code} · {formFactorLabel(row.form_factor)}</p></div> },
+	{ key: 'quantity', header: 'Còn lại', align: 'right', sortable: true, sortValue: (row) => numeric(row.quantity), render: (row) => <strong>{formatQuantity(row.quantity)} {row.unit}</strong> },
+	{ key: 'dimensions', header: 'Kích thước', render: (row) => stockUnitDimensions(row) },
+	{ key: 'location', header: 'Vị trí', sortable: true, render: (row) => row.warehouse_name || row.project_name || locationTypeLabel(row.location_type) },
+	{ key: 'condition', header: 'Tình trạng', sortable: true, render: (row) => <span className={row.condition === 'usable' ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-700'}>{conditionLabel(row.condition)}</span> },
+	{ key: 'status', header: 'Trạng thái', sortable: true, render: (row) => stockUnitStatusLabel(row.status) },
+]} empty="Chưa có Đoạn/Cuộn/Cây/Tấm được theo dõi" />; }
+
+function MaterialsTab({ rows, loading, error, onRetry, onCreate, onEdit, onInitialize }: { rows: RecordRow[]; loading: boolean; error: unknown; onRetry: () => void; onCreate?: () => void; onEdit?: (record: RecordRow) => void; onInitialize?: (record: RecordRow) => void }) { return <DataTable rows={rows} loading={loading} error={error} onRetry={onRetry} pageSize={15} defaultSort={{ key: 'name' }} columns={[
+  ...(onEdit ? [{ key: 'actions', header: 'Thao tác', action: true, className: 'w-24', render: (row: RecordRow) => <RowActions onEdit={() => onEdit(row)}>{onInitialize && row.identity_locked && row.tracking_mode !== 'physical_unit' ? <button title="Khởi tạo theo dõi đơn vị vật lý" aria-label="Khởi tạo theo dõi đơn vị vật lý" className="rounded-md border border-blue-200 p-1.5 text-blue-700 hover:bg-blue-50" onClick={() => onInitialize(row)}><Recycle className="h-4 w-4" /></button> : null}</RowActions> }] : []),
+  { key: 'code', header: 'Mã', sortable: true }, { key: 'name', header: 'Vật tư', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> }, { key: 'category', header: 'Nhóm', sortable: true }, { key: 'unit', header: 'ĐVT' }, { key: 'tracking_mode', header: 'Theo dõi', sortable: true, render: (row) => row.tracking_mode === 'physical_unit' ? `Từng ${formFactorLabel(row.form_factor).toLocaleLowerCase('vi-VN')}` : 'Tổng số lượng' }, { key: 'default_supplier_partner_name', header: 'Nhà cung cấp tham khảo' },
 ]} empty="Chưa có vật tư hoạt động" emptyAction={onCreate ? <button className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" onClick={onCreate}>Thêm vật tư</button> : undefined} />; }
 
-type DraftLine = { key: string; material_id: string; quantity: number; unit: string; reason: string; source_line_type?: string; source_line_id?: string; max_quantity?: number };
+type DraftLine = { key: string; material_id: string; quantity: number; unit: string; reason: string; source_line_type?: string; source_line_id?: string; max_quantity?: number; stock_units?: MaterialStockUnitInput[]; stock_unit_allocations?: StockUnitAllocation[]; existing_stock_unit_allocations?: StockUnitAllocation[] };
+type InitializationUnit = MaterialStockUnitInput & { warehouse_id: string };
+
+function InitializeMaterialStockUnitsDialog({ material, positions, pending, onClose, onSubmit }: { material: RecordRow | null; positions: StockPosition[]; pending: boolean; onClose: () => void; onSubmit: (values: RecordRow) => Promise<unknown> }) {
+	const toast = useToast();
+	const [formFactor, setFormFactor] = useState('segment');
+	const [units, setUnits] = useState<InitializationUnit[]>([]);
+	const [warning, setWarning] = useState('');
+	useEffect(() => {
+		if (!material) return;
+		setFormFactor(material.form_factor || 'segment');
+		setUnits(positions.map((position) => ({ ...emptyStockUnit(material.unit ?? position.unit, numeric(position.stock_quantity)), warehouse_id: position.warehouse_id })));
+		setWarning('');
+	}, [material?.id, positions.map((position) => `${position.warehouse_id}:${position.stock_quantity}`).join('|')]);
+	const update = (index: number, patch: Partial<InitializationUnit>) => setUnits((current) => current.map((unit, unitIndex) => unitIndex === index ? { ...unit, ...patch } : unit));
+	async function submit() {
+		for (const position of positions) {
+			const physical = units.filter((unit) => unit.warehouse_id === position.warehouse_id).reduce((sum, unit) => sum + numeric(unit.quantity), 0);
+			if (Math.abs(physical - numeric(position.stock_quantity)) > 0.000001) {
+				const message = `Tổng đơn vị tại ${position.warehouse_name} phải bằng tồn sổ ${formatQuantity(position.stock_quantity)} ${position.unit}.`;
+				setWarning(message); toast.warn({ title: 'Chưa thể khởi tạo', description: message }); return;
+			}
+		}
+		setWarning('');
+		await onSubmit({ form_factor: formFactor, units });
+	}
+	return <Dialog open={Boolean(material)} title="Khởi tạo theo dõi đơn vị vật lý" description="Đối soát một lần với tồn sổ hiện tại. Sau khi khởi tạo, mọi nhập/xuất/hoàn phải chọn đúng Đoạn/Cuộn/Cây/Tấm." onClose={onClose} size="xl">
+		{material ? <div className="space-y-4">
+			<div className="grid gap-3 rounded-lg border border-line bg-slate-50 p-3 sm:grid-cols-3"><DetailMetric label="Vật tư" value={`${material.code} · ${material.name}`} /><DetailMetric label="ĐVT" value={material.unit} /><Field label="Dạng vật tư"><select className={controlClass} value={formFactor} onChange={(event) => setFormFactor(event.target.value)}><option value="segment">Đoạn</option><option value="roll">Cuộn</option><option value="bar">Cây</option><option value="sheet">Tấm</option></select></Field></div>
+			{positions.length ? positions.map((position) => <div key={position.warehouse_id} className="rounded-lg border border-line p-3"><div className="mb-2 flex items-center justify-between gap-2"><div><p className="text-sm font-semibold text-ink">{position.warehouse_name}</p><p className="text-xs text-slate-500">Tồn sổ {formatQuantity(position.stock_quantity)} {position.unit}</p></div><button className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold" onClick={() => setUnits((current) => [...current, { ...emptyStockUnit(material.unit, 0), warehouse_id: position.warehouse_id }])}><Plus className="h-3.5 w-3.5" />Thêm đơn vị</button></div><div className="space-y-2">{units.map((unit, index) => unit.warehouse_id !== position.warehouse_id ? null : <div key={`${unit.unit_code}-${index}`} className="grid gap-2 md:grid-cols-[1.2fr_0.7fr_0.7fr_0.7fr_0.7fr_1fr_auto]"><input className={controlClass} value={unit.unit_code} onChange={(event) => update(index, { unit_code: event.target.value })} placeholder="Mã đơn vị" /><input className={controlClass} type="number" min="0.001" step="0.001" value={unit.quantity} onChange={(event) => update(index, { quantity: numeric(event.target.value) })} /><input className={controlClass} type="number" min="0.001" step="0.001" value={unit.length_mm ?? ''} onChange={(event) => update(index, { length_mm: optionalNumber(event.target.value) })} placeholder="Dài mm" /><input className={controlClass} type="number" min="0.001" step="0.001" value={unit.width_mm ?? ''} onChange={(event) => update(index, { width_mm: optionalNumber(event.target.value) })} placeholder="Rộng mm" /><input className={controlClass} type="number" min="0.001" step="0.001" value={unit.thickness_mm ?? ''} onChange={(event) => update(index, { thickness_mm: optionalNumber(event.target.value) })} placeholder="Dày mm" /><select className={controlClass} value={unit.condition} onChange={(event) => update(index, { condition: event.target.value })}><option value="usable">Dùng được</option><option value="damaged">Hư hỏng</option><option value="mixed">Lẫn tình trạng</option><option value="unknown">Chưa rõ</option></select><button className="rounded-md p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-700" onClick={() => setUnits((current) => current.filter((_, unitIndex) => unitIndex !== index))}><Trash2 className="h-4 w-4" /></button></div>)}</div></div>) : <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Vật tư không có tồn kho/công trình; có thể bật theo dõi vật lý mà không cần khởi tạo đơn vị ban đầu.</div>}
+			{warning ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">{warning}</div> : null}
+			<div className="flex justify-end gap-2 border-t border-line pt-4"><button className="rounded-md border border-line px-4 py-2 text-sm font-semibold" onClick={onClose}>Hủy</button><button disabled={pending} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={submit}>{pending ? 'Đang khởi tạo...' : 'Xác nhận khởi tạo'}</button></div>
+		</div> : null}
+	</Dialog>;
+}
 
 function StockDocumentDialog({ open, mode, projectId, receiptId, record, loading = false, error, materials, warehouses, receiptOptions, hasPermission, pending, onClose, onSubmit }: { open: boolean; mode: 'create' | 'edit'; projectId: string; receiptId: string; record?: StockDocument; loading?: boolean; error?: unknown; materials: RecordRow[]; warehouses: RecordRow[]; receiptOptions: WarehouseReceiptOption[]; hasPermission: (permission: string) => boolean; pending: boolean; onClose: () => void; onSubmit: (values: RecordRow) => Promise<unknown> }) {
+	const toast = useToast();
   const allowedTypes = useMemo(() => [
     hasPermission('warehouse.receive') ? { value: 'receive', label: 'Nhập kho' } : null,
     hasPermission('warehouse.issue') ? { value: 'issue', label: 'Xuất công trình' } : null,
@@ -288,7 +361,7 @@ function StockDocumentDialog({ open, mode, projectId, receiptId, record, loading
       setSourceAcceptanceId(record.reference_type === 'incoming_acceptance' ? record.reference_id ?? '' : '');
       setDocumentDate(String(record.document_date ?? '').slice(0, 10));
       setNote(record.note ?? '');
-      setLines((record.items ?? []).map((item) => ({ key: item.id, material_id: item.material_id, quantity: numeric(item.quantity), unit: item.unit, reason: item.reason ?? '', source_line_type: item.source_line_type, source_line_id: item.source_line_id })));
+      setLines((record.items ?? []).map((item) => ({ key: item.id, material_id: item.material_id, quantity: numeric(item.quantity), unit: item.unit, reason: item.reason ?? '', source_line_type: item.source_line_type, source_line_id: item.source_line_id, existing_stock_unit_allocations: item.stock_unit_allocations ?? [] })));
       return;
     }
     setMovementType(allowedTypes[0]?.value ?? 'receive');
@@ -309,23 +382,38 @@ function StockDocumentDialog({ open, mode, projectId, receiptId, record, loading
     setSourceAcceptanceId(id);
     const options = acceptanceGroups.get(id) ?? [];
     if (options[0]?.warehouse_id) setTargetWarehouseId(options[0].warehouse_id);
-    setLines(options.map((option) => ({ key: option.incoming_acceptance_item_id, material_id: option.material_id, quantity: numeric(option.remaining_quantity), unit: option.unit, reason: `Nhập theo ${option.acceptance_code}`, source_line_type: 'incoming_acceptance_item', source_line_id: option.incoming_acceptance_item_id, max_quantity: numeric(option.remaining_quantity) })));
+    setLines(options.map((option) => {
+			const material = materials.find((row) => row.id === option.material_id);
+			const quantity = numeric(option.remaining_quantity);
+			return { key: option.incoming_acceptance_item_id, material_id: option.material_id, quantity, unit: option.unit, reason: `Nhập theo ${option.acceptance_code}`, source_line_type: 'incoming_acceptance_item', source_line_id: option.incoming_acceptance_item_id, max_quantity: quantity, stock_units: material?.tracking_mode === 'physical_unit' ? [emptyStockUnit(option.unit, quantity)] : [] };
+		}));
   }
 
   function updateLine(index: number, patch: Partial<DraftLine>) { setLines((current) => current.map((line, itemIndex) => itemIndex === index ? { ...line, ...patch } : line)); }
-  function selectMaterial(index: number, materialId: string) { const material = materials.find((row) => row.id === materialId); updateLine(index, { material_id: materialId, unit: material?.unit ?? '' }); }
+  function selectMaterial(index: number, materialId: string) { const material = materials.find((row) => row.id === materialId); const physical = material?.tracking_mode === 'physical_unit'; updateLine(index, { material_id: materialId, unit: material?.unit ?? '', stock_units: physical && movementType === 'receive' ? [emptyStockUnit(material?.unit ?? '', numeric(lines[index]?.quantity))] : [], stock_unit_allocations: [] }); }
+	function showWarning(message: string) { setWarning(message); toast.warn({ title: 'Phiếu kho chưa hợp lệ', description: message }); }
   async function submit() {
     const cleanLines = lines.filter((line) => line.material_id && numeric(line.quantity) > 0);
     const needsProject = ['issue', 'return_to_warehouse', 'return_to_subcontractor'].includes(movementType);
-    if (!cleanLines.length) return setWarning('Phiếu kho cần ít nhất một dòng vật tư có số lượng lớn hơn 0.');
-    if (needsProject && !projectId) return setWarning('Vui lòng chọn công trình cho phiếu xuất hoặc hoàn trả.');
-    if (['issue', 'transfer'].includes(movementType) && !sourceWarehouseId) return setWarning('Kho nguồn là bắt buộc.');
-    if (['receive', 'return_to_warehouse', 'transfer'].includes(movementType) && !targetWarehouseId) return setWarning('Kho nhận là bắt buộc.');
-    if (movementType === 'transfer' && sourceWarehouseId === targetWarehouseId) return setWarning('Kho đích phải khác kho nguồn.');
+		if (!cleanLines.length) return showWarning('Phiếu kho cần ít nhất một dòng vật tư có số lượng lớn hơn 0.');
+		if (needsProject && !projectId) return showWarning('Vui lòng chọn công trình cho phiếu xuất hoặc hoàn trả.');
+		if (['issue', 'transfer'].includes(movementType) && !sourceWarehouseId) return showWarning('Kho nguồn là bắt buộc.');
+		if (['receive', 'return_to_warehouse', 'transfer'].includes(movementType) && !targetWarehouseId) return showWarning('Kho nhận là bắt buộc.');
+		if (movementType === 'transfer' && sourceWarehouseId === targetWarehouseId) return showWarning('Kho đích phải khác kho nguồn.');
     const exceeded = cleanLines.find((line) => line.max_quantity !== undefined && numeric(line.quantity) > numeric(line.max_quantity) + 0.000001);
-    if (exceeded) return setWarning('Số lượng nhập không được vượt khối lượng đạt nghiệm thu còn lại.');
+		if (exceeded) return showWarning('Số lượng nhập không được vượt khối lượng đạt nghiệm thu còn lại.');
+		if (mode === 'create') {
+			for (const line of cleanLines) {
+				const material = materials.find((row) => row.id === line.material_id);
+				if (material?.tracking_mode !== 'physical_unit') continue;
+				const allocations = movementType === 'receive' ? line.stock_units ?? [] : line.stock_unit_allocations ?? [];
+				const allocated = allocations.reduce((sum, item) => sum + numeric(item.quantity), 0);
+				if (!allocations.length || Math.abs(allocated - numeric(line.quantity)) > 0.000001) return showWarning(`Vật tư ${material.name}: tổng Đoạn/Cuộn/Cây/Tấm phải bằng số lượng dòng phiếu.`);
+			}
+		}
     setWarning('');
-    await onSubmit({ project_id: projectId || null, movement_type: movementType, source_warehouse_id: sourceWarehouseId || null, target_warehouse_id: targetWarehouseId || null, reference_type: sourceAcceptanceId ? 'incoming_acceptance' : null, reference_id: sourceAcceptanceId || null, document_date: documentDate, note, correction_reason: correctionReason, items: cleanLines });
+		const submittedLines = cleanLines.map(({ existing_stock_unit_allocations: _existing, ...line }) => mode === 'edit' ? { ...line, stock_units: undefined, stock_unit_allocations: undefined } : line);
+		await onSubmit({ project_id: projectId || null, movement_type: movementType, source_warehouse_id: sourceWarehouseId || null, target_warehouse_id: targetWarehouseId || null, reference_type: sourceAcceptanceId ? 'incoming_acceptance' : null, reference_id: sourceAcceptanceId || null, document_date: documentDate, note, correction_reason: correctionReason, items: submittedLines });
   }
 
   return <Dialog open={open} title={mode === 'edit' ? 'Chỉnh sửa phiếu kho' : 'Tạo phiếu kho'} description={mode === 'edit' ? 'Ngày và ghi chú được cập nhật trực tiếp. Thay đổi kho, vật tư hoặc số lượng sẽ lập phiếu thay thế và giữ lịch sử phiếu cũ.' : 'Ghi nhận chứng từ nhiều dòng; nghiệm thu đầu vào chỉ là nguồn, không tự động làm tăng tồn kho.'} onClose={onClose} size="xl">
@@ -339,6 +427,14 @@ function StockDocumentDialog({ open, mode, projectId, receiptId, record, loading
       </div>
       {movementType === 'receive' && projectId ? <Field label="Chứng từ nghiệm thu đầu vào (không bắt buộc)"><select className={controlClass} value={sourceAcceptanceId} onChange={(event) => event.target.value ? selectAcceptance(event.target.value) : (setSourceAcceptanceId(''), setLines([emptyLine()]))}><option value="">Nhập thủ công</option>{sourceAcceptanceId && !acceptanceGroups.has(sourceAcceptanceId) ? <option value={sourceAcceptanceId}>Chứng từ hiện tại · {shortId(sourceAcceptanceId)}</option> : null}{Array.from(acceptanceGroups.entries()).map(([id, rows]) => <option key={id} value={id}>{rows[0].acceptance_code} · {rows[0].request_code || rows[0].supplier_name || 'Nghiệm thu đầu vào'} · còn {rows.reduce((sum, row) => sum + numeric(row.remaining_quantity), 0).toLocaleString('vi-VN')}</option>)}</select></Field> : null}
       <div className="consflow-table-viewport rounded-lg border border-line"><table className="min-w-[760px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="w-12"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Vật tư</th><th className="px-3 py-2 text-right">Tối đa</th><th className="px-3 py-2 text-right">Số lượng</th><th className="px-3 py-2">ĐVT</th><th className="px-3 py-2">Ghi chú dòng</th></tr></thead><tbody className="divide-y divide-line">{lines.map((line, index) => <tr key={line.key}><td className="px-3 py-2"><button disabled={lines.length === 1 || Boolean(sourceAcceptanceId)} className="rounded-md p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30" onClick={() => setLines((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></button></td><td className="px-3 py-2"><select className={controlClass} disabled={Boolean(line.source_line_id)} value={line.material_id} onChange={(event) => selectMaterial(index, event.target.value)}><option value="">Chọn vật tư</option>{materials.map((row) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}</select></td><td className="px-3 py-2 text-right text-slate-500">{line.max_quantity === undefined ? '—' : formatQuantity(line.max_quantity)}</td><td className="px-3 py-2"><input className={`${controlClass} text-right`} type="number" min="0.001" step="0.001" max={line.max_quantity} value={line.quantity} onChange={(event) => updateLine(index, { quantity: numeric(event.target.value) })} /></td><td className="px-3 py-2"><input className={controlClass} value={line.unit} readOnly /></td><td className="px-3 py-2"><input className={controlClass} value={line.reason} onChange={(event) => updateLine(index, { reason: event.target.value })} /></td></tr>)}</tbody></table></div>
+			{lines.map((line, index) => {
+				const material = materials.find((row) => row.id === line.material_id);
+				if (material?.tracking_mode !== 'physical_unit') return null;
+				if (mode === 'edit') return <div key={`physical-${line.key}`} className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"><p className="font-semibold">{material.code} · {material.name}</p><p className="mt-1">Phiếu đã ghi sổ giữ nguyên lịch sử đơn vị vật lý. Muốn đổi tồn, hãy lập phiếu hoàn/chuyển mới.</p>{line.existing_stock_unit_allocations?.length ? <p className="mt-2 text-xs">Đơn vị trên phiếu: {line.existing_stock_unit_allocations.map((item) => `${item.unit_code ?? shortId(item.stock_unit_id)} (${formatQuantity(item.quantity)} ${line.unit})`).join(', ')}</p> : null}</div>;
+				return movementType === 'receive'
+					? <PhysicalReceiveEditor key={`physical-${line.key}`} material={material} line={line} onChange={(stock_units) => updateLine(index, { stock_units })} />
+					: <PhysicalAllocationEditor key={`physical-${line.key}`} material={material} line={line} movementType={movementType} sourceWarehouseId={sourceWarehouseId} projectId={projectId} onChange={(stock_unit_allocations) => updateLine(index, { stock_unit_allocations })} />;
+			})}
       {!sourceAcceptanceId ? <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => setLines((current) => [...current, emptyLine()])}><Plus className="h-4 w-4" />Thêm dòng</button> : null}
       <Field label="Ghi chú phiếu"><textarea className={controlClass} rows={2} value={note} onChange={(event) => setNote(event.target.value)} /></Field>
       {mode === 'edit' ? <Field label="Lý do điều chỉnh dữ liệu tồn kho"><textarea className={controlClass} rows={2} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} placeholder="Bắt buộc khi thay đổi kho, loại phiếu, vật tư, ĐVT hoặc số lượng" /></Field> : null}
@@ -347,6 +443,59 @@ function StockDocumentDialog({ open, mode, projectId, receiptId, record, loading
     </div>
     }
   </Dialog>;
+}
+
+function PhysicalReceiveEditor({ material, line, onChange }: { material: RecordRow; line: DraftLine; onChange: (units: MaterialStockUnitInput[]) => void }) {
+	const units = line.stock_units ?? [];
+	const update = (index: number, patch: Partial<MaterialStockUnitInput>) => onChange(units.map((unit, unitIndex) => unitIndex === index ? { ...unit, ...patch } : unit));
+	return <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+		<div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold text-blue-950">{material.code} · Khai báo từng {formFactorLabel(material.form_factor).toLocaleLowerCase('vi-VN')}</p><p className="text-xs text-blue-700">Tổng đơn vị phải bằng {formatQuantity(line.quantity)} {line.unit}.</p></div><button className="inline-flex items-center gap-1 rounded-md border border-blue-300 bg-white px-2 py-1 text-xs font-semibold text-blue-800" onClick={() => onChange([...units, emptyStockUnit(line.unit, 0)])}><Plus className="h-3.5 w-3.5" />Thêm {formFactorLabel(material.form_factor).toLocaleLowerCase('vi-VN')}</button></div>
+		<div className="space-y-2">{units.map((unit, index) => <div key={`${unit.unit_code}-${index}`} className="grid gap-2 rounded-md border border-blue-100 bg-white p-2 md:grid-cols-[1.2fr_0.7fr_0.7fr_0.7fr_0.7fr_1fr_auto]">
+			<input className={controlClass} value={unit.unit_code} onChange={(event) => update(index, { unit_code: event.target.value })} placeholder="Mã đơn vị" aria-label="Mã đơn vị vật lý" />
+			<input className={controlClass} type="number" min="0.001" step="0.001" value={unit.quantity} onChange={(event) => update(index, { quantity: numeric(event.target.value) })} aria-label="Số lượng đơn vị vật lý" />
+			<input className={controlClass} type="number" min="0.001" step="0.001" value={unit.length_mm ?? ''} onChange={(event) => update(index, { length_mm: optionalNumber(event.target.value) })} placeholder="Dài mm" aria-label="Chiều dài mm" />
+			<input className={controlClass} type="number" min="0.001" step="0.001" value={unit.width_mm ?? ''} onChange={(event) => update(index, { width_mm: optionalNumber(event.target.value) })} placeholder="Rộng mm" aria-label="Chiều rộng mm" />
+			<input className={controlClass} type="number" min="0.001" step="0.001" value={unit.thickness_mm ?? ''} onChange={(event) => update(index, { thickness_mm: optionalNumber(event.target.value) })} placeholder="Dày mm" aria-label="Độ dày mm" />
+			<select className={controlClass} value={unit.condition} onChange={(event) => update(index, { condition: event.target.value })} aria-label="Tình trạng đơn vị vật lý"><option value="usable">Dùng được</option><option value="damaged">Hư hỏng</option><option value="mixed">Lẫn tình trạng</option><option value="unknown">Chưa rõ</option></select>
+			<button disabled={units.length === 1} className="rounded-md p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-30" onClick={() => onChange(units.filter((_, unitIndex) => unitIndex !== index))} aria-label="Xóa đơn vị vật lý"><Trash2 className="h-4 w-4" /></button>
+		</div>)}</div>
+		<p className="mt-2 text-right text-xs font-semibold text-blue-900">Đã khai báo {formatQuantity(units.reduce((sum, unit) => sum + numeric(unit.quantity), 0))} / {formatQuantity(line.quantity)} {line.unit}</p>
+	</div>;
+}
+
+function PhysicalAllocationEditor({ material, line, movementType, sourceWarehouseId, projectId, onChange }: { material: RecordRow; line: DraftLine; movementType: string; sourceWarehouseId: string; projectId: string; onChange: (allocations: StockUnitAllocation[]) => void }) {
+	const fromProject = ['return_to_warehouse', 'return_to_subcontractor'].includes(movementType);
+	const locationFilter = fromProject ? `project_id=${encodeURIComponent(projectId)}&status=issued` : `warehouse_id=${encodeURIComponent(sourceWarehouseId)}&status=available`;
+	const available = useQuery({ queryKey: ['material-stock-units', 'allocation', material.id, movementType, sourceWarehouseId, projectId], queryFn: () => get<MaterialStockUnit[]>(`/stock/units?material_id=${encodeURIComponent(material.id)}&${locationFilter}`), enabled: Boolean(material.id && (fromProject ? projectId : sourceWarehouseId)) });
+	const allocations = line.stock_unit_allocations ?? [];
+	const selected = new Map(allocations.map((allocation) => [allocation.stock_unit_id, allocation]));
+	const toggle = (unit: MaterialStockUnit) => {
+		if (selected.has(unit.id)) return onChange(allocations.filter((allocation) => allocation.stock_unit_id !== unit.id));
+		const remaining = Math.max(numeric(line.quantity) - allocations.reduce((sum, allocation) => sum + numeric(allocation.quantity), 0), 0);
+		onChange([...allocations, { stock_unit_id: unit.id, unit_code: unit.unit_code, quantity: Math.min(numeric(unit.quantity), remaining || numeric(unit.quantity)), condition: unit.condition }]);
+	};
+	const update = (stockUnitId: string, patch: Partial<StockUnitAllocation>) => onChange(allocations.map((allocation) => allocation.stock_unit_id === stockUnitId ? { ...allocation, ...patch } : allocation));
+	return <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+		<div className="mb-2"><p className="text-sm font-semibold text-blue-950">{material.code} · Chọn đúng {formFactorLabel(material.form_factor).toLocaleLowerCase('vi-VN')}</p><p className="text-xs text-blue-700">{fromProject ? 'Chọn đơn vị còn tại đúng công trình và cập nhật tình trạng khi hoàn/trả.' : 'Chỉ đơn vị dùng được tại đúng kho nguồn mới có thể xuất/chuyển.'}</p></div>
+		{available.isLoading ? <p className="text-sm text-slate-500">Đang tải đơn vị khả dụng...</p> : available.error ? <p className="text-sm text-rose-700">Không tải được đơn vị khả dụng.</p> : !(available.data ?? []).length ? <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">Không có đơn vị vật lý phù hợp.</p> : <div className="space-y-2">{(available.data ?? []).map((unit) => {
+			const allocation = selected.get(unit.id);
+			return <div key={unit.id} className="grid items-center gap-2 rounded-md border border-blue-100 bg-white p-2 md:grid-cols-[auto_1fr_0.75fr_1fr]">
+				<input type="checkbox" checked={Boolean(allocation)} onChange={() => toggle(unit)} aria-label={`Chọn ${unit.unit_code}`} />
+				<div><p className="text-sm font-semibold text-slate-900">{unit.unit_code}</p><p className="text-xs text-slate-500">Còn {formatQuantity(unit.quantity)} {unit.unit} · {stockUnitDimensions(unit)}</p></div>
+				<input disabled={!allocation} className={controlClass} type="number" min="0.001" max={unit.quantity} step="0.001" value={allocation?.quantity ?? ''} onChange={(event) => update(unit.id, { quantity: numeric(event.target.value) })} aria-label={`Số lượng từ ${unit.unit_code}`} />
+				{fromProject ? <select disabled={!allocation} className={controlClass} value={allocation?.condition ?? unit.condition} onChange={(event) => update(unit.id, { condition: event.target.value })}><option value="usable">Dùng được</option><option value="damaged">Hư hỏng</option><option value="mixed">Lẫn tình trạng</option><option value="unknown">Chưa rõ</option></select> : <input disabled={!allocation} className={controlClass} value={allocation?.result_unit_code ?? ''} onChange={(event) => update(unit.id, { result_unit_code: event.target.value })} placeholder="Mã phần tách (tự sinh nếu trống)" />}
+				<div className="col-span-full grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+					<input disabled={!allocation} className={controlClass} type="number" min="0.001" step="0.001" value={allocation?.length_mm ?? ''} onChange={(event) => update(unit.id, { length_mm: optionalNumber(event.target.value) })} placeholder="Dài phần đi (mm)" aria-label={`Chiều dài phần di chuyển từ ${unit.unit_code}`} />
+					<input disabled={!allocation} className={controlClass} type="number" min="0.001" step="0.001" value={allocation?.remaining_length_mm ?? ''} onChange={(event) => update(unit.id, { remaining_length_mm: optionalNumber(event.target.value) })} placeholder="Dài còn lại (mm)" aria-label={`Chiều dài còn lại của ${unit.unit_code}`} />
+					<input disabled={!allocation} className={controlClass} type="number" min="0.001" step="0.001" value={allocation?.width_mm ?? ''} onChange={(event) => update(unit.id, { width_mm: optionalNumber(event.target.value) })} placeholder="Rộng phần đi (mm)" aria-label={`Chiều rộng phần di chuyển từ ${unit.unit_code}`} />
+					<input disabled={!allocation} className={controlClass} type="number" min="0.001" step="0.001" value={allocation?.remaining_width_mm ?? ''} onChange={(event) => update(unit.id, { remaining_width_mm: optionalNumber(event.target.value) })} placeholder="Rộng còn lại (mm)" aria-label={`Chiều rộng còn lại của ${unit.unit_code}`} />
+					<input disabled={!allocation} className={controlClass} type="number" min="0.001" step="0.001" value={allocation?.thickness_mm ?? ''} onChange={(event) => update(unit.id, { thickness_mm: optionalNumber(event.target.value) })} placeholder="Dày phần đi (mm)" aria-label={`Chiều dày phần di chuyển từ ${unit.unit_code}`} />
+					<input disabled={!allocation} className={controlClass} type="number" min="0.001" step="0.001" value={allocation?.remaining_thickness_mm ?? ''} onChange={(event) => update(unit.id, { remaining_thickness_mm: optionalNumber(event.target.value) })} placeholder="Dày còn lại (mm)" aria-label={`Chiều dày còn lại của ${unit.unit_code}`} />
+				</div>
+			</div>;
+		})}</div>}
+		<p className="mt-2 text-right text-xs font-semibold text-blue-900">Đã phân bổ {formatQuantity(allocations.reduce((sum, allocation) => sum + numeric(allocation.quantity), 0))} / {formatQuantity(line.quantity)} {line.unit}</p>
+	</div>;
 }
 
 function StockAdjustmentDialog({ record, pending, onClose, onSubmit }: { record: StockPosition | null; pending: boolean; onClose: () => void; onSubmit: (values: RecordRow) => Promise<unknown> }) {
@@ -392,17 +541,17 @@ function SiteUsageAdjustmentDialog({ record, pending, onClose, onSubmit }: { rec
   }, [record?.material_id]);
   async function submit() {
     const target = Number(targetUsed);
-    const issued = numeric(record?.issued_quantity);
-    const message = !Number.isFinite(target) || target < 0 ? 'Khối lượng đã dùng phải lớn hơn hoặc bằng 0.' : target > issued ? 'Khối lượng đã dùng không được vượt khối lượng đã xuất công trình.' : !reason.trim() ? 'Lý do điều chỉnh là bắt buộc.' : Math.abs(target - numeric(record?.used_quantity)) <= 0.000001 ? 'Khối lượng đã dùng chưa thay đổi.' : '';
+    const usableLimit = Math.max(numeric(record?.issued_quantity) - numeric(record?.waste_quantity), 0);
+    const message = !Number.isFinite(target) || target < 0 ? 'Khối lượng đã dùng phải lớn hơn hoặc bằng 0.' : target > usableLimit ? 'Khối lượng đã dùng cộng hao hụt không được vượt khối lượng đã xuất công trình.' : !reason.trim() ? 'Lý do điều chỉnh là bắt buộc.' : Math.abs(target - numeric(record?.used_quantity)) <= 0.000001 ? 'Khối lượng đã dùng chưa thay đổi.' : '';
     if (message) { setWarning(message); toast.warn({ title: 'Chưa thể điều chỉnh sử dụng', description: message }); return; }
     setWarning('');
     await onSubmit({ target_used_quantity: target, reason: reason.trim() });
   }
-  const projectedSurplus = Math.max(numeric(record?.issued_quantity) - Number(targetUsed || 0), 0);
+  const projectedSurplus = Math.max(numeric(record?.issued_quantity) - numeric(record?.waste_quantity) - Number(targetUsed || 0), 0);
   return <Dialog open={Boolean(record)} title="Điều chỉnh vật tư đã dùng" description="Đã xuất và vật tư dư vẫn được tính từ phiếu kho; thao tác này chỉ điều chỉnh lượng đã dùng có audit." onClose={onClose} size="lg">
     {record ? <div className="space-y-4">
       <div className="grid gap-3 rounded-lg border border-line bg-slate-50 p-3 sm:grid-cols-2"><DetailMetric label="Vật tư" value={`${record.code} · ${record.material_name}`} /><DetailMetric label="ĐVT" value={record.unit} /><DetailMetric label="Đã xuất công trình" value={formatQuantity(record.issued_quantity)} /><DetailMetric label="Dư sau điều chỉnh" value={formatQuantity(projectedSurplus)} /></div>
-      <Field label="Khối lượng đã dùng sau điều chỉnh"><input className={`${controlClass} ${warning && (!targetUsed || Number(targetUsed) < 0 || Number(targetUsed) > numeric(record.issued_quantity)) ? 'border-rose-300 bg-rose-50' : ''}`} type="number" min="0" max={numeric(record.issued_quantity)} step="0.001" value={targetUsed} onChange={(event) => setTargetUsed(event.target.value)} /></Field>
+      <Field label="Khối lượng đã dùng sau điều chỉnh"><input className={`${controlClass} ${warning && (!targetUsed || Number(targetUsed) < 0 || Number(targetUsed) > Math.max(numeric(record.issued_quantity) - numeric(record.waste_quantity), 0)) ? 'border-rose-300 bg-rose-50' : ''}`} type="number" min="0" max={Math.max(numeric(record.issued_quantity) - numeric(record.waste_quantity), 0)} step="0.001" value={targetUsed} onChange={(event) => setTargetUsed(event.target.value)} /></Field>
       <Field label="Lý do điều chỉnh"><textarea className={`${controlClass} ${warning && !reason.trim() ? 'border-rose-300 bg-rose-50' : ''}`} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Nêu căn cứ kiểm kê hoặc xác nhận sử dụng" /></Field>
       {warning ? <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm font-medium text-amber-800">{warning}</div> : null}
       <div className="flex justify-end gap-2 border-t border-line pt-4"><button className="rounded-md border border-line px-4 py-2 text-sm font-semibold" onClick={onClose}>Hủy</button><button disabled={pending} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={submit}>{pending ? 'Đang ghi nhận...' : 'Lưu điều chỉnh'}</button></div>
@@ -426,6 +575,7 @@ function StockDocumentDetail({ record }: { record: StockDocument }) {
         { key: 'material', label: 'Vật tư', render: item => <div><p className="break-words font-semibold text-slate-900">{item.material_name}</p><p className="mt-1 text-xs text-slate-500">{item.material_code}</p></div> },
         { key: 'quantity', label: 'Số lượng', align: 'right', render: item => <strong className="whitespace-nowrap">{formatQuantity(item.quantity)} {item.unit}</strong> },
         { key: 'movement', label: 'Mã biến động', render: item => <span className="break-words">{item.movement_code || '—'}</span> },
+				{ key: 'units', label: 'Đơn vị vật lý', render: item => item.stock_unit_allocations?.length ? <span className="break-words text-xs">{item.stock_unit_allocations.map((allocation) => `${allocation.unit_code ?? shortId(allocation.stock_unit_id)} (${formatQuantity(allocation.quantity)})`).join(', ')}</span> : '—' },
         { key: 'note', label: 'Ghi chú', render: item => <p className="whitespace-pre-wrap break-words text-slate-600">{item.reason || '—'}</p> },
       ]} />
     </RecordSection>
@@ -434,12 +584,36 @@ function StockDocumentDetail({ record }: { record: StockDocument }) {
   </div>;
 }
 
+function StockUnitDetail({ record }: { record: MaterialStockUnit }) {
+	return <div className="space-y-6">
+		<RecordSummary eyebrow={record.unit_code} title={record.material_name || record.material_code || 'Đơn vị vật tư'} subtitle={`${formFactorLabel(record.form_factor)} · ${formatQuantity(record.quantity)} ${record.unit}`} icon={<Recycle className="h-5 w-5" />} status={<span className={`rounded-md px-2 py-1 text-xs font-semibold ${record.status === 'available' && record.condition === 'usable' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>{stockUnitStatusLabel(record.status)}</span>} />
+		<RecordSection title="Hiện trạng"><RecordMetrics>
+			<RecordMetric label="Vị trí">{record.warehouse_name || record.project_name || locationTypeLabel(record.location_type)}</RecordMetric>
+			<RecordMetric label="Tình trạng">{conditionLabel(record.condition)}</RecordMetric>
+			<RecordMetric label="Kích thước">{stockUnitDimensions(record)}</RecordMetric>
+			<RecordMetric label="Nguồn gốc">{record.parent_unit_code ? `Tách từ ${record.parent_unit_code}` : 'Đơn vị gốc'}</RecordMetric>
+		</RecordMetrics></RecordSection>
+		<RecordSection title="Lịch sử bất biến" aside={`${record.events?.length ?? 0} sự kiện`}>
+			<RecordTable rows={record.events ?? []} rowKey={(event) => event.id} empty="Chưa có sự kiện." columns={[
+				{ key: 'event', label: 'Sự kiện', render: event => <span className="font-semibold text-slate-900">{stockUnitEventLabel(String(event.event_type))}</span> },
+				{ key: 'quantity', label: 'Số lượng', align: 'right', render: event => <span>{formatQuantity(event.quantity)} {record.unit}</span> },
+				{ key: 'balance', label: 'Trước → Sau', align: 'right', render: event => <span>{formatQuantity(event.before_quantity)} → {formatQuantity(event.after_quantity)}</span> },
+				{ key: 'location', label: 'Luồng', render: event => `${event.from_warehouse_name || event.from_project_name || locationTypeLabel(String(event.from_location_type ?? ''))} → ${event.to_warehouse_name || event.to_project_name || locationTypeLabel(String(event.to_location_type ?? ''))}` },
+				{ key: 'actor', label: 'Người ghi nhận', render: event => event.actor_name || 'Hệ thống' },
+				{ key: 'created_at', label: 'Thời điểm', render: event => event.created_at ? dateText(event.created_at) : '—' },
+			]} />
+		</RecordSection>
+	</div>;
+}
+
 const controlClass = 'w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50';
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>{children}</label>; }
 function DetailMetric({ label, value }: { label: string; value: React.ReactNode }) { return <div><p className="text-xs font-semibold uppercase text-slate-500">{label}</p><div className="mt-1 text-sm font-semibold text-ink">{value}</div></div>; }
 function emptyLine(): DraftLine { return { key: `${Date.now()}-${Math.random()}`, material_id: '', quantity: 1, unit: '', reason: '' }; }
+function emptyStockUnit(unit: string, quantity: number): MaterialStockUnitInput { return { unit_code: `DV-${Date.now().toString().slice(-8)}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`, quantity, unit, condition: 'usable' }; }
+function optionalNumber(value: string) { return value.trim() === '' ? undefined : numeric(value); }
 function groupReceiptOptions(rows: WarehouseReceiptOption[]) { const groups = new Map<string, WarehouseReceiptOption[]>(); rows.forEach((row) => groups.set(row.incoming_acceptance_id, [...(groups.get(row.incoming_acceptance_id) ?? []), row])); return groups; }
-function validTab(value: string | null): WarehouseTab { return value === 'documents' || value === 'site' || value === 'materials' ? value : 'stock'; }
+function validTab(value: string | null): WarehouseTab { return value === 'documents' || value === 'site' || value === 'units' || value === 'materials' ? value : 'stock'; }
 function numeric(value: unknown) { return Number(value ?? 0); }
 function formatQuantity(value: unknown) { return numeric(value).toLocaleString('vi-VN', { maximumFractionDigits: 3 }); }
 function formatDate(value: unknown) { return dateText(String(value ?? '').slice(0, 10), '—'); }
@@ -452,9 +626,16 @@ function canEditStockDocument(row: StockDocument, hasPermission: (permission: st
   return Boolean(permission && hasPermission(permission));
 }
 function shortId(value?: string) { return value ? value.slice(0, 8) : '—'; }
+function formFactorLabel(value?: string) { return ({ segment: 'Đoạn', roll: 'Cuộn', bar: 'Cây', sheet: 'Tấm' } as Record<string, string>)[value ?? ''] ?? 'Đơn vị vật lý'; }
+function conditionLabel(value?: string) { return ({ usable: 'Dùng được', damaged: 'Hư hỏng', mixed: 'Lẫn tình trạng', unknown: 'Chưa rõ' } as Record<string, string>)[value ?? ''] ?? (value || '—'); }
+function locationTypeLabel(value?: string) { return ({ warehouse: 'Kho', project: 'Công trình', external: 'Đã trả bên ngoài', consumed: 'Đã sử dụng hết' } as Record<string, string>)[value ?? ''] ?? (value || '—'); }
+function stockUnitStatusLabel(value?: string) { return ({ available: 'Sẵn sàng tái xuất', issued: 'Tại công trình', consumed: 'Đã dùng hết', quarantined: 'Cách ly', external: 'Đã trả bên ngoài', cancelled: 'Đã hủy' } as Record<string, string>)[value ?? ''] ?? (value || '—'); }
+function stockUnitEventLabel(value: string) { return ({ initialize: 'Khởi tạo', receive: 'Nhập kho', split: 'Tách phần', issue: 'Xuất công trình', transfer: 'Điều chuyển kho', use: 'Sử dụng', waste: 'Hao hụt / hư hỏng', return_to_warehouse: 'Hoàn kho', return_to_subcontractor: 'Trả thầu phụ', reclassify: 'Phân loại lại', reverse: 'Đảo nghiệp vụ' } as Record<string, string>)[value] ?? value; }
+function stockUnitDimensions(row: Pick<MaterialStockUnit, 'length_mm' | 'width_mm' | 'thickness_mm'>) { const values = [row.length_mm ? `D ${formatQuantity(row.length_mm)}` : '', row.width_mm ? `R ${formatQuantity(row.width_mm)}` : '', row.thickness_mm ? `Dày ${formatQuantity(row.thickness_mm)}` : ''].filter(Boolean); return values.length ? `${values.join(' × ')} mm` : '—'; }
 async function invalidateWarehouseQueries(queryClient: QueryClient) { await Promise.all([
   queryClient.invalidateQueries({ queryKey: ['stock-positions'] }),
   queryClient.invalidateQueries({ queryKey: ['stock-documents'] }),
+	queryClient.invalidateQueries({ queryKey: ['material-stock-units'] }),
   queryClient.invalidateQueries({ queryKey: ['stock-document'] }),
   queryClient.invalidateQueries({ queryKey: ['material-balances'] }),
   queryClient.invalidateQueries({ queryKey: ['warehouse-receipt-options'] }),
