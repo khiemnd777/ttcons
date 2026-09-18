@@ -1,5 +1,10 @@
 # Commercial Procurement Domain Map
 
+## Accounting Proposal Source Boundary
+
+- `accounting_requests.go::accountingSourceTx` accepts ordered-or-later procurement with an active linked partner, main-client receivable milestones and subcontractor payable milestones from active/completed contracts. Supplier contract milestones are excluded to avoid presenting a second parallel source for purchased material. First searches: `accountingSourceTx|CreateAccountingBasis`.
+- Source amount/currency/identity is snapshotted into a separately confirmed proposal basis; procurement estimated amount is reference-only. New proposals never call `ContractMilestoneAction(open-obligation)` or mutate legacy AP/AR, contract/milestone state, acceptance, procurement or warehouse balances. Legacy contract obligations remain compatibility behavior.
+
 ## Required-Approval Work Item Gate Recovery
 
 - `procurement.require_approved` is a project-wide fail-closed gate: every non-cancelled request must be `approved|ordered|partially_received|received`. It does not infer one source from Work Item titles or change procurement state. Blocked inspection returns the exact ordered request records and routes the oldest blocker through the canonical Procurement deep link; the normal server capability still determines whether the opened `ProcurementDialog` offers approval or read-only guidance.

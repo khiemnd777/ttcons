@@ -1,5 +1,7 @@
 TRUNCATE TABLE
   audit_logs,
+  accounting_misa_reviews, accounting_misa_allocations, accounting_misa_records, accounting_misa_batches,
+  accounting_request_events, accounting_requests, accounting_request_bases,
   accounting_handoffs, project_cash_requests, project_material_costs,
   activity_mentions, activity_read_states,
   receipt_allocations, client_advance_receipts, receivable_payment_schedules,
@@ -91,6 +93,7 @@ SELECT gen_random_uuid(), key, name, module FROM (VALUES
 ('accounting.journal_view','Xem sổ kế toán','accounting'),('accounting.journal_post','Ghi sổ chứng từ kế toán','accounting'),('accounting.journal_reverse','Lập bút toán đảo','accounting'),('accounting.period_close','Khóa kỳ kế toán','accounting'),('accounting.period_reopen','Mở lại kỳ kế toán','accounting'),('accounting.tax_view','Xem sổ thuế','accounting'),('accounting.tax_manage','Quản lý thuế','accounting'),
 ('project_finance.view','Xem tài chính công trình','project_finance'),('project_finance.cost_create','Ghi nhận chi phí vật tư','project_finance'),('project_finance.cost_review','Xác nhận chi phí vật tư','project_finance'),('project_finance.request_create','Lập đề nghị thu/chi','project_finance'),('project_finance.request_approve','Duyệt đề nghị thu/chi','project_finance'),('project_finance.process','Xác nhận bàn giao kế toán','project_finance'),('project_finance.report_view','Xem báo cáo quản trị công trình','project_finance'),
 ('accounting_handoff.view','Xem bàn giao kế toán','accounting_handoff'),('accounting_handoff.submit','Bàn giao hồ sơ kế toán','accounting_handoff'),('accounting_handoff.acknowledge','Xác nhận hồ sơ kế toán','accounting_handoff'),
+('accounting_request.view','Xem đề nghị kế toán','accounting_handoff'),('accounting_request.submit','Lập đề nghị kế toán','accounting_handoff'),('accounting_request.review','Tiếp nhận đề nghị kế toán','accounting_handoff'),('accounting_misa.reconcile','Đối soát dữ liệu MISA','accounting_handoff'),
 ('contract.view','Xem hợp đồng','contract'),('contract.create','Tạo và sửa hợp đồng','contract'),('contract.review','Review hợp đồng','contract'),('contract.approve','Duyệt hợp đồng','contract'),('contract.sign','Ký và kích hoạt hợp đồng','contract'),('contract.milestone_manage','Quản lý milestone hợp đồng','contract'),('contract.retention_release','Giải phóng giữ lại','contract'),
 ('contract.dispatch','Gửi hồ sơ hợp đồng giấy','contract'),('contract.scan_manage','Quản lý bản scan hợp đồng','contract'),('contract.variation.propose','Đề xuất phát sinh thi công','contract'),('contract.variation_qs_review','QS rà soát phát sinh','contract'),('contract.variation_purchase','Mua hàng xử lý phát sinh','contract'),
 ('catalog.view','Xem dữ liệu lõi','catalog'),('catalog.manage','Quản lý dữ liệu lõi','catalog'),
@@ -145,6 +148,11 @@ JOIN permissions permission ON
     'accounting_handoff.view','accounting_handoff.submit'
   )) OR
   (role.name IN ('director','qs') AND permission.key='accounting_handoff.view')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions(role_id,permission_id)
+SELECT r.id,p.id FROM roles r JOIN permissions p ON p.key IN ('accounting_request.view','accounting_request.submit','accounting_request.review','accounting_misa.reconcile')
+WHERE r.name IN ('admin','developer','accounting') OR (r.name IN ('pm','procurement') AND p.key IN ('accounting_request.view','accounting_request.submit')) OR (r.name IN ('director','qs') AND p.key='accounting_request.view')
 ON CONFLICT DO NOTHING;
 
 DELETE FROM role_permissions role_permission

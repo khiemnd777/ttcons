@@ -1,5 +1,15 @@
 # Materials Warehouse Domain Map
 
+## Proposal Context From Existing Stock
+
+- V145 proposals may link exact posted `issue` document IDs from the same project. Save checks warehouse permission and identity; submit rechecks posted state. `AccountingOperationsWorkspace` lists these documents separately, without requiring a proposal to exist. Corrected/cancelled or cross-project issues are not eligible.
+- `accounting_requests.go` / `AccountingOperationsDialog.tsx` own the reference adapter, not stock or valuation. No implicit payable, cost, receipt or movement is created by linking existing stock. First searches: `stock_document_ids|referencesValid|AccountingOperationsWorkspace`. Warehouse canonical document viewer remains the destination; movement quantities and physical-unit invariants remain unchanged.
+
+## Accounting Receipt Trace
+
+- Read-only Accounting detail uses `accounting_handoff_detail.go::accountingHandoffStockReferences` to locate posted receipt documents through typed procurement/acceptance headers, exact acceptance-item lines or historical BOQ-linked receipt movements. EXISTS avoids duplicate documents when several lines resolve to the same receipt; both source and document are project-scoped. Warehouse permission is required independently of handoff visibility.
+- This projection never posts stock, values inventory or creates AP. No visible linked receipt means only that no authorized link was found. Canonical `/stock/documents/:id` and exact record navigation remain the source detail owners. Test owner: `accounting_handoff_detail_test.go`.
+
 ## Exact Record Source Navigation
 
 - Movement summary formats PostgreSQL numeric strings in Vietnamese: `800.000` displays as `800`, preserving fractional quantities with commas. Do not print SQL decimal strings as Vietnamese thousands or change stored quantities to repair display.

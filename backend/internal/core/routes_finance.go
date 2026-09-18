@@ -3,6 +3,17 @@ package core
 import "github.com/gofiber/fiber/v2"
 
 func registerFinanceRoutes(protected fiber.Router, h *Handler) {
+	protected.Get("/me/accounting-requests", h.AccountingRequestQueue)
+	protected.Get("/projects/:id/accounting-operations", h.AccountingOperationsWorkspace)
+	protected.Post("/projects/:id/accounting-bases", h.CreateAccountingBasis)
+	protected.Post("/projects/:id/accounting-requests", h.SaveAccountingRequest)
+	protected.Post("/projects/:id/accounting-requests/:request/:action", h.AccountingRequestAction)
+	protected.Post("/projects/:id/misa-imports/preview", h.PreviewAccountingMISA)
+	protected.Post("/projects/:id/misa-imports/:batch/confirm", h.ConfirmAccountingMISA)
+	protected.Get("/projects/:id/misa-imports/:batch/file", h.AccountingMISAFile)
+	protected.Post("/projects/:id/misa-allocations", h.AllocateAccountingMISA)
+	protected.Post("/projects/:id/misa-allocations/:allocation/revoke", h.RevokeAccountingAllocation)
+	protected.Post("/projects/:id/misa-reviews", h.ReviewAccountingMISA)
 	protected.Get("/projects/:id/budget", h.ProjectBudget)
 	protected.Post("/projects/:id/budget", h.CreateBudget)
 	protected.Post("/budgets/:id/approve", h.ApproveBudget)
@@ -84,5 +95,6 @@ func registerFinanceRoutes(protected fiber.Router, h *Handler) {
 	protected.Post("/project-finance/material-costs/:id/:action", h.ProjectMaterialCostAction)
 	protected.Post("/project-finance/cash-requests/:id/:action", h.ProjectCashRequestAction)
 	protected.Post("/projects/:id/accounting-handoffs", h.CreateAccountingHandoff)
+	protected.Get("/projects/:id/accounting-handoff-detail", h.AccountingHandoffDetail)
 	protected.Post("/accounting-handoffs/:id/:action", h.AccountingHandoffAction)
 }

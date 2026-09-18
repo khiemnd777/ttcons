@@ -1,5 +1,10 @@
 # Admin Governance Domain Map
 
+## Accounting Proposal And MISA Scope
+
+- V145 + `backend/seed/seed.sql` define `accounting_request.view|submit|review` and `accounting_misa.reconcile`: Accounting/Admin/Developer all four, PM/Procurement view+submit, Director/QS view. `repository_access.go` enumerates these specific permissions for actors already carrying the company reconciliation marker; it grants no unrelated mutation or Audit access.
+- New project endpoints validate explicit permission and non-cancelled project through `accountingAccess`. `/me/accounting-requests` filters project scope and then exact view plus review/submit capability. No synthetic task, role identity shortcut, auth/session change or original-file public URL. First searches: `accountingAccess|AccountingRequestQueue|projectReconciliationGlobalActionPermissions`.
+
 ## Project Permission Actor Presentation
 
 - `Repository.ProjectPermissionActors` is a read-only presentation helper for source workspaces that must name current eligible actors. It begins with active, non-deleted, non-external App accounts whose global or exact-project role grants the requested permission, then rechecks each result through the canonical `CanAccessProjectPermission` so Admin/Director and project-scope rules stay aligned. Returned role display labels explain the grant only; callers and frontend must never use the list to authorize a mutation.

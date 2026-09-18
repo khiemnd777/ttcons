@@ -1,5 +1,20 @@
 # Accounting Finance Domain Map
 
+## Installment Proposals And Imported MISA Results — V145
+
+- Owners: `accounting_requests.go`, `accounting_misa.go`, `accounting_operations_workspace.go`; FE `AccountingOperationsDialog`, `AccountingRequestQueue`, `accountingOperations.ts`. First searches: `AccountingRequestAction|accountingSourceTx|parseAccountingMISA|accountingFingerprintSQL`. MISA remains official; no legacy AP/AR/payment/journal/stock writes or handoff close-gate changes.
+- One immutable accountant-confirmed evidence-backed basis per procurement or main-client/subcontractor milestone fixes partner, direction, currency and cap. Procurement estimates are never the cap. Proposal draft/submitted/returned/acknowledged/cancelled transitions have revision guards, immutable events and atomic audit; acknowledgement is not payment approval or execution.
+- Gross minus recovery reserves capacity. Recovery references acknowledged same-basis advances with an aggregate cap. Retention release references acknowledged retained value with its own cap; held value is already reserved and is never counted twice. These are proposal figures, not proof of advance cash. Posted project stock issues are context only; no valuation.
+- Import supports the explicit Consflow CSV template, 2 MB/2000 rows, one project/entity per batch, exact active partner IDs, original file/digest/actor/time and replacement history. It is not arbitrary native MISA export parsing or API synchronization. Balance-at-date and cash transactions remain separate; missing data is not unpaid status.
+- Many-to-many allocations require acknowledged requests and matching active transaction project/partner/currency/direction, capped on both sides under project locking. Caller operation UUID prevents duplicate retries. Revocation requires reason and invalidates prior review fingerprint. Allocated observations cannot be replaced until allocation revocation. A partial review remains visibly short of coverage.
+- See backend/frontend maps for schema/routes/RBAC and tests. `accounting_operations_test.go` covers caps, lifecycle, concurrent allocation, dedup/replacement, many-to-many, balances, contract sources, stock scope, observer and stale evidence. Browser/UAT is separate.
+
+## Source Trace And MISA Boundary (approved 2026-09-17)
+
+- MISA is the authoritative source for debt balances and receipts/payments. Consflow manages source dossiers, proposed obligations and reconciliation. Source tracing step 1 introduces no MISA synchronization, installment allocation, stock valuation or financial totals.
+- `accounting_handoff_detail.go` supplies current procurement/milestone context separately from the existing last handoff snapshot. Related acceptance/stock/contract records follow typed persisted IDs and exact project/permission checks. Missing links do not prove that physical receipt or a business event did not happen. Files come from authorized source references; they are never presented as a historical attachment manifest.
+- Shared UI `AccountingHandoffDetailDialog` serves project register and MyWork inspector/mobile/specialized lane. It reuses canonical actions and invalidation, keeps MISA reference explicitly user-entered and preserves the existing close gate/one-source uniqueness. Existing legacy finance/AP/AR modules are unchanged. First searches: `AccountingHandoffDetail|accountingHandoffStockReferences|accounting-handoff-detail`.
+
 ## Exact Record Source Navigation
 
 - AP/AR topic previews and Debt detail now expose typed related-source links; `/debt/payables|receivables?record=&record_type=&project_id=` open the exact authorized obligation independently of queue filters. Legacy payment topics open a narrow read-only `/source-records/payment/:id` viewer using the existing authorized payment list and exact ID/project checks. Never point legacy payments at `/accounting` (ProjectFinancePage), or mount AccountingPage/mutation controls. Source-type/ID pairs and actual partner IDs are the only link inputs.

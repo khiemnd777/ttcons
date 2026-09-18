@@ -653,6 +653,7 @@ func projectOperationsScopeArgs(profile workItemAccessProfile) []any {
 }
 
 var projectReconciliationReadPermissions = map[string]bool{
+	"accounting_request.view":     true,
 	"project.reconciliation.view": true,
 	"project.view":                true,
 	"pipeline.view":               true,
@@ -675,6 +676,9 @@ var projectReconciliationReadPermissions = map[string]bool{
 }
 
 var projectReconciliationGlobalActionPermissions = map[string]bool{
+	"accounting_request.submit":      true,
+	"accounting_request.review":      true,
+	"accounting_misa.reconcile":      true,
 	"accounting_handoff.acknowledge": true,
 	"project_finance.cost_create":    true,
 	"project_finance.cost_review":    true,

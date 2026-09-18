@@ -50,6 +50,7 @@ import {
 } from '../work-items/workItemPresentation';
 import { ProjectStartupWizard } from '../projects/ProjectStartupWizard';
 import { AccountingWorkLane } from './AccountingWorkLane';
+import { AccountingRequestQueue } from '../project-finance/AccountingRequestQueue';
 import { Dialog } from '../../components/Dialog';
 import { AccountingWorkCard, AccountingWorkDetails } from './AccountingWorkCard';
 import { AccountingHandoffActionDialog } from '../project-finance/AccountingHandoffActionDialog';
@@ -589,6 +590,7 @@ export function MyWorkPage() {
         <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionTabCount} onClick={() => updateParams({ mode: 'attention' })} />
       </div>
 
+      {mode === 'work' && hasPermission('accounting_request.view') && <AccountingRequestQueue projectId={project}/>}
       {mode === 'work' ? (
         <section className="mt-4">
           <div className="grid gap-3 xl:grid-cols-[208px_minmax(0,1fr)_320px]">

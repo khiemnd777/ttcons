@@ -57,6 +57,14 @@ func (h *Handler) CreateAccountingHandoff(c *fiber.Ctx) error {
 	return response.Created(c, row)
 }
 
+func (h *Handler) AccountingHandoffDetail(c *fiber.Ctx) error {
+	data, err := h.service.AccountingHandoffDetail(c.Context(), c.Params("id"), c.Query("source_type"), c.Query("source_id"), actorID(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, data)
+}
+
 func (h *Handler) AccountingHandoffAction(c *fiber.Ctx) error {
 	action := c.Params("action")
 	permissions := map[string][]string{

@@ -1,5 +1,22 @@
 # Consflow Frontend UI And Utility Map
 
+## Accounting Proposals And MISA File Import
+
+- `project-finance/AccountingOperationsDialog.tsx` owns confirmed-basis, installment proposal, CSV preview/confirm, allocation/revoke and reconciliation forms. `AccountingOperationsButton` opens it from `AccountingHandoffPage` and `AccountingHandoffDetailDialog` (including MyWork inspector/mobile). `AccountingRequestQueue.tsx` renders `/me/accounting-requests` separately in `MyWorkPage` and `AccountingWorkLane`, preserving exact request/project identity and legacy counts. No synthetic WorkItems.
+- `accountingOperations.ts` owns contracts/statuses, `eligibleMISATransactions`, `reconciliationLabel`, `proposalMoneyInput`, CSV header. First searches: `AccountingOperationsDialog|AccountingRequestQueue|proposalMoneyInput`. SQL numeric padding is removed before editing CurrencyInput so VND never resubmits artificial fractions.
+- Standards: Dialog/mobileFullscreen/manageFocus; WorkspaceTabs; RecordSection/RecordLink (milestone links its actual contract ID); source-currency CurrencyInput; ToastProvider and inline fields. EvidenceReferenceViewer resolves exact saved evidence. ProtectedDocumentViewerDialog reads original imported CSV from the exact protected project/batch endpoint. Never fabricate evidence metadata for imports.
+- Additional files use ConstructionEvidenceCapture -> EvidenceUploader and uploadWorkItemEvidenceDrafts at parent save, with an explicitly selected same-project WorkItem and canonical upload authorization. Shared upload session receipts preserve retries after parent-save failure. Never auto-select the first WorkItem or write a module-specific uploader.
+- Actor/project query identity plus post-mount refetch hides stale actions. Mutations invalidate operations and proposal queue; request actions carry expected_revision, allocations a retry UUID. Import preview resets when entity/file changes; confirm consumes the retained server file. Source and stock navigation never posts movements or payments.
+- `accountingOperations.test.ts`: transaction matching, SQL money edit normalization, stale-data hiding, action IDs/revision, exact evidence/import-file viewers, standard uploader/currency render and entrypoint identity. Evidence inventory includes the new capture/reference adapter. Build and these tests do not establish browser/UAT acceptance.
+
+## Accounting Handoff Detail Entrypoints
+
+- Purpose: reconcile exact source records before using existing handoff/acknowledge/return actions. Shared owner `modules/project-finance/AccountingHandoffDetailDialog.tsx`; contract `lib/types/domain/projectFinance.ts`.
+- Entry inventory: project/global `AccountingHandoffPage` source cell; `AccountingWorkDetails` in MyWork desktop inspector and mobile dialog; `AccountingWorkLane::SourceCell` in desktop table and mobile cards. All open the same dialog with exact project/source type/source ID. Source records use `RecordLink`; existing canonical pages resolve exact IDs.
+- UI tabs `Đối chiếu nguồn` / `Thông tin đã bàn giao` reuse `WorkspaceTabs`, `Dialog`, `RecordDetailLayout`. Snapshot displays only stored source fields, never current files. Missing partner ID is explicit and no name matching occurs. Loading/error hide stale detail/actions; actor-scoped fresh query and shared `invalidateAccountingWork` cover success/conflict refresh.
+- Attachment entry inventory adds one `EvidenceReferenceViewer`, one `DocumentReferenceViewButton`, and an exact workflow-PDF adapter to `ProtectedDocumentViewerDialog` in Accounting detail. PDFs use `/workflow-form-pdf-exports/:id/file`; document IDs remain `/documents/:id/file`; no fabricated Evidence records. Photo/PDF/Word/Excel and error/retry remain shared viewer behavior.
+- Meaningful coverage: `accountingHandoffDetail.test.ts` (render + callback hook harness for all entrypoints, permissions/states, snapshot/current separation, source/file IDs, PDF revision path); `evidenceComponentReuse.test.ts` inventory and `evidenceLifecycle.test.ts` protected media lifecycle. Browser/UAT is a separate acceptance gate.
+
 ## Canonical Workflow Terminology Presentation
 
 - User-approved labels are Node -> `Giai đoạn`, Step -> `Gói công việc`, Work Item -> `Đầu việc`, and the final workflow stage -> `Bàn giao công trình và hồ sơ kế toán`. The durable scope and exclusions are in `docs/workflow-terminology-agreement.md`.

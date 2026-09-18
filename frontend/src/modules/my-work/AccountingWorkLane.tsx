@@ -12,6 +12,8 @@ import {
   AccountingHandoffActionDialog,
 } from '../project-finance/AccountingHandoffActionDialog';
 import { useAccountingWorkActions } from '../project-finance/accountingWorkActions';
+import { AccountingHandoffDetailDialog } from '../project-finance/AccountingHandoffDetailDialog';
+import { AccountingRequestQueue } from '../project-finance/AccountingRequestQueue';
 
 const statusTabs: Array<{
   value: AccountingWorkStatus;
@@ -115,6 +117,7 @@ export function AccountingWorkLane({
 
   return (
     <section className="mt-4 space-y-4" aria-label="Nghiệp vụ Kế toán cần xử lý">
+      <AccountingRequestQueue projectId={project}/>
       <div className="flex gap-2 overflow-x-auto" aria-label="Lọc trạng thái hồ sơ kế toán">
         {statusTabs.map((tab) => (
           <button
@@ -219,8 +222,10 @@ export function AccountingWorkLane({
 }
 
 function SourceCell({ item }: { item: AccountingWorkItem }) {
+  const [detailOpen, setDetailOpen] = useState(false);
   return <div className="min-w-0 break-words">
-    <Link className="font-semibold text-blue-700 hover:underline" to={item.source_route}>{item.source_code}</Link>
+    <button type="button" className="font-semibold text-blue-700 hover:underline" onClick={() => setDetailOpen(true)}>{item.source_code}</button>
+    {detailOpen ? <AccountingHandoffDetailDialog key={item.handoff_id} target={item} onClose={() => setDetailOpen(false)} /> : null}
     <p className="font-semibold text-ink">{item.source_title}</p>
     <p className="text-xs text-slate-500">{item.counterparty_name || 'Chưa xác định đối tác'}</p>
   </div>;

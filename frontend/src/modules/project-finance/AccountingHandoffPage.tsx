@@ -28,6 +28,8 @@ import {
   type AccountingHandoffDialog,
 } from './AccountingHandoffActionDialog';
 import { invalidateAccountingWork } from './accountingWorkActions';
+import { AccountingHandoffDetailDialog } from './AccountingHandoffDetailDialog';
+import { AccountingOperationsButton } from './AccountingOperationsDialog';
 
 type HandoffFilter = 'all' | 'needs_attention' | 'ready' | 'handed_off' | 'acknowledged' | 'returned';
 
@@ -48,6 +50,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
   const [draftProjectId, setDraftProjectId] = useState(requestedProjectId);
   const [filter, setFilter] = useState<HandoffFilter>('all');
   const [dialog, setDialog] = useState<AccountingHandoffDialog<AccountingHandoffItem>>(null);
+  const [detail, setDetail] = useState<AccountingHandoffItem | null>(null);
   const { hasAnyPermission } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -99,6 +102,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
     setSearchParams(params, { replace: true });
     setFilter('all');
     setDialog(null);
+    setDetail(null);
   }
 
   function resetProjectScope() {
@@ -109,6 +113,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
     setDraftProjectId('');
     setFilter('all');
     setDialog(null);
+    setDetail(null);
   }
 
   const columns: Column<AccountingHandoffItem>[] = [
@@ -116,7 +121,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
       key: 'source',
       header: 'Hồ sơ nguồn',
       filterValue: (row) => [row.source_code, row.source_title, row.counterparty_name],
-      render: (row) => <div><Link className="font-semibold text-blue-700 hover:underline" to={row.source_route}>{row.source_code}</Link><div className="font-semibold text-ink">{row.source_title}</div><div className="text-xs text-slate-500">{row.counterparty_name || 'Chưa xác định đối tác'}</div></div>,
+      render: (row) => <button type="button" className="text-left" onClick={() => setDetail(row)}><span className="font-semibold text-blue-700 hover:underline">{row.source_code}</span><div className="font-semibold text-ink">{row.source_title}</div><div className="text-xs text-slate-500">{row.counterparty_name || 'Chưa xác định đối tác'}</div></button>,
     },
     {
       key: 'direction',
@@ -153,6 +158,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
 
   return (
     <div className="space-y-5">
+      {detail ? <AccountingHandoffDetailDialog key={`${projectId}:${detail.source_id}`} target={{ project_id: projectId, source_type: detail.source_type, source_id: detail.source_id }} taskId={taskId} onClose={() => setDetail(null)} /> : null}
       <PageHeader
         title="Hồ sơ bàn giao kế toán"
         description="Theo dõi hồ sơ nghiệp vụ từ Mua sắm và Hợp đồng đến lúc Kế toán tiếp nhận. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA."
@@ -168,6 +174,7 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
       />
 
       {!projectId ? <EmptyState title="Chọn công trình để xem hồ sơ bàn giao kế toán." /> : <>
+        <AccountingOperationsButton key={projectId} projectId={projectId}/>
         <WorkspaceTabs
           tabs={filterLabels.map(({ countKey, ...tab }) => ({ ...tab, count: countKey ? data?.summary[countKey] ?? 0 : undefined }))}
           activeTab={filter}

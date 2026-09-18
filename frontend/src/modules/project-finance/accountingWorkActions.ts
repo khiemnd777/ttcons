@@ -7,7 +7,7 @@ import type { AccountingHandoffDialog } from './AccountingHandoffActionDialog';
 
 export async function invalidateAccountingWork(queryClient: QueryClient, projectId: string) {
   await Promise.all([
-    ...['my-accounting-work', 'my-work-items', 'my-work-scope-summary', 'my-work-navigation-summary', 'project-finance']
+    ...['my-accounting-work', 'my-work-items', 'my-work-scope-summary', 'my-work-navigation-summary', 'project-finance', 'accounting-handoff-detail']
       .map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
     queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] }),
   ]);

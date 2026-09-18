@@ -1,0 +1,128 @@
+package core
+
+import (
+	"context"
+	"fmt"
+)
+
+func (s *Service) AccountingOperationsWorkspace(ctx context.Context, project, actor string) (Record, error) {
+	if err := s.accountingAccess(ctx, project, actor, "accounting_request.view"); err != nil {
+		return nil, err
+	}
+	result := Record{}
+	projectRow, err := s.repo.QueryOne(ctx, `SELECT id,code,name FROM projects WHERE id=$1 AND status<>'cancelled'`, project)
+	if err != nil {
+		return nil, err
+	}
+	result["project"] = projectRow
+	queries := []struct{ key, sql string }{
+		{"bases", `SELECT b.*,p.name AS partner_name FROM accounting_request_bases b JOIN partners p ON p.id=b.partner_id WHERE project_id=$1 ORDER BY created_at DESC,id`},
+		{"requests", `SELECT r.*,b.currency,b.direction,b.partner_id,b.source_type,b.source_id,p.name AS partner_name,
+ COALESCE(a.allocated,0)::text AS allocated_amount,(r.amount-COALESCE(a.allocated,0))::text AS uncovered_amount,
+ md5(r.revision::text||':'||COALESCE(a.keys,'')) AS fingerprint,
+ COALESCE((SELECT fingerprint=md5(r.revision::text||':'||COALESCE(a.keys,'')) FROM accounting_misa_reviews WHERE request_id=r.id ORDER BY created_at DESC,id DESC LIMIT 1),false) AS reviewed
+ FROM accounting_requests r JOIN accounting_request_bases b ON b.id=r.basis_id JOIN partners p ON p.id=b.partner_id
+ LEFT JOIN LATERAL (SELECT SUM(amount) AS allocated,string_agg(id::text||':'||amount::text||':'||record_id::text,',' ORDER BY id) AS keys FROM accounting_misa_allocations WHERE request_id=r.id AND active) a ON true
+ WHERE r.project_id=$1 AND r.status<>'cancelled' ORDER BY r.created_at DESC,r.id`},
+		{"records", `SELECT m.*,p.name AS partner_name,b.filename,b.confirmed_at,
+ (m.amount-COALESCE((SELECT SUM(amount) FROM accounting_misa_allocations WHERE record_id=m.id AND active),0))::text AS available_amount
+ FROM accounting_misa_records m JOIN partners p ON p.id=m.partner_id JOIN accounting_misa_batches b ON b.id=m.batch_id WHERE m.project_id=$1 ORDER BY m.record_date DESC,m.id`},
+		{"batches", `SELECT id,entity_code,filename,digest,status,created_at,confirmed_at FROM accounting_misa_batches WHERE project_id=$1 ORDER BY created_at DESC,id`},
+		{"allocations", `SELECT a.*,m.external_id,m.line_key,m.record_date,m.currency FROM accounting_misa_allocations a JOIN accounting_misa_records m ON m.id=a.record_id WHERE a.project_id=$1 ORDER BY a.created_at DESC,a.id`},
+		{"events", `SELECT e.* FROM accounting_request_events e JOIN accounting_requests r ON r.id=e.request_id WHERE r.project_id=$1 AND r.status<>'cancelled' ORDER BY e.created_at DESC,e.id`},
+		{"reviews", `SELECT * FROM accounting_misa_reviews WHERE project_id=$1 ORDER BY created_at DESC,id`},
+	}
+	for _, q := range queries {
+		rows, err := s.repo.Query(ctx, q.sql, project)
+		if err != nil {
+			return nil, err
+		}
+		result[q.key] = rows
+	}
+	caps := Record{}
+	for _, p := range []string{"accounting_request.submit", "accounting_request.review", "accounting_misa.reconcile", "procurement.view", "contract.view", "warehouse.view"} {
+		ok, err := s.repo.CanAccessProjectPermission(ctx, actor, project, []string{p})
+		if err != nil {
+			return nil, err
+		}
+		caps[p] = ok
+	}
+	result["capabilities"] = caps
+	sources := []Record{}
+	if boolValue(caps["procurement.view"]) {
+		rows, err := s.repo.Query(ctx, `SELECT id,'procurement_request'::text AS source_type,request_code AS code,title,'VND'::text AS currency,supplier_partner_id AS partner_id FROM procurement_requests WHERE project_id=$1 AND status IN ('ordered','partially_received','received') AND supplier_partner_id IN (SELECT id FROM partners WHERE active) ORDER BY request_code`, project)
+		if err != nil {
+			return nil, err
+		}
+		sources = append(sources, rows...)
+	}
+	if boolValue(caps["contract.view"]) {
+		rows, err := s.repo.Query(ctx, `SELECT m.id,'contract_milestone'::text AS source_type,m.milestone_code AS code,m.milestone_name AS title,c.currency,c.counterparty_partner_id AS partner_id FROM contract_milestones m JOIN contracts c ON c.id=m.contract_id WHERE c.project_id=$1 AND c.status IN ('active','completed') AND m.status IN ('active','eligible','obligation_opened','paid') AND c.counterparty_partner_id IN (SELECT id FROM partners WHERE active) AND ((c.contract_type='main_client' AND c.direction='receivable') OR (c.contract_type='subcontractor' AND c.direction='payable')) ORDER BY c.contract_code,m.sequence_no`, project)
+		if err != nil {
+			return nil, err
+		}
+		sources = append(sources, rows...)
+	}
+	result["sources"] = sources
+	result["stock_documents"] = []Record{}
+	if boolValue(caps["warehouse.view"]) {
+		rows, err := s.repo.Query(ctx, `SELECT id,document_code,document_date,note FROM stock_documents WHERE project_id=$1 AND status='posted' AND movement_type='issue' ORDER BY document_date DESC,id`, project)
+		if err != nil {
+			return nil, err
+		}
+		result["stock_documents"] = rows
+	}
+	evidence, err := s.repo.Query(ctx, `SELECT id FROM evidence_records WHERE project_id=$1 AND status IN ('draft','submitted','accepted') ORDER BY created_at DESC,id`, project)
+	if err != nil {
+		return nil, err
+	}
+	files := []Record{}
+	for _, e := range evidence {
+		file, err := s.EvidenceDetail(ctx, cleanID(e["id"]), actor)
+		if err != nil && !handoffReferenceUnavailable(err) {
+			return nil, err
+		}
+		if err == nil {
+			files = append(files, Record{"id": e["id"], "name": file["name"], "work_item_id": file["work_item_id"]})
+		}
+	}
+	result["evidence"] = files
+	work, err := s.repo.Query(ctx, `SELECT id,title FROM work_items WHERE project_id=$1 AND status IN ('ready','in_progress','needs_changes') ORDER BY title,id`, project)
+	if err != nil {
+		return nil, err
+	}
+	uploadTargets := []Record{}
+	for _, w := range work {
+		allowed, accessErr := s.repo.CanActOnWorkItem(ctx, cleanID(w["id"]), actor)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		if allowed {
+			uploadTargets = append(uploadTargets, w)
+		}
+	}
+	result["upload_targets"] = uploadTargets
+	return result, nil
+}
+
+func (s *Service) AccountingRequestQueue(ctx context.Context, actor string) ([]Record, error) {
+	scope, args, err := s.repo.ProjectAccessFilter(ctx, actor, "p", 1)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.repo.Query(ctx, fmt.Sprintf(`SELECT r.id,r.project_id,r.title,r.status,r.due_date,p.code AS project_code,p.name AS project_name FROM accounting_requests r JOIN projects p ON p.id=r.project_id WHERE p.status<>'cancelled' AND r.status IN ('submitted','returned') AND %s ORDER BY r.due_date,r.id`, scope), args...)
+	if err != nil {
+		return nil, err
+	}
+	visible := []Record{}
+	for _, row := range rows {
+		permission := "accounting_request.review"
+		if row["status"] == "returned" {
+			permission = "accounting_request.submit"
+		}
+		if s.accountingAccess(ctx, cleanID(row["project_id"]), actor, "accounting_request.view") == nil && s.accountingAccess(ctx, cleanID(row["project_id"]), actor, permission) == nil {
+			visible = append(visible, row)
+		}
+	}
+	return visible, nil
+}

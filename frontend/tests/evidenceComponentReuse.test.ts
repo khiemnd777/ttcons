@@ -216,17 +216,20 @@ test('inventory locks capture, evidence references and the one legacy document e
     if (documents) documentCounts[path] = documents;
   }
   assert.deepEqual(captureCounts, {
+    'project-finance/AccountingOperationsDialog.tsx': 1,
     'acceptance/AcceptanceEditor.tsx': 1, 'operations/ConstructionActionDialogs.tsx': 2, 'operations/ConstructionCheckDialogs.tsx': 2,
     'operations/ConstructionReportEvidenceDialog.tsx': 1, 'operations/ConstructionReportFormDialog.tsx': 1, 'operations/ConstructionReportLinkedComposer.tsx': 1,
   });
   assert.deepEqual(referenceCounts, {
+    'project-finance/AccountingOperationsDialog.tsx': 1,
+    'project-finance/AccountingHandoffDetailDialog.tsx': 1,
     'acceptance/AcceptanceEditor.tsx': 1, 'acceptance/AcceptancePage.tsx': 1, 'handover/HandoverChecklistSourceDialog.tsx': 1,
     'operations/ConstructionActionDialogs.tsx': 3, 'operations/ConstructionCheckDialogs.tsx': 2,
     'work-items/IncomingAcceptancePanel.tsx': 1, 'work-items/MaterialSnapshotPanel.tsx': 2, 'work-items/OwnerClientReconciliationPanel.tsx': 1,
     'work-items/SubcontractorReconciliationPanel.tsx': 1, 'work-items/SurplusHandlingPanel.tsx': 1,
     'work-items/DesignReleasePanel.tsx': 1, 'work-items/DiscussionWorkUpdateCard.tsx': 3, 'work-items/WorkflowFormPanel.tsx': 1,
   });
-  assert.deepEqual(documentCounts, { 'work-items/DiscussionWorkUpdateCard.tsx': 1 });
+  assert.deepEqual(documentCounts, { 'work-items/DiscussionWorkUpdateCard.tsx': 1, 'project-finance/AccountingHandoffDetailDialog.tsx': 1 });
 });
 
 test('new design evidence uses the evidence viewer while historical snapshots retain the document adapter', async () => {

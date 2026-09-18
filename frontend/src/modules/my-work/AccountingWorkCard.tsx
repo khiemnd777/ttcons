@@ -1,4 +1,6 @@
 import clsx from 'clsx';
+import { useState } from 'react';
+import { AccountingHandoffDetailDialog } from '../project-finance/AccountingHandoffDetailDialog';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -28,7 +30,10 @@ export function AccountingWorkCard({ item, selected, onSelect, onAcknowledge }: 
 export function AccountingWorkDetails({ item, canAcknowledge, onAction }: {
   item: AccountingWorkItem; canAcknowledge: boolean; onAction: (action: 'acknowledge' | 'return') => void;
 }) {
+  const [detailOpen, setDetailOpen] = useState(false);
   return <div className="space-y-3 text-sm">
+    <button type="button" className="rounded border border-blue-200 px-3 py-2 font-semibold text-blue-700" onClick={() => setDetailOpen(true)}>Đối chiếu hồ sơ</button>
+    {detailOpen ? <AccountingHandoffDetailDialog key={item.handoff_id} target={item} onClose={() => setDetailOpen(false)} /> : null}
     <p className="text-xs font-semibold text-violet-700">Hồ sơ kế toán · {item.source_type === 'procurement_request' ? 'Yêu cầu mua' : 'Mốc hợp đồng'}</p>
     <h2 className="font-semibold text-ink">{item.source_code} · {item.source_title}</h2>
     <StatusBadge status={item.status} />
