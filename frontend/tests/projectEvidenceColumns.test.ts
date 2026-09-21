@@ -4,9 +4,9 @@ import test from 'node:test';
 
 const gallerySource = await readFile(new URL('../src/modules/work-items/EvidenceGallery.tsx', import.meta.url), 'utf8');
 
-test('project evidence list separates file, stage and work item columns', () => {
-  assert.match(gallerySource, /<span>Hồ sơ<\/span>\s*<span>Giai đoạn<\/span>\s*<span>Đầu việc<\/span>/);
-  assert.match(gallerySource, /<ProjectEvidenceTextCell label="Giai đoạn" value=\{record\.run_node_name\} \/>/);
+test('project evidence list separates file, source or stage, and work item columns', () => {
+  assert.match(gallerySource, /<span>Hồ sơ<\/span>\s*<span>Nguồn \/ Giai đoạn<\/span>\s*<span>Đầu việc<\/span>/);
+  assert.match(gallerySource, /<ProjectEvidenceTextCell label="Nguồn \/ Giai đoạn" value=\{record\.design_release_id \? `Thiết kế/);
   assert.match(gallerySource, /<ProjectEvidenceTextCell label="Đầu việc" value=\{record\.work_item_title\} \/>/);
   assert.match(gallerySource, /showWorkItem && listContext !== 'project'/);
 });
