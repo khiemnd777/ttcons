@@ -513,6 +513,19 @@ func decodeStockUnitAllocations(value any) ([]StockUnitAllocationRequest, error)
 	if value == nil {
 		return nil, nil
 	}
+	// PostgreSQL JSONB null is normalized by scanRows as the string "null".
+	// A draft aggregate-material surplus handling intentionally persists no
+	// physical-unit allocations, which is equivalent to an empty list.
+	switch value := value.(type) {
+	case string:
+		if strings.TrimSpace(value) == "null" {
+			return nil, nil
+		}
+	case []byte:
+		if strings.TrimSpace(string(value)) == "null" {
+			return nil, nil
+		}
+	}
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return nil, err

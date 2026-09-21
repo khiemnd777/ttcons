@@ -2988,7 +2988,7 @@ func TestAutoAdvancedWorkflowFormKeepsConfirmationAndPDFCapabilities(t *testing.
 	service := NewService(repo, "test-secret")
 	service.ConfigureUploads(t.TempDir(), 1024*1024)
 	fixture := setupWorkItemFlowFixture(t, db, false)
-	bindWorkItemDomainExecutionContext(t, db, fixture, "form", "test.auto_advance_form", "form", "")
+	bindWorkItemDomainExecutionContext(t, db, fixture, "form", "test.auto_advance_form", "workflow_form", "")
 
 	var runID, nodeID, stepID string
 	if err := db.QueryRowContext(ctx, `

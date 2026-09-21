@@ -306,16 +306,16 @@ func TestMaterialBeforeAfterSnapshotAppliesSiteBalanceWithoutStockMovement(t *te
 	if savedRecord["status"] != "draft" {
 		t.Fatalf("draft snapshot status = %#v, want draft", savedRecord["status"])
 	}
-	var used, surplus float64
+	var used, waste, surplus float64
 	if err := db.QueryRowContext(ctx, `
-		SELECT used_quantity::float8, surplus_quantity::float8
+		SELECT used_quantity::float8, waste_quantity::float8, surplus_quantity::float8
 		FROM site_material_balances
 		WHERE project_id=$1 AND material_id=$2
-	`, fixture.projectID, materialID).Scan(&used, &surplus); err != nil {
+	`, fixture.projectID, materialID).Scan(&used, &waste, &surplus); err != nil {
 		t.Fatal(err)
 	}
-	if used != 0 || surplus != 12 {
-		t.Fatalf("draft changed balance used=%.3f surplus=%.3f, want 0/12", used, surplus)
+	if used != 0 || waste != 0 || surplus != 12 {
+		t.Fatalf("draft changed balance used=%.3f waste=%.3f surplus=%.3f, want 0/0/12", used, waste, surplus)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 2, materialID)
 
@@ -329,14 +329,14 @@ func TestMaterialBeforeAfterSnapshotAppliesSiteBalanceWithoutStockMovement(t *te
 		t.Fatalf("submitted snapshot = %#v, want submitted/applied", submittedRecord)
 	}
 	if err := db.QueryRowContext(ctx, `
-		SELECT used_quantity::float8, surplus_quantity::float8
+		SELECT used_quantity::float8, waste_quantity::float8, surplus_quantity::float8
 		FROM site_material_balances
 		WHERE project_id=$1 AND material_id=$2
-	`, fixture.projectID, materialID).Scan(&used, &surplus); err != nil {
+	`, fixture.projectID, materialID).Scan(&used, &waste, &surplus); err != nil {
 		t.Fatal(err)
 	}
-	if used != 4 || surplus != 8 {
-		t.Fatalf("submitted balance used=%.3f surplus=%.3f, want 4/8", used, surplus)
+	if used != 4 || waste != 1 || surplus != 7 {
+		t.Fatalf("submitted balance used=%.3f waste=%.3f surplus=%.3f, want 4/1/7", used, waste, surplus)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE material_id=$1`, 2, materialID)
 	assertCount(t, db, `SELECT COUNT(*) FROM material_before_after_snapshot_items WHERE material_id=$1 AND used_quantity=4 AND before_evidence_id=$2 AND after_evidence_id=$3`, 1, materialID, beforeEvidence["id"], afterEvidence["id"])
