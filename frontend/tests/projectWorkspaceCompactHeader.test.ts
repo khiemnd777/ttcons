@@ -9,9 +9,9 @@ async function source(path: string) {
 test('shared PageHeader keeps the compact operational hierarchy used by project workspaces', async () => {
   const pageHeader = await source('components/PageHeader.tsx');
 
-  assert.match(pageHeader, /mb-3 flex flex-col gap-2 border-b border-line pb-2/);
+  assert.match(pageHeader, /mb-3 flex gap-2 border-b border-line pb-2[\s\S]*compactMobile \? 'flex-row items-center justify-between' : 'flex-col'/);
   assert.match(pageHeader, /max-w-full truncate text-lg font-semibold leading-6/);
-  assert.match(pageHeader, /line-clamp-2 min-w-0 text-xs/);
+  assert.match(pageHeader, /compactMobile \? 'hidden md:block' : 'line-clamp-2'[\s\S]*min-w-0 text-xs/);
   assert.match(pageHeader, /md:flex md:items-baseline md:gap-2/);
   assert.doesNotMatch(pageHeader, /density|text-2xl font-semibold tracking-normal text-ink/);
 });

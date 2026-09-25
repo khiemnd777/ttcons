@@ -14,6 +14,7 @@ export function WorkItemCard({
   selected = false,
   compact = false,
   showWorkflowPrefix = false,
+  showMobileActionLabel = false,
   displayStatus,
 }: {
   item: WorkItem;
@@ -22,6 +23,7 @@ export function WorkItemCard({
   selected?: boolean;
   compact?: boolean;
   showWorkflowPrefix?: boolean;
+  showMobileActionLabel?: boolean;
   displayStatus?: string;
 }) {
   const overdue = isWorkOverdue(item);
@@ -33,6 +35,7 @@ export function WorkItemCard({
   return (
     <article className={clsx(
       'group relative flex border-b border-line transition-colors last:border-b-0',
+      showMobileActionLabel && 'flex-col md:flex-row',
       selected ? 'bg-blue-50/70' : overdue ? 'bg-rose-50/40' : upcoming ? 'bg-amber-50/30' : 'bg-white hover:bg-slate-50',
     )}>
       {selected ? <span className="absolute inset-y-2 left-0 w-1 rounded-r bg-blue-600" aria-hidden="true" /> : null}
@@ -62,11 +65,12 @@ export function WorkItemCard({
       </button>
       <button
         type="button"
-        className="m-2 ml-0 inline-flex w-10 shrink-0 items-center justify-center self-stretch rounded-md text-blue-700 outline-none hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500"
+        className={clsx('m-2 ml-0 inline-flex w-10 shrink-0 items-center justify-center self-stretch rounded-md text-blue-700 outline-none hover:bg-blue-100 focus-visible:ring-2 focus-visible:ring-blue-500', showMobileActionLabel && 'mx-3 mb-3 min-h-11 w-auto border border-blue-200 px-3 text-sm font-semibold md:m-2 md:ml-0 md:w-10 md:border-0 md:px-0')}
         aria-label={openLabel}
         title={openLabel}
         onClick={onOpen}
       >
+        {showMobileActionLabel ? <span className="mr-2 md:hidden">{openLabel}</span> : null}
         <ArrowUpRight className="h-4 w-4" />
       </button>
     </article>

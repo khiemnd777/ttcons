@@ -112,7 +112,7 @@ test('My Work presents source-backed quick filters inside the selected work scop
   const quickFilters = page.slice(page.indexOf('function WorkQuickFilters('), page.indexOf('function ModeTab('));
 
   assert.match(workMode, /<ScopeRail[\s\S]*<WorkQuickFilters[\s\S]*<FilterBar/);
-  assert.doesNotMatch(page.slice(page.indexOf('<PageHeader'), page.indexOf('<div className="mt-4 flex')), /<WorkQuickFilters/);
+  assert.doesNotMatch(page.slice(page.indexOf('<PageHeader'), page.indexOf('<div className="mt-2 grid grid-cols-2')), /<WorkQuickFilters/);
   assert.match(quickFilters, /aria-label="Bộ lọc nhanh công việc"/);
   assert.match(quickFilters, /Bộ lọc nhanh · \{scopeLabel\}/);
   assert.match(quickFilters, /onClick=\{\(\) => onSelect\('all'\)\}/);
@@ -122,6 +122,25 @@ test('My Work presents source-backed quick filters inside the selected work scop
   assert.match(quickFilters, /bucket: 'upcoming', label: 'Sắp tới · chỉ xem'/);
   assert.match(quickFilters, /bucket: 'completed', label: 'Hoàn tất', value: summary\.completed/);
   assert.doesNotMatch(quickFilters, /waiting_decision|waiting_supplement|Chờ tôi duyệt|Chờ bổ sung|Đã xử lý/);
+});
+
+test('My Work mobile controls keep actions visible without stacked horizontal rails', async () => {
+  const [page, card, accountingQueue] = await Promise.all([
+    myWorkPageSource(),
+    source('../src/modules/work-items/WorkItemCard.tsx'),
+    source('../src/modules/project-finance/AccountingRequestQueue.tsx'),
+  ]);
+
+  assert.match(page, /mt-2 grid grid-cols-2 gap-1\.5 md:mt-4 md:flex/);
+  assert.match(page, /grid grid-cols-2 gap-1\.5 min-\[360px\]:grid-cols-3 md:hidden/);
+  assert.match(page, /<Dialog open=\{mobileOpen\} title="Phạm vi công việc"/);
+  assert.match(page, /<Dialog open=\{open\} title="Lọc công việc"[\s\S]*mobileFullscreen manageFocus/);
+  assert.match(page, /onApply=\{\(values\) => updateParams\(\{ project: values\.project[\s\S]*bucket: 'all' \}\)\}/);
+  assert.match(page, /window\.matchMedia\('\(max-width: 767px\)'\)\.matches\) onOpen\(entry\.item\)/);
+  assert.match(page, /md:max-h-\[720px\] md:overflow-y-auto/);
+  assert.match(card, /showMobileActionLabel[\s\S]*<span className="mr-2 md:hidden">\{openLabel\}<\/span>/);
+  assert.match(accountingQueue, /requests\.length === 0\) return null/);
+  assert.match(accountingQueue, /query\.isError && requests\.length === 0[\s\S]*Thử lại/);
 });
 
 test('My Work routes the removed accounting-specific quick bucket to the dedicated Accounting lane', async () => {

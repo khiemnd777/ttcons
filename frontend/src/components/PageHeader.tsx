@@ -5,11 +5,13 @@ export function PageHeader({
   description,
   actions,
   horizontalFrom = 'md',
+  compactMobile = false,
 }: {
   title: string;
   description?: string;
   actions?: ReactNode;
   horizontalFrom?: 'md' | 'xl' | '2xl';
+  compactMobile?: boolean;
 }) {
   const responsiveLayout = {
     md: 'md:flex-row md:items-center md:justify-between',
@@ -18,7 +20,7 @@ export function PageHeader({
   }[horizontalFrom];
 
   return (
-    <div className={`mb-3 flex flex-col gap-2 border-b border-line pb-2 ${responsiveLayout}`}>
+    <div className={`mb-3 flex gap-2 border-b border-line pb-2 ${compactMobile ? 'flex-row items-center justify-between' : 'flex-col'} ${responsiveLayout}`}>
       <div className="min-w-0 flex-1 md:flex md:items-baseline md:gap-2">
         <h1
           className="max-w-full truncate text-lg font-semibold leading-6 tracking-normal text-ink md:max-w-[42%] md:shrink-0"
@@ -30,7 +32,7 @@ export function PageHeader({
           <>
             <span className="hidden text-xs text-slate-300 md:inline" aria-hidden="true">·</span>
             <p
-              className="line-clamp-2 min-w-0 text-xs leading-[18px] text-slate-500 md:block md:truncate"
+              className={`${compactMobile ? 'hidden md:block' : 'line-clamp-2'} min-w-0 text-xs leading-[18px] text-slate-500 md:truncate`}
               title={description}
             >
               {description}

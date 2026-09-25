@@ -1,5 +1,10 @@
 # Current States
 
+## Bàn làm việc mobile — duyệt triển khai 2026-09-24
+
+- Will be done: obtain explicit browser/UAT authorization in a later turn to verify actual 320/360/440px rendering, safe-area/keyboard behavior, launcher position, long labels, loading/error states and tap targets on the current build. Keep this plan active until that UX gate is accepted or the user closes it.
+- Done: reviewed the 440px screenshot and current owners at clean base revision `4bbd582`; user approved the review package and shared-shell launcher change. Implemented the compact mobile mode grid, scope/dialog, six quick-filter grid, search/filter dialog with applied chips, labelled canonical Work Item opener and page-level mobile result scroll. Empty Accounting request queues collapse after successful load; load/error/retry remain visible. The standard-shell mobile Utility launcher portals into the header, retaining Dock state; focus routes retain the fixed fallback. Updated the central/frontend/root-cause maps and focused source contracts. On the resulting working tree, `npm run build`, all 495 frontend tests, `npm run check:bundle-budget`, and `git diff --check` passed. No browser/UAT was run; affected UI remains `NOT UX ACCEPTED`.
+
 ## CI release unblock — `v2026-09-21.1`
 
 - Will be done: no further release action; keep this record open until the user asks to close the plan.

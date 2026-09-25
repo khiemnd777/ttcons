@@ -14,7 +14,10 @@ test('global Utility Dock persists across standard and focus AppShell branches',
 
   assert.match(shell, /import \{ UtilityDock \} from '\.\.\/modules\/utilities\/UtilityDock'/);
   assert.ok((shell.match(/<UtilityDock key="global-utility-dock" \/>/g) ?? []).length === 2, 'standard and focus shells must share one keyed utility identity');
-  assert.match(shell, /const UTILITY_DOCK_CONTENT_CLEARANCE_CLASS = 'pb-\[calc\(8rem\+env\(safe-area-inset-bottom\)\)\] sm:pb-16';/);
+  assert.match(shell, /const UTILITY_DOCK_CONTENT_CLEARANCE_CLASS = 'pb-\[calc\(1\.5rem\+env\(safe-area-inset-bottom\)\)\] sm:pb-16';/);
+  assert.match(shell, /id="utility-dock-mobile-launcher" className="sm:hidden"/);
+  assert.match(dock, /createPortal\(mobileLauncher, mobileLauncherHost\)/);
+  assert.match(dock, /!standardShell \? <div className="pointer-events-auto flex items-center gap-2 sm:hidden">\{mobileLauncher\}<\/div>/);
   assert.match(shell, /if \(location\.pathname\.startsWith\('\/pipeline-builder'\) \|\| projectFocusMode\) \{[\s\S]*?<div className="min-h-screen bg-surface">[\s\S]*?<Outlet \/>[\s\S]*?<UtilityDock key="global-utility-dock" \/>/);
   assert.doesNotMatch(shell, /projectFocusMode && UTILITY_DOCK_CONTENT_CLEARANCE_CLASS/);
   assert.match(shell, /<main className=\{clsx\('flex-1 px-4 pt-5 md:px-6', UTILITY_DOCK_CONTENT_CLEARANCE_CLASS\)}>\n\s*<Outlet \/>/);

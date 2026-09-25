@@ -15,7 +15,14 @@ export function AccountingRequestQueue({ projectId = '' }: {
             project_code: string;
             status: string;
         }[]>('/me/accounting-requests'), enabled, staleTime: 0, refetchOnMount: 'always' });
-    if (!enabled)
-        return null;
-    return <section className="space-y-2 rounded border border-line p-3"><h3 className="font-semibold">Đề nghị theo đợt cần xử lý</h3>{query.isError ? <p role="alert">Không tải được đề nghị. <button onClick={() => void query.refetch()}>Thử lại</button></p> : query.isFetching ? <p>Đang tải…</p> : <>{!query.data?.length && <p className="text-sm">Chưa có đề nghị cần xử lý.</p>}{query.data?.filter(r => !projectId || r.project_id === projectId).map(r => <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t py-2 text-sm"><span>{r.project_code} · {r.title} · {requestStatuses[r.status]}</span><AccountingOperationsButton projectId={r.project_id} requestId={r.id}/></div>)}</>}</section>;
+    if (!enabled) return null;
+    const requests = query.data?.filter((request) => !projectId || request.project_id === projectId) ?? [];
+    if (!query.isPending && !query.isError && requests.length === 0) return null;
+    return <section className="mb-3 space-y-2 rounded-lg border border-line bg-white p-3" aria-label="Đề nghị theo đợt cần xử lý">
+        <h3 className="text-sm font-semibold">Đề nghị theo đợt cần xử lý</h3>
+        {query.isError && requests.length === 0 ? <p role="alert" className="text-sm">Không tải được đề nghị. <button className="font-semibold text-blue-700 underline" onClick={() => void query.refetch()}>Thử lại</button></p> : null}
+        {query.isPending ? <p className="text-sm text-slate-500">Đang tải…</p> : null}
+        {requests.map((request) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-sm"><span className="min-w-0 flex-1">{request.project_code} · {request.title} · {requestStatuses[request.status]}</span><AccountingOperationsButton projectId={request.project_id} requestId={request.id}/></div>)}
+        {query.isError && requests.length > 0 ? <p role="alert" className="text-xs text-amber-700">Chưa cập nhật được đề nghị mới. <button className="font-semibold underline" onClick={() => void query.refetch()}>Thử lại</button></p> : null}
+    </section>;
 }

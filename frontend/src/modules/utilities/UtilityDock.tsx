@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import {
   AlertCircle,
   ArrowRight,
@@ -99,8 +100,14 @@ export function UtilityDock() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
   const [projectToReveal, setProjectToReveal] = useState('');
+  const [mobileLauncherHost, setMobileLauncherHost] = useState<HTMLElement | null>(null);
   const projectStripRef = useRef<HTMLDivElement>(null);
   const routeProjectID = /^\/projects\/([^/]+)/.exec(location.pathname)?.[1] ?? '';
+  const standardShell = !location.pathname.startsWith('/pipeline-builder') && !routeProjectID;
+
+  useEffect(() => {
+    setMobileLauncherHost(document.getElementById('utility-dock-mobile-launcher'));
+  }, [location.pathname]);
 
   const workSummary = useQuery({
     queryKey: ['my-work-navigation-summary', actorID],
@@ -260,6 +267,29 @@ export function UtilityDock() {
   };
   const workExpanded = expandedDockKeys.includes('work');
   const compactUtilityLaunchers = openProjectIDs.length >= 4;
+  const mobileLauncher = (
+    <button
+      type="button"
+      className={clsx('pointer-events-auto sm:hidden', mobileLauncherHost
+        ? 'relative grid h-10 w-10 place-items-center rounded-md border border-line bg-white text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
+        : 'inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-lg hover:border-blue-200 hover:text-blue-700')}
+      onClick={() => {
+        if (pickerOpen || mobilePanel) {
+          setPickerOpen(false);
+          setMobilePanel(null);
+          return;
+        }
+        if (discussionCount > 0) showMobileDiscussion();
+        else setMobilePanel('work');
+      }}
+      aria-label={`Mở tiện ích, ${workCount} việc làm ngay, ${discussionCount} tin mới`}
+      aria-expanded={Boolean(pickerOpen || mobilePanel)}
+    >
+      <Sparkles className="h-4 w-4 text-blue-600" />
+      {mobileLauncherHost ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-center text-[10px] font-bold leading-4 text-white">{compactCount(workCount + discussionCount)}</span>
+        : <>Tiện ích <CountBadge value={workCount + discussionCount} /></>}
+    </button>
+  );
 
   return (
     <div className="pointer-events-none fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[35] flex flex-col items-end gap-2 sm:bottom-4">
@@ -441,25 +471,8 @@ export function UtilityDock() {
         />
       ) : null}
 
-      <div className="pointer-events-auto flex items-center gap-2 sm:hidden">
-        <button
-          type="button"
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-lg hover:border-blue-200 hover:text-blue-700"
-          onClick={() => {
-            if (pickerOpen || mobilePanel) {
-              setPickerOpen(false);
-              setMobilePanel(null);
-              return;
-            }
-            if (discussionCount > 0) showMobileDiscussion();
-            else setMobilePanel('work');
-          }}
-          aria-label={`Mở tiện ích, ${workCount} việc làm ngay, ${discussionCount} tin mới`}
-        >
-          <Sparkles className="h-4 w-4 text-blue-600" /> Tiện ích
-          <CountBadge value={workCount + discussionCount} />
-        </button>
-      </div>
+      {mobileLauncherHost ? createPortal(mobileLauncher, mobileLauncherHost)
+        : !standardShell ? <div className="pointer-events-auto flex items-center gap-2 sm:hidden">{mobileLauncher}</div> : null}
     </div>
   );
 }

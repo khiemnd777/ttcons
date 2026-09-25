@@ -190,7 +190,7 @@ export function MyWorkPage() {
   const [startupDialogProjectID, setStartupDialogProjectID] = useState<string | null>(() => requestedSetup || null);
   const [autoApprovalLane, setAutoApprovalLane] = useState<ApprovalLaneKey | null>(null);
   const [searchDraft, setSearchDraft] = useState(searchParams.get('search') ?? '');
-	const streamStatus = useActorRealtimeStatus();
+  const streamStatus = useActorRealtimeStatus();
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [accountingDetailsOpen, setAccountingDetailsOpen] = useState(false);
   const accountingActions = useAccountingWorkActions();
@@ -521,6 +521,12 @@ export function MyWorkPage() {
     updateParams({ queue: 'responsible', bucket: 'need_action', project: null, status: null, deadline: null, type: null, entry_kind: null, priority: null, search: null, sort: 'priority' });
   }
 
+  function changeWorkFilter(key: string, value: string) {
+    updateParams(key === 'entry_kind'
+      ? { entry_kind: value || null, status: null, deadline: null, type: null, priority: null, bucket: 'all' }
+      : { [key]: value || null, bucket: 'all' });
+  }
+
   function selectBucket(nextBucket: WorkQuickBucket) {
     updateParams({
       mode: 'work',
@@ -572,22 +578,23 @@ export function MyWorkPage() {
       <PageHeader
         title="Bàn làm việc"
         description={`${user?.full_name ?? 'Người dùng'}${roleSummary ? ` · ${roleSummary}` : ''} · Mở thẳng đúng sổ nghiệp vụ cần xử lý`}
+        compactMobile
         actions={(
           <div className="flex items-center gap-2">
             <LiveStatusBadge status={streamStatus} />
-            <button className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={refreshAll}>
+            <button className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 md:px-3" onClick={refreshAll} aria-label="Làm mới Bàn làm việc">
             <RefreshCw className={clsx('h-4 w-4', (workItems.isFetching || scopeSummary.isFetching || workflowActions.isFetching || startupActions.isFetching || activityAttentionSummary.isFetching || pendingNodeApprovals.isFetching || (canViewAccountingWork && accountingWork.isFetching) || (canReviewWorkReports && reportReviewSummary.isFetching) || (mode === 'approval' && canReviewWorkReports && reportReviewList.isFetching) || (mode === 'attention' && activityAttention.isFetching)) && 'animate-spin')} />
-              Làm mới
+              <span className="hidden md:inline">Làm mới</span>
             </button>
           </div>
         )}
       />
 
-      <div className="mt-4 flex gap-1 overflow-x-auto border-b border-line">
+      <div className="mt-2 grid grid-cols-2 gap-1.5 md:mt-4 md:flex md:gap-1 md:overflow-x-auto md:border-b md:border-line" role="group" aria-label="Chế độ Bàn làm việc">
         <ModeTab active={mode === 'work'} label="Công việc" count={workTabCount} onClick={() => updateParams({ mode: 'work', queue, bucket })} />
         <ModeTab active={mode === 'approval'} label="Chờ tôi duyệt" count={approvalTabCount} onClick={() => updateParams({ mode: 'approval', queue, bucket })} />
         {canViewAccountingWork ? <ModeTab active={mode === 'accounting'} label="Nghiệp vụ Kế toán" count={accountingTabCount} onClick={() => updateParams({ mode: 'accounting' })} /> : null}
-        <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionTabCount} onClick={() => updateParams({ mode: 'attention' })} />
+        <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionTabCount} wideMobile={!canViewAccountingWork} onClick={() => updateParams({ mode: 'attention' })} />
       </div>
 
       {mode === 'work' && hasPermission('accounting_request.view') && <AccountingRequestQueue projectId={project}/>}
@@ -627,11 +634,26 @@ export function MyWorkPage() {
                 advancedOpen={advancedFiltersOpen}
                 onSearchDraft={setSearchDraft}
                 onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: 'all' })}
-                onChange={(key, value) => updateParams(key === 'entry_kind'
-                  ? { entry_kind: value || null, status: null, deadline: null, type: null, priority: null, bucket: 'all' }
-                  : { [key]: value || null, bucket: 'all' })}
+                onChange={changeWorkFilter}
                 onReset={resetFilters}
                 onToggleAdvanced={() => setAdvancedFiltersOpen((open) => !open)}
+              />
+
+              <MobileFilterBar
+                searchDraft={searchDraft}
+                project={project}
+                status={status}
+                deadline={deadline}
+                workType={workType}
+                priority={priority}
+                sort={sort}
+                entryKind={entryKind}
+                facets={facets}
+                accounting={canViewAccountingWork}
+                onSearchDraft={setSearchDraft}
+                onSearch={() => updateParams({ search: searchDraft.trim() || null, bucket: 'all' })}
+                onChange={changeWorkFilter}
+                onApply={(values) => updateParams({ project: values.project || null, status: values.status || null, deadline: values.deadline || null, type: values.workType || null, priority: values.priority || null, sort: values.sort, entry_kind: values.entryKind || null, bucket: 'all' })}
               />
 
               <div className="mt-3">
@@ -962,8 +984,8 @@ function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable,
   ];
   const allActive = selected === 'all';
   return (
-    <section className="mb-3 rounded-lg border border-line bg-white p-3" aria-label="Bộ lọc nhanh công việc" aria-busy={loading}>
-      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <section className="mb-3 rounded-lg border border-line bg-white p-2 md:p-3" aria-label="Bộ lọc nhanh công việc" aria-busy={loading}>
+      <div className="mb-2 hidden flex-col gap-2 md:flex md:flex-row md:items-center md:justify-between">
         <h2 className="text-sm font-semibold text-ink">Bộ lọc nhanh · {scopeLabel}</h2>
         <button
           type="button"
@@ -978,7 +1000,15 @@ function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable,
           <span className="text-base font-semibold">{loading ? '…' : unavailable ? '—' : summary.total}</span>
         </button>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="grid grid-cols-2 gap-1.5 min-[360px]:grid-cols-3 md:hidden">
+        <button type="button" aria-pressed={allActive} className={clsx('flex min-h-11 min-w-0 items-center justify-between gap-1 rounded-md border px-2 text-left text-xs font-semibold', allActive ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-700')} onClick={() => onSelect('all')}>
+          <span>Tất cả</span><span className="tabular-nums">{loading ? '…' : unavailable ? '—' : summary.total}</span>
+        </button>
+        {cards.map((card) => <button key={card.bucket} type="button" aria-pressed={selected === card.bucket} aria-label={card.label} className={clsx('flex min-h-11 min-w-0 items-center justify-between gap-1 rounded-md border px-2 text-left text-xs font-semibold', selected === card.bucket ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-line bg-white text-slate-700')} onClick={() => onSelect(card.bucket)}>
+          <span className="min-w-0">{card.bucket === 'upcoming' ? 'Sắp tới' : card.label}</span><span className="shrink-0 tabular-nums">{loading ? '…' : unavailable ? '—' : card.value}</span>
+        </button>)}
+      </div>
+      <div className="hidden gap-2 overflow-x-auto pb-1 md:flex">
         {cards.map((card) => {
           const Icon = card.icon;
           const active = selected === card.bucket;
@@ -1003,10 +1033,10 @@ function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable,
   );
 }
 
-function ModeTab({ active, label, count, onClick }: { active: boolean; label: string; count: number | string; onClick: () => void }) {
+function ModeTab({ active, label, count, wideMobile = false, onClick }: { active: boolean; label: string; count: number | string; wideMobile?: boolean; onClick: () => void }) {
   return (
-    <button className={clsx('border-b-2 px-4 py-3 text-sm font-semibold', active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800')} onClick={onClick}>
-      {label} <span className="ml-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{count}</span>
+    <button type="button" aria-pressed={active} className={clsx('flex min-h-11 min-w-0 items-center justify-between gap-1 rounded-md border px-2 py-1.5 text-left text-xs font-semibold md:block md:rounded-none md:border-0 md:border-b-2 md:px-4 md:py-3 md:text-sm', wideMobile && 'col-span-2 md:col-auto', active ? 'border-blue-300 bg-blue-50 text-blue-700 md:border-blue-600 md:bg-transparent' : 'border-line bg-white text-slate-600 hover:text-slate-800 md:border-transparent')} onClick={onClick}>
+      <span className="min-w-0 leading-4">{label}</span> <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 md:ml-1 md:px-2">{count}</span>
     </button>
   );
 }
@@ -1033,18 +1063,32 @@ function ScopeRail({ value, counts, loading, onChange, unavailable = false }: {
   loading: boolean;
   onChange: (value: WorkScopeKey) => void;
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const countValue = (scope: WorkScopeKey) => counts?.[scope]?.total ?? 0;
+  const selectedLabel = scopes.find((item) => item.key === value)?.label ?? 'Tôi phụ trách';
   return (
-    <aside className="min-w-0 rounded-lg border border-line bg-white p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc" aria-busy={loading}>
+    <aside className="min-w-0 rounded-lg border border-line bg-white p-2 md:p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc" aria-busy={loading}>
       {unavailable ? <p className="mb-2 text-xs text-amber-700">Số lượng chưa khả dụng. Bấm Làm mới để thử lại.</p> : null}
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="flex min-h-11 items-center justify-between gap-2 md:hidden">
+        <span className="text-xs font-semibold text-slate-500">Phạm vi</span>
+        <span className="min-w-0 truncate text-sm font-semibold text-ink">{selectedLabel}{!loading && !unavailable && countValue(value) > 0 ? ` · ${countValue(value)}` : ''}</span>
+        <button type="button" className="shrink-0 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700" onClick={() => setMobileOpen(true)}>Đổi</button>
+      </div>
+      <Dialog open={mobileOpen} title="Phạm vi công việc" size="sm" mobileFullscreen manageFocus onClose={() => setMobileOpen(false)}>
+        <div className="grid gap-2">
+          {scopes.map((item) => <button key={item.key} type="button" aria-pressed={item.key === value} className={clsx('flex min-h-11 items-center justify-between rounded-md border px-3 text-left text-sm font-semibold', item.key === value ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-line text-slate-700')} onClick={() => { onChange(item.key); setMobileOpen(false); }}>
+            <span>{item.label}</span><ScopeCountChip count={countValue(item.key)} active={item.key === value} />
+          </button>)}
+        </div>
+      </Dialog>
+      <div className="mb-2 hidden items-center justify-between gap-3 md:flex">
         <h2 className="text-sm font-semibold text-ink">Phạm vi</h2>
         <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-blue-700 xl:hidden">
           {scopes.find((item) => item.key === value)?.label}
           <ScopeCountChip count={countValue(value)} active />
         </span>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0">
+      <div className="hidden gap-2 overflow-x-auto pb-1 md:flex xl:flex-col xl:overflow-visible xl:pb-0">
         {scopes.map((item) => {
           const active = item.key === value;
           return (
@@ -1086,7 +1130,7 @@ function FilterBar({ searchDraft, project, status, deadline, workType, priority,
   const workTypes = normalizeFacetOptions(facets.work_types, 'Loại việc');
   const priorities = normalizeFacetOptions(facets.priorities, 'Ưu tiên');
   return (
-    <div className="my-work-filters relative z-10 space-y-4 rounded-lg border border-line bg-white p-4 text-sm">
+    <div className="my-work-filters relative z-10 hidden space-y-4 rounded-lg border border-line bg-white p-4 text-sm md:block">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-700" /><h2 className="text-sm font-semibold text-ink">Tìm công việc</h2></div>
         {hasFilters ? <button type="button" className="focus-ring inline-flex items-center gap-1 rounded text-xs font-semibold text-slate-600 hover:text-blue-700" onClick={onReset}>Về mặc định<X className="h-3.5 w-3.5" /></button> : null}
@@ -1136,6 +1180,81 @@ function FilterBar({ searchDraft, project, status, deadline, workType, priority,
   );
 }
 
+type MobileFilterValues = {
+  project: string;
+  status: string;
+  deadline: string;
+  workType: string;
+  priority: string;
+  sort: string;
+  entryKind: WorkQueueKind;
+};
+
+function MobileFilterBar({ searchDraft, project, status, deadline, workType, priority, sort, entryKind, facets, accounting, onSearchDraft, onSearch, onChange, onApply }: MobileFilterValues & {
+  searchDraft: string;
+  facets: MyWorkFacets;
+  accounting: boolean;
+  onSearchDraft: (value: string) => void;
+  onSearch: () => void;
+  onChange: (key: string, value: string) => void;
+  onApply: (values: MobileFilterValues) => void;
+}) {
+  const searchId = useId();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<MobileFilterValues>({ project, status, deadline, workType, priority, sort, entryKind });
+  const projects = normalizeFacetOptions(facets.projects, 'Công trình');
+  const statuses = normalizeFacetOptions(facets.statuses, 'Trạng thái');
+  const workTypes = normalizeFacetOptions(facets.work_types, 'Loại việc');
+  const priorities = normalizeFacetOptions(facets.priorities, 'Ưu tiên');
+  const applied = [
+    project && { key: 'project', label: `Công trình: ${projects.find((item) => item.value === project)?.label ?? 'Đã chọn'}` },
+    entryKind && { key: 'entry_kind', label: entryKind === 'accounting_handoff' ? 'Hồ sơ kế toán' : 'Công việc quy trình' },
+    status && { key: 'status', label: `Trạng thái: ${statusLabel(status)}` },
+    deadline && { key: 'deadline', label: `Hạn việc: ${deadlineOptions.find((item) => item.value === deadline)?.label ?? deadline}` },
+    workType && { key: 'type', label: `Loại việc: ${workTypeLabel(workType)}` },
+    priority && { key: 'priority', label: `Ưu tiên: ${priorityLabel(priority)}` },
+    sort !== 'priority' && { key: 'sort', label: `Sắp xếp: ${sortOptions.find((item) => item.value === sort)?.label ?? sort}` },
+  ].filter((item): item is { key: string; label: string } => Boolean(item));
+  const setField = (key: keyof MobileFilterValues, value: string) => setDraft((current) => ({
+    ...current,
+    [key]: value,
+    ...(key === 'entryKind' ? { status: '', deadline: '', workType: '', priority: '' } : {}),
+  }));
+
+  return (
+    <div className="mb-3 space-y-2 md:hidden">
+      <div className="flex min-w-0 gap-2">
+        <form className="min-w-0 flex-1" onSubmit={(event) => { event.preventDefault(); onSearch(); }}>
+          <label className="sr-only" htmlFor={searchId}>Tìm công việc</label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input id={searchId} type="search" className="h-11 w-full min-w-0 rounded-md border border-line bg-white pl-9 pr-11 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={searchDraft} onChange={(event) => onSearchDraft(event.target.value)} placeholder="Tìm tên việc, công trình…" />
+            <button type="submit" className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-md text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500" aria-label="Tìm công việc"><Search className="h-4 w-4" /></button>
+          </div>
+        </form>
+        <button type="button" className="h-11 shrink-0 rounded-md border border-blue-300 bg-white px-3 text-sm font-semibold text-blue-700" onClick={() => { setDraft({ project, status, deadline, workType, priority, sort, entryKind }); setOpen(true); }}>Lọc {applied.length}</button>
+      </div>
+      {applied.length ? <div className="flex flex-wrap gap-1.5" aria-label="Bộ lọc đang áp dụng">
+        {applied.map((item) => <button key={item.key} type="button" className="inline-flex max-w-full items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-800" aria-label={`Bỏ lọc ${item.label}`} onClick={() => onChange(item.key, item.key === 'sort' ? 'priority' : '')}><span className="truncate">{item.label}</span><X className="h-3.5 w-3.5 shrink-0" /></button>)}
+      </div> : null}
+      <Dialog open={open} title="Lọc công việc" size="sm" mobileFullscreen manageFocus onClose={() => setOpen(false)} footer={<div className="flex items-center justify-between gap-3"><button type="button" className="min-h-11 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700" onClick={() => setDraft({ project: '', status: '', deadline: '', workType: '', priority: '', sort: 'priority', entryKind: '' })}>Xóa lọc</button><button type="button" className="min-h-11 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white" onClick={() => { onApply(draft); setOpen(false); }}>Áp dụng</button></div>}>
+        <div className="grid gap-3 text-sm">
+          {accounting ? <div><span className="mb-1 block text-xs font-semibold text-slate-600">Công trình</span><AsyncProjectPicker value={draft.project} onChange={(value) => setField('project', value)} endpoint="/project-finance/projects" queryKey="my-accounting-work-project-options" emptyLabel="Tất cả công trình" /></div>
+            : <FilterSelect fieldLabel="Công trình" value={draft.project} label="Tất cả công trình" options={projects} onChange={(value) => setField('project', value)} />}
+          {accounting ? <FilterSelect fieldLabel="Loại hồ sơ" value={draft.entryKind} label="Tất cả loại hồ sơ" options={[{ value: 'work_item', label: 'Công việc quy trình' }, { value: 'accounting_handoff', label: 'Hồ sơ kế toán' }]} onChange={(value) => setField('entryKind', value)} /> : null}
+          <FilterSelect fieldLabel="Trạng thái" value={draft.status} label="Tất cả trạng thái" options={statuses.length ? statuses.map((item) => ({ ...item, label: statusLabel(item.value) })) : statusOptions} onChange={(value) => setField('status', value)} />
+          {draft.entryKind !== 'accounting_handoff' ? <>
+            <FilterSelect fieldLabel="Hạn việc" value={draft.deadline} label="Tất cả hạn việc" options={deadlineOptions} onChange={(value) => setField('deadline', value)} />
+            <FilterSelect fieldLabel="Loại việc" value={draft.workType} label="Tất cả loại việc" options={workTypes.map((item) => ({ ...item, label: workTypeLabel(item.value) }))} onChange={(value) => setField('workType', value)} />
+            <FilterSelect fieldLabel="Ưu tiên" value={draft.priority} label="Tất cả ưu tiên" options={priorities.map((item) => ({ ...item, label: priorityLabel(item.value) }))} onChange={(value) => setField('priority', value)} />
+          </> : null}
+          <FilterSelect fieldLabel="Sắp xếp" value={draft.sort} label="Sắp xếp" options={sortOptions} onChange={(value) => setField('sort', value)} />
+        </div>
+      </Dialog>
+    </div>
+  );
+}
+
 function normalizeFacetOptions(values: FacetOption[] | undefined, fallback: string) {
   return asArray<FacetOption>(values).map((item) => {
     if (typeof item === 'string') return { value: item, label: item };
@@ -1158,7 +1277,7 @@ function mergeApprovalProjectOptions(base: Array<{ value: string; label: string 
 }
 
 function FilterSelect({ value, label, fieldLabel, options, onChange }: { value: string; label: string; fieldLabel?: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
-  const control = <select className={clsx('min-w-0 rounded-md border border-line bg-white px-3 text-sm font-medium text-slate-700', fieldLabel ? 'block h-10 w-full outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100' : 'py-2')} value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
+  const control = <select className={clsx('min-w-0 rounded-md border border-line bg-white px-3 text-sm font-medium text-slate-700', fieldLabel ? 'block h-11 w-full outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:h-10' : 'py-2')} value={value} onChange={(event) => onChange(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
   return fieldLabel ? (
     <label className="block min-w-0">
       <span className="mb-1 block text-xs font-semibold leading-4 text-slate-600">{fieldLabel}</span>
@@ -1195,13 +1314,16 @@ function WorkList({ rows, entries, prioritizeAccounting = false, selectedAccount
       {error ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Chưa cập nhật được dữ liệu mới; đang giữ danh sách gần nhất.</span><button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetry}>Thử lại</button></div> : null}
       {workflowActionsError ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Không tải được hành động chuyển giai đoạn.</span>{onRetryWorkflowActions ? <button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetryWorkflowActions}>Thử lại</button> : null}</div> : null}
       {startupActionsError ? <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Không tải được điều phối khởi tạo công trình.</span>{onRetryStartupActions ? <button className="shrink-0 font-semibold text-amber-900 underline underline-offset-2" onClick={onRetryStartupActions}>Thử lại</button> : null}</div> : null}
-      <div className="max-h-[720px] overflow-y-auto rounded-lg border border-line bg-white">
+      <div className="rounded-lg border border-line bg-white md:max-h-[720px] md:overflow-y-auto">
         {orderedEntries.map((entry) => {
           const key = workQueueEntryKey(entry);
           if (entry.kind === 'project_startup') return <ProjectStartupActionCard key={key} action={entry.item} selected={selectedStartupActionId === entry.item.id} onSelect={() => onSelectStartupAction?.(entry.item.id)} onOpen={() => onOpenStartupAction?.(entry.item)} />;
           if (entry.kind === 'workflow_action') return <WorkflowActionCard key={key} action={entry.item} selected={selectedWorkflowActionId === entry.item.id} pending={pendingWorkflowActionId === entry.item.id} onSelect={() => onSelectWorkflowAction?.(entry.item.id)} onRun={() => onRunWorkflowAction?.(entry.item)} />;
           if (entry.kind === 'accounting_handoff') return <AccountingWorkCard key={key} item={entry.item} selected={selectedAccountingId === entry.item.handoff_id} onSelect={() => onSelectAccounting?.(entry.item)} onAcknowledge={entry.item.status === 'handed_off' && onAcknowledgeAccounting ? () => onAcknowledgeAccounting(entry.item) : undefined} />;
-          return <WorkItemCard key={key} item={entry.item} selected={selectedId === entry.item.id} onSelect={() => onSelect(entry.item.id)} onOpen={() => onOpen(entry.item)} />;
+          return <WorkItemCard key={key} item={entry.item} selected={selectedId === entry.item.id} showMobileActionLabel onSelect={() => {
+            if (window.matchMedia('(max-width: 767px)').matches) onOpen(entry.item);
+            else onSelect(entry.item.id);
+          }} onOpen={() => onOpen(entry.item)} />;
         })}
         {startupActionsLoading ? <WorkflowActionSkeleton /> : null}
         {workflowActionsLoading ? <WorkflowActionSkeleton /> : null}
@@ -1382,7 +1504,7 @@ function inAttentionQueue(item: ActivityAttentionItem, queue: AttentionQueueKey)
 
 function LiveStatusBadge({ status }: { status: StreamStatus }) {
   const label = status === 'connected' ? 'Đang trực tuyến' : status === 'reconnecting' ? 'Đang kết nối lại' : 'Mất kết nối · Làm mới thủ công';
-  return <span className={clsx('inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-semibold', status === 'connected' ? 'bg-emerald-50 text-emerald-700' : status === 'reconnecting' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}><span className={clsx('h-2 w-2 rounded-full', status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400')} />{label}</span>;
+  return <span aria-label={label} title={label} className={clsx('inline-flex h-10 items-center gap-2 rounded-md px-2.5 text-xs font-semibold md:h-auto md:py-1.5', status === 'connected' ? 'bg-emerald-50 text-emerald-700' : status === 'reconnecting' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}><span className={clsx('h-2 w-2 rounded-full', status === 'connected' ? 'bg-emerald-500' : status === 'reconnecting' ? 'bg-amber-500' : 'bg-slate-400')} /><span className="hidden md:inline">{label}</span></span>;
 }
 
 function SourceError({ title, onRetry }: { title: string; onRetry?: () => void }) { return <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><p className="font-semibold">{title}</p>{onRetry ? <button className="mt-3 rounded-md border border-rose-200 bg-white px-3 py-2 font-semibold" onClick={onRetry}>Thử lại</button> : null}</div>; }

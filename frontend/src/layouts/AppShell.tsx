@@ -45,7 +45,7 @@ type NavItem = {
 type NavGroup = { title: string; items: NavItem[] };
 type NavBadge = { value: number | '…' | '—'; error?: boolean };
 
-const UTILITY_DOCK_CONTENT_CLEARANCE_CLASS = 'pb-[calc(8rem+env(safe-area-inset-bottom))] sm:pb-16';
+const UTILITY_DOCK_CONTENT_CLEARANCE_CLASS = 'pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-16';
 
 const navGroups: NavGroup[] = [
   {
@@ -263,13 +263,14 @@ export function AppShell() {
                 <Menu className="h-5 w-5" />
               </button>
               <BrandHomeLink compact className="lg:hidden" />
-              <p className="hidden text-sm font-medium text-ink sm:block">Bắt đầu từ việc ưu tiên, luôn rõ Dự án › Node › Bước</p>
+              <p className="hidden text-sm font-medium text-ink lg:block">Bắt đầu từ việc ưu tiên, luôn rõ Công trình › Giai đoạn › Gói công việc</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <NotificationPanel summary={indicators.notifications.data} />
+              <div id="utility-dock-mobile-launcher" className="sm:hidden" />
               <button
                 type="button"
-                className="hidden items-center gap-2 rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex"
+                className="hidden items-center gap-2 rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:flex"
                 onClick={() => navigate('/profile')}
                 aria-label="Mở hồ sơ cá nhân"
               >
@@ -280,7 +281,7 @@ export function AppShell() {
                 </span>
               </button>
               <button
-                className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                className="hidden items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 lg:inline-flex"
                 onClick={() => {
                   void logout().finally(() => navigate('/login'));
                 }}
