@@ -1,0 +1,13 @@
+# [Closed] Active plans archive — 2026-10-01
+
+Closed by user request on 2026-10-01. Both active plans have been removed from `docs/current-states.md`. The notes below preserve their recorded state at closure; closing a plan does not claim new technical verification, browser/UAT acceptance, migration execution or deployment.
+
+## [Closed] Bàn làm việc mobile — duyệt triển khai 2026-09-24
+
+- Will be done (archived at closure; no longer active scope): obtain explicit browser/UAT authorization in a later turn to verify actual 320/360/440px rendering, safe-area/keyboard behavior, launcher position, long labels, loading/error states and tap targets on the current build. Keep this plan active until that UX gate is accepted or the user closes it.
+- Done: reviewed the 440px screenshot and current owners at clean base revision `4bbd582`; user approved the review package and shared-shell launcher change. Implemented the compact mobile mode grid, scope/dialog, six quick-filter grid, search/filter dialog with applied chips, labelled canonical Work Item opener and page-level mobile result scroll. Empty Accounting request queues collapse after successful load; load/error/retry remain visible. The standard-shell mobile Utility launcher portals into the header, retaining Dock state; focus routes retain the fixed fallback. Updated the central/frontend/root-cause maps and focused source contracts. On the resulting working tree, `npm run build`, all 495 frontend tests, `npm run check:bundle-budget`, and `git diff --check` passed. No browser/UAT was run; affected UI remains `NOT UX ACCEPTED`.
+
+## [Closed] CI release unblock — `v2026-09-21.1`
+
+- Will be done (archived at closure; no longer active scope): no further release action; keep this record open until the user asks to close the plan.
+- Done: GitHub release `v2026-09-21.1` was blocked before image build/VPS deploy by three backend integration failures. Diagnosis confirmed one persisted JSON decode defect and two stale assertions/fixtures. The decoder now treats persisted JSONB `null` as an empty allocation list; the stale V144 balance assertion and `workflow_form` fixture are aligned. All three regression tests passed against isolated PostgreSQL/Redis. Release `v2026-09-21.2` then passed backend CI but stopped at a stale frontend assertion that expected the retired standalone `Giai đoạn` column; the current UI intentionally owns a combined `Nguồn / Giai đoạn` column to represent design evidence and runtime stages. Release `v2026-09-21.3` (commit `e0ce728c2d5cfcf377a0c61f28ac5366978372c0`) passed the full GitHub CI gate, built and pushed immutable images, deployed to VPS, and passed public HTTPS, gateway health and `/api/ready` checks. No production migration ran.
