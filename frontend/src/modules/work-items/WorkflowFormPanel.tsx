@@ -106,6 +106,7 @@ export function WorkflowFormPanel({
   workItemStatus,
   onChanged,
   readOnly = false,
+  artifactReadOnly = false,
   navigationRequest,
   externalActions = false,
   actionRef,
@@ -119,6 +120,7 @@ export function WorkflowFormPanel({
   workItemStatus?: string;
   onChanged?: () => void;
   readOnly?: boolean;
+  artifactReadOnly?: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
   externalActions?: boolean;
   actionRef?: Ref<WorkflowFormActionHandle>;
@@ -182,7 +184,7 @@ export function WorkflowFormPanel({
   const startsWorkItem = !submitted && !readOnly && ['ready', 'needs_changes'].includes(String(workItemStatus ?? ''));
   const currentRevision = Number(instance?.current_revision ?? 0);
   const canAmend = Boolean(form.data?.capabilities?.can_amend) && submitted && !readOnly;
-  const artifactAccess = workflowFormArtifactAccess(form.data);
+  const artifactAccess = workflowFormArtifactAccess(form.data, artifactReadOnly);
   const canAddConfirmation = artifactAccess.canAddConfirmation && !amending;
   const canGeneratePDF = artifactAccess.canGeneratePDF && !amending;
   const canDeletePDF = artifactAccess.canDeletePDF && !amending;

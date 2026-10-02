@@ -439,6 +439,9 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 		}
 		requestedKeys[permissionKey] = true
 	}
+	if roleName != "deputy_manager" && requestedKeys["project.supervision.view"] {
+		return nil, validationError("Quyền theo dõi Giám sát toàn công ty chỉ dành cho Phó Quản Lý")
+	}
 	if roleName == "admin" {
 		if requestedKeys["settings.update"] || requestedKeys["staff.import"] || requestedKeys["sample_data.create"] {
 			return nil, validationError("Quyền chỉ dành cho Nhà phát triển", Record{"permissions": []string{"settings.update", "staff.import", "sample_data.create"}})
@@ -560,6 +563,7 @@ type workItemAccessProfile struct {
 	IsDirector              bool
 	IsManager               bool
 	CanReconcileAllProjects bool
+	CanSuperviseAllProjects bool
 }
 
 func (r *Repository) WorkItemAccessProfile(ctx context.Context, userID string) (workItemAccessProfile, error) {
@@ -574,7 +578,8 @@ func (r *Repository) WorkItemAccessProfile(ctx context.Context, userID string) (
 				WHERE reconciliation_role.user_id=u.id
 				  AND reconciliation_role.project_id IS NULL
 				  AND reconciliation_permission.key='project.reconciliation.view'
-			) AS can_reconcile_all_projects
+			) AS can_reconcile_all_projects,
+			`+deputyManagerUserSQL("u.id")+` AS can_supervise_all_projects
 		FROM users u
 		LEFT JOIN staff s ON s.user_id=u.id AND s.status='active'
 		WHERE u.id=$1
@@ -588,6 +593,7 @@ func (r *Repository) WorkItemAccessProfile(ctx context.Context, userID string) (
 	profile.StaffID = fmt.Sprint(staffRows[0]["staff_id"])
 	profile.Department = fmt.Sprint(staffRows[0]["department"])
 	profile.CanReconcileAllProjects = boolValue(staffRows[0]["can_reconcile_all_projects"])
+	profile.CanSuperviseAllProjects = boolValue(staffRows[0]["can_supervise_all_projects"])
 
 	roleRows, err := r.Query(ctx, `
 		SELECT DISTINCT r.id::text AS id, r.name, r.display_name, COALESCE(ur.project_id::text, '') AS project_id
@@ -631,7 +637,7 @@ var projectOperationsViewPermissions = []string{"operation.view", "project.view"
 // Bulk equivalent of CanViewProjectOperations, shared by cross-project activity reads.
 // The alias and parameter offset are repository-owned, never request input.
 func projectOperationsScopeSQL(alias string, start int) string {
-	return fmt.Sprintf(`(%[1]s.status <> 'cancelled' AND (
+	base := fmt.Sprintf(`(%[1]s.status <> 'cancelled' AND (
 		$%[2]d::boolean OR (
 			EXISTS (SELECT 1 FROM user_roles access_role
 				JOIN role_permissions access_grant ON access_grant.role_id=access_role.role_id
@@ -646,6 +652,7 @@ func projectOperationsScopeSQL(alias string, start int) string {
 				OR EXISTS (SELECT 1 FROM user_roles project_role
 					WHERE project_role.project_id=%[1]s.id AND project_role.user_id=$%[4]d::uuid))
 		)))`, alias, start, start+1, start+2, start+3)
+	return fmt.Sprintf(`(%s OR (%s.status <> 'cancelled' AND NOT %s.is_sample AND %s))`, base, alias, alias, deputyManagerUserSQL(fmt.Sprintf("$%d::uuid", start+2)))
 }
 
 func projectOperationsScopeArgs(profile workItemAccessProfile) []any {
@@ -706,7 +713,7 @@ func reconciliationCompanyScopeAllowed(profile workItemAccessProfile, granted, r
 }
 
 func profileCanObserveAllProjectWork(profile workItemAccessProfile) bool {
-	return profile.IsManager || profile.CanReconcileAllProjects
+	return profile.IsManager || profile.CanReconcileAllProjects || profile.CanSuperviseAllProjects
 }
 
 func (r *Repository) UserHasAnyPermission(ctx context.Context, userID string, required []string) (bool, error) {
@@ -808,6 +815,11 @@ func (r *Repository) CanAccessProjectPermission(ctx context.Context, userID, pro
 	if reconciliationCompanyScopeAllowed(profile, permissions, required) {
 		return true, nil
 	}
+	if supervisionCompanyScopeAllowed(profile, permissions, required) {
+		var allowed bool
+		err := r.db.QueryRowContext(ctx, `SELECT `+supervisedProjectSQL("$1::uuid"), projectID).Scan(&allowed)
+		return allowed, err
+	}
 	return r.UserHasProjectScope(ctx, userID, projectID)
 }
 
@@ -870,6 +882,9 @@ func (r *Repository) CanMutateProjectActivity(ctx context.Context, userID, proje
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
 		return false, err
+	}
+	if profile.CanSuperviseAllProjects {
+		return r.CanViewProjectOperations(ctx, projectID, userID)
 	}
 	if !profile.CanReconcileAllProjects || profile.IsAdmin || profile.IsDirector {
 		return true, nil
@@ -1008,6 +1023,11 @@ func (r *Repository) CanViewProjectOperations(ctx context.Context, projectID, us
 	if profile.IsAdmin || profile.CanReconcileAllProjects {
 		return true, nil
 	}
+	if profile.CanSuperviseAllProjects {
+		var allowed bool
+		err := r.db.QueryRowContext(ctx, `SELECT `+supervisedProjectSQL("$1::uuid"), projectID).Scan(&allowed)
+		return allowed, err
+	}
 	permissions, err := r.UserProjectPermissions(ctx, userID, projectID)
 	if err != nil {
 		return false, err
@@ -1051,6 +1071,9 @@ func (r *Repository) ProjectOperationsVisibleProjectIDs(ctx context.Context, use
 	profile, err := r.WorkItemAccessProfile(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+	if profile.CanSuperviseAllProjects {
+		return r.ProjectVisibleProjectIDs(ctx, userID)
 	}
 	rows, err := r.Query(ctx, `
 		SELECT p.id::text AS id

@@ -16,7 +16,7 @@ test('shared workspace tabs own the flat member-tab presentation and accessible 
   assert.match(tabs, /active \? 'border-blue-600 text-blue-700'/);
   assert.match(tabs, /border-transparent text-slate-600 hover:border-slate-300 hover:text-ink/);
   assert.match(tabs, /<Icon className="h-4 w-4 shrink-0" aria-hidden="true" \/>/);
-  assert.match(tabs, /typeof tab\.count === 'number'/);
+  assert.match(tabs, /typeof tab\.count === 'number' \|\| typeof tab\.count === 'string'/);
   assert.match(tabs, /overflow-x-auto/);
   assert.match(tabs, /flex min-w-max gap-1/);
 });

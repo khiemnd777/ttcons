@@ -6,8 +6,8 @@ export type WorkflowFormArtifactAccess = {
   canDeletePDF: boolean;
 };
 
-export function workflowFormArtifactAccess(form?: WorkflowFormDetail): WorkflowFormArtifactAccess {
-  const submitted = form?.instance?.status === 'submitted';
+export function workflowFormArtifactAccess(form?: WorkflowFormDetail, readOnly = false): WorkflowFormArtifactAccess {
+  const submitted = !readOnly && form?.instance?.status === 'submitted';
   return {
     canAddConfirmation: submitted && form?.capabilities?.can_add_confirmation === true,
     canGeneratePDF: submitted && form?.capabilities?.can_generate_pdf === true,

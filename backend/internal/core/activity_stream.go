@@ -400,6 +400,18 @@ func (s *Service) publishPersonalInvalidation(eventType, recipientID, projectID 
 }
 
 func (s *Service) publishWorkReportChanged(projectID string, actorIDs ...string) {
+	if s.repo != nil && s.repo.db != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		deputies, err := s.repo.Query(ctx, `SELECT account.id::text FROM users account WHERE `+deputyManagerUserSQL("account.id")+` AND `+supervisedProjectSQL("$1::uuid"), projectID)
+		cancel()
+		if err != nil {
+			log.Printf("level=warn component=supervision operation=report_invalidation error=%q", err.Error())
+		} else {
+			for _, deputy := range deputies {
+				actorIDs = append(actorIDs, cleanID(deputy["id"]))
+			}
+		}
+	}
 	seen := map[string]bool{}
 	for _, actorID := range actorIDs {
 		actorID = cleanID(actorID)

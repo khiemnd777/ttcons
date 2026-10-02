@@ -120,7 +120,8 @@ test('upcoming workflow forms keep the primary layout while remaining read-only'
   assert.match(detail, /const resolvedPrimarySurface = detailItem \? resolveWorkItemPrimarySurface\(detailItem\) : null/);
   assert.match(detail, /futureReadOnly && resolvedPrimarySurface\?\.kind !== 'workflow_form'/);
   assert.match(detail, /futureReadOnly && !primarySurface/);
-  assert.match(detail, /readOnly=\{futureReadOnly\}/);
+  assert.match(detail, /const panelsReadOnly = readOnly \|\| futureReadOnly/);
+  assert.match(detail, /readOnly=\{panelsReadOnly\}/);
   assert.doesNotMatch(detail, /hasWorkflowFormSummary\(item\) && \(readOnly \|\| !primarySurfaceKind/);
   assert.match(detail, /hasWorkflowForm && \(!primarySurfaceKind \|\| !primarySurfaceUsesWorkflowForm\(primarySurfaceKind\)\)/);
 

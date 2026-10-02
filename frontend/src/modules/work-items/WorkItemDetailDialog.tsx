@@ -26,6 +26,8 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { get, post } from '../../lib/api/client';
+import { useAuth } from '../../lib/auth/AuthContext';
+import { workItemObserverReadOnly } from './workItemObserverAccess';
 import { dateText } from '../../lib/utils/format';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { statusLabel } from '../../lib/utils/status';
@@ -103,11 +105,13 @@ export function WorkItemDetailDialog({
   item,
   onClose,
   onChanged,
+  readOnly = false,
 }: {
   open: boolean;
   item: WorkItem | null;
   onClose: () => void;
   onChanged?: (item: WorkItem) => void;
+  readOnly?: boolean;
 }) {
   const workContextLabel = item ? workItemWorkflowContext(item).path : undefined;
 
@@ -120,7 +124,7 @@ export function WorkItemDetailDialog({
       onClose={onClose}
       size="workspace"
     >
-      <WorkItemDetailWorkspace item={item} onClose={onClose} onChanged={onChanged} />
+      <WorkItemDetailWorkspace item={item} readOnly={readOnly} onClose={onClose} onChanged={onChanged} />
     </Dialog>
   );
 }
@@ -133,6 +137,7 @@ export function WorkItemDetailWorkspace({
   onChanged,
   onDirtyChange,
   onBusyChange,
+  readOnly: requestedReadOnly = false,
 }: {
   item?: WorkItem | null;
   workItemId?: string;
@@ -141,6 +146,7 @@ export function WorkItemDetailWorkspace({
   onChanged?: (item: WorkItem) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
+  readOnly?: boolean;
 }) {
   const [actionText, setActionText] = useState('');
   const [pendingAction, setPendingAction] = useState<WorkItemActionKey | null>(null);
@@ -148,6 +154,8 @@ export function WorkItemDetailWorkspace({
   const [startReason, setStartReason] = useState('');
   const [startReasonAttempted, setStartReasonAttempted] = useState(false);
   const queryClient = useQueryClient();
+  const { hasPermission } = useAuth();
+  const hasCompanySupervision = hasPermission('project.supervision.view');
   const toast = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -175,8 +183,10 @@ export function WorkItemDetailWorkspace({
     queryFn: () => get<WorkItem>(`/work-items/${selectedWorkId}`),
     enabled: Boolean(selectedWorkId),
     retry: false,
+    ...(hasCompanySupervision ? { staleTime: 0, refetchOnMount: 'always' as const } : {}),
   });
   const detailItem = workDetail.data ?? item;
+  const readOnly = workItemObserverReadOnly({ explicitReadOnly: requestedReadOnly, hasCompanySupervision, detailFresh: workDetail.isFetchedAfterMount && !workDetail.isFetching && !workDetail.isError, canAct: workDetail.data?.capabilities?.can_act ?? workDetail.data?.can_act, canDecide: workDetail.data?.capabilities?.can_decide ?? workDetail.data?.can_decide });
   const activityOptions = useQuery({
     queryKey: ['project-activity-options', detailItem?.project_id],
     queryFn: () => get<ProjectActivityOptions>(`/projects/${detailItem?.project_id}/activity/options`),
@@ -200,12 +210,15 @@ export function WorkItemDetailWorkspace({
       comment: string;
       bypassStartRequirements?: boolean;
       startRequirementsToken?: string;
-    }) => post<WorkItem>(`/work-items/${workItemId}/${action}`, {
+    }) => {
+      if (readOnly) throw new Error('Đầu việc đang được mở ở chế độ chỉ xem.');
+      return post<WorkItem>(`/work-items/${workItemId}/${action}`, {
       comment,
       reason: comment,
       bypass_start_requirements: bypassStartRequirements,
       start_requirements_token: startRequirementsToken,
-    }),
+      });
+    },
     onSuccess: (updated, variables) => {
       setActionText('');
       setPendingAction(null);
@@ -235,8 +248,10 @@ export function WorkItemDetailWorkspace({
     },
   });
   const activityAction = useMutation({
-    mutationFn: ({ workItemId, payload }: { workItemId: string; payload: ActivityPayload }) =>
-      post<WorkItemActivity>(`/work-items/${workItemId}/activity`, payload),
+    mutationFn: ({ workItemId, payload }: { workItemId: string; payload: ActivityPayload }) => {
+      if (readOnly) throw new Error('Trao đổi tại trang thảo luận của công trình.');
+      return post<WorkItemActivity>(`/work-items/${workItemId}/activity`, payload);
+    },
     onSuccess: (_activity, variables) => {
       queryClient.invalidateQueries({ queryKey: ['work-item', variables.workItemId] });
       queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
@@ -250,7 +265,7 @@ export function WorkItemDetailWorkspace({
   });
 
   function runAction(action: WorkItemActionKey) {
-    if (!detailItem?.id) return;
+    if (readOnly || !detailItem?.id) return;
     if (workItemIsUpcoming(detailItem)) {
       if (action !== 'start' || !detailItem.start_readiness?.can_bypass) return;
       setStartReason('');
@@ -268,7 +283,7 @@ export function WorkItemDetailWorkspace({
   }
 
   function confirmEarlyStart() {
-    if (!detailItem?.id || !detailItem.start_readiness?.can_bypass) return;
+    if (readOnly || !detailItem?.id || !detailItem.start_readiness?.can_bypass) return;
     const reason = startReason.trim();
     if (!reason) {
       setStartReasonAttempted(true);
@@ -345,11 +360,12 @@ export function WorkItemDetailWorkspace({
     onBusyChange?.(designBusy || primaryBusy || supportBusy || workAction.isPending || activityAction.isPending);
   }, [activityAction.isPending, designBusy, guardEditing, onBusyChange, primaryBusy, supportBusy, workAction.isPending]);
 
-  const actions = permittedActions(detailItem, workflowFormActionState?.submitted);
+  const actions = readOnly ? [] : permittedActions(detailItem, workflowFormActionState?.submitted);
   const evidence = asArray<EvidenceRecord>(detailItem?.evidence);
   const activities = asArray<WorkItemActivity>(detailItem?.activities);
   const attachmentOptions = buildActivityAttachmentOptions(evidence);
   const futureReadOnly = detailItem ? workItemIsUpcoming(detailItem) : false;
+  const panelsReadOnly = readOnly || futureReadOnly;
   const resolvedPrimarySurface = detailItem ? resolveWorkItemPrimarySurface(detailItem) : null;
   const primarySurface = futureReadOnly && resolvedPrimarySurface?.kind !== 'workflow_form'
     ? null
@@ -362,7 +378,7 @@ export function WorkItemDetailWorkspace({
   const latestActivity = activities[0];
   const skippedHistory = detailItem?.status === 'cancelled';
   const showMobileWorkflowFormActions = Boolean(
-    workflowFormActionState?.available
+    !readOnly && workflowFormActionState?.available
     && !workflowFormActionState.submitted
     && !workflowFormActionState.readOnly,
   );
@@ -373,6 +389,7 @@ export function WorkItemDetailWorkspace({
       {detailItem ? (
         <div className={clsx('space-y-4', showMobileWorkflowFormActions && 'pb-20 xl:pb-0')}>
           <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} workflowNavigation={workflowNavigation} />
+          {readOnly ? <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">Theo dõi công việc · Chỉ xem. Trao đổi tại trang thảo luận của công trình.</p> : null}
 
           {futureReadOnly ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -395,7 +412,7 @@ export function WorkItemDetailWorkspace({
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
             <main className="min-w-0 space-y-4">
               <WorkItemStartRequirementPanel item={detailItem} />
-              {detailItem.project_id && isDesignReleaseWorkItem(detailItem) ? <DesignReleasePanel projectId={detailItem.project_id} workItems={[detailItem]} readOnly={futureReadOnly || skippedHistory} onDirtyChange={guardEditing ? setDesignDirty : undefined} onBusyChange={guardEditing ? setDesignBusy : undefined} /> : null}
+              {detailItem.project_id && isDesignReleaseWorkItem(detailItem) ? <DesignReleasePanel projectId={detailItem.project_id} workItems={[detailItem]} readOnly={panelsReadOnly || skippedHistory} onDirtyChange={guardEditing ? setDesignDirty : undefined} onBusyChange={guardEditing ? setDesignBusy : undefined} /> : null}
               {skippedHistory ? (
                 <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-panel">
                   <p className="font-semibold text-ink">Hồ sơ lịch sử chỉ đọc</p>
@@ -415,7 +432,8 @@ export function WorkItemDetailWorkspace({
                       item={detailItem}
                       evidence={evidence}
                       surface={primarySurface}
-                      readOnly={futureReadOnly}
+                      readOnly={panelsReadOnly}
+                      observerReadOnly={readOnly}
                       navigationRequest={navigationRequest}
                       workflowFormActionRef={workflowFormActionRef}
                       onWorkflowFormActionStateChange={handleWorkflowFormActionStateChange}
@@ -428,7 +446,7 @@ export function WorkItemDetailWorkspace({
 
               {skippedHistory ? (
                 <SkippedWorkItemHistory activities={activities} evidence={evidence} />
-              ) : primarySurface || futureReadOnly ? (
+              ) : primarySurface || panelsReadOnly ? (
                 <WorkItemSupportingTabs
                   item={detailItem}
                   evidence={evidence}
@@ -438,7 +456,8 @@ export function WorkItemDetailWorkspace({
                   activitySubmitting={activityAction.isPending}
                   primarySurfaceKind={primarySurface?.kind}
                   navigationRequest={navigationRequest}
-                  readOnly={futureReadOnly}
+                  readOnly={panelsReadOnly}
+                  artifactReadOnly={readOnly}
                   onDirtyChange={guardEditing ? setSupportDirty : undefined}
                   onBusyChange={guardEditing ? setSupportBusy : undefined}
                   onSubmitActivity={(payload) => {
@@ -451,6 +470,7 @@ export function WorkItemDetailWorkspace({
 
             <WorkItemActionPanel
               item={detailItem}
+              readOnly={readOnly}
               actions={actions}
               actionText={actionText}
               pendingAction={pendingAction}
@@ -479,7 +499,7 @@ export function WorkItemDetailWorkspace({
         </div>
       ) : null}
       <Dialog
-        open={amendmentDialogOpen}
+        open={amendmentDialogOpen && !readOnly}
         title="Chỉnh sửa hồ sơ đã chốt?"
         description={`Thao tác này sẽ tạo phiên bản ${Number(workflowFormActionState?.currentRevision ?? 0) + 1}. Trạng thái đầu việc và quy trình được giữ nguyên.`}
         onClose={() => {
@@ -542,7 +562,7 @@ export function WorkItemDetailWorkspace({
         </div>
       </Dialog>
       <Dialog
-        open={startConfirmationOpen}
+        open={startConfirmationOpen && !readOnly}
         title="Bắt đầu công việc trước lượt?"
         description="Workflow chính vẫn giữ nguyên node hiện tại. Thao tác này và lý do sẽ được lưu trong lịch sử audit."
         onClose={() => {
@@ -864,6 +884,7 @@ function workflowNeighborTitle(item: WorkItem) {
 
 function WorkItemActionPanel({
   item,
+  readOnly,
   actions,
   actionText,
   pendingAction,
@@ -885,6 +906,7 @@ function WorkItemActionPanel({
   navigationRequest,
 }: {
   item: WorkItem;
+  readOnly: boolean;
   actions: WorkItemActionKey[];
   actionText: string;
   pendingAction: WorkItemActionKey | null;
@@ -906,19 +928,19 @@ function WorkItemActionPanel({
   navigationRequest: WorkItemRequirementNavigationRequest | null;
 }) {
   const workflowFormIsPrimary = Boolean(
-    workflowFormActionState?.available
+    !readOnly && workflowFormActionState?.available
     && !workflowFormActionState.submitted
     && !workflowFormActionState.readOnly,
   );
-  const workflowFormCanAmend = Boolean(workflowFormActionState?.available && workflowFormActionState.canAmend && !workflowFormActionState.amending);
-  const workflowFormIsAmending = Boolean(workflowFormActionState?.available && workflowFormActionState.amending);
-  const constructionHandoffActivationRequired = constructionHandoffNeedsActivation(item, workflowFormActionState?.submitted)
+  const workflowFormCanAmend = Boolean(!readOnly && workflowFormActionState?.available && workflowFormActionState.canAmend && !workflowFormActionState.amending);
+  const workflowFormIsAmending = Boolean(!readOnly && workflowFormActionState?.available && workflowFormActionState.amending);
+  const constructionHandoffActivationRequired = !readOnly && constructionHandoffNeedsActivation(item, workflowFormActionState?.submitted)
     && !workItemIsUpcoming(item)
     && (item.capabilities?.can_act ?? item.can_act) === true;
   const formIssueCount = workflowFormActionState?.validationIssueLabels.length ?? 0;
-  const primaryAction = workflowFormIsPrimary || constructionHandoffActivationRequired ? undefined : actions[0];
-  const secondaryActions = workflowFormIsPrimary || constructionHandoffActivationRequired ? actions : actions.slice(1);
-  const panelNextAction = workflowFormIsAmending
+  const primaryAction = readOnly || workflowFormIsPrimary || constructionHandoffActivationRequired ? undefined : actions[0];
+  const secondaryActions = readOnly ? [] : workflowFormIsPrimary || constructionHandoffActivationRequired ? actions : actions.slice(1);
+  const panelNextAction = readOnly ? 'Theo dõi công việc · Chỉ xem' : workflowFormIsAmending
     ? `Lưu phiên bản chỉnh sửa ${workflowFormActionState?.currentRevision ? workflowFormActionState.currentRevision + 1 : ''}`.trim()
     : constructionHandoffActivationRequired
       ? 'Kích hoạt bàn giao thi công'
@@ -971,7 +993,7 @@ function WorkItemActionPanel({
         ) : null}
       </div>
 
-      {workflowFormIsPrimary || constructionHandoffActivationRequired || actions.length ? (
+      {!readOnly && (workflowFormIsPrimary || constructionHandoffActivationRequired || actions.length) ? (
         <div className="mt-3 space-y-2">
           {workflowFormIsPrimary && formIssueCount ? (
             <button
@@ -1189,6 +1211,7 @@ function WorkItemSupportingTabs({
   primarySurfaceKind,
   navigationRequest,
   readOnly,
+  artifactReadOnly,
   onDirtyChange,
   onBusyChange,
   onSubmitActivity,
@@ -1202,6 +1225,7 @@ function WorkItemSupportingTabs({
   primarySurfaceKind?: WorkItemPrimarySurfaceKind;
   navigationRequest: WorkItemRequirementNavigationRequest | null;
   readOnly: boolean;
+  artifactReadOnly?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
   onSubmitActivity: (payload: ActivityPayload) => Promise<void>;
@@ -1326,7 +1350,7 @@ function WorkItemSupportingTabs({
             onSubmit={onSubmitActivity}
           />
         ) : null}
-        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} navigationRequest={navigationRequest} onDirtyChange={guardEditing ? handleDirtyChange : undefined} onBusyChange={guardEditing ? handleBusyChange : undefined} /> : null}
+        {activeTab === 'form' ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} artifactReadOnly={artifactReadOnly} navigationRequest={navigationRequest} onDirtyChange={guardEditing ? handleDirtyChange : undefined} onBusyChange={guardEditing ? handleBusyChange : undefined} /> : null}
       </div>
     </section>
   );

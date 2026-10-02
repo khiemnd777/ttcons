@@ -1,5 +1,11 @@
 # Reporting Analytics Domain Map
 
+## Independent Supervisor Report Review
+
+- V146 + `repository_work_reports.go` persist Supervisor classification and per-user/per-revision receipts. `scope=supervision` has server-side project/Supervisor/read-state filters, default25/max50 limit and offset; `scopes.supervision` is unread current-revision count. PM review queue also stays pending after another reviewer acknowledges.
+- Detail returns actor-specific capabilities and receipt history; requests send current `revision_no`. Repository reauthorizes current active actor under report lock; unique receipts make duplicate acknowledgement idempotent, and stale revisions/needs-changes cannot be overwritten. Shared report state remains compatible; no all-reviewer workflow gate.
+- Company override applies to exact Supervisor reports/evidence/PDF, not unrelated authored reports or financial analytics. Legacy finance project scope remains separate. Notifications preserve original recipient and co-deliver classified report delivery to active global deputies; shared viewer still uses exact protected report revision evidence endpoints.
+
 ## Work Report Revision PDF Presentation
 
 - `work_report_pdf.go` renders selected immutable snapshots as A4 daily-report content with a normalized date, readable typography, wrapped metadata, recorded progress, warning-styled blockers and full SHA-256. Footers identify report day, revision and page/total. Missing progress/time remains missing; no live status or identity substitution is introduced.

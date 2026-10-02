@@ -17,6 +17,7 @@ test('external-only roles are not assignable App roles', () => {
 test('pipeline actor choices exclude the client business counterpart', () => {
   assert.equal(pipelineActorRoleOptions.includes('Chủ đầu tư'), false);
   assert.equal(pipelineActorRoleOptions.includes('PM'), true);
+  assert.equal(pipelineActorRoleOptions.includes('Phó Quản Lý'), true);
   assert.equal(pipelineActorRoleOptions.includes('QA/QC'), true);
 });
 

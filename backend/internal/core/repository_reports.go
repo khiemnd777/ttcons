@@ -199,6 +199,9 @@ func (r *Repository) ProjectFinanceProjectOptions(ctx context.Context, userID st
 
 func (r *Repository) projectOptions(ctx context.Context, userID string, req ReportOptionsRequest, cursor *reportProjectOptionsCursor, requiredPermission string) ([]Record, Record, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	if requiredPermission == "work_report.view" {
+		scopeSQL, scopeArgs, err = r.SupervisionProjectAccessFilter(ctx, userID, "p", 1)
+	}
 	if err != nil {
 		return nil, nil, err
 	}

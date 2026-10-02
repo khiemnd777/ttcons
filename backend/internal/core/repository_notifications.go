@@ -46,7 +46,7 @@ func decodeNotificationCursor(value string) (notificationCursor, error) {
 }
 
 func (r *Repository) notificationVisibility(ctx context.Context, actorID string, start int, projectAlias string) (string, []any, error) {
-	projectScope, scopeArgs, err := r.ProjectAccessFilter(ctx, actorID, "visible_project", start)
+	projectScope, scopeArgs, err := r.SupervisionProjectAccessFilter(ctx, actorID, "visible_project", start)
 	if err != nil {
 		return "", nil, err
 	}

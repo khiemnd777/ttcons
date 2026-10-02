@@ -9,7 +9,7 @@ import (
 )
 
 func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	scopeSQL, scopeArgs, err := r.SupervisionProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func (r *Repository) ListProjects(ctx context.Context, userID string) ([]Record,
 }
 
 func (r *Repository) ProjectProgressBoard(ctx context.Context, userID string) ([]Record, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	scopeSQL, scopeArgs, err := r.SupervisionProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (r *Repository) ProjectProgressBoard(ctx context.Context, userID string) ([
 }
 
 func (r *Repository) ProjectVisibleProjectIDs(ctx context.Context, userID string) (map[string]struct{}, error) {
-	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, userID, "p", 1)
+	scopeSQL, scopeArgs, err := r.SupervisionProjectAccessFilter(ctx, userID, "p", 1)
 	if err != nil {
 		return nil, err
 	}

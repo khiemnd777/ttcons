@@ -47,10 +47,11 @@ type projectExplorerIndex struct {
 }
 
 type projectExplorerRevisionSnapshot struct {
-	CatalogVersion int64
-	ActorVersion   int64
-	BypassAccess   bool
-	StaffID        string
+	CatalogVersion   int64
+	ActorVersion     int64
+	BypassAccess     bool
+	SupervisionScope bool
+	StaffID          string
 }
 
 func normalizeProjectExplorerRequest(input ProjectExplorerRequest) (ProjectExplorerRequest, error) {
@@ -107,7 +108,7 @@ func (q ProjectExplorerRequest) cacheHash() string {
 }
 
 func (r *Repository) ProjectExplorerIndex(ctx context.Context, actorID string, request ProjectExplorerRequest) (projectExplorerIndex, error) {
-	scopeSQL, args, err := r.ProjectAccessFilter(ctx, actorID, "p", 1)
+	scopeSQL, args, err := r.SupervisionProjectAccessFilter(ctx, actorID, "p", 1)
 	if err != nil {
 		return projectExplorerIndex{}, err
 	}
@@ -244,6 +245,7 @@ func (r *Repository) ProjectExplorerRevisionSnapshot(ctx context.Context, actorI
 				JOIN roles role ON role.id=ur.role_id
 				WHERE ur.user_id=$1 AND ur.project_id IS NULL AND role.name IN ('admin','director')
 			) AS bypass_access,
+			`+deputyManagerUserSQL("$1::uuid")+` AS supervision_scope,
 			COALESCE((
 				SELECT staff.id::text
 				FROM staff
@@ -259,10 +261,11 @@ func (r *Repository) ProjectExplorerRevisionSnapshot(ctx context.Context, actorI
 		return projectExplorerRevisionSnapshot{}, err
 	}
 	return projectExplorerRevisionSnapshot{
-		CatalogVersion: int64(number(row["catalog_version"])),
-		ActorVersion:   int64(number(row["actor_version"])),
-		BypassAccess:   boolValue(row["bypass_access"]),
-		StaffID:        cleanID(row["staff_id"]),
+		CatalogVersion:   int64(number(row["catalog_version"])),
+		ActorVersion:     int64(number(row["actor_version"])),
+		BypassAccess:     boolValue(row["bypass_access"]),
+		SupervisionScope: boolValue(row["supervision_scope"]),
+		StaffID:          cleanID(row["staff_id"]),
 	}, nil
 }
 
@@ -271,8 +274,10 @@ func (r *Repository) ProjectExplorerProjectVersions(ctx context.Context, actorID
 	if len(projectIDs) == 0 {
 		return versions, nil
 	}
-	scopeSQL := projectAccessSQL("p", 1)
-	scopeArgs := []any{revision.BypassAccess, actorID, revision.StaffID}
+	scopeSQL, scopeArgs, err := r.SupervisionProjectAccessFilter(ctx, actorID, "p", 1)
+	if err != nil {
+		return nil, err
+	}
 	placeholders := make([]string, 0, len(projectIDs))
 	args := append([]any(nil), scopeArgs...)
 	for _, projectID := range projectIDs {

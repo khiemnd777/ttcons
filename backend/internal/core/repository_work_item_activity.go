@@ -2233,8 +2233,8 @@ func workItemScopeArgs(profile workItemAccessProfile, managerOverride bool, incl
 }
 
 func workItemScopeSQL(alias string, start int) string {
-	manager := fmt.Sprintf("$%d::boolean", start)
 	userID := fmt.Sprintf("NULLIF($%d,'')::uuid", start+1)
+	manager := fmt.Sprintf("($%d::boolean AND (NOT %s OR %s))", start, deputyManagerUserSQL(userID), supervisedProjectSQL(alias+".project_id"))
 	staffID := fmt.Sprintf("NULLIF($%d,'')::uuid", start+2)
 	staffText := fmt.Sprintf("$%d", start+2)
 	department := fmt.Sprintf("$%d", start+3)

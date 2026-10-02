@@ -21,6 +21,9 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 	if err != nil {
 		return nil, err
 	}
+	// Company observation is restricted to classified Supervisor reports even
+	// when the actor also carries a separately granted report-management role.
+	scopeSQL = "(" + scopeSQL + " OR (report.is_supervisor_report AND NOT project.is_sample AND " + deputyManagerUserSQL("NULLIF($2,'')::uuid") + "))"
 	args := append([]any{}, scopeArgs...)
 	conditions := []string{"project.status <> 'cancelled'", scopeSQL}
 	addArg := func(value any) string {
@@ -50,14 +53,35 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 	case "source":
 		conditions = append(conditions, "source.reported_by="+addArg(actorID)+"::uuid", "source.report_delivery_eligible", "report.id IS NULL")
 	case "review":
-		conditions = append(conditions, "report.recipient_id="+addArg(actorID)+"::uuid", "report.status='submitted'")
+		reviewActor := addArg(actorID)
+		conditions = append(conditions, "report.recipient_id="+reviewActor+"::uuid", "report.status IN ('submitted','acknowledged')", "NOT EXISTS (SELECT 1 FROM work_report_read_receipts receipt WHERE receipt.report_id=report.id AND receipt.revision_no=report.current_revision_no AND receipt.user_id="+reviewActor+"::uuid)")
 	case "all":
 		conditions = append(conditions, "report.id IS NOT NULL")
+	case "supervision":
+		profile, err := r.WorkItemAccessProfile(ctx, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !profile.CanSuperviseAllProjects {
+			return nil, forbiddenError("Bạn không có quyền theo dõi báo cáo Giám sát")
+		}
+		conditions = append(conditions, "report.is_supervisor_report", "NOT project.is_sample")
 	default:
 		return nil, validationError("Phạm vi báo cáo không hợp lệ", Record{"scope": filter.Scope})
 	}
 	if filter.ProjectID != "" {
 		conditions = append(conditions, "source.project_id="+addArg(filter.ProjectID)+"::uuid")
+	}
+	if filter.SupervisorID != "" {
+		conditions = append(conditions, "source.reported_by="+addArg(filter.SupervisorID)+"::uuid")
+	}
+	viewerActor := addArg(actorID)
+	viewerReceipt := `EXISTS (SELECT 1 FROM work_report_read_receipts receipt WHERE receipt.report_id=report.id AND receipt.revision_no=report.current_revision_no AND receipt.user_id=` + viewerActor + `::uuid)`
+	if filter.ReadStatus == "read" {
+		conditions = append(conditions, viewerReceipt)
+	}
+	if filter.ReadStatus == "unread" {
+		conditions = append(conditions, "NOT "+viewerReceipt)
 	}
 	if filter.Status != "" {
 		conditions = append(conditions, statusExpression+"="+addArg(filter.Status))
@@ -72,11 +96,17 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 		pattern := "%" + strings.ToLower(filter.Search) + "%"
 		conditions = append(conditions, `lower(concat_ws(' ',project.code,project.name,author.full_name,recipient.full_name,source.weather,source.work_summary,source.issues_summary)) LIKE `+addArg(pattern))
 	}
+	pagination := ""
+	if filter.Scope == "supervision" {
+		pagination = " LIMIT " + addArg(filter.Limit) + " OFFSET " + addArg(filter.Offset)
+	}
 	return r.Query(ctx, fmt.Sprintf(`
 		SELECT
 			source.id::text AS source_id,
 			'operation_daily_report' AS source_kind,
 			report.id::text AS work_report_id,
+			report.is_supervisor_report,
+			%s AS viewer_acknowledged,
 			source.project_id::text AS project_id,
 			project.code AS project_code,
 			project.name AS project_name,
@@ -118,21 +148,39 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 		LEFT JOIN users reviewer ON reviewer.id=report.reviewed_by
 		WHERE %s
 		ORDER BY source.report_date DESC,source.created_at DESC,source.id
-	`, statusExpression, strings.Join(conditions, " AND ")), args...)
+	%s`, viewerReceipt, statusExpression, strings.Join(conditions, " AND "), pagination), args...)
 }
 
 func (r *Repository) WorkReportSummary(ctx context.Context, actorID string, filter WorkReportFilter) (WorkReportSummary, error) {
+	profile, err := r.WorkItemAccessProfile(ctx, actorID)
+	if err != nil {
+		return WorkReportSummary{}, err
+	}
+	if filter.Scope == "supervision" && !profile.CanSuperviseAllProjects {
+		return WorkReportSummary{}, forbiddenError("Bạn không có quyền theo dõi báo cáo Giám sát")
+	}
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, actorID, "project", 1)
 	if err != nil {
 		return WorkReportSummary{}, err
 	}
+	scopeSQL = "(" + scopeSQL + " OR (report.is_supervisor_report AND NOT project.is_sample AND " + deputyManagerUserSQL("NULLIF($2,'')::uuid") + "))"
 	args := append([]any{}, scopeArgs...)
 	addArg := func(value any) string {
 		args = append(args, value)
 		return fmt.Sprintf("$%d", len(args))
 	}
 	permissionActor := addArg(actorID)
+	supervisionAllowed := addArg(profile.CanSuperviseAllProjects)
 	filterConditions := []string{"TRUE"}
+	if filter.SupervisorID != "" {
+		filterConditions = append(filterConditions, "base.reported_by="+addArg(filter.SupervisorID)+"::uuid")
+	}
+	if filter.ReadStatus == "read" {
+		filterConditions = append(filterConditions, "base.viewer_acknowledged")
+	}
+	if filter.ReadStatus == "unread" {
+		filterConditions = append(filterConditions, "NOT base.viewer_acknowledged")
+	}
 	if filter.ProjectID != "" {
 		filterConditions = append(filterConditions, "base.project_id="+addArg(filter.ProjectID)+"::uuid")
 	}
@@ -152,6 +200,8 @@ func (r *Repository) WorkReportSummary(ctx context.Context, actorID string, filt
 		WITH base AS (
 			SELECT source.id,source.project_id,source.report_date,source.reported_by,
 				report.id AS work_report_id,report.recipient_id,report.status AS formal_status,
+				(report.is_supervisor_report AND NOT project.is_sample AND %s::boolean) AS supervision_candidate,
+				EXISTS (SELECT 1 FROM work_report_read_receipts receipt WHERE receipt.report_id=report.id AND receipt.revision_no=report.current_revision_no AND receipt.user_id=%s::uuid) AS viewer_acknowledged,
 				COALESCE(report.status,CASE WHEN source.report_delivery_eligible THEN 'draft' ELSE 'recorded' END) AS status,
 				source.report_delivery_eligible,
 				lower(concat_ws(' ',project.code,project.name,author.full_name,recipient.full_name,source.weather,source.work_summary,source.issues_summary)) AS search_text,
@@ -187,9 +237,10 @@ func (r *Repository) WorkReportSummary(ctx context.Context, actorID string, filt
 			WHERE project.status <> 'cancelled' AND %s
 		), filtered AS (
 			SELECT base.*,
+				(can_view AND supervision_candidate) AS supervision_scope,
 				(can_view AND reported_by=%s::uuid AND work_report_id IS NOT NULL) AS mine_scope,
 				(can_view AND reported_by=%s::uuid AND report_delivery_eligible AND work_report_id IS NULL) AS source_scope,
-				(can_review AND recipient_id=%s::uuid AND formal_status='submitted') AS review_scope,
+				(can_review AND recipient_id=%s::uuid AND formal_status IN ('submitted','acknowledged') AND NOT viewer_acknowledged) AS review_scope,
 				(can_manage AND work_report_id IS NOT NULL) AS all_scope
 			FROM base
 			WHERE %s
@@ -199,9 +250,10 @@ func (r *Repository) WorkReportSummary(ctx context.Context, actorID string, filt
 			COUNT(*) FILTER (WHERE source_scope) AS source,
 			COUNT(*) FILTER (WHERE review_scope) AS review,
 			COUNT(*) FILTER (WHERE all_scope) AS all_scope,
-			COUNT(*) FILTER (WHERE mine_scope OR source_scope OR review_scope OR all_scope) AS total_visible
+			COUNT(*) FILTER (WHERE supervision_scope AND NOT viewer_acknowledged) AS supervision,
+			COUNT(*) FILTER (WHERE mine_scope OR source_scope OR review_scope OR all_scope OR supervision_scope) AS total_visible
 		FROM filtered
-	`, permissionActor, permissionActor, permissionActor, scopeSQL,
+	`, supervisionAllowed, permissionActor, permissionActor, permissionActor, permissionActor, scopeSQL,
 		permissionActor, permissionActor, permissionActor, strings.Join(filterConditions, " AND ")), args...)
 	if err != nil {
 		return WorkReportSummary{}, err
@@ -210,6 +262,7 @@ func (r *Repository) WorkReportSummary(ctx context.Context, actorID string, filt
 		Scopes: map[string]int{
 			"mine": int(number(row["mine"])), "source": int(number(row["source"])),
 			"review": int(number(row["review"])), "all": int(number(row["all_scope"])),
+			"supervision": int(number(row["supervision"])),
 		},
 		TotalVisible: int(number(row["total_visible"])),
 	}, nil
@@ -220,7 +273,7 @@ func (r *Repository) WorkReportSource(ctx context.Context, sourceID string) (Rec
 		SELECT source.*,source.id::text AS source_id,source.project_id::text AS project_id,
 			source.reported_by::text AS author_id,project.code AS project_code,project.name AS project_name,
 			author.full_name AS author_name,COALESCE(author.deleted_at IS NOT NULL, false) AS author_account_deleted,work_item.title AS work_item_title,
-			report.id::text AS work_report_id,report.recipient_id::text AS recipient_id,
+			report.id::text AS work_report_id,report.is_supervisor_report,report.recipient_id::text AS recipient_id,
 			recipient.full_name AS recipient_name,COALESCE(recipient.deleted_at IS NOT NULL, false) AS recipient_account_deleted,report.status,report.current_revision_no,
 			report.submitted_at,report.reviewed_by::text AS reviewed_by,reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL, false) AS reviewed_by_account_deleted,
 			report.reviewed_at,report.review_comment,revision.snapshot_sha256 AS delivery_snapshot_sha256
@@ -335,7 +388,13 @@ func (r *Repository) WorkReportHistory(ctx context.Context, reportID string) ([]
 }
 
 func (r *Repository) WorkReportHeader(ctx context.Context, reportID string) (Record, error) {
-	return r.QueryOne(ctx, `SELECT id::text AS id,source_id::text AS source_id,project_id::text AS project_id,author_id::text AS author_id,recipient_id::text AS recipient_id,status,current_revision_no FROM work_reports WHERE id=$1`, reportID)
+	return r.QueryOne(ctx, `SELECT id::text AS id,source_id::text AS source_id,project_id::text AS project_id,author_id::text AS author_id,recipient_id::text AS recipient_id,status,current_revision_no,is_supervisor_report FROM work_reports WHERE id=$1`, reportID)
+}
+
+func (r *Repository) WorkReportReadReceipts(ctx context.Context, reportID string) ([]Record, error) {
+	return r.Query(ctx, `SELECT receipt.revision_no,receipt.user_id::text AS user_id,account.full_name AS user_name,COALESCE(account.deleted_at IS NOT NULL,false) AS user_account_deleted,receipt.acknowledged_at,receipt.comment
+		FROM work_report_read_receipts receipt JOIN users account ON account.id=receipt.user_id
+		WHERE receipt.report_id=$1 ORDER BY receipt.revision_no,receipt.acknowledged_at,receipt.user_id`, reportID)
 }
 
 func (r *Repository) WorkReportRevision(ctx context.Context, reportID string, revisionNo int) (Record, error) {
@@ -397,7 +456,7 @@ func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID
 func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceID, recipientID, comment, actorID, actorName string) (Record, error) {
 	source, err := queryOneRecord(ctx, tx, `
 		SELECT source.*,project.code AS project_code,project.name AS project_name,author.full_name AS author_name,
-			work_item.title AS work_item_title
+			work_item.title AS work_item_title,`+supervisorUserSQL("source.reported_by", "source.project_id")+` AS is_supervisor_report
 		FROM operation_daily_reports source
 		JOIN projects project ON project.id=source.project_id AND project.status <> 'cancelled'
 		LEFT JOIN users author ON author.id=source.reported_by
@@ -454,10 +513,12 @@ func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceI
 	hash := sha256Hex(rawSnapshot)
 
 	existing, existingErr := queryOneRecord(ctx, tx, `SELECT * FROM work_reports WHERE source_kind='operation_daily_report' AND source_id=$1 FOR UPDATE`, sourceID)
+	isSupervisorReport := boolValue(source["is_supervisor_report"])
 	revisionNo := 1
 	reportID := ""
 	eventType := "submitted"
 	if existingErr == nil {
+		isSupervisorReport = boolValue(existing["is_supervisor_report"])
 		if fmt.Sprint(existing["status"]) != "needs_changes" {
 			return nil, validationError("Báo cáo chỉ được gửi lại sau khi có yêu cầu bổ sung", Record{"status": existing["status"]})
 		}
@@ -482,10 +543,10 @@ func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceI
 	} else if errors.Is(existingErr, sql.ErrNoRows) {
 		if err := tx.QueryRowContext(ctx, `
 			INSERT INTO work_reports
-				(source_kind,source_id,project_id,report_type,report_date,author_id,recipient_id,status,current_revision_no)
-			VALUES ('operation_daily_report',$1,$2,'construction_daily',$3,$4,$5,'submitted',1)
+				(source_kind,source_id,project_id,report_type,report_date,author_id,recipient_id,status,current_revision_no,is_supervisor_report)
+			VALUES ('operation_daily_report',$1,$2,'construction_daily',$3,$4,$5,'submitted',1,$6)
 			RETURNING id::text
-		`, sourceID, source["project_id"], source["report_date"], actorID, recipientID).Scan(&reportID); err != nil {
+		`, sourceID, source["project_id"], source["report_date"], actorID, recipientID, isSupervisorReport).Scan(&reportID); err != nil {
 			return nil, err
 		}
 	} else {
@@ -508,7 +569,29 @@ func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceI
 		return nil, err
 	}
 	reportDateLabel := workReportDisplayDate(dateOnly(source["report_date"]))
-	audience := Record{"user_ids": []string{recipientID}, "exclude_actor": true}
+	audienceIDs := []string{recipientID}
+	if isSupervisorReport {
+		rows, err := tx.QueryContext(ctx, `SELECT account.id::text FROM users account WHERE `+deputyManagerUserSQL("account.id")+` AND `+supervisedProjectSQL("$1::uuid"), cleanID(source["project_id"]))
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			if !workReportContains(audienceIDs, id) {
+				audienceIDs = append(audienceIDs, id)
+			}
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rows.Close()
+	}
+	audience := Record{"user_ids": audienceIDs, "exclude_actor": true}
 	if eventType == "resubmitted" {
 		audience["resolve_user_ids"] = []string{actorID}
 	}
@@ -549,7 +632,7 @@ func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceI
 	}, nil
 }
 
-func (r *Repository) ReviewWorkReport(ctx context.Context, reportID, action, comment, actorID, actorName string, canManage bool) (Record, error) {
+func (r *Repository) ReviewWorkReport(ctx context.Context, reportID, action, comment, actorID, actorName string, _ bool, expectedRevision ...int) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -559,11 +642,36 @@ func (r *Repository) ReviewWorkReport(ctx context.Context, reportID, action, com
 	if err != nil {
 		return nil, err
 	}
-	if fmt.Sprint(report["status"]) != "submitted" {
-		return nil, validationError("Báo cáo không ở trạng thái chờ xem", Record{"status": report["status"]})
+	if len(expectedRevision) > 0 && expectedRevision[0] > 0 && expectedRevision[0] != int(number(report["current_revision_no"])) {
+		return nil, validationError("Báo cáo đã có lần gửi mới. Vui lòng tải lại", Record{"reason": "stale_revision", "current_revision_no": report["current_revision_no"]})
 	}
-	if cleanID(report["recipient_id"]) != actorID && !canManage {
-		return nil, forbiddenError("Báo cáo này không được gửi đến bạn")
+	var authorized bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
+		SELECT 1 FROM users account
+		JOIN projects project ON project.id=$2::uuid AND project.status <> 'cancelled'
+		WHERE account.id=$1::uuid AND account.status='active' AND account.deleted_at IS NULL
+		AND NOT EXISTS (SELECT 1 FROM user_roles external_assignment JOIN roles external_role ON external_role.id=external_assignment.role_id WHERE external_assignment.user_id=account.id AND external_role.external_only)
+		AND EXISTS (SELECT 1 FROM user_roles assignment
+			JOIN roles role ON role.id=assignment.role_id AND NOT role.external_only
+			JOIN role_permissions link ON link.role_id=role.id
+			JOIN permissions permission ON permission.id=link.permission_id
+			WHERE assignment.user_id=account.id AND (assignment.project_id IS NULL OR assignment.project_id=project.id)
+			AND permission.key IN ('work_report.review','work_report.manage')
+			AND (
+				($3::uuid=account.id OR permission.key='work_report.manage')
+				AND (project.created_by=account.id OR assignment.project_id=project.id OR (assignment.project_id IS NULL AND role.name IN ('admin','director'))
+					OR EXISTS (SELECT 1 FROM project_members member JOIN staff member_staff ON member_staff.id=member.staff_id AND member_staff.status='active' WHERE member.project_id=project.id AND member.active AND member_staff.user_id=account.id))
+				OR ($4::boolean AND `+deputyManagerUserSQL("account.id")+` AND `+supervisedProjectSQL("project.id")+`)
+			)
+		)
+	)`, actorID, cleanID(report["project_id"]), cleanID(report["recipient_id"]), boolValue(report["is_supervisor_report"])).Scan(&authorized); err != nil {
+		return nil, err
+	}
+	if !authorized {
+		return nil, forbiddenError("Bạn không có quyền xem xét báo cáo này")
+	}
+	if !workReportContains([]string{"submitted", "acknowledged"}, fmt.Sprint(report["status"])) {
+		return nil, validationError("Báo cáo không ở trạng thái chờ xem", Record{"status": report["status"]})
 	}
 	status := map[string]string{"request-changes": "needs_changes", "acknowledge": "acknowledged"}[action]
 	if status == "" {
@@ -571,6 +679,23 @@ func (r *Repository) ReviewWorkReport(ctx context.Context, reportID, action, com
 	}
 	if action == "request-changes" && strings.TrimSpace(comment) == "" {
 		return nil, validationError("Lý do yêu cầu bổ sung là bắt buộc", Record{"comment": "required"})
+	}
+	if action == "acknowledge" {
+		result, err := tx.ExecContext(ctx, `INSERT INTO work_report_read_receipts (report_id,revision_no,user_id,comment)
+			VALUES ($1,$2,$3::uuid,NULLIF($4,'')) ON CONFLICT (report_id,revision_no,user_id) DO NOTHING`, reportID, report["current_revision_no"], actorID, strings.TrimSpace(comment))
+		if err != nil {
+			return nil, err
+		}
+		inserted, err := result.RowsAffected()
+		if err != nil {
+			return nil, err
+		}
+		if inserted == 0 {
+			if err := tx.Commit(); err != nil {
+				return nil, err
+			}
+			return r.WorkReportSource(ctx, cleanID(report["source_id"]))
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE work_reports

@@ -175,6 +175,7 @@ export type ProjectActivityAttachmentOption = {
 };
 
 export type ProjectActivityOptions = {
+  comment_only?: boolean;
   members: ProjectActivityMemberOption[];
   roles: ProjectActivityRoleOption[];
   targets: ProjectActivityTargetOption[];

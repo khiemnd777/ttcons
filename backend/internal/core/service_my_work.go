@@ -511,7 +511,23 @@ func (s *Service) ProjectActivityOptions(ctx context.Context, projectID, actorID
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ProjectActivityOptions(ctx, projectID, profile)
+	options, err := s.repo.ProjectActivityOptions(ctx, projectID, profile)
+	if err != nil {
+		return nil, err
+	}
+	commentOnly := false
+	if profile.CanSuperviseAllProjects && !profile.IsManager {
+		inScope, scopeErr := s.repo.UserHasProjectScope(ctx, actorID, projectID)
+		if scopeErr != nil {
+			return nil, scopeErr
+		}
+		commentOnly = !inScope
+	}
+	options["comment_only"] = commentOnly
+	if commentOnly {
+		options["attachments"] = []Record{}
+	}
+	return options, nil
 }
 
 func normalizeProjectEvidenceFilter(filter ProjectEvidenceFilter) (ProjectEvidenceFilter, error) {

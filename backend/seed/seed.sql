@@ -69,13 +69,15 @@ INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000015','sales','Sale','Phụ trách phối hợp khách hàng, BOQ và hồ sơ thương mại',true),
 ('20000000-0000-0000-0000-000000000016','legal','Pháp lý','Phụ trách rà soát pháp lý hợp đồng',true),
 ('20000000-0000-0000-0000-000000000017','contract_officer','Bộ phận HĐ','Phụ trách lập, luân chuyển, ký và lưu hồ sơ hợp đồng',true),
-('20000000-0000-0000-0000-000000000018','developer','Nhà phát triển','Quản trị kỹ thuật và thiết lập hệ thống',true);
+('20000000-0000-0000-0000-000000000018','developer','Nhà phát triển','Quản trị kỹ thuật và thiết lập hệ thống',true),
+('20000000-0000-0000-0000-000000000019','deputy_manager','Phó Quản Lý','Theo dõi tiến độ toàn công ty, công việc và báo cáo Giám sát',true);
 
 UPDATE roles
 SET external_only=(name='client');
 
 INSERT INTO permissions (id, key, name, module)
 SELECT gen_random_uuid(), key, name, module FROM (VALUES
+('project.supervision.view','Theo dõi Giám sát toàn công ty','project'),
 ('project.view','Xem công trình','project'),('project.create','Tạo công trình','project'),('project.update','Cập nhật công trình','project'),('project.delete','Xóa công trình','project'),('project.member.manage','Quản lý thành viên công trình','project'),('project.import','Import công trình','project'),('project.export','Xuất công trình','project'),('project.reconciliation.view','Đối soát tài chính toàn công ty','project'),
 ('pipeline.view','Xem pipeline','pipeline'),('pipeline.create','Tạo pipeline','pipeline'),('pipeline.edit','Sửa pipeline','pipeline'),('pipeline.publish','Publish pipeline','pipeline'),('pipeline.run','Chạy pipeline','pipeline'),('pipeline.advance_node','Chuyển node','pipeline'),
 ('workflow_definition.import','Import định nghĩa workflow','pipeline'),('workflow_definition.export','Xuất định nghĩa workflow','pipeline'),
@@ -115,9 +117,15 @@ WHERE key='staff.account_security.manage';
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
-WHERE (r.name = 'developer' AND p.key <> 'project.reconciliation.view')
-   OR (r.name = 'admin' AND p.key NOT IN ('settings.update','staff.import','sample_data.create','project.reconciliation.view'))
+WHERE (r.name = 'developer' AND p.key NOT IN ('project.reconciliation.view','project.supervision.view'))
+   OR (r.name = 'admin' AND p.key NOT IN ('settings.update','staff.import','sample_data.create','project.reconciliation.view','project.supervision.view'))
 ON CONFLICT DO NOTHING;
+
+INSERT INTO role_permissions (role_id,permission_id)
+SELECT role.id,permission.id FROM roles role JOIN permissions permission ON permission.key IN (
+  'project.supervision.view','project.view','pipeline.view','planning.view','operation.view',
+  'work_report.view','work_report.review','work_report.export'
+) WHERE role.name='deputy_manager' ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id,permission_id)
 SELECT role.id,permission.id

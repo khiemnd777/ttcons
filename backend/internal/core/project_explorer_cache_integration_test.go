@@ -118,3 +118,73 @@ func TestProjectExplorerRedisCacheInvalidatesByDatabaseRevision(t *testing.T) {
 		t.Fatalf("fallback page=%+v", fallback)
 	}
 }
+
+func TestDeputyExplorerCacheRevokesAndRestoresCompanyScope(t *testing.T) {
+	redisURL := os.Getenv("CONSFLOW_TEST_REDIS_CACHE_URL")
+	if redisURL == "" {
+		t.Skip("set CONSFLOW_TEST_REDIS_CACHE_URL for warm-cache supervision test")
+	}
+	database := openIsolatedAccountingTestDB(t)
+	ctx := context.Background()
+	options, err := redis.ParseURL(redisURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := redis.NewClient(options)
+	t.Cleanup(func() { _ = client.Close() })
+	if err := client.Ping(ctx).Err(); err != nil {
+		t.Fatal(err)
+	}
+	actor, project := newID(), newID()
+	mustExec(t, database, `INSERT INTO users(id,email,password_hash,full_name,status) VALUES($1,$2,'demo:test','Deputy Cache','active')`, actor, actor+"@test.local")
+	mustExec(t, database, `INSERT INTO projects(id,name,code,client_name) VALUES($1,'Deputy Cache Project',$2,'Client')`, project, "DEPC-"+project[:8])
+	mustExec(t, database, `INSERT INTO user_roles(user_id,role_id) SELECT $1,id FROM roles WHERE name='deputy_manager'`, actor)
+	service := NewService(NewRepository(database), "test-secret")
+	service.ConfigureProjectExplorerCache(client, ProjectExplorerCacheConfig{Mode: "serve", OperationTimeout: time.Second, IndexTTL: time.Minute, RowTTL: time.Minute, LockTTL: time.Second, MaxValueBytes: 256 * 1024}, nil)
+	request := ProjectExplorerRequest{Page: 1, PageSize: 25}
+	for _, phase := range []struct {
+		marker bool
+		want   int
+	}{{true, 1}, {true, 1}, {false, 0}, {false, 0}, {true, 1}, {true, 1}} {
+		if phase.marker {
+			mustExec(t, database, `INSERT INTO role_permissions(role_id,permission_id) SELECT role.id,permission.id FROM roles role JOIN permissions permission ON permission.key='project.supervision.view' WHERE role.name='deputy_manager' ON CONFLICT DO NOTHING`)
+		} else {
+			mustExec(t, database, `DELETE FROM role_permissions WHERE role_id IN(SELECT id FROM roles WHERE name='deputy_manager') AND permission_id IN(SELECT id FROM permissions WHERE key='project.supervision.view')`)
+		}
+		page, err := service.ProjectExplorer(ctx, actor, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if page.Total != phase.want || len(page.Items) != phase.want {
+			t.Fatalf("marker=%v warm index total=%d rows=%d want=%d", phase.marker, page.Total, len(page.Items), phase.want)
+		}
+	}
+	for _, status := range []string{"inactive", "active"} {
+		mustExec(t, database, `UPDATE users SET status=$2 WHERE id=$1`, actor, status)
+		page, err := service.ProjectExplorer(ctx, actor, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := 0
+		if status == "active" {
+			want = 1
+		}
+		if page.Total != want || len(page.Items) != want {
+			t.Fatalf("status=%s cached scope %#v", status, page)
+		}
+	}
+	for _, sample := range []bool{true, false} {
+		mustExec(t, database, `UPDATE projects SET is_sample=$2 WHERE id=$1`, project, sample)
+		page, err := service.ProjectExplorer(ctx, actor, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := 1
+		if sample {
+			want = 0
+		}
+		if page.Total != want || len(page.Items) != want {
+			t.Fatalf("sample=%v cached scope %#v", sample, page)
+		}
+	}
+}

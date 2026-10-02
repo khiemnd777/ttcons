@@ -207,12 +207,16 @@ func (h *Handler) GetWorkReportEvidenceFile(c *fiber.Ctx) error {
 
 func workReportFilter(c *fiber.Ctx) WorkReportFilter {
 	return WorkReportFilter{
-		Scope:     c.Query("scope", "mine"),
-		ProjectID: c.Query("project_id"),
-		Status:    c.Query("status"),
-		DateFrom:  c.Query("date_from"),
-		DateTo:    c.Query("date_to"),
-		Search:    c.Query("search"),
+		Scope:        c.Query("scope", "mine"),
+		ProjectID:    c.Query("project_id"),
+		Status:       c.Query("status"),
+		DateFrom:     c.Query("date_from"),
+		DateTo:       c.Query("date_to"),
+		Search:       c.Query("search"),
+		SupervisorID: c.Query("supervisor_id"),
+		ReadStatus:   c.Query("read_status"),
+		Limit:        c.QueryInt("limit", 25),
+		Offset:       c.QueryInt("offset", 0),
 	}
 }
 

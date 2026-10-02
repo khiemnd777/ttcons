@@ -165,7 +165,7 @@ export type NotificationPreference = {
 };
 
 export type WorkReportSummary = {
-  scopes: Partial<Record<'mine' | 'source' | 'review' | 'all', number>>;
+  scopes: Partial<Record<'mine' | 'source' | 'review' | 'all' | 'supervision', number>>;
   total_visible: number;
 };
 
@@ -187,6 +187,8 @@ export type WorkReportListItem = AnyRecord & {
   status: WorkReportStatus;
   current_revision_no: number;
   submitted_at?: string;
+  is_supervisor_report?: boolean;
+  viewer_acknowledged?: boolean;
 };
 
 export type WorkReportRevision = AnyRecord & {
@@ -228,4 +230,6 @@ export type WorkReportDetail = WorkReportListItem & {
   review_comment?: string;
   revisions: WorkReportRevision[];
   events: WorkReportEvent[];
+  capabilities?: { can_acknowledge: boolean; can_request_changes: boolean; can_discuss: boolean };
+  read_receipts?: Array<{ revision_no: number; user_id: string; user_name: string; acknowledged_at: string; comment?: string }>;
 };

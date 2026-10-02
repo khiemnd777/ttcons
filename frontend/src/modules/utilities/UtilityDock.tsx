@@ -786,7 +786,7 @@ function ProjectConversationContent({ project }: { project: ProjectDiscussionPro
                       {activityVisibilityLabel(item.visibility) ? <p className={clsx('mt-1 text-[11px]', own ? 'text-blue-100' : 'text-slate-500')}>{activityVisibilityLabel(item.visibility)}</p> : null}
                       <ActivityAttachments attachments={item.attachments} compact />
                     </div>
-                    {!item.withdrawn_at && project.can_post ? <button type="button" className="mt-1 inline-flex items-center gap-1 px-1 text-[11px] font-semibold text-slate-500 hover:text-blue-700" onClick={() => setReplyTo(item)}><Reply className="h-3 w-3" /> Trả lời</button> : null}
+                    {!item.withdrawn_at && project.can_post && (options.data?.comment_only !== true || !item.scope_type || ['project', 'work_item'].includes(item.scope_type)) ? <button type="button" className="mt-1 inline-flex items-center gap-1 px-1 text-[11px] font-semibold text-slate-500 hover:text-blue-700" onClick={() => setReplyTo(item)}><Reply className="h-3 w-3" /> Trả lời</button> : null}
                   </div>
                 </article>
               </div>
@@ -798,6 +798,7 @@ function ProjectConversationContent({ project }: { project: ProjectDiscussionPro
         <div className="shrink-0 border-t border-line bg-white p-3">
           <ActivityComposer
             mode="project"
+            commentOnly={options.isLoading || options.isError || options.data?.comment_only === true}
             allowTarget
             variant="chat"
             density="compact"
@@ -809,7 +810,7 @@ function ProjectConversationContent({ project }: { project: ProjectDiscussionPro
             onRetryMentionOptions={() => void options.refetch()}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
-            submitting={addActivity.isPending}
+            submitting={addActivity.isPending || options.isLoading || options.isError}
             onSubmit={(payload) => addActivity.mutateAsync(payload).then(() => undefined)}
           />
         </div>

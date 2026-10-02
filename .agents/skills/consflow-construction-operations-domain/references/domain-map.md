@@ -1,5 +1,12 @@
 # Construction Operations Domain Map
 
+## Company Supervisor Oversight
+
+- Phó Quản Lý uses `/me/supervision-work` to observe required Supervisor roles and assigned Supervisor work across real company projects; no manual project membership or execution/approval override. Shared Work Item detail is an explicitly read-only oversight entrypoint; canonical project discussion remains available through comment-only controls for nonmembers.
+- Supervisor report delivery keeps the original PM recipient and adds active global deputies. Classified report history/evidence is immutable; acknowledgements are recorded per actor and revision rather than inferred from shared status. Requests for changes retain source locks until changed-source resubmission; no requirement that both reviewers acknowledge before a Giai đoạn may advance.
+- Owners/searches: `supervision.go|supervisorWorkSQL|supervisorUserSQL`, `repository_work_reports.go|work_report_read_receipts`, `WorkReportReviewDialog|SupervisionWorkspace`. Classification uses canonical roles/member labels, never staff position text or a person's name.
+- Company options reuse that classification through `supervisionSupervisorOptionsSQL` candidate unions instead of a user-by-project scan. Non-deleted staff membership semantics remain identical to `supervisorUserSQL`; optimizing options does not change report classification, assignments, delivery, receipt or work execution behavior. Equivalence regression is `TestSupervisionOptionsMatchCanonicalClassification`.
+
 ## Mobile Report Capture
 
 - The create/edit form leads with source/date, photos and daily work, then weather/progress and optional issue/resource/note disclosures. `Dialog.mobileFullscreen` remains an explicit opt-in. Report attachments use the same `EvidenceUploader` table and continuous camera as all other capture forms. Mobile resource cards reuse desktop table controls; footer actions remain permission-aware draft/send or save-only.

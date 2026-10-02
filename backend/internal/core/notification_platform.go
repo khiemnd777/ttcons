@@ -636,7 +636,7 @@ func filterNotificationRecipients(ctx context.Context, tx *sql.Tx, projection no
 	if len(candidates) > 500 {
 		return nil, errors.New("notification explicit audience exceeds 500 recipients")
 	}
-	args := []any{projection.ProjectID, projection.EventKey, projection.CategoryKey, projection.RequiredDelivery, projection.PermissionsAny}
+	args := []any{projection.ProjectID, projection.EventKey, projection.CategoryKey, projection.RequiredDelivery, projection.PermissionsAny, projection.AggregateID}
 	values := make([]string, 0, len(candidates))
 	for _, candidateID := range candidates {
 		args = append(args, candidateID)
@@ -655,6 +655,10 @@ func filterNotificationRecipients(ctx context.Context, tx *sql.Tx, projection no
 		  )
 		  AND (
 			NULLIF($1,'')::uuid IS NULL
+			OR ($2 IN ('work_report.submitted','work_report.resubmitted') AND %s
+				AND EXISTS (SELECT 1 FROM work_reports supervised_report JOIN projects supervised_project ON supervised_project.id=supervised_report.project_id
+					WHERE supervised_report.source_id=NULLIF($6,'')::uuid AND supervised_report.project_id=NULLIF($1,'')::uuid
+					AND supervised_report.is_supervisor_report AND supervised_project.status <> 'cancelled' AND NOT supervised_project.is_sample))
 			OR EXISTS (
 				SELECT 1 FROM user_roles privileged_assignment
 				JOIN roles privileged_role ON privileged_role.id=privileged_assignment.role_id
@@ -701,7 +705,7 @@ func filterNotificationRecipients(ctx context.Context, tx *sql.Tx, projection no
 			),true)
 		  )
 		ORDER BY account.id
-	`, strings.Join(values, ",")), args...)
+	`, strings.Join(values, ","), deputyManagerUserSQL("account.id")), args...)
 	if err != nil {
 		return nil, err
 	}

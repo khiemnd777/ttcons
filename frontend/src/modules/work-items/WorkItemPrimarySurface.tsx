@@ -47,6 +47,7 @@ export function WorkItemPrimarySurface({
   evidence,
   surface = resolveWorkItemPrimarySurface(item),
   readOnly = false,
+  observerReadOnly = false,
   navigationRequest,
   workflowFormActionRef,
   onWorkflowFormActionStateChange,
@@ -57,6 +58,7 @@ export function WorkItemPrimarySurface({
   evidence: EvidenceRecord[];
   surface?: WorkItemPrimarySurfaceDefinition;
   readOnly?: boolean;
+  observerReadOnly?: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
   workflowFormActionRef?: Ref<WorkflowFormActionHandle>;
   onWorkflowFormActionStateChange?: (state: WorkflowFormActionState | null) => void;
@@ -77,6 +79,7 @@ export function WorkItemPrimarySurface({
         onWorkflowFormActionStateChange,
         onDirtyChange,
         onBusyChange,
+        observerReadOnly,
       )}
     </section>
   );
@@ -360,7 +363,17 @@ function renderPrimaryPanel(
   onWorkflowFormActionStateChange?: (state: WorkflowFormActionState | null) => void,
   onDirtyChange?: (dirty: boolean) => void,
   onBusyChange?: (busy: boolean) => void,
+  observerReadOnly = false,
 ) {
+  // Specialized operational panels predate read-only embedding. Observer
+  // entrypoints retain the canonical evidence/form readers without mounting
+  // those write-only editors or widening their source permissions.
+  if (observerReadOnly && !['workflow_form', 'evidence', 'approval'].includes(kind)) {
+    return <div className="space-y-3">
+      <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly variant="embedded" />
+      {hasWorkflowFormSummary(item) ? <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly artifactReadOnly /> : null}
+    </div>;
+  }
   switch (kind) {
     case 'workflow_form':
       return (
@@ -370,6 +383,7 @@ function renderPrimaryPanel(
           evidence={evidence}
           workItemStatus={item.status}
           readOnly={readOnly}
+          artifactReadOnly={observerReadOnly}
           navigationRequest={navigationRequest}
           externalActions
           actionRef={workflowFormActionRef}
@@ -381,7 +395,7 @@ function renderPrimaryPanel(
     case 'evidence':
       return <EvidencePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} variant="primary" onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />;
     case 'approval':
-      return <ApprovalPrimaryPanel item={item} evidence={evidence} readOnly={readOnly} navigationRequest={navigationRequest} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />;
+      return <ApprovalPrimaryPanel item={item} evidence={evidence} readOnly={readOnly} artifactReadOnly={observerReadOnly} navigationRequest={navigationRequest} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />;
     case 'incoming_acceptance':
       return <IncomingAcceptancePanel workItemId={item.id} projectId={item.project_id} evidence={evidence} />;
     case 'material_snapshot':
@@ -471,6 +485,7 @@ function ApprovalPrimaryPanel({
   item,
   evidence,
   readOnly,
+  artifactReadOnly,
   navigationRequest,
   onDirtyChange,
   onBusyChange,
@@ -478,6 +493,7 @@ function ApprovalPrimaryPanel({
   item: WorkItem;
   evidence: EvidenceRecord[];
   readOnly: boolean;
+  artifactReadOnly?: boolean;
   navigationRequest?: WorkItemRequirementNavigationRequest | null;
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -503,7 +519,7 @@ function ApprovalPrimaryPanel({
         </div>
       </div>
       {hasWorkflowFormSummary(item) ? (
-        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} navigationRequest={navigationRequest} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />
+        <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly} artifactReadOnly={artifactReadOnly} navigationRequest={navigationRequest} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />
       ) : (
         <EmptyState title="Không có hồ sơ nghiệp vụ gắn với phê duyệt này." />
       )}

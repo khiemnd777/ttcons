@@ -1,5 +1,12 @@
 # Admin Governance Domain Map
 
+## Deputy Manager Role Boundary
+
+- V146 adds system App role `deputy_manager` / Phó Quản Lý and reserved `project.supervision.view`; role identity and marker assignments are guarded in PostgreSQL and `ReplaceRolePermissions`. Catalog/import/member role options are dynamic; the pipeline role-label catalog includes Phó Quản Lý. No existing PM or human account assignment is rewritten.
+- Company scope requires an active non-deleted real internal account, global system role and current marker. `CanSuperviseAllProjects` never sets `IsManager`, Admin/Director or Accounting reconciliation. Narrow explicit view/report-review permissions bypass membership only on real active projects. Financial queries retain legacy scope even for mixed roles.
+- Admin bootstrap treats the marker as a reserved exception. Explorer scope is rechecked and cached-empty indexes invalidate on marker restoration (V147) or sample-project scope changes (V148). Actor/revision receipts and report locks protect independent acknowledgements and prevent stale reviews. First searches: `deputyManagerUserSQL|SupervisionProjectAccessFilter|supervisionCompanyScopeAllowed|comment_only`.
+- Supervision filter options use grant/member candidate sets (`supervisionSupervisorOptionsSQL`), retaining service profile checks and the current Deputy predicate within SQL. Global/scoped/member identity comes from canonical role grants and supported member aliases; text positions/display names of other roles do not qualify. User active/deleted/sample and project cancelled/sample boundaries are preserved; no new access grant or cache is introduced.
+
 ## Accounting Proposal And MISA Scope
 
 - V145 + `backend/seed/seed.sql` define `accounting_request.view|submit|review` and `accounting_misa.reconcile`: Accounting/Admin/Developer all four, PM/Procurement view+submit, Director/QS view. `repository_access.go` enumerates these specific permissions for actors already carrying the company reconciliation marker; it grants no unrelated mutation or Audit access.

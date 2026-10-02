@@ -84,7 +84,7 @@ test('My Work tab count follows the selected scope summary instead of the select
   const page = await myWorkPageSource();
 
   assert.match(page, /const workTabCount = scopeSummary\.isLoading[\s\S]*scopeSummary\.isError && !scopeSummary\.data[\s\S]*scopeSummary\.data\?\.\[queue\]\?\.total \?\? 0/);
-  assert.match(page, /label="Công việc" count=\{workTabCount\}/);
+  assert.match(page, /id: 'work', label: 'Công việc', icon: BriefcaseBusiness, count: workTabCount/);
   assert.doesNotMatch(page, /const workTabCount = workItems\.isLoading|\(firstPage\?\.total \?\? 0\) \+ workflowActionTotal/);
 });
 
@@ -109,10 +109,10 @@ test('My Work defaults to personal responsibility and keeps approval out of ordi
 test('My Work presents source-backed quick filters inside the selected work scope', async () => {
   const page = await myWorkPageSource();
   const workMode = page.slice(page.indexOf("{mode === 'work' ? ("), page.indexOf(") : mode === 'approval' ? ("));
-  const quickFilters = page.slice(page.indexOf('function WorkQuickFilters('), page.indexOf('function ModeTab('));
+  const quickFilters = page.slice(page.indexOf('function WorkQuickFilters('), page.indexOf('function ScopeCountChip('));
 
   assert.match(workMode, /<ScopeRail[\s\S]*<WorkQuickFilters[\s\S]*<FilterBar/);
-  assert.doesNotMatch(page.slice(page.indexOf('<PageHeader'), page.indexOf('<div className="mt-2 grid grid-cols-2')), /<WorkQuickFilters/);
+  assert.doesNotMatch(page.slice(page.indexOf('<PageHeader'), page.indexOf('<WorkspaceTabs')), /<WorkQuickFilters/);
   assert.match(quickFilters, /aria-label="Bộ lọc nhanh công việc"/);
   assert.match(quickFilters, /Bộ lọc nhanh · \{scopeLabel\}/);
   assert.match(quickFilters, /onClick=\{\(\) => onSelect\('all'\)\}/);
@@ -124,14 +124,14 @@ test('My Work presents source-backed quick filters inside the selected work scop
   assert.doesNotMatch(quickFilters, /waiting_decision|waiting_supplement|Chờ tôi duyệt|Chờ bổ sung|Đã xử lý/);
 });
 
-test('My Work mobile controls keep actions visible without stacked horizontal rails', async () => {
+test('My Work uses the standard mode rail and keeps mobile source actions visible', async () => {
   const [page, card, accountingQueue] = await Promise.all([
     myWorkPageSource(),
     source('../src/modules/work-items/WorkItemCard.tsx'),
     source('../src/modules/project-finance/AccountingRequestQueue.tsx'),
   ]);
 
-  assert.match(page, /mt-2 grid grid-cols-2 gap-1\.5 md:mt-4 md:flex/);
+  assert.match(page, /<WorkspaceTabs tabs=\{modeTabs\} activeTab=\{mode\}/);
   assert.match(page, /grid grid-cols-2 gap-1\.5 min-\[360px\]:grid-cols-3 md:hidden/);
   assert.match(page, /<Dialog open=\{mobileOpen\} title="Phạm vi công việc"/);
   assert.match(page, /<Dialog open=\{open\} title="Lọc công việc"[\s\S]*mobileFullscreen manageFocus/);
@@ -156,7 +156,7 @@ test('My Work separates actor-decidable approvals into a dedicated compatible mo
 
   assert.match(page, /type ModeKey = 'work' \| 'approval' \| 'accounting' \| 'attention'/);
   assert.match(page, /legacyApprovalMode = requestedQueue === 'pending_approval' \|\| requestedBucket === 'waiting_decision'/);
-  assert.match(page, /label="Chờ tôi duyệt" count=\{approvalTabCount\}/);
+  assert.match(page, /id: 'approval', label: 'Chờ tôi duyệt', icon: CheckCircle2, count: approvalTabCount/);
   assert.match(page, /mode === 'approval'[\s\S]*<ApprovalWorkspace/);
   assert.match(page, /bucket: 'waiting_decision'/);
   assert.match(page, /<NodeApprovalLane/);
@@ -285,7 +285,7 @@ test('My Work exposes a focused Accounting lane with direct handoff actions', as
 
   assert.match(page, /type ModeKey = 'work' \| 'approval' \| 'accounting' \| 'attention'/);
   assert.match(page, /hasPermission\('accounting_handoff\.view'\) && hasPermission\('accounting_handoff\.acknowledge'\)/);
-  assert.match(page, /label="Nghiệp vụ Kế toán" count=\{accountingTabCount\}/);
+  assert.match(page, /id: 'accounting' as const, label: 'Nghiệp vụ Kế toán', icon: BriefcaseBusiness, count: accountingTabCount/);
   assert.match(page, /get<AccountingWorkPage>\(buildAccountingWorkPath/);
   assert.match(page, /<AccountingWorkLane/);
   assert.match(lane, /Ưu tiên tiếp nhận hồ sơ kế toán toàn công ty/);

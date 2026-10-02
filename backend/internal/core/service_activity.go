@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Service) AddWorkItemActivity(ctx context.Context, workItemID string, req WorkItemActivityRequest, actorID, actorName string) (Record, error) {
-	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	allowed, err := s.repo.CanCommentOnWorkItem(ctx, workItemID, actorID)
 	if err != nil {
 		return nil, err
 	}
@@ -33,8 +33,17 @@ func (s *Service) AddWorkItemActivity(ctx context.Context, workItemID string, re
 	if err != nil {
 		return nil, err
 	}
-	if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+	if err := s.requireSupervisionCommentScope(ctx, cleanID(item["project_id"]), actorID, normalized); err != nil {
 		return nil, err
+	}
+	canAct, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if canAct {
+		if err := s.requireActivePipelineWorkItem(ctx, item); err != nil {
+			return nil, err
+		}
 	}
 	normalized, err = s.validateActivityAttachments(ctx, cleanID(item["project_id"]), workItemID, normalized)
 	if err != nil {
@@ -114,6 +123,15 @@ func (s *Service) ResolveActivity(ctx context.Context, activityID string, req Ac
 		return nil, err
 	}
 	projectID := cleanID(activity["project_id"])
+	if profile.CanSuperviseAllProjects && !profile.IsManager {
+		inScope, scopeErr := s.repo.UserHasProjectScope(ctx, actorID, projectID)
+		if scopeErr != nil {
+			return nil, scopeErr
+		}
+		if !inScope {
+			return nil, forbiddenError("Phạm vi theo dõi Giám sát chỉ cho phép trao đổi, không xử lý trạng thái hoạt động")
+		}
+	}
 	workItemID := cleanID(activity["work_item_id"])
 	if workItemID != "" {
 		allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
@@ -284,6 +302,9 @@ func (s *Service) AddProjectActivity(ctx context.Context, projectID string, req 
 	if !canMutate {
 		return nil, forbiddenError("Chế độ đối soát Kế toán chỉ được xem hoạt động của công trình")
 	}
+	if err := s.requireSupervisionCommentScope(ctx, projectID, actorID, req); err != nil {
+		return nil, err
+	}
 	if strings.TrimSpace(req.ParentActivityID) != "" {
 		req.ActivityType = "comment"
 		req.Visibility = "project"
@@ -303,6 +324,10 @@ func (s *Service) AddProjectActivity(ctx context.Context, projectID string, req 
 	}
 	normalized, err = s.normalizeProjectActivityTarget(ctx, projectID, normalized, actorID)
 	if err != nil {
+		return nil, err
+	}
+	// Legacy metadata adapters may produce attachments during normalization.
+	if err := s.requireSupervisionCommentScope(ctx, projectID, actorID, normalized); err != nil {
 		return nil, err
 	}
 	attachmentWorkItemID := ""
@@ -698,7 +723,7 @@ func (s *Service) normalizeProjectActivityTarget(ctx context.Context, projectID 
 		return req, validationError("scope_id không hợp lệ", Record{"scope_id": scopeID})
 	}
 	if scopeType == "work_item" {
-		allowed, err := s.repo.CanActOnWorkItem(ctx, scopeID, actorID)
+		allowed, err := s.repo.CanCommentOnWorkItem(ctx, scopeID, actorID)
 		if err != nil {
 			return req, err
 		}
@@ -729,7 +754,7 @@ func (s *Service) normalizeProjectActivityTarget(ctx context.Context, projectID 
 		if !validActivityUUID(req.WorkItemID) {
 			return req, validationError("Mã đầu việc không hợp lệ", Record{"work_item_id": req.WorkItemID})
 		}
-		allowed, err := s.repo.CanActOnWorkItem(ctx, req.WorkItemID, actorID)
+		allowed, err := s.repo.CanCommentOnWorkItem(ctx, req.WorkItemID, actorID)
 		if err != nil {
 			return req, err
 		}

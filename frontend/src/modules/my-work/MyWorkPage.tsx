@@ -24,6 +24,8 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
+import { WorkspaceTabs, type WorkspaceTabItem } from '../../components/WorkspaceTabs';
+import { SupervisionWorkspace } from './SupervisionWorkspace';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
@@ -81,7 +83,7 @@ import {
   type WorkScopeKey,
 } from './myWorkDomain';
 
-type ModeKey = 'work' | 'approval' | 'accounting' | 'attention';
+type ModeKey = 'work' | 'approval' | 'accounting' | 'attention' | 'supervision' | 'supervision_reports';
 type LegacyQueueKey = WorkScopeKey | 'pending_approval';
 type AttentionQueueKey = 'all' | 'mentions' | 'questions' | 'blockers' | 'reminders' | 'unread';
 type WorkQuickBucket = 'all' | 'need_action' | 'in_progress' | 'blocked' | 'upcoming' | 'completed';
@@ -197,12 +199,15 @@ export function MyWorkPage() {
 
   const canViewAccountingWork = hasPermission('accounting_handoff.view') && hasPermission('accounting_handoff.acknowledge');
   const canAcknowledgeAccounting = hasPermission('accounting_handoff.acknowledge');
-  const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'accounting', 'attention'], 'work');
+  const canSupervise = hasPermission('project.supervision.view');
+  const requestedMode = validValue<ModeKey>(searchParams.get('mode'), ['work', 'approval', 'accounting', 'attention', 'supervision', 'supervision_reports'], 'work');
   const requestedQueue = validValue<LegacyQueueKey>(searchParams.get('queue'), ['responsible', 'mine', 'department', 'pending_approval', 'watching', 'all'], 'responsible');
   const requestedBucket = validValue<SummaryBucket>(searchParams.get('bucket'), ['all', 'need_action', 'in_progress', 'overdue', 'blocked', 'waiting_decision', 'upcoming', 'completed', 'done_today', 'waiting_supplement'], 'need_action');
   const legacyApprovalMode = requestedQueue === 'pending_approval' || requestedBucket === 'waiting_decision';
   const legacyReturnedAccountingMode = requestedMode === 'work' && requestedBucket === 'waiting_supplement' && canViewAccountingWork;
-  const mode: ModeKey = requestedMode === 'accounting'
+  const mode: ModeKey = requestedMode === 'supervision' || requestedMode === 'supervision_reports'
+    ? canSupervise ? requestedMode : 'work'
+    : requestedMode === 'accounting'
     ? canViewAccountingWork ? 'accounting' : 'work'
     : requestedMode === 'attention'
       ? 'attention'
@@ -345,6 +350,12 @@ export function MyWorkPage() {
     enabled: Boolean(user?.id) && canReviewWorkReports,
     retry: false,
   });
+  const supervisionReportSummary = useQuery({
+    queryKey: ['work-report-summary', user?.id, 'supervision'],
+    queryFn: () => get<WorkReportSummary>('/work-reports/summary'),
+    enabled: Boolean(user?.id) && canSupervise,
+    retry: false,
+  });
   const reportReviewList = useQuery({
     queryKey: ['work-reports', 'review', user?.id, 'my-work', project],
     queryFn: () => {
@@ -456,6 +467,16 @@ export function MyWorkPage() {
     : accountingWork.isError && !accountingFirstPage
       ? '—'
       : accountingFirstPage?.summary.handed_off_count ?? 0;
+  const modeTabs: WorkspaceTabItem<ModeKey>[] = [
+    { id: 'work', label: 'Công việc', icon: BriefcaseBusiness, count: workTabCount },
+    ...(canSupervise ? [
+      { id: 'supervision' as const, label: 'Công việc Giám sát', icon: UserCog },
+      { id: 'supervision_reports' as const, label: 'Báo cáo Giám sát', icon: CheckCircle2, count: supervisionReportSummary.isLoading ? '…' : supervisionReportSummary.isError ? '—' : supervisionReportSummary.data?.scopes.supervision ?? 0 },
+    ] : []),
+    { id: 'approval', label: 'Chờ tôi duyệt', icon: CheckCircle2, count: approvalTabCount },
+    ...(canViewAccountingWork ? [{ id: 'accounting' as const, label: 'Nghiệp vụ Kế toán', icon: BriefcaseBusiness, count: accountingTabCount }] : []),
+    { id: 'attention', label: 'Trao đổi cần phản hồi', icon: MessageSquare, count: attentionTabCount },
+  ];
   const approvalWorkLaneCount = approvalWorkItems.isLoading
     ? '…'
     : approvalWorkItems.isError && !approvalFirstPage
@@ -551,6 +572,12 @@ export function MyWorkPage() {
     if (canReviewWorkReports) void reportReviewSummary.refetch();
     if (mode === 'approval' && canReviewWorkReports) void reportReviewList.refetch();
     if (canViewAccountingWork) void accountingWork.refetch();
+    if (canSupervise) {
+      void supervisionReportSummary.refetch();
+      void queryClient.invalidateQueries({ queryKey: ['supervision-work', user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['supervision-options', user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ['work-reports', 'supervision', user?.id] });
+    }
   }
 
   function openWorkItem(item: WorkItem) {
@@ -590,12 +617,7 @@ export function MyWorkPage() {
         )}
       />
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5 md:mt-4 md:flex md:gap-1 md:overflow-x-auto md:border-b md:border-line" role="group" aria-label="Chế độ Bàn làm việc">
-        <ModeTab active={mode === 'work'} label="Công việc" count={workTabCount} onClick={() => updateParams({ mode: 'work', queue, bucket })} />
-        <ModeTab active={mode === 'approval'} label="Chờ tôi duyệt" count={approvalTabCount} onClick={() => updateParams({ mode: 'approval', queue, bucket })} />
-        {canViewAccountingWork ? <ModeTab active={mode === 'accounting'} label="Nghiệp vụ Kế toán" count={accountingTabCount} onClick={() => updateParams({ mode: 'accounting' })} /> : null}
-        <ModeTab active={mode === 'attention'} label="Trao đổi cần phản hồi" count={attentionTabCount} wideMobile={!canViewAccountingWork} onClick={() => updateParams({ mode: 'attention' })} />
-      </div>
+      <WorkspaceTabs tabs={modeTabs} activeTab={mode} onChange={(nextMode) => updateParams({ mode: nextMode, queue, bucket })} ariaLabel="Chế độ Bàn làm việc" className="mt-4" />
 
       {mode === 'work' && hasPermission('accounting_request.view') && <AccountingRequestQueue projectId={project}/>}
       {mode === 'work' ? (
@@ -762,6 +784,8 @@ export function MyWorkPage() {
           onLoadMore={() => void accountingWork.fetchNextPage()}
           onRetry={() => void accountingWork.refetch()}
         />
+      ) : mode === 'supervision' || mode === 'supervision_reports' ? (
+        <SupervisionWorkspace key={mode} reports={mode === 'supervision_reports'} />
       ) : (
         <ActivityAttentionPanel
           rows={attentionRows}
@@ -1030,14 +1054,6 @@ function WorkQuickFilters({ summary, selected, scopeLabel, loading, unavailable,
         })}
       </div>
     </section>
-  );
-}
-
-function ModeTab({ active, label, count, wideMobile = false, onClick }: { active: boolean; label: string; count: number | string; wideMobile?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" aria-pressed={active} className={clsx('flex min-h-11 min-w-0 items-center justify-between gap-1 rounded-md border px-2 py-1.5 text-left text-xs font-semibold md:block md:rounded-none md:border-0 md:border-b-2 md:px-4 md:py-3 md:text-sm', wideMobile && 'col-span-2 md:col-auto', active ? 'border-blue-300 bg-blue-50 text-blue-700 md:border-blue-600 md:bg-transparent' : 'border-line bg-white text-slate-600 hover:text-slate-800 md:border-transparent')} onClick={onClick}>
-      <span className="min-w-0 leading-4">{label}</span> <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 md:ml-1 md:px-2">{count}</span>
-    </button>
   );
 }
 

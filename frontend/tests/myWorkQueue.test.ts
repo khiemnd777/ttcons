@@ -96,7 +96,7 @@ test('both views share canonical actions and invalidation; observer navigation r
   for (const view of [page, lane]) assert.match(view, /useAccountingWorkActions\(\)/);
   for (const family of ['my-accounting-work', 'my-work-items', 'my-work-scope-summary', 'my-work-navigation-summary', 'project-finance']) assert.ok(actions.includes(`'${family}'`));
   assert.match(register, /invalidateAccountingWork\(queryClient, projectId\)/);
-  assert.match(page, /label="Nghiệp vụ Kế toán"/);
+  assert.match(page, /label: 'Nghiệp vụ Kế toán'/);
   assert.match(page, /entryKind !== 'accounting_handoff'/);
   assert.match(card, /Nhóm Kế toán · hàng chờ chung/);
   assert.match(card, /source_route/);

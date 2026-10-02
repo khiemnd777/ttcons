@@ -508,6 +508,7 @@ function ActivityThreadContent({
               ) : null}
               {rows.length ? (
                 <ChatDiscussion
+                  commentOnly={options.isLoading || options.isError || options.data?.comment_only === true}
                   key={[attention, scopeFilter, scopeIdFilter, activityTypeFilter, visibilityFilter, actorFilter, deferredSearch].join(':')}
                   rows={rows}
                   currentUserId={user?.id}
@@ -531,6 +532,7 @@ function ActivityThreadContent({
               <div className="sticky bottom-0 z-10 mt-auto border-t border-line bg-white/95 p-3 backdrop-blur">
                 <ActivityComposer
                   mode="project"
+                  commentOnly={options.isLoading || options.isError || options.data?.comment_only === true}
                   variant="chat"
                   replyTo={replyTo}
                   editItem={editItem}
@@ -544,7 +546,7 @@ function ActivityThreadContent({
                   mentionOptionsLoading={options.isLoading}
                   mentionOptionsError={options.isError}
                   onRetryMentionOptions={() => void options.refetch()}
-                  submitting={addActivity.isPending || updateMessage.isPending}
+                  submitting={addActivity.isPending || updateMessage.isPending || options.isLoading || options.isError}
                   onSubmit={(payload) => addActivity.mutateAsync(payload).then(() => undefined)}
                 />
               </div>
@@ -568,6 +570,7 @@ function ActivityThreadContent({
                       <div className="space-y-2">
                         {group.items.map((item) => (
                           <ActivityCard
+                            canResolve={!options.isLoading && !options.isError && options.data?.comment_only !== true}
                             key={item.id}
                             item={item}
                             projectId={projectId}
@@ -689,6 +692,7 @@ function ActivityError({ onRetry }: { onRetry: () => void }) {
 
 function ChatDiscussion({
   rows,
+  commentOnly = false,
   currentUserId,
   currentUser,
   projectId,
@@ -707,6 +711,7 @@ function ChatDiscussion({
   onReaction,
 }: {
   rows: WorkItemActivity[];
+  commentOnly?: boolean;
   currentUserId?: string;
   currentUser?: User;
   projectId: string;
@@ -808,6 +813,8 @@ function ChatDiscussion({
               <div className="space-y-1.5">
                 {group.items.map((item, index) => (
                   <ChatMessage
+                    canResolve={!commentOnly}
+                    canReply={!commentOnly || !item.scope_type || ['project', 'work_item'].includes(item.scope_type)}
                     key={item.id}
                     item={item}
                     projectId={projectId}
@@ -847,6 +854,8 @@ function ChatDiscussion({
 
 function ChatMessage({
   item,
+  canReply = true,
+  canResolve = true,
   projectId,
   own,
   currentUser,
@@ -863,6 +872,8 @@ function ChatMessage({
   onReaction,
 }: {
   item: WorkItemActivity;
+  canReply?: boolean;
+  canResolve?: boolean;
   projectId: string;
   own: boolean;
   currentUser?: User;
@@ -964,7 +975,7 @@ function ChatMessage({
             {item.edited_at && !withdrawn ? <span className={ownBlueBubble ? 'text-blue-100' : 'text-slate-400'}>đã chỉnh sửa</span> : null}
           </div> : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            {!withdrawn ? <button type="button" className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-white" onClick={onReply}>
+            {!withdrawn && canReply ? <button type="button" className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-white" onClick={onReply}>
               <Reply className="h-3 w-3" />
               Trả lời{item.reply_count ? ` · ${item.reply_count}` : ''}
             </button> : item.reply_count ? <span className="text-xs font-semibold text-slate-500">{item.reply_count} câu trả lời</span> : null}
@@ -973,7 +984,7 @@ function ChatMessage({
                 {marking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Đánh dấu đã đọc'}
               </button>
             ) : null}
-            {!withdrawn && resolveLabel && !resolved ? (
+            {!withdrawn && canResolve && resolveLabel && !resolved ? (
               <button type="button" className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-white disabled:opacity-50" disabled={resolving} onClick={onResolve}>
                 {resolving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                 {resolveLabel}
@@ -1020,6 +1031,7 @@ function FilterSelect({
 
 function ActivityCard({
   item,
+  canResolve = true,
   projectId,
   marking,
   resolving,
@@ -1027,6 +1039,7 @@ function ActivityCard({
   onResolve,
 }: {
   item: WorkItemActivity;
+  canResolve?: boolean;
   projectId: string;
   marking: boolean;
   resolving: boolean;
@@ -1072,7 +1085,7 @@ function ActivityCard({
       {!withdrawn ? <ActivityAttachments attachments={item.attachments} /> : null}
       {!withdrawn && item.reactions?.length ? <div className="mt-2"><ActivityReactionBar reactions={item.reactions} /></div> : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {resolveLabel && !resolved ? (
+        {canResolve && resolveLabel && !resolved ? (
           <button type="button" className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50" disabled={resolving} onClick={onResolve}>
             {resolving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
             {resolveLabel}

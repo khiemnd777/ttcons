@@ -6,7 +6,7 @@ export type WorkspaceTabItem<T extends string> = {
   id: T;
   label: string;
   icon: LucideIcon;
-  count?: number;
+  count?: number | string;
 };
 
 export function WorkspaceTabs<T extends string>({
@@ -45,7 +45,7 @@ export function WorkspaceTabs<T extends string>({
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 {tab.label}
-                {typeof tab.count === 'number' ? (
+                {typeof tab.count === 'number' || typeof tab.count === 'string' ? (
                   <span
                     className={clsx(
                       'rounded px-1.5 py-0.5 text-xs',

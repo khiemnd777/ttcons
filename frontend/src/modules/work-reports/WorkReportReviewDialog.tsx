@@ -30,6 +30,7 @@ import { dateText } from '../../lib/utils/format';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { constructionReportViewModel } from '../operations/constructionReportViewModel';
 import { EvidenceGallery } from '../work-items/EvidenceGallery';
+import { workReportReviewCapabilities } from './workReportReviewCapabilities';
 
 type ReviewTab = 'content' | 'history' | 'revisions';
 
@@ -79,7 +80,8 @@ export function WorkReportReviewDialog({
   const view = useMemo(() => constructionReportViewModel(selectedSnapshot), [selectedSnapshot]);
   const selectedEvidence = selectedRevision?.evidence_records ?? [];
   const isCurrentRevision = !selectedRevision || Number(selectedRevision.revision_no) === currentRevisionNo;
-  const mayReview = Boolean(detail && isCurrentRevision && canReview && detail.status === 'submitted' && (canManage || detail.recipient_id === userID));
+  const reviewCapabilities = workReportReviewCapabilities({ current: isCurrentRevision, ready: Boolean(detail) && !loading && !error, status: detail?.status, capabilities: detail?.capabilities, canReview, canManage, recipientID: detail?.recipient_id, userID });
+  const mayReview = reviewCapabilities.acknowledge || reviewCapabilities.requestChanges;
 
   const evidenceFilePath = useCallback((record: EvidenceRecord) => {
     if (!detail?.work_report_id || !selectedRevision) return `/evidence/${record.id}/file`;
@@ -100,7 +102,7 @@ export function WorkReportReviewDialog({
   }, [detail, open]);
 
   async function review(action: 'request-changes' | 'acknowledge') {
-    if (!detail?.work_report_id) return;
+    if (!detail?.work_report_id || !(action === 'acknowledge' ? reviewCapabilities.acknowledge : reviewCapabilities.requestChanges)) return;
     if (action === 'request-changes' && !reviewComment.trim()) {
       setReviewCommentInvalid(true);
       toast.warn({ title: 'Chưa nhập nội dung cần bổ sung', description: 'Nêu rõ phần người lập cần chỉnh sửa trước khi gửi lại.' });
@@ -109,7 +111,7 @@ export function WorkReportReviewDialog({
     }
     setBusyAction(action);
     try {
-      await post(`/work-reports/${detail.work_report_id}/${action}`, { comment: reviewComment.trim() });
+      await post(`/work-reports/${detail.work_report_id}/${action}`, { comment: reviewComment.trim(), revision_no: currentRevisionNo });
       await onRefresh();
       toast.success(action === 'acknowledge' ? 'Đã xác nhận xem báo cáo' : 'Đã gửi yêu cầu bổ sung');
     } catch (requestError) {
@@ -143,7 +145,7 @@ export function WorkReportReviewDialog({
     navigate(`/projects/${detail.project_id}/operations?tab=timeline&report=${encodeURIComponent(detail.source_id)}`);
   }
 
-  const footer = detail ? (
+  const footer = detail && !loading && !error ? (
     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
       {canOpenSource ? (
         <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" onClick={openSource}>
@@ -151,17 +153,18 @@ export function WorkReportReviewDialog({
         </button>
       ) : <span />}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {reviewCapabilities.discuss ? <button type="button" className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700" onClick={() => navigate(`/projects/${detail.project_id}/discussion`)}>Trao đổi</button> : null}
         {!isCurrentRevision && currentRevisionNo > 0 ? (
           <button type="button" className="rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={() => setSelectedRevisionNo(currentRevisionNo)}>Về bản hiện tại</button>
         ) : null}
         {mayReview ? (
           <>
-            <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60" disabled={Boolean(busyAction)} onClick={() => void review('request-changes')}>
+            {reviewCapabilities.requestChanges ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-60" disabled={Boolean(busyAction)} onClick={() => void review('request-changes')}>
               {busyAction === 'request-changes' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <MessageSquareWarning className="h-4 w-4" />} Yêu cầu bổ sung
-            </button>
-            <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:opacity-60" disabled={Boolean(busyAction)} onClick={() => void review('acknowledge')}>
+            </button> : null}
+            {reviewCapabilities.acknowledge ? <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:opacity-60" disabled={Boolean(busyAction)} onClick={() => void review('acknowledge')}>
               {busyAction === 'acknowledge' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Xác nhận đã xem
-            </button>
+            </button> : null}
           </>
         ) : null}
       </div>
@@ -189,6 +192,11 @@ export function WorkReportReviewDialog({
       ) : detail ? (
         <div ref={contentRef} className="space-y-5">
           <ReportSummary detail={detail} revision={selectedRevision} view={view} />
+          <section className="rounded-lg border border-line p-3" aria-label="Xác nhận đã xem theo người nhận và lần gửi">
+            <h3 className="text-sm font-semibold">Đã xem · Lần {selectedRevision?.revision_no ?? currentRevisionNo}</h3>
+            {(detail.read_receipts ?? []).filter((receipt) => receipt.revision_no === Number(selectedRevision?.revision_no ?? currentRevisionNo)).map((receipt) => <p key={receipt.user_id} className="mt-1 text-sm text-slate-600">{receipt.user_name}{receipt.user_id === userID ? ' (tôi)' : ''} · {dateTimeText(receipt.acknowledged_at)}{receipt.comment ? ` · ${receipt.comment}` : ''}</p>)}
+            {!(detail.read_receipts ?? []).some((receipt) => receipt.revision_no === Number(selectedRevision?.revision_no ?? currentRevisionNo)) ? <p className="mt-1 text-xs text-slate-500">Chưa có xác nhận đã xem cho lần gửi này.</p> : null}
+          </section>
 
           {!isCurrentRevision ? (
             <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">

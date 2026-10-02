@@ -4,6 +4,7 @@ export type AppRoleBoundary = {
 
 export const pipelineActorRoleOptions = [
   'PM',
+  'Phó Quản Lý',
   'QS',
   'Thiết kế',
   'Giám sát',

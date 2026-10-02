@@ -12,6 +12,7 @@ import { ActivityTopicCard } from './ActivityTopic';
 import { activityVisibilityLabel } from './activityTopicDomain';
 import type { ActivityMentionOption } from './activityChatInputDomain';
 import { chatMentionPayload } from './activityChatInputDomain';
+import { companyDiscussionPayload } from './activityComposerPolicy';
 export type { ActivityMentionOption } from './activityChatInputDomain';
 
 type ComposerMode = 'project' | 'work_item';
@@ -114,6 +115,7 @@ export function ActivityComposer({
   mode,
   submitting,
   allowTarget = false,
+  commentOnly = false,
   targetOptions = [],
   attachmentOptions = [],
   mentionOptions = [],
@@ -133,6 +135,7 @@ export function ActivityComposer({
   mode: ComposerMode;
   submitting?: boolean;
   allowTarget?: boolean;
+  commentOnly?: boolean;
   targetOptions?: ActivityTargetOption[];
   attachmentOptions?: ActivityAttachmentOption[];
   mentionOptions?: ActivityMentionOption[];
@@ -174,15 +177,16 @@ export function ActivityComposer({
   const navigateToValidation = useValidationNavigation(formRef);
 
   const activityOptions = useMemo(() => {
+    if (commentOnly) return baseActivityOptions.filter((option) => option.value === 'comment');
     if (mode === 'work_item') return [...baseActivityOptions, ...workItemOnlyOptions];
     return baseActivityOptions;
-  }, [mode]);
+  }, [commentOnly, mode]);
 
   const editing = variant === 'chat' && Boolean(editItem);
   const replying = variant === 'chat' && !editing && Boolean(replyTo);
   const lockedContext = replying || editing;
   const editCommentChanged = editing && comment.trim() !== (editItem?.comment ?? '').trim();
-  const effectiveActivityType: ActivityType = lockedContext ? 'comment' : activityType;
+  const effectiveActivityType: ActivityType = commentOnly || lockedContext ? 'comment' : activityType;
   const needsDueAt = effectiveActivityType === 'reminder';
   const showsDueAt = effectiveActivityType === 'reminder' || effectiveActivityType === 'blocker';
   const needsReference = effectiveActivityType === 'file_note';
@@ -191,8 +195,8 @@ export function ActivityComposer({
   const missingDueAt = touched && needsDueAt && !dueAt;
   const missingReference = touched && needsReference && !attachments.length;
   const missingTarget = touched && needsTargetId && !targetId.trim();
-  const visibleTargetOptions = targetOptions.filter((option) => option.scope_type === targetScope);
-  const availableTargetScopeOptions = targetScopeOptions.filter((option) => option.value === 'project' || targetOptions.some((target) => target.scope_type === option.value));
+  const visibleTargetOptions = targetOptions.filter((option) => option.scope_type === targetScope && (!commentOnly || ['project', 'work_item'].includes(option.scope_type)));
+  const availableTargetScopeOptions = targetScopeOptions.filter((option) => (!commentOnly || ['project', 'work_item'].includes(option.value)) && (option.value === 'project' || targetOptions.some((target) => target.scope_type === option.value)));
   const visibleAttachmentOptions = attachmentOptions.filter((option) => option.type === referenceType);
   const visibleMentionOptions = mentionOptions.filter((option) => option.type === mentionType);
   const selectedTargetOption = targetOptions.find((option) => option.scope_type === targetScope && option.scope_id === targetId);
@@ -200,6 +204,15 @@ export function ActivityComposer({
     ? enumLabel('scope_type', 'project')
     : selectedTargetOption?.label ?? targetScopeOptions.find((option) => option.value === targetScope)?.label ?? 'Chọn đối tượng';
   const topicPreview = <ActivityTopicCard source={editing ? editItem! : replying ? replyTo! : selectedTargetOption ?? {}} />;
+  useEffect(() => {
+    if (!commentOnly) return;
+    setActivityType('comment');
+    setAttachments([]);
+    setDueAt('');
+    setOwnerId('');
+    setVisibility('project');
+    if (!['project', 'work_item'].includes(targetScope)) { setTargetScope('project'); setTargetId(''); }
+  }, [commentOnly, targetScope]);
 
   useEffect(() => {
     if (!editItem) return;
@@ -290,7 +303,7 @@ export function ActivityComposer({
     const selectedTarget = targetOptions.find((option) => option.scope_type === targetScope && option.scope_id === targetId.trim());
 
     try {
-      await onSubmit({
+      await onSubmit(companyDiscussionPayload({
         activity_type: effectiveActivityType,
         comment: comment.trim(),
         visibility: replying ? (replyTo?.visibility as Visibility ?? 'project') : variant === 'chat' ? 'project' : visibility,
@@ -301,7 +314,7 @@ export function ActivityComposer({
         mentions: variant === 'chat' ? chatMentionPayload(comment, mentions) : mentions,
         attachments: replying ? [] : attachments,
         metadata: replying ? {} : metadata,
-      });
+      }, commentOnly));
     } catch {
       return;
     } finally {
@@ -330,7 +343,7 @@ export function ActivityComposer({
       optionsLoading={mentionOptionsLoading}
       optionsError={mentionOptionsError}
       onRetryOptions={onRetryMentionOptions}
-      activityType={activityType}
+      activityType={effectiveActivityType}
       activityOptions={activityOptions}
       onActivityTypeChange={setActivityType}
       compact={density === 'compact'}
@@ -641,7 +654,7 @@ export function ActivityComposer({
 				<span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
 					<MessageSquarePlus className="h-4 w-4" />
 				</span>
-				<span className="min-w-0 flex-1 text-sm font-medium text-slate-500">Viết trao đổi, đặt câu hỏi hoặc ghi nhận quyết định...</span>
+				<span className="min-w-0 flex-1 text-sm font-medium text-slate-500">{commentOnly ? 'Viết trao đổi trong công trình...' : 'Viết trao đổi, đặt câu hỏi hoặc ghi nhận quyết định...'}</span>
 				<span className="hidden text-xs font-semibold text-blue-700 sm:inline">Tạo trao đổi</span>
 			</button>
 		);
@@ -675,7 +688,7 @@ export function ActivityComposer({
         ))}
       </div>
 
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      {!commentOnly ? <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Ai có thể xem</span>
           <select
@@ -686,7 +699,7 @@ export function ActivityComposer({
             {visibilityOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
-      </div>
+      </div> : null}
 
       {allowTarget ? (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -739,7 +752,7 @@ export function ActivityComposer({
         placeholder="Nhập nội dung hoạt động"
       />
 
-      {showsDueAt || activityType === 'decision' || needsReference ? (
+      {showsDueAt || effectiveActivityType === 'decision' || needsReference ? (
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {showsDueAt ? (
             <label data-validation-key="due_at" data-validation-error={missingDueAt ? 'true' : undefined} className="block scroll-mt-24 rounded-md">
@@ -756,7 +769,7 @@ export function ActivityComposer({
               />
             </label>
           ) : null}
-          {activityType === 'blocker' || activityType === 'decision' ? (
+          {effectiveActivityType === 'blocker' || effectiveActivityType === 'decision' ? (
             <label className="block">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Người phụ trách</span>
               <select

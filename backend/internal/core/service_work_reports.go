@@ -160,6 +160,15 @@ func (s *Service) WorkReports(ctx context.Context, filter WorkReportFilter, acto
 			return nil, forbiddenError("Bạn không có quyền xem toàn bộ báo cáo")
 		}
 	}
+	if normalized.Scope == "supervision" {
+		profile, err := s.repo.WorkItemAccessProfile(ctx, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if !profile.CanSuperviseAllProjects {
+			return nil, forbiddenError("Bạn không có quyền theo dõi báo cáo Giám sát")
+		}
+	}
 	if normalized.ProjectID != "" {
 		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"work_report.view"})
 		if err != nil {
@@ -194,10 +203,27 @@ func normalizeWorkReportFilter(filter WorkReportFilter) (WorkReportFilter, error
 	if filter.Scope == "" {
 		filter.Scope = "mine"
 	}
-	if filter.Scope != "mine" && filter.Scope != "source" && filter.Scope != "review" && filter.Scope != "all" {
+	if filter.Scope != "mine" && filter.Scope != "source" && filter.Scope != "review" && filter.Scope != "all" && filter.Scope != "supervision" {
 		return filter, validationError("Phạm vi báo cáo không hợp lệ", Record{"scope": filter.Scope})
 	}
 	filter.ProjectID = cleanID(filter.ProjectID)
+	filter.SupervisorID = cleanID(filter.SupervisorID)
+	if filter.SupervisorID != "" && !validActivityUUID(filter.SupervisorID) {
+		return filter, validationError("supervisor_id không hợp lệ")
+	}
+	filter.ReadStatus = strings.TrimSpace(filter.ReadStatus)
+	if filter.ReadStatus != "" && filter.ReadStatus != "read" && filter.ReadStatus != "unread" {
+		return filter, validationError("Trạng thái đã xem không hợp lệ")
+	}
+	if filter.Limit <= 0 {
+		filter.Limit = 25
+	}
+	if filter.Limit > 50 {
+		filter.Limit = 50
+	}
+	if filter.Offset < 0 {
+		return filter, validationError("offset không hợp lệ")
+	}
 	if filter.ProjectID != "" && !validActivityUUID(filter.ProjectID) {
 		return filter, validationError("project_id không hợp lệ", Record{"project_id": filter.ProjectID})
 	}
@@ -244,11 +270,15 @@ func (s *Service) WorkReportDetail(ctx context.Context, sourceID, actorID string
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem báo cáo này")
 	}
-	canManage, err := s.repo.UserHasAnyProjectPermission(ctx, actorID, cleanID(detail["project_id"]), []string{"work_report.manage"})
+	canManage, err := s.repo.CanAccessProjectPermission(ctx, actorID, cleanID(detail["project_id"]), []string{"work_report.manage"})
 	if err != nil {
 		return nil, err
 	}
-	if !canManage && actorID != cleanID(detail["author_id"]) && actorID != cleanID(detail["recipient_id"]) {
+	canSupervise, err := s.repo.CanSuperviseWorkReport(ctx, actorID, detail)
+	if err != nil {
+		return nil, err
+	}
+	if !canManage && !canSupervise && actorID != cleanID(detail["author_id"]) && actorID != cleanID(detail["recipient_id"]) {
 		return nil, forbiddenError("Báo cáo này không thuộc phạm vi cá nhân của bạn")
 	}
 	if cleanID(detail["work_report_id"]) == "" {
@@ -283,6 +313,24 @@ func (s *Service) WorkReportDetail(ctx context.Context, sourceID, actorID string
 	}
 	detail["revisions"] = revisions
 	detail["events"] = events
+	receipts, err := s.repo.WorkReportReadReceipts(ctx, cleanID(detail["work_report_id"]))
+	if err != nil {
+		return nil, err
+	}
+	detail["read_receipts"] = receipts
+	acknowledged := false
+	for _, receipt := range receipts {
+		if cleanID(receipt["user_id"]) == actorID && int(number(receipt["revision_no"])) == int(number(detail["current_revision_no"])) {
+			acknowledged = true
+		}
+	}
+	detail["viewer_acknowledged"] = acknowledged
+	canReview, err := s.repo.UserHasAnyProjectPermission(ctx, actorID, reportProjectID, []string{"work_report.review", "work_report.manage"})
+	if err != nil {
+		return nil, err
+	}
+	mayReview := canReview && (canManage || canSupervise || actorID == cleanID(detail["recipient_id"])) && workReportContains([]string{"submitted", "acknowledged"}, fmt.Sprint(detail["status"]))
+	detail["capabilities"] = Record{"can_acknowledge": mayReview && !acknowledged, "can_request_changes": mayReview, "can_discuss": canSupervise || actorID == cleanID(detail["recipient_id"]) || canManage}
 	return detail, nil
 }
 
@@ -306,11 +354,15 @@ func (s *Service) WorkReportEvidenceFile(ctx context.Context, reportID string, r
 	if !allowed {
 		return EvidenceFileResult{}, forbiddenError("Bạn không có quyền xem minh chứng báo cáo này")
 	}
-	canManage, err := s.repo.UserHasAnyProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.manage"})
+	canManage, err := s.repo.CanAccessProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.manage"})
 	if err != nil {
 		return EvidenceFileResult{}, err
 	}
-	if !canManage && actorID != cleanID(header["author_id"]) && actorID != cleanID(header["recipient_id"]) {
+	canSupervise, err := s.repo.CanSuperviseWorkReport(ctx, actorID, header)
+	if err != nil {
+		return EvidenceFileResult{}, err
+	}
+	if !canManage && !canSupervise && actorID != cleanID(header["author_id"]) && actorID != cleanID(header["recipient_id"]) {
 		return EvidenceFileResult{}, forbiddenError("Báo cáo này không thuộc phạm vi cá nhân của bạn")
 	}
 	revision, err := s.repo.WorkReportRevision(ctx, reportID, revisionNo)
@@ -404,6 +456,9 @@ func (s *Service) ReviewWorkReport(ctx context.Context, reportID, action string,
 	if len([]rune(req.Comment)) > 2000 {
 		return nil, validationError("Ý kiến xem xét không được vượt quá 2000 ký tự")
 	}
+	if req.RevisionNo < 0 {
+		return nil, validationError("Lần gửi báo cáo không hợp lệ")
+	}
 	header, err := s.repo.WorkReportHeader(ctx, reportID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, validationError("Không tìm thấy báo cáo", Record{"report_id": reportID})
@@ -418,11 +473,11 @@ func (s *Service) ReviewWorkReport(ctx context.Context, reportID, action string,
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem xét báo cáo này")
 	}
-	canManage, err := s.repo.UserHasAnyProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.manage"})
+	canManage, err := s.repo.CanAccessProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.manage"})
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.repo.ReviewWorkReport(ctx, reportID, action, req.Comment, actorID, actorName, canManage)
+	row, err := s.repo.ReviewWorkReport(ctx, reportID, action, req.Comment, actorID, actorName, canManage, req.RevisionNo)
 	if err != nil {
 		return nil, err
 	}
@@ -484,11 +539,15 @@ func (s *Service) ExportWorkReportPDF(ctx context.Context, reportID string, revi
 	if !allowed {
 		return tabularExportResult{}, forbiddenError("Bạn không có quyền xuất báo cáo này")
 	}
-	canManage, err := s.repo.UserHasAnyProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.manage"})
+	canManage, err := s.repo.CanAccessProjectPermission(ctx, actorID, cleanID(header["project_id"]), []string{"work_report.manage"})
 	if err != nil {
 		return tabularExportResult{}, err
 	}
-	if !canManage && actorID != cleanID(header["author_id"]) && actorID != cleanID(header["recipient_id"]) {
+	canSupervise, err := s.repo.CanSuperviseWorkReport(ctx, actorID, header)
+	if err != nil {
+		return tabularExportResult{}, err
+	}
+	if !canManage && !canSupervise && actorID != cleanID(header["author_id"]) && actorID != cleanID(header["recipient_id"]) {
 		return tabularExportResult{}, forbiddenError("Báo cáo này không thuộc phạm vi cá nhân của bạn")
 	}
 	revision, err := s.repo.WorkReportRevision(ctx, reportID, revisionNo)
