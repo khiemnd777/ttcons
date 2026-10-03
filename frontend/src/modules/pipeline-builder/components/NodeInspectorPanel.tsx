@@ -4,7 +4,7 @@ import { ChevronDown, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide
 import { Dialog } from '../../../components/Dialog';
 import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode, WorkflowFormCatalogItem } from '../../../lib/types/domain';
-import { pipelineActorRoleOptions } from '../../../lib/utils/roles';
+import { pipelineActorRoleChoices, roleSummary } from '../../../lib/utils/roles';
 import { enumOptions, nodeTypeValues } from '../../../lib/utils/status';
 import { useValidationNavigation } from '../../../lib/utils/formValidationNavigation';
 
@@ -270,7 +270,7 @@ export function NodeInspectorPanel({
                   <MultiSelect
                     label={approvalMode === 'ordered' ? 'Thứ tự role duyệt' : 'Role được duyệt'}
                     value={approvalRoles}
-                    options={pipelineActorRoleOptions}
+                    options={pipelineActorRoleChoices}
                     emptyText="Chưa chọn role phê duyệt"
                     loadingPlaceholder="Đang tải roles..."
                     searchPlaceholder="Gõ để tìm role"
@@ -317,7 +317,7 @@ export function NodeInspectorPanel({
             <div className="mt-3 space-y-2">
               {sortedSteps.length ? sortedSteps.map((step: Record<string, any>, index: number) => {
                 const stepId = step.id ? String(step.id) : '';
-                const stepRoles = Array.isArray(step.required_role_ids) ? step.required_role_ids.join(', ') : '';
+                const stepRoles = Array.isArray(step.required_role_ids) ? roleSummary(step.required_role_ids) : '';
                 const stepWorkflowForm = step.form_version_id ? formByVersionId.get(String(step.form_version_id)) : undefined;
                 const canDragStep = Boolean(stepId) && canReorderSteps;
                 const isDropTarget = Boolean(stepId) && dropTargetStepId === stepId && draggedStepId !== stepId;
@@ -452,7 +452,7 @@ export function NodeInspectorPanel({
             fieldKey="required_role_ids"
             label="Role phụ trách"
             value={stepForm.required_role_ids}
-            options={pipelineActorRoleOptions}
+            options={pipelineActorRoleChoices}
             invalid={stepRolesInvalid}
             emptyText="Chưa gán role phụ trách"
             loadingPlaceholder="Đang tải roles..."

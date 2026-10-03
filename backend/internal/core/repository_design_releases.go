@@ -460,7 +460,7 @@ func (r *Repository) HandoffDesignRelease(ctx context.Context, releaseID, workIt
 	}
 	release := releaseRows[0]
 	if fmt.Sprint(release["status"]) != "released" {
-		return nil, validationError("PM chỉ có thể bàn giao revision thiết kế hiện hành", Record{"status": release["status"]})
+		return nil, validationError("Quản lý dự án chỉ có thể bàn giao revision thiết kế hiện hành", Record{"status": release["status"]})
 	}
 	projectID := cleanID(release["project_id"])
 	rows, err := queryTx(ctx, tx, `
@@ -488,7 +488,7 @@ func (r *Repository) HandoffDesignRelease(ctx context.Context, releaseID, workIt
 	if err := insertDesignDiscussionUpdateTx(ctx, tx, release, workItemID, "handoff:"+handoffID, actorID, nil); err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "design_release_handed_off", "design_release_handoff", handoffID, "PM bàn giao revision hồ sơ thiết kế cho QS", Record{
+	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "design_release_handed_off", "design_release_handoff", handoffID, "Quản lý dự án bàn giao revision hồ sơ thiết kế cho QS", Record{
 		"design_release_id": releaseID, "revision_no": release["revision_no"], "revision_label": release["revision_label"], "work_item_id": workItemID,
 	}); err != nil {
 		return nil, err

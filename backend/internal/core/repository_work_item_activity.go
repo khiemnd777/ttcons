@@ -716,6 +716,11 @@ func (r *Repository) insertActivityAttentionTx(ctx context.Context, tx *sql.Tx, 
 				  AND (
 					pm.role_ids ? $3::text
 					OR (NULLIF($4::text, '') IS NOT NULL AND pm.role_ids ? $4::text)
+					OR EXISTS (
+						SELECT 1 FROM jsonb_array_elements_text(pm.role_ids) member_role(label)
+						WHERE consflow_role_label_key(member_role.label)='pm'
+						  AND (consflow_role_label_key($3::text)='pm' OR consflow_role_label_key($4::text)='pm')
+					)
 				  )
 				ON CONFLICT DO NOTHING
 			`, activityID, projectID, mention.ID, mention.Label); err != nil {
@@ -1402,14 +1407,15 @@ func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID strin
 		return nil, err
 	}
 	roles, err := r.Query(ctx, `
-		SELECT role_name AS id, role_name AS label
+		SELECT DISTINCT ON (consflow_role_label_key(role_name)) role_name AS id,
+			CASE WHEN consflow_role_label_key(role_name)='pm' THEN 'Quản lý dự án' ELSE role_name END AS label
 		FROM (
 			SELECT DISTINCT role_name
 			FROM project_members pm
 			CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(pm.role_ids, '[]'::jsonb)) AS roles(role_name)
 			WHERE pm.project_id=$1 AND pm.active AND role_name <> ''
 		) role_options
-		ORDER BY lower(role_name), role_name
+		ORDER BY consflow_role_label_key(role_name), role_name
 	`, projectID)
 	if err != nil {
 		return nil, err
@@ -2266,11 +2272,12 @@ func workItemScopeSQL(alias string, start int) string {
 						OR pm.role_ids ? 'pm'
 						OR pm.role_ids ? 'PM'
 						OR pm.role_ids ? 'Project Manager'
+						OR pm.role_ids ? 'Quản lý dự án'
 						OR (NULLIF(%s,'') IS NOT NULL AND %s.department=%s)
 						OR EXISTS (
 							SELECT 1
 							FROM jsonb_array_elements_text(pm.role_ids) pm_role(role_label)
-							JOIN jsonb_array_elements_text(%s.role_ids) wi_role(role_label) ON wi_role.role_label=pm_role.role_label
+							JOIN jsonb_array_elements_text(%s.role_ids) wi_role(role_label) ON consflow_role_label_key(wi_role.role_label)=consflow_role_label_key(pm_role.role_label)
 						)
 						OR EXISTS (
 							SELECT 1
@@ -2284,7 +2291,7 @@ func workItemScopeSQL(alias string, start int) string {
 									AND EXISTS (
 										SELECT 1
 										FROM jsonb_array_elements_text(pm.role_ids) pm_role(role_label)
-										WHERE pm_role.role_label=wias.role_name
+										WHERE consflow_role_label_key(pm_role.role_label)=consflow_role_label_key(wias.role_name)
 									)
 								)
 							  )
@@ -2299,11 +2306,11 @@ func workItemScopeSQL(alias string, start int) string {
 					  AND ur.project_id=%s.project_id
 					  AND (
 						r.name IN ('admin','director','pm')
-						OR r.display_name IN ('Admin','Giám đốc','PM','Project Manager')
+						OR r.display_name IN ('Admin','Giám đốc','PM','Project Manager','Quản lý dự án')
 						OR EXISTS (
 							SELECT 1
 							FROM jsonb_array_elements_text(%s.role_ids) wi_role(role_label)
-							WHERE wi_role.role_label IN (r.name, r.display_name, r.id::text)
+							WHERE consflow_role_label_key(wi_role.role_label) IN (consflow_role_label_key(r.name), consflow_role_label_key(r.display_name), r.id::text)
 						)
 						OR EXISTS (
 							SELECT 1
@@ -2311,7 +2318,7 @@ func workItemScopeSQL(alias string, start int) string {
 							WHERE wias.work_item_id=%s.id
 							  AND wias.assignment_type <> 'watcher'
 							  AND NULLIF(wias.role_name, '') IS NOT NULL
-							  AND wias.role_name IN (r.name, r.display_name, r.id::text)
+							  AND consflow_role_label_key(wias.role_name) IN (consflow_role_label_key(r.name), consflow_role_label_key(r.display_name), r.id::text)
 						)
 					  )
 				)

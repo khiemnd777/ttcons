@@ -594,7 +594,7 @@ func (r *Repository) DeactivateProjectMember(ctx context.Context, projectID, mem
 		return nil, validationError("Thành viên đã ngừng tham gia", Record{"member_id": memberID})
 	}
 	if member["is_project_manager"] == true {
-		return nil, validationError("Không thể ngừng tham gia PM hiện tại; hãy cập nhật PM thay thế trước", Record{"member_id": memberID})
+		return nil, validationError("Không thể ngừng tham gia Quản lý dự án hiện tại; hãy cập nhật Quản lý dự án thay thế trước", Record{"member_id": memberID})
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE project_members SET active=false, updated_at=now() WHERE id=$1`, memberID); err != nil {
 		return nil, err

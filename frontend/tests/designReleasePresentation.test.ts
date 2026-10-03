@@ -27,7 +27,7 @@ test('Preparation exposes immutable design package revisions and explicit PM han
   assert.match(preparation, /<DesignReleasePanel projectId=\{id\} workItems=\{allPreparationItems\}/);
   assert.match(detail, /isDesignReleaseWorkItem\(detailItem\)[\s\S]*<DesignReleasePanel/);
   assert.match(panel, /Mỗi lần phát hành là một gói hồ sơ độc lập/);
-  assert.match(panel, /Revision mới không tự thay revision PM đã bàn giao cho QS/);
+  assert.match(panel, /Revision mới không tự thay revision Quản lý dự án đã bàn giao cho QS/);
   assert.match(panel, /BOQ và mua hàng giữ nguyên nguồn cũ/);
   assert.match(panel, /Bàn giao \{current\.revision_label\} cho QS/);
   assert.match(panel, /<EvidenceUploader\b/);

@@ -1,3 +1,4 @@
+import { roleSummary } from '../../lib/utils/roles';
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -1051,7 +1052,7 @@ function WorkflowWorkMobileCard({
 }
 
 function workflowWorkOwnerLabel(item: WorkItem) {
-  const roleLabels = asArray<string>(item.role_ids).filter(Boolean).join(', ');
+  const roleLabels = roleSummary(asArray<string>(item.role_ids));
   return (item.assignee_name ? identityReferenceText(item.assignee_name, item.assignee_account_deleted) : undefined)
     ?? item.owner_name
     ?? item.responsible_name

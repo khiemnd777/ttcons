@@ -1,5 +1,11 @@
 # Workflow Orchestration Domain Map
 
+## Project Manager Label Compatibility
+
+- Current role presentation uses Quản lý dự án for `pm`. Stored PM / Project Manager labels remain valid in template/run/work-item responsibilities and approval requirements; V149 does not rewrite any historical definition or runtime copy.
+- Go label matching and SQL responsibility/read/actionability predicates normalize only PM aliases, retain existing actor/project/permission/state guards and never identify Deputy Manager as PM. Pipeline publication retains external-role checks. Sample projects resolve canonical PM actors after the display rename; workflow Excel export keeps `pm` round trips.
+- NodeInspector reuses its existing MultiSelect with separate visible label/raw value; new UI selection keeps the compatible `PM` value. Owners: `roles.ts`, `repository_access.go`, `my_work_repository.go`, `my_workflow_actions.go`, `repository_work_item_activity.go`, `service_sample_data.go`, V149. First searches: `consflow_role_label_key|pipelineActorRoleChoices|normalizeRoleLabel`.
+
 ## Canonical User-Facing Workflow Terminology
 
 - The approved canonical Vietnamese vocabulary is `Giai đoạn` for Node, `Gói công việc` for Step and `Đầu việc` for Work Item. The official final workflow stage wording is `Bàn giao công trình và hồ sơ kế toán`; see `docs/workflow-terminology-agreement.md`.

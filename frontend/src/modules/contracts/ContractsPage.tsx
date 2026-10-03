@@ -797,7 +797,7 @@ function NextActionBand({
     message = `Phát sinh ${purchaseVariation.variation_code} đang chờ Mua hàng lấy giá.`;
     actionNode = <PrimaryButton label="Xác nhận đã lấy giá" onClick={() => onAction(variationPurchaseAction(purchaseVariation))} />;
   } else if (reviewVariation) {
-    message = `Phát sinh ${reviewVariation.variation_code} đang chờ PM/Giám đốc duyệt.`;
+    message = `Phát sinh ${reviewVariation.variation_code} đang chờ Quản lý dự án/Giám đốc duyệt.`;
     actionNode = <PrimaryButton label="Duyệt phát sinh" onClick={() => onAction(variationApproveAction(reviewVariation))} />;
   } else if (approvedVariation) {
     message = `Phụ lục ${approvedVariation.variation_code} đã duyệt và đang chờ tạo phiên bản điều chỉnh.`;
@@ -1311,7 +1311,7 @@ function CreateVariationDialog({ open, currencyCode, onClose, onSubmit }: {
   onSubmit: (values: Record<string, any>) => Promise<any>;
 }) {
   return (
-    <Dialog open={open} title="Đề xuất phát sinh ngoài kế hoạch" description="Luồng bắt buộc: Đề xuất → QS → Mua hàng lấy giá → PM/Giám đốc duyệt → mua hàng/điều chỉnh hợp đồng." onClose={onClose} size="lg">
+    <Dialog open={open} title="Đề xuất phát sinh ngoài kế hoạch" description="Luồng bắt buộc: Đề xuất → QS → Mua hàng lấy giá → Quản lý dự án/Giám đốc duyệt → mua hàng/điều chỉnh hợp đồng." onClose={onClose} size="lg">
       <SimpleForm
         layout="two-column"
         submitLabel="Tạo đề xuất phát sinh"

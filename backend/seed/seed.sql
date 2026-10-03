@@ -54,7 +54,7 @@ INSERT INTO users (id, email, password_hash, full_name, status) VALUES
 INSERT INTO roles (id, name, display_name, description, system_role) VALUES
 ('20000000-0000-0000-0000-000000000001','admin','Admin','Quản trị toàn hệ thống',true),
 ('20000000-0000-0000-0000-000000000002','director','Giám đốc','Duyệt ngân sách và quyết định vượt hạn mức',true),
-('20000000-0000-0000-0000-000000000003','pm','PM','Quản lý công trình và pipeline',true),
+('20000000-0000-0000-0000-000000000003','pm','Quản lý dự án','Quản lý công trình và pipeline',true),
 ('20000000-0000-0000-0000-000000000004','qs','QS','Bóc tách khối lượng, BOQ và kiểm soát chi phí',true),
 ('20000000-0000-0000-0000-000000000005','accounting','Kế toán','Tiếp nhận hồ sơ công trình và xử lý nghiệp vụ kế toán trên MISA',true),
 ('20000000-0000-0000-0000-000000000006','procurement','Mua hàng','Phụ trách yêu cầu mua và nhà cung cấp',true),

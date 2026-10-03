@@ -108,9 +108,16 @@ func workflowDefinitionExportRoleNames(value any, catalog workflowDefinitionCata
 	for _, label := range labels {
 		if name := catalog.RoleNameByDisplayName[strings.ToLower(strings.TrimSpace(label))]; name != "" {
 			result = append(result, name)
-		} else {
-			result = append(result, label)
+			continue
 		}
+		// Legacy published definitions may still carry PM after catalog rename.
+		if normalizeRoleLabel(label) == "pm" {
+			if role, exists := catalog.RoleByName["pm"]; exists && !boolValue(role["external_only"]) {
+				result = append(result, "pm")
+				continue
+			}
+		}
+		result = append(result, label)
 	}
 	return result
 }

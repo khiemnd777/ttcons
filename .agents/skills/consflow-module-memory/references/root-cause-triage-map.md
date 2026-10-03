@@ -1,5 +1,10 @@
 # Consflow Root-Cause Triage Map
 
+## PM Catalog Rename And Legacy Label Mismatch
+
+- Keywords: Quản lý dự án, PM selector still visible, missing sample PM, workflow role mismatch after V149. First searches: `appRoleDisplayName|pipelineActorRoleChoices|appRoleChoices|consflow_role_label_key|sampleRoleMatches|sampleActorsForRoleLabel`. Compare current `roles.name/display_name`, saved member/workflow values, presentation labels and actual actor/project checks separately.
+- `pm` remains the canonical Project Manager key; PM / Project Manager are legacy aliases of Quản lý dự án. Deputy Manager is separate. Verify V149 exists before running the new SQL predicates. Do not relabel historical snapshots or widen privileges to hide a mismatch; preserve sample-role ambiguity checks and exact current Excel catalog mappings.
+
 ## Deputy Manager Scope And Observer UI
 
 - Slow “Đang tải bộ lọc...” at company supervision: separate `/me/supervision-options` latency from bounded queue latency. The original options query applied nested `supervisorUserSQL(u.id,p.id)` for each active user/project and produced 1.79 million subplan loops on a representative local DB. `supervisionSupervisorOptionsSQL` now starts from global/scoped role and member candidate sets, UNIONs user IDs and joins users; keep classification-equivalence and actor/project/sample checks. Recheck with endpoint timing plus EXPLAIN ANALYZE/BUFFERS, not a cache-only workaround. Owners: `supervision.go`, `TestSupervisionOptionsMatchCanonicalClassification`; UI consumer is `SupervisionWorkspace.tsx`.

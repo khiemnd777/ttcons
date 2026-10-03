@@ -1,5 +1,10 @@
 # Commercial Procurement Domain Map
 
+## Project Manager Display Name
+
+- Current `pm` presentation is Quản lý dự án. ContractsPage, contractsPresentation and shared status labels use this name in variation approval notices. Keep event keys/statuses, grants, stored `next_roles` and source transitions intact; V149 role compatibility is owned by Admin Governance/Workflow maps.
+- Design-release handoff guidance names Quản lý dự án without rebinding the release handed to QS or modifying historical events/snapshots. First searches: `Quản lý dự án|appRoleDisplayName|consflow_role_label_key`.
+
 ## Accounting Proposal Source Boundary
 
 - `accounting_requests.go::accountingSourceTx` accepts ordered-or-later procurement with an active linked partner, main-client receivable milestones and subcontractor payable milestones from active/completed contracts. Supplier contract milestones are excluded to avoid presenting a second parallel source for purchased material. First searches: `accountingSourceTx|CreateAccountingBasis`.

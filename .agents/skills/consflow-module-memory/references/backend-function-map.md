@@ -1,5 +1,11 @@
 # Consflow Backend Function Map
 
+## Project Manager Label Compatibility
+
+- Owners: V149, seed, `repository_access.go::normalizeRoleLabel/UserIsProjectManager`, `my_work_repository.go`, `my_workflow_actions.go`, `repository_work_item_activity.go`, `repository_notifications.go`, `pipeline_template_lifecycle.go`, `service_sample_data.go`, `workflow_definition_excel_export.go`. First searches: `consflow_role_label_key|normalizeRoleLabel|sampleRoleMatches|sampleActorsForRoleLabel`.
+- Current canonical `pm` displays as Quản lý dự án. V149 only updates catalog presentation and adds the immutable SQL compatibility helper. PM / Project Manager / Quản lý dự án match the same role; unrelated SQL labels retain exact comparison semantics. Actor/project/membership guards remain required. Mention options return the current human label with compatible IDs; role mentions still resolve active members only in the selected project.
+- Sample provisioning keeps exact role keys, ambiguity/external-role guards and safe account identities. Existing PM-labelled workflows and actor lookup work after rename. Excel export resolves old/new PM labels back to `pm`. No historical persisted row is relabelled. Regressions: `TestProjectManager*`, `TestProjectManagerDisplayNameUpgradePreservesCatalogAndWorkflow`.
+
 ## Deputy Manager Supervision (V146–V148)
 
 - `supervision.go`: repository-owned `deputyManagerUserSQL`, `supervisorUserSQL`, `supervisedProjectSQL`; reserved global active/non-deleted/non-sample/non-external system role marker; `CanSuperviseWorkReport`, narrow `supervisionCompanyScopeAllowed`, separate `SupervisionProjectAccessFilter`, `CanCommentOnWorkItem`, `requireSupervisionCommentScope`. Marker read scope does not grant finance/approval/execution scope. `WorkItemAccessProfile` carries `CanSuperviseAllProjects` independently of manager/accounting flags.

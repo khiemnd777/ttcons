@@ -416,7 +416,7 @@ export function ProjectsPage() {
 					queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] }),
 					queryClient.invalidateQueries({ queryKey: ['my-work-navigation-summary'] }),
 				]);
-				toast.success({ title: `Đã tạo ${result.created_count} công trình`, description: 'Mở Bàn làm việc để hoàn tất PM, nhân sự bước đầu và khởi chạy quy trình.' });
+				toast.success({ title: `Đã tạo ${result.created_count} công trình`, description: 'Mở Bàn làm việc để hoàn tất Quản lý dự án, nhân sự bước đầu và khởi chạy quy trình.' });
 			}}
 			onError={(title, error) => toast.error(title, error)}
 		/>

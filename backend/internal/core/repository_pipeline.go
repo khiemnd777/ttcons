@@ -981,7 +981,7 @@ func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, co
 			currentReleaseID := cleanID(releaseState["current_release_id"])
 			handedOffReleaseID := cleanID(releaseState["handed_off_release_id"])
 			ready = currentReleaseID != "" && currentReleaseID == handedOffReleaseID
-			reason = "Revision thiết kế hiện hành chưa được PM bàn giao cho QS"
+			reason = "Revision thiết kế hiện hành chưa được Quản lý dự án bàn giao cho QS"
 			if currentReleaseID == "" {
 				reason = "Chưa có revision hồ sơ thiết kế đã phát hành"
 			}
@@ -2001,7 +2001,7 @@ func (r *Repository) ensureHandoverScaffoldTx(ctx context.Context, tx *sql.Tx, c
 	handoverCode := "HO-" + strings.ToUpper(strings.ReplaceAll(newID(), "-", ""))[:10]
 	rows, err := queryTx(ctx, tx, `
 		INSERT INTO handover_records (project_id,handover_code,status,final_acceptance_id,client_representative,company_representative,notes,created_by)
-		SELECT $1,$2,'draft',$3,COALESCE(NULLIF(p.client_name,''),'Chủ đầu tư'),'PM phụ trách','Tự động mở từ quy trình chính thức',NULLIF($4,'')::uuid
+		SELECT $1,$2,'draft',$3,COALESCE(NULLIF(p.client_name,''),'Chủ đầu tư'),'Quản lý dự án phụ trách','Tự động mở từ quy trình chính thức',NULLIF($4,'')::uuid
 		FROM projects p WHERE p.id=$1
 		RETURNING id
 	`, projectID, handoverCode, finalAcceptanceID, actorID)

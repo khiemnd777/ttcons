@@ -482,12 +482,12 @@ func myWorkItemsBaseSQL() string {
 							SELECT 1 FROM staff actor_staff
 							JOIN project_members pm ON pm.staff_id=actor_staff.id AND pm.active
 							WHERE actor_staff.user_id=NULLIF($2,'')::uuid AND actor_staff.status='active' AND pm.project_id=sw.project_id
-							  AND (pm.role_ids ?| ARRAY['pm','PM','Project Manager','admin','director','Giám đốc'])
+							  AND (pm.role_ids ?| ARRAY['pm','PM','Project Manager','Quản lý dự án','admin','director','Giám đốc'])
 						)
 						OR EXISTS (
 							SELECT 1 FROM user_roles ur JOIN roles actor_role ON actor_role.id=ur.role_id
 							WHERE ur.user_id=NULLIF($2,'')::uuid AND ur.project_id=sw.project_id
-							  AND (actor_role.name IN ('pm','admin','director') OR actor_role.display_name IN ('PM','Project Manager','Admin','Giám đốc'))
+							  AND (actor_role.name IN ('pm','admin','director') OR actor_role.display_name IN ('PM','Project Manager','Quản lý dự án','Admin','Giám đốc'))
 						)
 						OR (
 							(
@@ -506,8 +506,8 @@ func myWorkItemsBaseSQL() string {
 								WHERE EXISTS (
 									SELECT 1 FROM user_roles ur JOIN roles actor_role ON actor_role.id=ur.role_id
 									WHERE ur.user_id=NULLIF($2,'')::uuid AND (ur.project_id IS NULL OR ur.project_id=sw.project_id)
-									  AND lower(btrim(required.role_label)) IN (
-										lower(btrim(actor_role.name)), lower(btrim(actor_role.display_name)), lower(actor_role.id::text)
+									  AND lower(btrim(consflow_role_label_key(required.role_label))) IN (
+										lower(btrim(consflow_role_label_key(actor_role.name))), lower(btrim(consflow_role_label_key(actor_role.display_name))), lower(actor_role.id::text)
 									  )
 								)
 								OR EXISTS (
@@ -515,7 +515,7 @@ func myWorkItemsBaseSQL() string {
 									JOIN project_members pm ON pm.staff_id=actor_staff.id AND pm.active
 									CROSS JOIN LATERAL jsonb_array_elements_text(pm.role_ids) member_role(role_label)
 									WHERE actor_staff.user_id=NULLIF($2,'')::uuid AND actor_staff.status='active' AND pm.project_id=sw.project_id
-									  AND lower(btrim(member_role.role_label))=lower(btrim(required.role_label))
+									  AND lower(btrim(consflow_role_label_key(member_role.role_label)))=lower(btrim(consflow_role_label_key(required.role_label)))
 								)
 							)
 						)
@@ -541,7 +541,7 @@ func myWorkRoleResponsibilitySQL(alias string, userParam, staffParam int) string
 					SELECT 1
 					FROM jsonb_array_elements_text(pm.role_ids) member_role(role_label)
 					JOIN jsonb_array_elements_text(%s.role_ids) work_role(role_label)
-					  ON work_role.role_label=member_role.role_label
+					  ON consflow_role_label_key(work_role.role_label)=consflow_role_label_key(member_role.role_label)
 				)
 				OR EXISTS (
 					SELECT 1
@@ -549,7 +549,7 @@ func myWorkRoleResponsibilitySQL(alias string, userParam, staffParam int) string
 					CROSS JOIN LATERAL jsonb_array_elements_text(pm.role_ids) member_role(role_label)
 					WHERE assignment.work_item_id=%s.id
 					  AND assignment.assignment_type='role'
-					  AND assignment.role_name=member_role.role_label
+					  AND consflow_role_label_key(assignment.role_name)=consflow_role_label_key(member_role.role_label)
 				)
 			  )
 		)
@@ -561,12 +561,12 @@ func myWorkRoleResponsibilitySQL(alias string, userParam, staffParam int) string
 			  AND (
 				EXISTS (
 					SELECT 1 FROM jsonb_array_elements_text(%s.role_ids) work_role(role_label)
-					WHERE work_role.role_label IN (role.name, role.display_name, role.id::text)
+					WHERE consflow_role_label_key(work_role.role_label) IN (consflow_role_label_key(role.name), consflow_role_label_key(role.display_name), role.id::text)
 				)
 				OR EXISTS (
 					SELECT 1 FROM work_item_assignments assignment
 					WHERE assignment.work_item_id=%s.id AND assignment.assignment_type='role'
-					  AND assignment.role_name IN (role.name, role.display_name, role.id::text)
+					  AND consflow_role_label_key(assignment.role_name) IN (consflow_role_label_key(role.name), consflow_role_label_key(role.display_name), role.id::text)
 				)
 			  )
 		)

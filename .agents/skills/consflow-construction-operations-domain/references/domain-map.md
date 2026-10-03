@@ -1,5 +1,10 @@
 # Construction Operations Domain Map
 
+## Project Manager Display Name
+
+- Current `pm` role presentation is Quản lý dự án, distinct from Phó Quản Lý. Operations report recipient and commercial-variation guidance use the current name; ConstructionHandoffPanel keeps the compatible `PM` saved value with the current visible option label. Report recipients, site work responsibility, handoff states, evidence and historical snapshots are unchanged.
+- Shared role labels and V149 compatibility are owned by Admin Governance/Workflow maps. First searches: `appRoleDisplayName|Quản lý dự án|consflow_role_label_key`; never infer Deputy execution/approval authority from the renamed PM label.
+
 ## Company Supervisor Oversight
 
 - Phó Quản Lý uses `/me/supervision-work` to observe required Supervisor roles and assigned Supervisor work across real company projects; no manual project membership or execution/approval override. Shared Work Item detail is an explicitly read-only oversight entrypoint; canonical project discussion remains available through comment-only controls for nonmembers.

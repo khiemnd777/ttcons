@@ -225,7 +225,7 @@ func myWorkflowActionResponsibilitySQL(nodeAlias, projectAlias string, userParam
 			WHERE member.project_id=%[2]s.id
 			  AND member.staff_id=NULLIF($%[4]d,'')::uuid
 			  AND member.active
-			  AND lower(btrim(member_role.role_label))=lower(btrim(required_role.role_label))
+			  AND lower(btrim(consflow_role_label_key(member_role.role_label)))=lower(btrim(consflow_role_label_key(required_role.role_label)))
 		)
 		OR EXISTS (
 			SELECT 1
@@ -234,8 +234,8 @@ func myWorkflowActionResponsibilitySQL(nodeAlias, projectAlias string, userParam
 			CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(%[1]s.responsible_role_ids,'[]'::jsonb)) required_role(role_label)
 			WHERE user_role.user_id=NULLIF($%[3]d,'')::uuid
 			  AND (user_role.project_id IS NULL OR user_role.project_id=%[2]s.id)
-			  AND lower(btrim(required_role.role_label)) IN (
-				lower(btrim(role.name)),lower(btrim(role.display_name)),lower(role.id::text)
+			  AND lower(btrim(consflow_role_label_key(required_role.role_label))) IN (
+				lower(btrim(consflow_role_label_key(role.name))),lower(btrim(consflow_role_label_key(role.display_name))),lower(role.id::text)
 			  )
 		)
 	)`, nodeAlias, projectAlias, userParam, staffParam)

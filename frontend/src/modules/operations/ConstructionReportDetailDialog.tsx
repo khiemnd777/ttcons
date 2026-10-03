@@ -76,7 +76,7 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
   const [recipientId, setRecipientId] = useState('');
   const selectedRecipient = recipients.data?.find((recipient) => recipient.id === recipientId);
   const deliveryRecipientLabel = selectedRecipient?.recommendation_reason === 'project_pm'
-    ? `PM · ${selectedRecipient.full_name}`
+    ? `Quản lý dự án · ${selectedRecipient.full_name}`
     : selectedRecipient?.full_name ?? 'người quản lý';
   const deliveryButtonLabel = deliveryStatus === 'needs_changes'
     ? `Gửi lại cho ${deliveryRecipientLabel}`

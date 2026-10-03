@@ -1,3 +1,4 @@
+import { roleSummary } from '../../lib/utils/roles';
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -383,7 +384,7 @@ function PipelineStageContext({
   onAdvance: () => void;
   onBlock: () => void;
 }) {
-  const roleLabels = asArray<string>(node.responsible_role_ids).filter(Boolean).join(', ') || '-';
+  const roleLabels = roleSummary(asArray<string>(node.responsible_role_ids)) || '-';
 
   return (
     <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">

@@ -45,7 +45,7 @@ export function DiscussionWorkflowActionCard({
           <span className="rounded bg-white px-2 py-1 ring-1 ring-blue-100">Chưa khởi động</span>
         </div>
         <h3 className="mt-3 text-sm font-semibold leading-5 text-ink">Hoàn tất thiết lập công trình</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-600">Kiểm tra thông tin, nhân sự, PM và điều kiện bước đầu trước khi tạo công việc thật.</p>
+        <p className="mt-1 text-xs leading-5 text-slate-600">Kiểm tra thông tin, nhân sự, Quản lý dự án và điều kiện bước đầu trước khi tạo công việc thật.</p>
         <p className="mt-2 text-xs font-medium text-blue-800">Thông tin → Nhân sự → Thiết lập</p>
         <button
           type="button"

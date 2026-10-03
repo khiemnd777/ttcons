@@ -102,7 +102,7 @@ export function DesignReleasePanel({ projectId, workItems = [], readOnly = false
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Thiết kế</p>
           <h2 className="mt-1 text-base font-semibold text-ink">Revision hồ sơ thiết kế</h2>
-          <p className="mt-1 text-sm text-slate-600">Mỗi lần phát hành là một gói hồ sơ độc lập. Revision mới không tự thay revision PM đã bàn giao cho QS.</p>
+          <p className="mt-1 text-sm text-slate-600">Mỗi lần phát hành là một gói hồ sơ độc lập. Revision mới không tự thay revision Quản lý dự án đã bàn giao cho QS.</p>
         </div>
         {!readOnly && workspace.data.capabilities.can_manage ? (
           <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setEditorOpen(true)}>
@@ -118,8 +118,8 @@ export function DesignReleasePanel({ projectId, workItems = [], readOnly = false
             <div className="flex gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <p className="font-semibold">{latestHandoff ? `Có revision mới ${current.revision_label} chưa được bàn giao lại` : `${current.revision_label} chưa được PM bàn giao cho QS`}</p>
-                <p className="mt-1">BOQ và mua hàng giữ nguyên nguồn cũ cho đến khi PM xác nhận bàn giao revision hiện hành.</p>
+                <p className="font-semibold">{latestHandoff ? `Có revision mới ${current.revision_label} chưa được bàn giao lại` : `${current.revision_label} chưa được Quản lý dự án bàn giao cho QS`}</p>
+                <p className="mt-1">BOQ và mua hàng giữ nguyên nguồn cũ cho đến khi Quản lý dự án xác nhận bàn giao revision hiện hành.</p>
               </div>
             </div>
             {!readOnly && workspace.data.capabilities.can_handoff ? (
@@ -132,7 +132,7 @@ export function DesignReleasePanel({ projectId, workItems = [], readOnly = false
         </div>
       ) : current && latestHandoff ? (
         <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <p className="font-semibold">PM đã bàn giao {latestHandoff.revision_label} cho QS</p>
+          <p className="font-semibold">Quản lý dự án đã bàn giao {latestHandoff.revision_label} cho QS</p>
           <p className="mt-1">{latestHandoff.handed_off_by_name || 'Không rõ người bàn giao'} · {dateTimeText(latestHandoff.handed_off_at)}</p>
         </div>
       ) : null}
@@ -470,7 +470,7 @@ function DesignReleaseEditorDialog({ open, projectId, workItemId, draft, onClose
           </label>
         </div>
         <label className="block text-sm font-semibold text-slate-700">Ghi chú
-          <textarea className="mt-1 min-h-24 w-full rounded-md border border-line px-3 py-2 font-normal text-ink outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={notes} maxLength={4000} onChange={(event) => setNotes(event.target.value)} placeholder="Phạm vi thay đổi, lưu ý cho PM/QS..." />
+          <textarea className="mt-1 min-h-24 w-full rounded-md border border-line px-3 py-2 font-normal text-ink outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" value={notes} maxLength={4000} onChange={(event) => setNotes(event.target.value)} placeholder="Phạm vi thay đổi, lưu ý cho Quản lý dự án/QS..." />
         </label>
 
         <div className="rounded-lg border border-line p-4">

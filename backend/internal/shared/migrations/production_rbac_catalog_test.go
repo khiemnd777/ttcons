@@ -23,6 +23,7 @@ func TestProductionRBACCatalogSupportsFreshDatabaseWithoutSeed(t *testing.T) {
 	}
 
 	assertRBACCount(t, ctx, database, `SELECT COUNT(*) FROM roles WHERE system_role`, 19)
+	assertRBACCount(t, ctx, database, `SELECT COUNT(*) FROM roles WHERE name='pm' AND display_name='Quản lý dự án' AND system_role AND NOT external_only`, 1)
 	assertRBACCount(t, ctx, database, `SELECT COUNT(*) FROM roles WHERE name='deputy_manager' AND display_name='Phó Quản Lý' AND system_role AND NOT external_only`, 1)
 	assertRBACCount(t, ctx, database, `SELECT COUNT(*) FROM role_permissions grant_row JOIN roles role ON role.id=grant_row.role_id JOIN permissions permission ON permission.id=grant_row.permission_id WHERE role.name='deputy_manager' AND permission.key IN ('project.supervision.view','project.view','pipeline.view','planning.view','operation.view','work_report.view','work_report.review','work_report.export')`, 8)
 	assertRBACCount(t, ctx, database, `SELECT COUNT(*) FROM role_permissions grant_row JOIN roles role ON role.id=grant_row.role_id JOIN permissions permission ON permission.id=grant_row.permission_id WHERE permission.key='project.supervision.view' AND role.name <> 'deputy_manager'`, 0)

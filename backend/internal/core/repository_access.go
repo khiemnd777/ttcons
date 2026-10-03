@@ -458,10 +458,10 @@ func (r *Repository) ReplaceRolePermissions(ctx context.Context, roleID string, 
 			}
 		}
 		if roleName != "pm" && requestedKeys["project.export"] {
-			return nil, validationError("Quyền xuất công trình chỉ dành cho Quản trị viên, Nhà phát triển hoặc PM", Record{"permission": "project.export"})
+			return nil, validationError("Quyền xuất công trình chỉ dành cho Quản trị viên, Nhà phát triển hoặc Quản lý dự án", Record{"permission": "project.export"})
 		}
 		if roleName != "pm" && requestedKeys["workflow_definition.export"] {
-			return nil, validationError("Quyền xuất định nghĩa workflow chỉ dành cho Quản trị viên, Nhà phát triển hoặc PM", Record{"permission": "workflow_definition.export"})
+			return nil, validationError("Quyền xuất định nghĩa workflow chỉ dành cho Quản trị viên, Nhà phát triển hoặc Quản lý dự án", Record{"permission": "workflow_definition.export"})
 		}
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, roleID); err != nil {
@@ -1478,6 +1478,7 @@ func (r *Repository) UserIsProjectManager(ctx context.Context, userID, projectID
 					pm.role_ids ? 'pm'
 					OR pm.role_ids ? 'PM'
 					OR pm.role_ids ? 'Project Manager'
+					OR pm.role_ids ? 'Quản lý dự án'
 					OR pm.role_ids ? 'admin'
 					OR pm.role_ids ? 'director'
 					OR pm.role_ids ? 'Giám đốc'
@@ -1489,7 +1490,7 @@ func (r *Repository) UserIsProjectManager(ctx context.Context, userID, projectID
 				JOIN roles r ON r.id=ur.role_id
 				WHERE ur.user_id=$2
 				  AND ur.project_id=p.id
-				  AND (r.name IN ('pm','admin','director') OR r.display_name IN ('PM','Project Manager','Admin','Giám đốc'))
+				  AND (r.name IN ('pm','admin','director') OR r.display_name IN ('PM','Project Manager','Quản lý dự án','Admin','Giám đốc'))
 			)
 		  )
 	`, projectID, userID)
@@ -1552,7 +1553,11 @@ func roleLabelsIntersect(labels []string, required []string) bool {
 }
 
 func normalizeRoleLabel(value string) string {
-	return strings.ToLower(strings.TrimSpace(value))
+	label := strings.ToLower(strings.TrimSpace(value))
+	if label == "quản lý dự án" || label == "project manager" {
+		return "pm"
+	}
+	return label
 }
 
 func (r *Repository) canAccessWorkItem(ctx context.Context, workItemID, userID string, includeWatchers, includeCancelled bool) (bool, error) {

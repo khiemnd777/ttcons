@@ -226,7 +226,7 @@ func (s *Service) EvidenceAction(ctx context.Context, evidenceID, action string,
 		return nil, err
 	}
 	if cleanID(evidence["design_release_id"]) != "" {
-		return nil, validationError("Hồ sơ thuộc revision thiết kế được rà soát theo thao tác bàn giao của PM", Record{
+		return nil, validationError("Hồ sơ thuộc revision thiết kế được rà soát theo thao tác bàn giao của Quản lý dự án", Record{
 			"design_release_id": evidence["design_release_id"],
 			"revision_label":    evidence["design_revision_label"],
 		})

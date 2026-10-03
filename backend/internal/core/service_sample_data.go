@@ -215,7 +215,8 @@ func sampleDataPipelineCompatibility(blueprint sampleDataBlueprint) SampleDataPi
 func sampleRoleMatches(blueprint sampleDataBlueprint, roleLabel string) []sampleDataRoleAccount {
 	matches := []sampleDataRoleAccount{}
 	for _, role := range blueprint.Roles {
-		if strings.EqualFold(strings.TrimSpace(role.RoleName), strings.TrimSpace(roleLabel)) {
+		if strings.EqualFold(strings.TrimSpace(role.RoleName), strings.TrimSpace(roleLabel)) ||
+			(strings.EqualFold(role.RoleKey, "pm") && normalizeRoleLabel(roleLabel) == "pm") {
 			matches = append(matches, role)
 		}
 	}
@@ -544,6 +545,15 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 }
 
 func sampleActorsForRoleLabel(blueprint sampleDataBlueprint, roleLabel string) []sampleDataStaffActor {
+	if normalizeRoleLabel(roleLabel) == "pm" {
+		matches := sampleRoleMatches(blueprint, roleLabel)
+		if len(matches) != 1 {
+			return nil
+		}
+		// Resolve through the catalog first; a custom PM-labelled actor must not
+		// win a map iteration against the renamed canonical Project Manager.
+		roleLabel = matches[0].RoleName
+	}
 	for name, actors := range blueprint.Actors {
 		if strings.EqualFold(strings.TrimSpace(name), strings.TrimSpace(roleLabel)) {
 			return actors

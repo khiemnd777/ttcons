@@ -117,7 +117,7 @@ export const statusLabels: LabelMap = {
   sent: 'Đã gửi bản giấy',
   qs_review: 'QS đang rà soát',
   purchasing_sourcing: 'Mua hàng đang lấy giá',
-  pending_approval: 'Chờ PM/Giám đốc duyệt',
+  pending_approval: 'Chờ Quản lý dự án/Giám đốc duyệt',
   procurement_created: 'Đã tạo yêu cầu mua',
   urgent: 'Gấp',
   normal: 'Không gấp',

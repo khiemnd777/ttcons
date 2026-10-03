@@ -1,5 +1,11 @@
 # Admin Governance Domain Map
 
+## PM Display Name Agreement
+
+- The internal system role key `pm` means Quản lý dự án; `deputy_manager` means Phó Quản Lý. V149 renames only `roles.display_name` for canonical PM and preserves role IDs, grants, user/project assignments and account identities. Existing migrations and historical snapshots are immutable.
+- Go `normalizeRoleLabel` and SQL `consflow_role_label_key` retain PM / Project Manager compatibility with the current display name. Deputy labels never become PM aliases. Every caller still enforces actor/project scope; display conversion is not a grant.
+- Sample role/actor resolution and workflow Excel export support the old/current PM labels while preserving ambiguity and external-role rejection. Frontend presentation lives in `lib/utils/roles.ts`. First searches: `appRoleDisplayName|consflow_role_label_key|sampleRoleMatches`. See central/backend/frontend maps and `docs/project-manager-role-label.md`.
+
 ## Deputy Manager Role Boundary
 
 - V146 adds system App role `deputy_manager` / Phó Quản Lý and reserved `project.supervision.view`; role identity and marker assignments are guarded in PostgreSQL and `ReplaceRolePermissions`. Catalog/import/member role options are dynamic; the pipeline role-label catalog includes Phó Quản Lý. No existing PM or human account assignment is rewritten.

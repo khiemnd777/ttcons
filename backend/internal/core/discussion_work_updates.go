@@ -103,7 +103,7 @@ func insertDesignDiscussionUpdateTx(ctx context.Context, tx *sql.Tx, release Rec
 	} else if event == "released" {
 		status = "released"
 	} else {
-		comment = "PM đã bàn giao hồ sơ thiết kế cho QS"
+		comment = "Quản lý dự án đã bàn giao hồ sơ thiết kế cho QS"
 	}
 	return insertDiscussionWorkUpdateTx(ctx, tx, projectID, workItemID, actorID, "design_release", releaseID, event, comment, Record{
 		"title": "Hồ sơ thiết kế", "revision_label": release["revision_label"], "revision_no": release["revision_no"],

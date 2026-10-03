@@ -204,7 +204,7 @@ func (s *Service) HandoffDesignRelease(ctx context.Context, releaseID string, bo
 		return nil, err
 	}
 	if !capabilities.CanHandoff {
-		return nil, forbiddenError("Chỉ PM của công trình mới có thể bàn giao revision thiết kế cho QS")
+		return nil, forbiddenError("Chỉ Quản lý dự án của công trình mới có thể bàn giao revision thiết kế cho QS")
 	}
 	workItemID := cleanID(body["work_item_id"])
 	if err := s.validateDesignReleaseWorkItem(ctx, projectID, workItemID, true); err != nil {
@@ -293,7 +293,7 @@ func (s *Service) validateDesignReleaseWorkItem(ctx context.Context, projectID, 
 	actionKey := strings.TrimSpace(fmt.Sprint(row["domain_action_key"]))
 	if handoff {
 		if actionKey != "source.design_documents_ready" {
-			return validationError("Công việc liên kết không phải bước PM bàn giao hồ sơ thiết kế", Record{"work_item_id": workItemID})
+			return validationError("Công việc liên kết không phải bước Quản lý dự án bàn giao hồ sơ thiết kế", Record{"work_item_id": workItemID})
 		}
 		return nil
 	}

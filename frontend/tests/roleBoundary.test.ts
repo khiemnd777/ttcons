@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  appRoleDisplayName,
+  appRoleChoices,
+  pipelineActorRoleChoices,
   appRoleScopeLabel,
   isAssignableAppRole,
   pipelineActorRoleOptions,
@@ -22,7 +25,20 @@ test('pipeline actor choices exclude the client business counterpart', () => {
 });
 
 test('account role summaries deduplicate and normalize display names', () => {
-  assert.deepEqual(uniqueRoleNames([' PM ', 'PM', '', 'QS', ' QS ']), ['PM', 'QS']);
-  assert.equal(roleSummary([' PM ', 'PM', '', 'QS', ' QS ']), 'PM, QS');
+  assert.deepEqual(uniqueRoleNames([' PM ', 'PM', '', 'QS', ' QS ']), ['Quản lý dự án', 'QS']);
+  assert.equal(roleSummary([' PM ', 'PM', '', 'QS', ' QS ']), 'Quản lý dự án, QS');
   assert.equal(roleSummary(), '');
+});
+
+test('Project Manager aliases display distinctly from Deputy Manager without changing stored choices', () => {
+  for (const value of ['PM', 'pm', ' Project Manager ', 'Quản lý dự án']) {
+    assert.equal(appRoleDisplayName(value), 'Quản lý dự án');
+  }
+  assert.equal(appRoleDisplayName('Phó Quản Lý'), 'Phó Quản Lý');
+  assert.equal(appRoleDisplayName('deputy_manager'), 'deputy_manager');
+  assert.deepEqual(pipelineActorRoleChoices.find((choice) => choice.value === 'PM'), { value: 'PM', label: 'Quản lý dự án' });
+  assert.equal(roleSummary(['PM', 'Quản lý dự án', 'Phó Quản Lý']), 'Quản lý dự án, Phó Quản Lý');
+  assert.deepEqual(appRoleChoices(['Quản lý dự án', 'PM', 'QS'], ['PM']), [
+    { value: 'PM', label: 'Quản lý dự án' }, { value: 'QS', label: 'QS' },
+  ]);
 });

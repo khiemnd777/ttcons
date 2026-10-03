@@ -1,3 +1,4 @@
+import { appRoleChoices, appRoleDisplayName, roleSummary } from '../../lib/utils/roles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Check, CheckCircle2, LockKeyhole, PlayCircle, RefreshCw, Search, UserCog, Users } from 'lucide-react';
@@ -262,7 +263,7 @@ export function ProjectStartupWizard({
       if (!hasAnyMember) problems.push('chọn ít nhất một nhân sự');
       if (invalidDrafts.some((draft) => !draft.role_ids.length)) problems.push('gán vai trò vận hành cho mọi người đã chọn');
       if (invalidDrafts.some((draft) => !draftHasProjectView(draft, accessRoles))) problems.push('bảo đảm mỗi người có quyền project.view');
-      if (!hasPMEligibleMember) problems.push('chọn ít nhất một người đủ quyền PM');
+      if (!hasPMEligibleMember) problems.push('chọn ít nhất một người đủ quyền Quản lý dự án');
       toast.warn({ title: 'Chưa thể tiếp tục', description: problems.join('; ') || 'Anh không có quyền quản lý thành viên công trình.' });
       return;
     }
@@ -298,13 +299,13 @@ export function ProjectStartupWizard({
         queryClient.invalidateQueries({ queryKey: ['my-project-startup-actions'] }),
       ]);
       onChanged();
-      toast.success('Đã bàn giao trách nhiệm thiết lập cho PM');
+      toast.success('Đã bàn giao trách nhiệm thiết lập cho Quản lý dự án');
     } catch (error) {
       if (error instanceof ApiError && error.code === 'VALIDATION_ERROR') {
-        toast.warn({ title: 'Chưa thể chỉ định PM', description: error.message });
+        toast.warn({ title: 'Chưa thể chỉ định Quản lý dự án', description: error.message });
         return;
       }
-      toast.error('Không chỉ định được PM', error);
+      toast.error('Không chỉ định được Quản lý dự án', error);
     }
   }
 
@@ -572,7 +573,7 @@ function MemberSelectionStep({
       ) : null}
 
       <section className={clsx('rounded-lg border p-3 text-sm', hasPMEligibleMember ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900')}>
-        <div className="flex items-start gap-2">{hasPMEligibleMember ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}<p>{hasPMEligibleMember ? 'Đã có ít nhất một người đủ quyền PM: xem công trình, quản lý thành viên và chạy pipeline.' : 'Cần ít nhất một người có đủ `project.view`, `project.member.manage` và `pipeline.run` trước khi tiếp tục.'}</p></div>
+        <div className="flex items-start gap-2">{hasPMEligibleMember ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />}<p>{hasPMEligibleMember ? 'Đã có ít nhất một người đủ quyền Quản lý dự án: xem công trình, quản lý thành viên và chạy pipeline.' : 'Cần ít nhất một người có đủ `project.view`, `project.member.manage` và `pipeline.run` trước khi tiếp tục.'}</p></div>
       </section>
     </div>
   );
@@ -585,13 +586,13 @@ function MemberDraftCard({ draft, accessRoles, roleLabels, submitted, onChange }
     <article className={clsx('rounded-lg border p-4', submitted && (!draft.role_ids.length || !accessReady) ? 'border-rose-300 bg-rose-50/30' : 'border-line bg-white')}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div><p className="font-semibold text-ink">{draft.staff.full_name}</p><p className="mt-0.5 text-xs text-slate-500">{[draft.staff.department, draft.staff.position].filter(Boolean).join(' · ') || 'Chưa có đơn vị công tác'}</p></div>
-        <span className={clsx('w-fit rounded-md px-2 py-1 text-xs font-semibold', pmReady ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>{pmReady ? 'Đủ quyền PM' : 'Thành viên'}</span>
+        <span className={clsx('w-fit rounded-md px-2 py-1 text-xs font-semibold', pmReady ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600')}>{pmReady ? 'Đủ quyền Quản lý dự án' : 'Thành viên'}</span>
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
           <p className="mb-2 text-sm font-semibold text-slate-700">Vai trò vận hành <span className="text-rose-600">*</span></p>
           <div className="grid max-h-48 gap-2 overflow-y-auto rounded-md border border-line p-2 sm:grid-cols-2">
-            {roleLabels.map((label) => <RoleCheckbox key={label} label={label} checked={draft.role_ids.includes(label)} onChange={() => onChange({ role_ids: toggleValue(draft.role_ids, label) })} />)}
+            {appRoleChoices(roleLabels, draft.role_ids).map(({ value, label }) => <RoleCheckbox key={value} label={label} checked={draft.role_ids.includes(value)} onChange={() => onChange({ role_ids: toggleValue(draft.role_ids, value) })} />)}
           </div>
           {submitted && !draft.role_ids.length ? <p className="mt-1 text-xs font-medium text-rose-700">Chọn ít nhất một vai trò vận hành.</p> : null}
         </div>
@@ -636,7 +637,7 @@ function SetupStep({ loading, error, data, teamMembers, eligibleMembers, selecte
   return (
     <div className="space-y-4">
       <section className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-line bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Người chịu trách nhiệm</p><p className="mt-2 font-semibold text-ink">{data.owner_name || 'Chưa xác định'}</p><p className="mt-1 text-xs text-slate-600">{data.pm_user_id ? 'PM công trình' : 'Người tạo công trình (tạm thời)'}</p></div>
+        <div className="rounded-lg border border-line bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Người chịu trách nhiệm</p><p className="mt-2 font-semibold text-ink">{data.owner_name || 'Chưa xác định'}</p><p className="mt-1 text-xs text-slate-600">{data.pm_user_id ? 'Quản lý dự án công trình' : 'Người tạo công trình (tạm thời)'}</p></div>
         <div className="rounded-lg border border-line bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mẫu quy trình</p><p className="mt-2 font-semibold text-ink">{data.template_name || 'Chưa có mẫu đã phát hành'}</p><p className="mt-1 text-xs text-slate-600">{data.template_id ? 'Sẵn sàng kiểm tra bước đầu' : 'Cần chọn hoặc phát hành mẫu quy trình'}</p></div>
       </section>
 
@@ -658,10 +659,10 @@ function SetupStep({ loading, error, data, teamMembers, eligibleMembers, selecte
                     <p className="truncate text-xs text-slate-500" title={[member.department, member.position].filter(Boolean).join(' · ')}>{[member.department, member.position].filter(Boolean).join(' · ') || member.email || 'Chưa có thông tin đơn vị'}</p>
                   </div>
                   <div className="flex min-w-0 flex-wrap gap-1.5">
-                    {member.role_ids.length ? member.role_ids.map((role) => <span key={role} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{role}</span>) : <span className="text-xs text-amber-700">Chưa có vai trò vận hành</span>}
+                    {member.role_ids.length ? member.role_ids.map((role) => <span key={role} className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{appRoleDisplayName(role)}</span>) : <span className="text-xs text-amber-700">Chưa có vai trò vận hành</span>}
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
-                    {member.staff_id === data.pm_staff_id ? <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">PM phụ trách</span> : null}
+                    {member.staff_id === data.pm_staff_id ? <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">Quản lý dự án phụ trách</span> : null}
                     <span className={clsx('rounded-full px-2 py-0.5 text-xs font-semibold', member.account_active === false ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700')}>{member.account_active === false ? 'Tài khoản ngừng' : 'Đang hoạt động'}</span>
                   </div>
                 </div>
@@ -702,16 +703,16 @@ function SetupStep({ loading, error, data, teamMembers, eligibleMembers, selecte
 
       {data.capabilities.can_manage_project_manager ? (
         <section className="rounded-lg border border-line p-4">
-          <h3 className="flex items-center gap-2 font-semibold text-ink"><UserCog className="h-5 w-5 text-blue-700" />Chỉ định PM chịu trách nhiệm</h3>
+          <h3 className="flex items-center gap-2 font-semibold text-ink"><UserCog className="h-5 w-5 text-blue-700" />Chỉ định Quản lý dự án chịu trách nhiệm</h3>
           <p className="mt-1 text-sm text-slate-600">Danh sách chỉ hiển thị thành viên có đủ quyền xem công trình, quản lý thành viên và chạy pipeline.</p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <select className="min-w-0 flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm focus-ring" value={selectedPMStaffID} onChange={(event) => onSelectedPMChange(event.target.value)}>
-              <option value="">Chọn PM đủ điều kiện</option>
-              {eligibleMembers.map((member) => <option key={member.id} value={member.staff_id}>{member.full_name} · {member.role_ids.join(', ')}</option>)}
+              <option value="">Chọn Quản lý dự án đủ điều kiện</option>
+              {eligibleMembers.map((member) => <option key={member.id} value={member.staff_id}>{member.full_name} · {roleSummary(member.role_ids)}</option>)}
             </select>
-            <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" disabled={!selectedPMStaffID || selectedPMStaffID === data.pm_staff_id || assigningPM} onClick={onAssignPM}>{assigningPM ? 'Đang lưu…' : 'Bàn giao cho PM'}</button>
+            <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" disabled={!selectedPMStaffID || selectedPMStaffID === data.pm_staff_id || assigningPM} onClick={onAssignPM}>{assigningPM ? 'Đang lưu…' : 'Bàn giao cho Quản lý dự án'}</button>
           </div>
-          {!eligibleMembers.length ? <p className="mt-2 text-sm text-amber-800">Chưa có thành viên đủ quyền PM. Quay lại bước Chọn nhân sự để bổ sung role.</p> : null}
+          {!eligibleMembers.length ? <p className="mt-2 text-sm text-amber-800">Chưa có thành viên đủ quyền Quản lý dự án. Quay lại bước Chọn nhân sự để bổ sung role.</p> : null}
         </section>
       ) : null}
 
@@ -720,7 +721,7 @@ function SetupStep({ loading, error, data, teamMembers, eligibleMembers, selecte
         <div className="mt-3 space-y-2">
           {data.first_steps.length ? data.first_steps.map((startupStep) => (
             <div key={startupStep.id} className={clsx('rounded-md border p-3', startupStep.covered ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50')}>
-              <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">{startupStep.name}</p><p className="mt-1 text-xs text-slate-600">Vai trò: {startupStep.role_ids.join(', ') || 'Không giới hạn'}{startupStep.required_permission ? ` · Quyền: ${startupStep.required_permission}` : ''}</p></div><span className={clsx('shrink-0 text-xs font-semibold', startupStep.covered ? 'text-emerald-700' : 'text-amber-800')}>{startupStep.covered ? 'Đã có người' : 'Thiếu người'}</span></div>
+              <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold text-ink">{startupStep.name}</p><p className="mt-1 text-xs text-slate-600">Vai trò: {roleSummary(startupStep.role_ids) || 'Không giới hạn'}{startupStep.required_permission ? ` · Quyền: ${startupStep.required_permission}` : ''}</p></div><span className={clsx('shrink-0 text-xs font-semibold', startupStep.covered ? 'text-emerald-700' : 'text-amber-800')}>{startupStep.covered ? 'Đã có người' : 'Thiếu người'}</span></div>
               <p className="mt-2 text-xs text-slate-700">{startupStep.eligible_users.length ? startupStep.eligible_users.map((person) => person.full_name).join(', ') : 'Chưa có thành viên phù hợp.'}</p>
             </div>
           )) : <p className="text-sm text-slate-600">Node đầu không có bước tạo công việc.</p>}
@@ -766,7 +767,7 @@ function normalizeMemberSearch(value: string) {
 }
 
 function normalizeRoleLabel(value: string) {
-  return normalizeMemberSearch(value).replace(/\s+/g, ' ');
+  return normalizeMemberSearch(appRoleDisplayName(value)).replace(/\s+/g, ' ');
 }
 
 function toggleValue(values: string[], value: string) {

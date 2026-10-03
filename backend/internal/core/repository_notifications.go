@@ -108,11 +108,11 @@ func (r *Repository) notificationVisibility(ctx context.Context, actorID string,
 								WHERE actionable_member.project_id=actionable_item.project_id
 								  AND actionable_member.staff_id=actionable_staff.id AND actionable_member.active
 								  AND (
-									actionable_member.role_ids ?| ARRAY['admin','director','Giám đốc','pm','PM','Project Manager']
+									actionable_member.role_ids ?| ARRAY['admin','director','Giám đốc','pm','PM','Project Manager','Quản lý dự án']
 									OR (NULLIF(actionable_staff.department,'') IS NOT NULL AND actionable_item.department=actionable_staff.department)
 									OR EXISTS (
 										SELECT 1 FROM jsonb_array_elements_text(actionable_member.role_ids) member_role(role_label)
-										JOIN jsonb_array_elements_text(actionable_item.role_ids) item_role(role_label) ON item_role.role_label=member_role.role_label
+										JOIN jsonb_array_elements_text(actionable_item.role_ids) item_role(role_label) ON consflow_role_label_key(item_role.role_label)=consflow_role_label_key(member_role.role_label)
 									)
 									OR EXISTS (
 										SELECT 1 FROM work_item_assignments actionable_group_assignment
@@ -120,7 +120,10 @@ func (r *Repository) notificationVisibility(ctx context.Context, actorID string,
 										  AND actionable_group_assignment.assignment_type <> 'watcher'
 										  AND (
 											(NULLIF(actionable_staff.department,'') IS NOT NULL AND actionable_group_assignment.department=actionable_staff.department)
-											OR (NULLIF(actionable_group_assignment.role_name,'') IS NOT NULL AND actionable_member.role_ids ? actionable_group_assignment.role_name)
+											OR (NULLIF(actionable_group_assignment.role_name,'') IS NOT NULL AND EXISTS (
+												SELECT 1 FROM jsonb_array_elements_text(actionable_member.role_ids) member_role(label)
+												WHERE consflow_role_label_key(member_role.label)=consflow_role_label_key(actionable_group_assignment.role_name)
+												))
 										  )
 									)
 								  )
@@ -134,10 +137,10 @@ func (r *Repository) notificationVisibility(ctx context.Context, actorID string,
 						  AND actionable_user_assignment.project_id=actionable_item.project_id
 						  AND (
 							actionable_role.name IN ('admin','director','pm')
-							OR actionable_role.display_name IN ('Admin','Giám đốc','PM','Project Manager')
+							OR actionable_role.display_name IN ('Admin','Giám đốc','PM','Project Manager','Quản lý dự án')
 							OR EXISTS (
 								SELECT 1 FROM jsonb_array_elements_text(actionable_item.role_ids) item_role(role_label)
-								WHERE item_role.role_label IN (actionable_role.name,actionable_role.display_name,actionable_role.id::text)
+								WHERE consflow_role_label_key(item_role.role_label) IN (consflow_role_label_key(actionable_role.name),consflow_role_label_key(actionable_role.display_name),actionable_role.id::text)
 							)
 							OR EXISTS (
 								SELECT 1 FROM work_item_assignments actionable_role_assignment

@@ -18,6 +18,31 @@ export const pipelineActorRoleOptions = [
   'Đội thi công',
 ];
 
+// Presentation only: persisted workflow values remain compatible with PM.
+export function appRoleDisplayName(value: string) {
+  const label = value.trim();
+  return ['pm', 'project manager', 'quản lý dự án'].includes(label.toLocaleLowerCase('vi-VN'))
+    ? 'Quản lý dự án'
+    : label;
+}
+
+export const pipelineActorRoleChoices = pipelineActorRoleOptions.map((value) => ({
+  value,
+  label: appRoleDisplayName(value),
+}));
+
+export function appRoleChoices(values: readonly string[], selected: readonly string[] = []) {
+  const choices = new Map<string, { value: string; label: string }>();
+  for (const value of values) {
+    const label = appRoleDisplayName(value);
+    if (choices.has(label)) continue;
+    // Keep the saved member value when editing an existing assignment.
+    const saved = selected.find((item) => appRoleDisplayName(item) === label);
+    choices.set(label, { value: saved ?? value, label });
+  }
+  return [...choices.values()];
+}
+
 export function isAssignableAppRole<T extends AppRoleBoundary>(role: T) {
   return role.external_only !== true;
 }
@@ -27,7 +52,7 @@ export function appRoleScopeLabel(role: AppRoleBoundary) {
 }
 
 export function uniqueRoleNames(roles?: readonly string[]) {
-  return Array.from(new Set((roles ?? []).map((role) => role.trim()).filter(Boolean)));
+  return Array.from(new Set((roles ?? []).map(appRoleDisplayName).filter(Boolean)));
 }
 
 export function roleSummary(roles?: readonly string[]) {

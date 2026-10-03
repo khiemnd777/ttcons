@@ -1,3 +1,4 @@
+import { roleSummary } from '../../lib/utils/roles';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -417,7 +418,7 @@ function preparationFilterMatches(item: WorkItem, filter: PreparationFilter) {
 }
 
 function workItemOwner(item: WorkItem) {
-  if (!item.assignee_name) return asArray<string>(item.role_ids).join(', ') || '-';
+  if (!item.assignee_name) return roleSummary(asArray<string>(item.role_ids)) || '-';
   const label = identityReferenceText(item.assignee_name, item.assignee_account_deleted);
   return item.assignee_account_deleted ? `${label} · Cần phân công lại` : label;
 }

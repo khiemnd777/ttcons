@@ -1,5 +1,11 @@
 # Consflow Frontend UI And Utility Map
 
+## Project Manager Display Presentation
+
+- `lib/utils/roles.ts::{appRoleDisplayName,appRoleChoices,roleSummary,uniqueRoleNames,pipelineActorRoleChoices}` displays PM / Project Manager / canonical `pm` as Quản lý dự án and keeps Phó Quản Lý distinct. Display helpers do not authorize access. `appRoleChoices` deduplicates display aliases and prefers the saved raw value when editing an existing membership.
+- Owners/consumers: AppShell/Profile/MyWork account summaries; ProjectMembersPanel role chips/filters/member dialog; ProjectStartupWizard role choices/current team/first-step coverage; PlanningPage, PreparationPage and ProjectDetailPage current role summaries; NodeInspectorPanel existing MultiSelect and step summaries. Pipeline choices retain raw `PM` values with the new visible label. API role catalog names come from V149.
+- Existing PM text in project startup, Operations report recipient/variation notices, Contracts approval labels and design-release handoff now names Quản lý dự án. No layout redesign or new dialog/viewer. Preserve stored workflow/member/form values and historical snapshots; do not bulk-replace IDs or arbitrary user-authored content. First searches: `appRoleDisplayName|appRoleChoices|pipelineActorRoleChoices|roleSummary`; coverage: `roleBoundary.test.ts` plus existing module/render tests.
+
 ## Deputy Manager supervision workspace (2026-10-02)
 
 - Purpose: company-wide oversight of Supervisor work and reports without granting task assignment/completion or project coordination overrides. Owners: `modules/my-work/{MyWorkPage,SupervisionWorkspace}.tsx`, `modules/work-reports/{WorkReportReviewDialog.tsx,workReportReviewCapabilities.ts}`, `lib/types/domain/common.ts`, `lib/utils/roles.ts`. First searches: `project.supervision.view|supervision_reports|read_receipts|viewer_acknowledged|workReportReviewCapabilities`.

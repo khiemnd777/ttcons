@@ -182,7 +182,7 @@ function VariationReadinessNote({ projectId, loading, error, available, canViewC
   if (available) return null;
   if (loading) return <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600">Đang kiểm tra điều kiện đề xuất…</p>;
   if (error) return <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600"><p>Không tải được điều kiện đề xuất.</p>{onRetry ? <button type="button" className="mt-1 font-semibold text-blue-700 hover:text-blue-800" onClick={onRetry}>Thử lại</button> : null}</div>;
-  return <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600"><p>Cần PM/Thương mại hoàn tất hợp đồng trước khi gửi đề xuất.</p><p className="mt-1">Báo cáo, kiểm tra và xử lý hiện trường vẫn hoạt động bình thường.</p>{canViewContracts ? <Link className="mt-1 inline-flex font-semibold text-blue-700 hover:text-blue-800" to={`/projects/${projectId}/contracts`}>Mở hợp đồng</Link> : null}</div>;
+  return <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600"><p>Cần Quản lý dự án/Thương mại hoàn tất hợp đồng trước khi gửi đề xuất.</p><p className="mt-1">Báo cáo, kiểm tra và xử lý hiện trường vẫn hoạt động bình thường.</p>{canViewContracts ? <Link className="mt-1 inline-flex font-semibold text-blue-700 hover:text-blue-800" to={`/projects/${projectId}/contracts`}>Mở hợp đồng</Link> : null}</div>;
 }
 
 function ResolutionDialog({ action, onClose, onSaved }: Props & { action: ConstructionActionItem }) {

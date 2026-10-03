@@ -25,6 +25,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { RowActions } from '../../components/RowActions';
 import { useToast } from '../../components/ToastProvider';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
+import { appRoleChoices, appRoleDisplayName, uniqueRoleNames } from '../../lib/utils/roles';
 import { IdentityReferenceLabel } from '../../components/IdentityReferenceLabel';
 
 type MemberDialog =
@@ -105,7 +106,7 @@ export function ProjectMembersPanel({
     [items],
   );
   const roles = useMemo(
-    () => Array.from(new Set(items.flatMap((item) => item.role_ids ?? []))).sort(localeCompareVI),
+    () => uniqueRoleNames(items.flatMap((item) => item.role_ids ?? [])).sort(localeCompareVI),
     [items],
   );
   const filtered = useMemo(() => {
@@ -114,14 +115,14 @@ export function ProjectMembersPanel({
       if (status === 'active' && !member.active) return false;
       if (status === 'inactive' && member.active) return false;
       if (department && member.department !== department) return false;
-      if (role && !member.role_ids.includes(role)) return false;
+      if (role && !member.role_ids.some((label) => appRoleDisplayName(label) === role)) return false;
       if (!normalizedQuery) return true;
       return normalizeSearch([
         member.full_name,
         member.email,
         member.department,
         member.position,
-        ...member.role_ids,
+        ...member.role_ids.map(appRoleDisplayName),
         ...member.global_roles.map((item) => item.display_name),
         ...member.project_roles.map((item) => item.display_name),
       ].filter(Boolean).join(' ')).includes(normalizedQuery);
@@ -284,7 +285,7 @@ function MemberIdentity({ member }: { member: ProjectMember }) {
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
           <p className="truncate font-semibold text-ink"><IdentityReferenceLabel name={member.full_name} deleted={member.account_deleted} /></p>
-          {member.is_project_manager ? <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-blue-700">PM chính</span> : null}
+          {member.is_project_manager ? <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">Quản lý dự án chính</span> : null}
         </div>
         {member.email ? <p className="truncate text-xs text-slate-500">{member.email}</p> : null}
       </div>
@@ -303,7 +304,7 @@ function DepartmentPosition({ member }: { member: ProjectMember }) {
 
 function RoleChips({ roles }: { roles: string[] }) {
   if (!roles.length) return <span className="text-sm text-slate-400">Chưa gán</span>;
-  return <div className="flex flex-wrap gap-1">{roles.map((role) => <span key={role} className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{role}</span>)}</div>;
+  return <div className="flex flex-wrap gap-1">{roles.map((role) => <span key={role} className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{appRoleDisplayName(role)}</span>)}</div>;
 }
 
 function AccessRoleSummary({ member }: { member: ProjectMember }) {
@@ -433,7 +434,7 @@ function ProjectMemberFormDialog({ open, member, data, saving, onClose, onSave, 
 
         <Field fieldKey="role_ids" label="Vai trò vận hành tại công trình" required invalid={submitted && !roleIDs.length}>
           <div className={clsx('grid gap-2 rounded-md border p-3 sm:grid-cols-2 lg:grid-cols-3', submitted && !roleIDs.length ? 'border-rose-300 bg-rose-50/40' : 'border-line')}>
-            {roleLabels.map((label) => <CheckOption key={label} label={label} checked={roleIDs.includes(label)} onChange={() => setRoleIDs(toggleValue(roleIDs, label))} />)}
+            {appRoleChoices(roleLabels, roleIDs).map(({ value, label }) => <CheckOption key={value} label={label} checked={roleIDs.includes(value)} onChange={() => setRoleIDs(toggleValue(roleIDs, value))} />)}
           </div>
         </Field>
 

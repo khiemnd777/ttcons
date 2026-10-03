@@ -1,5 +1,11 @@
 # Project Planning Domain Map
 
+## Project Manager Presentation
+
+- Canonical `pm` displays as Quản lý dự án; project member/PM ownership and the separately scoped Phó Quản Lý role remain distinct. Project startup, membership chips/filters/dialog choices, current Planning/Preparation/work summaries and PM handoff messages use the current name.
+- Existing PM / Project Manager member/workflow labels continue matching canonical PM. Frontend `appRoleChoices` keeps the selected legacy membership value while showing one current label per alias group; Go/SQL compatibility retains existing project and active-member guards. No assignment or historical record backfill.
+- Owners: `ProjectMembersPanel.tsx`, `ProjectStartupWizard.tsx`, `PlanningPage.tsx`, `PreparationPage.tsx`, `ProjectDetailPage.tsx`, shared `roles.ts`, `project_startup.go`, `repository_access.go`, V149. First searches: `appRoleChoices|appRoleDisplayName|consflow_role_label_key`.
+
 ## Discussion-Centered Source Updates
 
 - Design revision files belong to the unified Evidence ledger. Canonical current/uploaded records and new activity snapshots use `EvidenceReferenceViewButton`; local queued files use `EvidenceDraftViewerDialog`. Immutable pre-V140 activity snapshots keep `DocumentReferenceViewButton` and their actual `/documents/:id/file` source. Both paths reuse the photo/PDF/Office readers, preserve exact historical source/revision identity and never substitute the current revision, start work or change release/handoff state. First searches: `design_release_items|EvidenceReferenceViewButton|EvidenceDraftViewerDialog|DocumentReferenceViewButton|DesignReleaseFiles|snapshot.files`.

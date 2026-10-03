@@ -41,7 +41,7 @@ export function variationQSAction(row: ContractVariation): NonNullable<ActionDia
 }
 
 export function variationPurchaseAction(row: ContractVariation): NonNullable<ActionDialog> {
-  return { title: 'Mua hàng xác nhận đã lấy giá', description: row.title, endpoint: `/contract-variations/${row.id}/purchase`, success: 'Đã chuyển phát sinh sang PM/Giám đốc duyệt', commentRequired: true };
+  return { title: 'Mua hàng xác nhận đã lấy giá', description: row.title, endpoint: `/contract-variations/${row.id}/purchase`, success: 'Đã chuyển phát sinh sang Quản lý dự án/Giám đốc duyệt', commentRequired: true };
 }
 
 export function variationApproveAction(row: ContractVariation): NonNullable<ActionDialog> {

@@ -270,7 +270,7 @@ func templateExternalRoleIssuesSQL() string {
 		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(n.responsible_role_ids,'[]'::jsonb)) required(role_label)
 		JOIN roles role
 		  ON role.external_only
-		 AND lower(btrim(role.display_name))=lower(btrim(required.role_label))
+		 AND lower(btrim(consflow_role_label_key(role.display_name)))=lower(btrim(consflow_role_label_key(required.role_label)))
 		WHERE n.template_id=$1
 		UNION ALL
 		SELECT n.id,s.id,required.role_label,
@@ -281,7 +281,7 @@ func templateExternalRoleIssuesSQL() string {
 		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(s.required_role_ids,'[]'::jsonb)) required(role_label)
 		JOIN roles role
 		  ON role.external_only
-		 AND lower(btrim(role.display_name))=lower(btrim(required.role_label))
+		 AND lower(btrim(consflow_role_label_key(role.display_name)))=lower(btrim(consflow_role_label_key(required.role_label)))
 		WHERE n.template_id=$1
 		UNION ALL
 		SELECT n.id,NULL::uuid,required.role_label,
@@ -291,7 +291,7 @@ func templateExternalRoleIssuesSQL() string {
 		CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(n.approval_policy_json->'roles','[]'::jsonb)) required(role_label)
 		JOIN roles role
 		  ON role.external_only
-		 AND lower(btrim(role.display_name))=lower(btrim(required.role_label))
+		 AND lower(btrim(consflow_role_label_key(role.display_name)))=lower(btrim(consflow_role_label_key(required.role_label)))
 		WHERE n.template_id=$1
 		ORDER BY node_id,step_id NULLS FIRST,role_label
 	`

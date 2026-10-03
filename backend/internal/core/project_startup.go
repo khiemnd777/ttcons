@@ -268,7 +268,7 @@ func projectStartupReadiness(ctx context.Context, db queryContext, projectID str
 		}
 	}
 	if !pmReady {
-		blockers = append(blockers, Record{"key": "project_manager", "label": "Chỉ định PM đang là thành viên hoạt động"})
+		blockers = append(blockers, Record{"key": "project_manager", "label": "Chỉ định Quản lý dự án đang là thành viên hoạt động"})
 	}
 	return Record{
 		"project_id": project["project_id"], "project_code": project["project_code"], "project_name": project["project_name"], "created_at": project["created_at"],
@@ -373,14 +373,14 @@ func projectStartupMembers(ctx context.Context, db queryContext, projectID strin
 
 func (s *Service) SetProjectManager(ctx context.Context, projectID, staffID, actorID, actorName string) (Record, error) {
 	if cleanID(projectID) == "" || cleanID(staffID) == "" {
-		return nil, validationError("Công trình và nhân sự PM là bắt buộc")
+		return nil, validationError("Công trình và nhân sự Quản lý dự án là bắt buộc")
 	}
 	allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"project.member.manage"})
 	if err != nil {
 		return nil, err
 	}
 	if !allowed {
-		return nil, forbiddenError("Anh/chị không có quyền chỉ định PM cho công trình này")
+		return nil, forbiddenError("Anh/chị không có quyền chỉ định Quản lý dự án cho công trình này")
 	}
 	project, err := s.repo.SetProjectManager(ctx, projectID, staffID, actorID, actorName)
 	if err != nil {
@@ -428,7 +428,7 @@ func (r *Repository) SetProjectManager(ctx context.Context, projectID, staffID, 
 	`, projectID, staffID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, validationError("PM phải là thành viên đang hoạt động và có tài khoản đăng nhập", Record{"staff_id": staffID})
+			return nil, validationError("Quản lý dự án phải là thành viên đang hoạt động và có tài khoản đăng nhập", Record{"staff_id": staffID})
 		}
 		return nil, err
 	}
@@ -440,7 +440,7 @@ func (r *Repository) SetProjectManager(ctx context.Context, projectID, staffID, 
 		}
 	}
 	if len(missing) > 0 {
-		return nil, validationError("PM chưa có đủ quyền để hoàn tất khởi tạo công trình", Record{"missing_permissions": missing})
+		return nil, validationError("Quản lý dự án chưa có đủ quyền để hoàn tất khởi tạo công trình", Record{"missing_permissions": missing})
 	}
 	if cleanID(project["pm_staff_id"]) == staffID {
 		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
@@ -456,7 +456,7 @@ func (r *Repository) SetProjectManager(ctx context.Context, projectID, staffID, 
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, projectID, actorID, actorName, "project_pm_changed", "project", projectID,
-		fmt.Sprintf("Chỉ định %s làm PM công trình", target["full_name"]),
+		fmt.Sprintf("Chỉ định %s làm Quản lý dự án công trình", target["full_name"]),
 		Record{"previous_owner_user_id": previousOwnerID, "pm_staff_id": staffID, "pm_user_id": target["user_id"]}); err != nil {
 		return nil, err
 	}
