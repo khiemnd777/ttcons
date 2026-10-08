@@ -59,8 +59,8 @@ func (s *Service) CreateHandover(ctx context.Context, projectID string, req Hand
 		"final_acceptance_id": finalAcceptanceID, "workflow_form_instance_id": formInstanceID,
 		"handover_date": handoverDate, "client_representative": clientRepresentative,
 		"company_representative": companyRepresentative, "documents_ready": false,
-		"warehouse_closed": false, "payables_recorded": false, "receivables_recorded": false,
-		"notes": notes, "created_by": actorID,
+		"warehouse_closed": false,
+		"notes":            notes, "created_by": actorID,
 	}, req.WorkItemContext, actorID, actorName)
 }
 

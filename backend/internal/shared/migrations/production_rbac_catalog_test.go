@@ -208,7 +208,9 @@ func TestDeputyMigrationPreservesHistoryAndBackfillsOnlyActualReceipts(t *testin
 			t.Fatal(err)
 		}
 	}
-	if _, err := Run(ctx, database, "../../../migrations"); err != nil {
+	// This regression covers the historical V146 backfill. V150 deliberately
+	// rejects populated preproduction databases instead of archiving them.
+	if _, err := Run(ctx, database, retirementPredecessorDir(t)); err != nil {
 		t.Fatal(err)
 	}
 	assertRBACCount(t, ctx, database, `SELECT COUNT(*) FROM work_reports WHERE is_supervisor_report`, 1)

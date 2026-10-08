@@ -234,8 +234,8 @@ func activityConversationJoinSQL(userExpression string) string {
 func activityAttentionCandidatesSQL(userID string, profile workItemAccessProfile, filter ActivityAttentionFilter) (string, []any) {
 	projectAccess := projectAccessSQL("p", 2)
 	workItemAccess := workItemScopeSQL("wi", 5)
-	args := []any{userID, profile.IsAdmin || profile.IsDirector, profile.UserID, profile.StaffID}
-	args = append(args, workItemScopeArgs(profile, profile.IsManager, true)...)
+	args := []any{userID, profile.IsAdmin || profile.IsDirector || profile.IsDeveloper, profile.UserID, profile.StaffID}
+	args = append(args, workItemScopeArgs(profile, profile.IsManager || profile.IsDeveloper, true)...)
 
 	mentioned := `EXISTS (
 		SELECT 1 FROM activity_mentions candidate_mention
@@ -349,9 +349,6 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 					WHEN wia.scope_type='acceptance' THEN ar.title
 					WHEN wia.scope_type='rework' THEN rw.title
 					WHEN wia.scope_type='handover' THEN 'Bàn giao · ' || hr.status
-					WHEN wia.scope_type='payable' THEN pay.payable_code || ' · ' || pay.vendor_name
-					WHEN wia.scope_type='receivable' THEN rec.receivable_code || ' · ' || rec.client_name
-					WHEN wia.scope_type='payment' THEN pm.payment_code || ' · ' || pm.payment_type
 					ELSE wi.title
 				END,
 				'Project'
@@ -400,9 +397,6 @@ func (r *Repository) ListMyActivityAttention(ctx context.Context, userID string,
 		LEFT JOIN acceptance_records ar ON ar.id=wia.scope_id AND wia.scope_type='acceptance'
 		LEFT JOIN rework_requests rw ON rw.id=wia.scope_id AND wia.scope_type='rework'
 		LEFT JOIN handover_records hr ON hr.id=wia.scope_id AND wia.scope_type='handover'
-		LEFT JOIN payables pay ON pay.id=wia.scope_id AND wia.scope_type='payable'
-		LEFT JOIN receivables rec ON rec.id=wia.scope_id AND wia.scope_type='receivable'
-		LEFT JOIN payments pm ON pm.id=wia.scope_id AND wia.scope_type='payment'
 		ORDER BY
 			candidate.is_unread DESC,
 			CASE
@@ -608,7 +602,7 @@ func (r *Repository) WorkItemEvidenceCounts(ctx context.Context, workItemID stri
 }
 
 func (r *Repository) GetEvidenceDetail(ctx context.Context, evidenceID string) (Record, error) {
-	return getEvidenceDetail(ctx, r.db, evidenceID)
+	return getEvidenceDetail(ctx, r.querySource(), evidenceID)
 }
 
 func getEvidenceDetail(ctx context.Context, db queryContext, evidenceID string) (Record, error) {

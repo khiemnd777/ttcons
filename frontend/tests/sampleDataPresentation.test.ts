@@ -18,7 +18,10 @@ test('sample data tab and actions stay developer-permission gated', async () => 
   assert.match(panel, /post<SampleUserProvisionResult>\('\/settings\/sample-data\/users'/);
   assert.match(panel, /post<SampleDataResult>\('\/settings\/sample-data\/projects'/);
   assert.match(panel, /pipeline_template_id: pipelineID/);
-  assert.match(panel, /accounting_book_id: profile === 'completed' \? accountingBookID : ''/);
+  assert.doesNotMatch(panel, /accounting_book_id|accounting_books|accountingBookID/);
+  assert.match(panel, /const canCreate = Boolean\(selectedPipeline\?\.compatible\)/);
+  assert.match(panel, /profile !== 'completed' \|\| Boolean\(selectedPipeline\?\.completed_compatible\)/);
+  assert.match(panel, /<BlockerList blockers=\{selectedPipeline.completed_blockers\}/);
 });
 
 test('sample data profile flow exposes approved progress and confirmation semantics', async () => {
@@ -31,7 +34,7 @@ test('sample data profile flow exposes approved progress and confirmation semant
   assert.match(panel, /title="Xác nhận tạo dữ liệu mẫu"/);
   assert.match(panel, /Mở Bàn làm việc/);
   assert.match(panel, /Chọn Pipeline đã phát hành/);
-  assert.match(panel, /Chọn sổ kế toán/);
+  assert.doesNotMatch(panel, /Chọn sổ kế toán|Chưa có sổ kế toán|Sổ kế toán chưa đủ điều kiện/);
   assert.match(panel, /Math\.floor\(finalProgress \* selectedPipeline\.selected_step_count \/ 100\)/);
   assert.doesNotMatch(panel, /Pipeline Rev8/);
   assert.doesNotMatch(panel, /20 bước/);

@@ -525,10 +525,6 @@ func (h *Handler) EligibleContractMilestone(c *fiber.Ctx) error {
 	return h.contractMilestoneAction(c, "eligible")
 }
 
-func (h *Handler) OpenContractMilestoneObligation(c *fiber.Ctx) error {
-	return h.contractMilestoneAction(c, "open-obligation")
-}
-
 func (h *Handler) contractMilestoneAction(c *fiber.Ctx, action string) error {
 	if err := h.requireContractChildPermission(c, "milestone", c.Params("id"), []string{"contract.milestone_manage"}); err != nil {
 		return err
@@ -609,27 +605,11 @@ func (h *Handler) contractVariationAction(c *fiber.Ctx, action string, permissio
 	return response.OK(c, row)
 }
 
-func (h *Handler) ReleaseContractRetention(c *fiber.Ctx) error {
-	if err := h.requireContractChildPermission(c, "retention", c.Params("id"), []string{"contract.retention_release"}); err != nil {
-		return err
-	}
-	var req ContractRetentionReleaseRequest
-	if err := json.Unmarshal(c.Body(), &req); err != nil {
-		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu giải phóng giữ lại không hợp lệ")
-	}
-	row, err := h.service.ReleaseContractRetention(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
-	if err != nil {
-		return err
-	}
-	return response.OK(c, row)
-}
-
 func (h *Handler) requireContractChildPermission(c *fiber.Ctx, kind, id string, permissions []string) error {
 	queries := map[string]string{
 		"version":   `SELECT c.project_id FROM contract_versions child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
 		"milestone": `SELECT c.project_id FROM contract_milestones child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
 		"variation": `SELECT c.project_id FROM contract_variations child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
-		"retention": `SELECT c.project_id FROM contract_retentions child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
 		"dispatch":  `SELECT c.project_id FROM contract_dispatches child JOIN contracts c ON c.id=child.contract_id WHERE child.id=$1`,
 	}
 	query := queries[kind]

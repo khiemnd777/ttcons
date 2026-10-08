@@ -34,7 +34,6 @@ import type {
   ContractMilestone,
   ContractDispatch,
   ContractSigningForm,
-  ContractRetention,
   ContractVariation,
   ContractVersion,
   Partner,
@@ -66,10 +65,8 @@ import {
   dispatchMethodLabel,
   dispatchMethodOptions,
   milestoneEligibleAction,
-  milestoneObligationAction,
   milestoneTypeLabel,
   milestoneTypeOptions,
-  obligationLabel,
   readinessCount,
   signedDays,
   variationApproveAction,
@@ -86,9 +83,8 @@ import {
 } from './contractsPresentation';
 
 type CreateDialog = 'contract' | 'version' | 'milestone' | 'variation' | null;
-type DetailTab = 'execution' | 'versions' | 'milestones' | 'variations' | 'retentions';
+type DetailTab = 'execution' | 'versions' | 'milestones' | 'variations';
 type DirectionFilter = 'all' | 'receivable' | 'payable';
-type RetentionDialog = { id: string; outstanding: number; milestone: string } | null;
 type VersionSignTarget = { version: ContractVersion; form: ContractSigningForm } | null;
 type DispatchReceiveTarget = ContractDispatch | null;
 type ContractPermissions = {
@@ -97,7 +93,6 @@ type ContractPermissions = {
   canApprove: boolean;
   canSign: boolean;
   canManageMilestone: boolean;
-  canReleaseRetention: boolean;
   canDispatch: boolean;
   canScan: boolean;
   canVariationQS: boolean;
@@ -121,7 +116,6 @@ export function ContractsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [createDialog, setCreateDialog] = useState<CreateDialog>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialog>(null);
-  const [retentionDialog, setRetentionDialog] = useState<RetentionDialog>(null);
   const [versionSignTarget, setVersionSignTarget] = useState<VersionSignTarget>(null);
   const [dispatchDialogOpen, setDispatchDialogOpen] = useState(false);
   const [dispatchReceiveTarget, setDispatchReceiveTarget] = useState<DispatchReceiveTarget>(null);
@@ -153,7 +147,6 @@ export function ContractsPage() {
     canApprove: hasAnyPermission(['contract.approve']),
     canSign: hasAnyPermission(['contract.sign']),
     canManageMilestone: hasAnyPermission(['contract.milestone_manage']),
-    canReleaseRetention: hasAnyPermission(['contract.retention_release']),
     canDispatch: hasAnyPermission(['contract.dispatch']),
     canScan: hasAnyPermission(['contract.scan_manage']),
     canVariationQS: hasAnyPermission(['contract.variation_qs_review']),
@@ -163,7 +156,7 @@ export function ContractsPage() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
-    if (requestedTab && ['execution', 'versions', 'milestones', 'variations', 'retentions'].includes(requestedTab)) {
+    if (requestedTab && ['execution', 'versions', 'milestones', 'variations'].includes(requestedTab)) {
       setActiveTab(requestedTab as DetailTab);
     }
     if (!sourceLink.active && !selectedId && contracts.data?.length) {
@@ -212,15 +205,6 @@ export function ContractsPage() {
       setActionDialog(null);
     },
     onError: (error) => toast.error('Không thực hiện được thao tác hợp đồng', error),
-  });
-  const release = useMutation({
-    mutationFn: (values: Record<string, any>) => post<Contract>(`/contract-retentions/${retentionDialog?.id}/release`, values),
-    onSuccess: async () => {
-      await invalidate();
-      setRetentionDialog(null);
-      toast.success('Đã mở công nợ giải phóng khoản giữ lại');
-    },
-    onError: (error) => toast.error('Không giải phóng được khoản giữ lại', error),
   });
   const signVersion = useMutation({
     mutationFn: async ({ target, payload }: { target: NonNullable<VersionSignTarget>; payload: SignatureCapturePayload }) => {
@@ -281,7 +265,6 @@ export function ContractsPage() {
     value: (contracts.data ?? [])
       .filter((item) => item.status === 'active')
       .reduce((sum, item) => sum + Number(item.current_amount ?? 0), 0),
-    retention: (contracts.data ?? []).reduce((sum, item) => sum + Number(item.retention_outstanding ?? 0), 0),
   }), [contracts.data]);
 
   const scanReminders = useMemo(() => {
@@ -357,7 +340,6 @@ export function ContractsPage() {
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <Metric label="Hợp đồng đang hiệu lực" value={`${summary.active} hợp đồng`} />
         <Metric label="Tổng giá trị hiện hành" value={<CurrencyText value={summary.value} />} />
-        <Metric label="Chưa giải phóng" value={<CurrencyText value={summary.retention} />} />
       </div>
 
       {!contracts.isLoading && scanReminders.length ? (
@@ -480,7 +462,6 @@ export function ContractsPage() {
                 permissions={permissions}
                 onAction={openAction}
                 onSign={openVersionSignature}
-                onRelease={setRetentionDialog}
               />
               <ContractTabs contract={selected} activeTab={activeTab} onChange={setActiveTab} />
               <div className="p-4">
@@ -525,13 +506,6 @@ export function ContractsPage() {
                     canPurchase={permissions.canVariationPurchase}
                     canProcurement={permissions.canVariationProcurement}
                     onAction={openAction}
-                  />
-                ) : null}
-                {activeTab === 'retentions' ? (
-                  <RetentionTable
-                    contract={selected}
-                    canRelease={permissions.canReleaseRetention}
-                    onRelease={setRetentionDialog}
                   />
                 ) : null}
               </div>
@@ -628,24 +602,6 @@ export function ContractsPage() {
           onSubmit={(values) => actionDialog && action.mutateAsync({ endpoint: actionDialog.endpoint, body: values })}
         />
       </Dialog>
-      <Dialog
-        open={Boolean(retentionDialog)}
-        title="Giải phóng khoản giữ lại"
-        description={retentionDialog ? `${retentionDialog.milestone} · còn ${currency(retentionDialog.outstanding)}` : undefined}
-        onClose={() => setRetentionDialog(null)}
-      >
-        <SimpleForm
-          submitLabel="Mở công nợ giải phóng"
-          cancelLabel="Đóng"
-          fields={[
-            { name: 'amount', label: 'Số tiền giải phóng', type: 'currency', currencyCode: selected?.currency, defaultValue: retentionDialog?.outstanding ?? 0, required: true, min: 0 },
-            { name: 'due_date', label: 'Ngày đến hạn', type: 'date', defaultValue: new Date().toISOString().slice(0, 10), required: true },
-            { name: 'comment', label: 'Căn cứ giải phóng', type: 'textarea', defaultValue: '', required: true },
-          ]}
-          onCancel={() => setRetentionDialog(null)}
-          onSubmit={(values) => release.mutateAsync(values)}
-        />
-      </Dialog>
     </>
   );
 }
@@ -734,25 +690,21 @@ function NextActionBand({
   permissions,
   onAction,
   onSign,
-  onRelease,
 }: {
   contract: Contract;
   permissions: ContractPermissions;
   onAction: (value: NonNullable<ActionDialog>) => void;
   onSign: (version: ContractVersion) => void;
-  onRelease: (value: RetentionDialog) => void;
 }) {
   const draftVersion = contract.versions?.find((row) => row.status === 'draft' && permissions.canReview);
   const reviewVersion = contract.versions?.find((row) => row.status === 'review' && permissions.canApprove);
   const approvedVersion = contract.versions?.find((row) => row.status === 'approved' && permissions.canSign);
   const activeMilestone = contract.milestones?.find((row) => row.status === 'active' && permissions.canManageMilestone);
-  const eligibleMilestone = contract.milestones?.find((row) => row.status === 'eligible' && permissions.canManageMilestone);
   const draftVariation = contract.variations?.find((row) => row.status === 'draft' && permissions.canCreate);
   const qsVariation = contract.variations?.find((row) => row.status === 'qs_review' && permissions.canVariationQS);
   const purchaseVariation = contract.variations?.find((row) => row.status === 'purchasing_sourcing' && permissions.canVariationPurchase);
   const reviewVariation = contract.variations?.find((row) => ['pending_approval', 'review'].includes(row.status) && permissions.canApprove);
   const approvedVariation = contract.variations?.find((row) => row.status === 'approved' && permissions.canCreate);
-  const outstandingRetention = contract.retentions?.find((row) => Number(row.outstanding_amount) > 0 && permissions.canReleaseRetention);
 
   let message = 'Không có việc nào thuộc quyền hiện tại đang chờ xử lý.';
   let actionNode: ReactNode = null;
@@ -784,9 +736,6 @@ function NextActionBand({
   } else if (activeMilestone) {
     message = `Mốc ${activeMilestone.milestone_name} đang chờ xác nhận đủ điều kiện.`;
     actionNode = <PrimaryButton label="Xác nhận đủ điều kiện" onClick={() => onAction(milestoneEligibleAction(activeMilestone))} />;
-  } else if (eligibleMilestone) {
-    message = `Mốc ${eligibleMilestone.milestone_name} đã đủ điều kiện mở công nợ.`;
-    actionNode = <PrimaryButton label="Mở công nợ" onClick={() => onAction(milestoneObligationAction(eligibleMilestone))} />;
   } else if (draftVariation) {
     message = `Phát sinh ${draftVariation.variation_code} đang chờ gửi QS.`;
     actionNode = <PrimaryButton label="Gửi QS" onClick={() => onAction(variationSubmitAction(draftVariation))} />;
@@ -802,18 +751,6 @@ function NextActionBand({
   } else if (approvedVariation) {
     message = `Phụ lục ${approvedVariation.variation_code} đã duyệt và đang chờ tạo phiên bản điều chỉnh.`;
     actionNode = <PrimaryButton label="Tạo phiên bản điều chỉnh" onClick={() => onAction(variationIncorporateAction(approvedVariation))} />;
-  } else if (outstandingRetention) {
-    message = `Khoản giữ lại của mốc ${outstandingRetention.milestone_name} còn ${currency(outstandingRetention.outstanding_amount)}.`;
-    actionNode = (
-      <PrimaryButton
-        label="Giải phóng khoản giữ lại"
-        onClick={() => onRelease({
-          id: outstandingRetention.id,
-          outstanding: Number(outstandingRetention.outstanding_amount),
-          milestone: outstandingRetention.milestone_name,
-        })}
-      />
-    );
   }
 
   return (
@@ -835,7 +772,6 @@ function ContractTabs({ contract, activeTab, onChange }: { contract: Contract; a
     { id: 'versions', label: 'Phiên bản', count: contract.versions?.length ?? 0 },
     { id: 'milestones', label: 'Mốc thanh toán', count: contract.milestones?.length ?? 0 },
     { id: 'variations', label: 'Phụ lục', count: contract.variations?.length ?? 0 },
-    { id: 'retentions', label: 'Khoản giữ lại', count: contract.retentions?.length ?? 0 },
   ];
   return (
     <div className="overflow-x-auto border-b border-line bg-white px-2" role="tablist" aria-label="Hồ sơ hợp đồng">
@@ -1019,12 +955,11 @@ function MilestoneTable({ contract, canManage, onAction }: {
   if (!rows.length) return <EmptyState title="Chưa có mốc thanh toán" />;
   const rowAction = (row: ContractMilestone) => {
     if (canManage && row.status === 'active') return <SmallButton label="Đủ điều kiện" onClick={() => onAction(milestoneEligibleAction(row))} />;
-    if (canManage && row.status === 'eligible') return <SmallButton label="Mở công nợ" onClick={() => onAction(milestoneObligationAction(row))} />;
     return null;
   };
   return (
     <ResponsiveRecords
-      headers={['Mốc', 'Trước giữ lại', 'Giữ lại', 'Sau giữ lại', 'Điều kiện', 'Trạng thái', 'Công nợ']}
+      headers={['Mốc', 'Trước giữ lại', 'Giữ lại', 'Sau giữ lại', 'Điều kiện', 'Trạng thái', '']}
       rows={rows.map((row) => [
         <div>
           <div className="font-semibold">{row.milestone_code} · {row.milestone_name}</div>
@@ -1035,7 +970,7 @@ function MilestoneTable({ contract, canManage, onAction }: {
         <CurrencyText value={row.net_amount} />,
         acceptanceLabel(row),
         <StatusBadge status={row.status} />,
-        rowAction(row) ?? obligationLabel(row),
+        rowAction(row),
       ])}
       cards={rows.map((row) => (
         <RecordCard
@@ -1049,7 +984,6 @@ function MilestoneTable({ contract, canManage, onAction }: {
           <RecordValue label="Giữ lại"><CurrencyText value={row.retention_amount} /></RecordValue>
           <RecordValue label="Sau giữ lại"><CurrencyText value={row.net_amount} /></RecordValue>
           <RecordValue label="Điều kiện">{acceptanceLabel(row)}</RecordValue>
-          <RecordValue label="Công nợ" full>{obligationLabel(row) || 'Chưa mở công nợ'}</RecordValue>
         </RecordCard>
       ))}
     />
@@ -1108,43 +1042,6 @@ function VariationTable({ contract, canReview, canApprove, canCreate, canQS, can
               </div>
             </RecordValue>
           ) : null}
-        </RecordCard>
-      ))}
-    />
-  );
-}
-
-function RetentionTable({ contract, canRelease, onRelease }: {
-  contract: Contract;
-  canRelease: boolean;
-  onRelease: (value: RetentionDialog) => void;
-}) {
-  const rows = contract.retentions ?? [];
-  if (!rows.length) return <EmptyState title="Chưa phát sinh khoản giữ lại" />;
-  const rowAction = (row: ContractRetention) => canRelease && Number(row.outstanding_amount) > 0 ? (
-    <SmallButton
-      label="Giải phóng"
-      onClick={() => onRelease({ id: row.id, outstanding: Number(row.outstanding_amount), milestone: row.milestone_name })}
-    />
-  ) : null;
-  return (
-    <ResponsiveRecords
-      headers={['', 'Nguồn', 'Đã giữ', 'Đã giải phóng', 'Còn lại', 'Hết bảo hành', 'Trạng thái']}
-      rows={rows.map((row) => [
-        rowAction(row),
-        <span className="font-semibold">{row.milestone_code} · {row.milestone_name}</span>,
-        <CurrencyText value={row.held_amount} />,
-        <CurrencyText value={row.released_amount} />,
-        <CurrencyText value={row.outstanding_amount} />,
-        row.warranty_end_date ? dateText(row.warranty_end_date) : 'Theo xác nhận',
-        <StatusBadge status={row.status} />,
-      ])}
-      cards={rows.map((row) => (
-        <RecordCard key={row.id} title={`${row.milestone_code} · ${row.milestone_name}`} status={row.status} action={rowAction(row)}>
-          <RecordValue label="Đã giữ"><CurrencyText value={row.held_amount} /></RecordValue>
-          <RecordValue label="Đã giải phóng"><CurrencyText value={row.released_amount} /></RecordValue>
-          <RecordValue label="Còn lại"><CurrencyText value={row.outstanding_amount} /></RecordValue>
-          <RecordValue label="Hết bảo hành">{row.warranty_end_date ? dateText(row.warranty_end_date) : 'Theo xác nhận'}</RecordValue>
         </RecordCard>
       ))}
     />
@@ -1220,7 +1117,7 @@ function CreateContractDialog({ open, partners, onClose, onSubmit }: {
           { name: 'contract_code', label: 'Mã hợp đồng', defaultValue: `HD-${Date.now().toString().slice(-6)}`, required: true },
           { name: 'title', label: 'Tên hợp đồng', defaultValue: 'Hợp đồng thi công', required: true },
           { name: 'contract_type', label: 'Loại hợp đồng', type: 'select', defaultValue: 'main_client', required: true, options: contractTypeOptions },
-          { name: 'direction', label: 'Chiều công nợ', type: 'select', defaultValue: 'receivable', required: true, options: directionOptions },
+          { name: 'direction', label: 'Chiều hợp đồng', type: 'select', defaultValue: 'receivable', required: true, options: directionOptions },
           { name: 'counterparty_partner_id', label: 'Đối tác', type: 'select', defaultValue: '', required: true, options: partnerOptions(partners, ['client', 'supplier', 'subcontractor', 'labor_team', 'service_provider', 'other']) },
           { name: 'currency', label: 'Đơn vị tiền tệ', defaultValue: 'VND', required: true },
           { name: 'original_amount', label: 'Giá trị gốc', type: 'currency', currencyCode: (values) => String(values.currency || 'VND'), defaultValue: 0, required: true, min: 0 },

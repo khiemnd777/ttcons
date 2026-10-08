@@ -6,7 +6,6 @@ const domainTypeFiles = [
   'commercial.ts',
   'constructionQuality.ts',
   'activityEvidence.ts',
-  'accounting.ts',
   'reports.ts',
   'workflowForms.ts',
   'materialsWarehouse.ts',

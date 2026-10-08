@@ -31,7 +31,6 @@ test('every current semantic table has the shared local scroll viewport', async 
     '../src/components/DataTable.tsx',
     '../src/components/RecordDetailLayout.tsx',
     '../src/modules/acceptance/AcceptancePage.tsx',
-    '../src/modules/accounting/ManualJournalDialog.tsx',
     '../src/modules/boq/SupplierQuotationWorkspace.tsx',
     '../src/modules/contracts/ContractsPage.tsx',
     '../src/modules/handover/HandoverWorkspace.tsx',
@@ -55,7 +54,7 @@ test('every current semantic table has the shared local scroll viewport', async 
   const tableCount = ownerSources.reduce((count, owner) => count + (owner.match(/<table\b/g) ?? []).length, 0);
   const viewportCount = ownerSources.reduce((count, owner) => count + (owner.match(/consflow-table-viewport(?!-)/g) ?? []).length, 0);
 
-  assert.equal(tableCount, 27);
+  assert.equal(tableCount, 26);
   assert.equal(viewportCount, tableCount);
   assert.equal(ownerSources.some((owner) => /<thead[^>]*\bsticky\b/.test(owner)), false);
 });

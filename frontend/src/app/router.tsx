@@ -36,7 +36,6 @@ const AcceptancePage = lazy(() => import('../modules/acceptance/AcceptancePage')
 const ReworkPage = lazy(() => import('../modules/rework/ReworkPage').then(({ ReworkPage }) => ({ default: ReworkPage })));
 const HandoverPage = lazy(() => import('../modules/handover/HandoverPage').then(({ HandoverPage }) => ({ default: HandoverPage })));
 const ProjectFinancePage = lazy(() => import('../modules/project-finance/ProjectFinancePage').then(({ ProjectFinancePage }) => ({ default: ProjectFinancePage })));
-const DebtPage = lazy(() => import('../modules/debt/DebtPage').then(({ DebtPage }) => ({ default: DebtPage })));
 const CoreDataPage = lazy(() => import('../modules/core-data/CoreDataPage').then(({ CoreDataPage }) => ({ default: CoreDataPage })));
 const StaffPage = lazy(() => import('../modules/staff/StaffPage').then(({ StaffPage }) => ({ default: StaffPage })));
 const RolesPage = lazy(() => import('../modules/rbac/RolesPage').then(({ RolesPage }) => ({ default: RolesPage })));
@@ -128,7 +127,7 @@ export const router = createBrowserRouter([
           { path: 'acceptance', element: guarded(<AcceptancePage />, ['acceptance.view']) },
           { path: 'rework', element: guarded(<Navigate to="../operations?tab=actions" replace />, ['rework.view']) },
           { path: 'handover', element: guarded(<HandoverPage />, ['handover.view']) },
-          { path: 'accounting', element: guarded(<ProjectFinancePage />, ['accounting_handoff.view', 'project_finance.view']) },
+          { path: 'accounting', element: guarded(<ProjectFinancePage />, ['accounting_handoff.view']) },
           { path: 'audit', element: guarded(<AuditPage scoped />, ['audit.view'], false, ['project.reconciliation.view']) },
         ],
       },
@@ -144,9 +143,7 @@ export const router = createBrowserRouter([
       { path: '/acceptance', element: guarded(<AcceptancePage global />, ['acceptance.view']) },
       { path: '/rework', element: guarded(<ReworkPage />, ['rework.view', 'replanning.view']) },
       { path: '/handover', element: guarded(<HandoverPage />, ['handover.view']) },
-      { path: '/accounting', element: guarded(<ProjectFinancePage global />, ['accounting_handoff.view', 'project_finance.view']) },
-      { path: '/debt/payables', element: guarded(<DebtPage kind="payables" />, ['accounting.payable_view']) },
-      { path: '/debt/receivables', element: guarded(<DebtPage kind="receivables" />, ['accounting.receivable_view']) },
+      { path: '/accounting', element: guarded(<ProjectFinancePage global />, ['accounting_handoff.view']) },
       { path: '/core-data', element: guarded(<Navigate to="/core-data/input" replace />, ['catalog.view']) },
       { path: '/core-data/input', element: guarded(<CoreDataPage key="partner-input" group="input" />, ['catalog.view']) },
       { path: '/core-data/output', element: guarded(<CoreDataPage key="partner-output" group="output" />, ['catalog.view']) },

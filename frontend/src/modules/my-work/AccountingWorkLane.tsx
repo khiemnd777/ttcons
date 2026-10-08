@@ -13,7 +13,6 @@ import {
 } from '../project-finance/AccountingHandoffActionDialog';
 import { useAccountingWorkActions } from '../project-finance/accountingWorkActions';
 import { AccountingHandoffDetailDialog } from '../project-finance/AccountingHandoffDetailDialog';
-import { AccountingRequestQueue } from '../project-finance/AccountingRequestQueue';
 
 const statusTabs: Array<{
   value: AccountingWorkStatus;
@@ -117,7 +116,6 @@ export function AccountingWorkLane({
 
   return (
     <section className="mt-4 space-y-4" aria-label="Nghiệp vụ Kế toán cần xử lý">
-      <AccountingRequestQueue projectId={project}/>
       <div className="flex gap-2 overflow-x-auto" aria-label="Lọc trạng thái hồ sơ kế toán">
         {statusTabs.map((tab) => (
           <button

@@ -349,12 +349,8 @@ func (r *Repository) PartnerDeletionTargets(ctx context.Context, partnerIDs []st
 			 +(SELECT COUNT(*) FROM procurement_requests item WHERE item.supplier_partner_id=partner.id)
 			 +(SELECT COUNT(*) FROM supplier_quotations item WHERE item.supplier_partner_id=partner.id)),
 			(SELECT COUNT(*) FROM contracts item WHERE item.counterparty_partner_id=partner.id),
-			((SELECT COUNT(*) FROM payables item WHERE item.vendor_partner_id=partner.id)
-			 +(SELECT COUNT(*) FROM receivables item WHERE item.client_partner_id=partner.id)
-			 +(SELECT COUNT(*) FROM input_invoices item WHERE item.vendor_partner_id=partner.id)
-			 +(SELECT COUNT(*) FROM output_invoices item WHERE item.client_partner_id=partner.id)
-			 +(SELECT COUNT(*) FROM journal_entry_lines item WHERE item.partner_id=partner.id)
-			 +(SELECT COUNT(*) FROM project_material_costs item WHERE item.vendor_partner_id=partner.id)),
+			((SELECT COUNT(*) FROM accounting_reconciliation_bases item WHERE item.partner_id=partner.id)
+			 +(SELECT COUNT(*) FROM accounting_misa_records item WHERE item.partner_id=partner.id)),
 			(SELECT COUNT(*) FROM incoming_acceptance_records item WHERE item.supplier_partner_id=partner.id OR item.subcontractor_partner_id=partner.id)
 		FROM partners partner
 		WHERE partner.id IN (`+placeholders+`) AND partner.active
@@ -395,12 +391,9 @@ func (r *Repository) ProjectDeletionTargets(ctx context.Context, projectIDs []st
 			(SELECT COUNT(*) FROM pipeline_runs item WHERE item.project_id=project.id),
 			(SELECT COUNT(*) FROM work_items item WHERE item.project_id=project.id AND item.status NOT IN ('completed','done','cancelled')),
 			(SELECT COUNT(*) FROM issues item WHERE item.project_id=project.id AND item.status NOT IN ('resolved','closed','cancelled','deleted')),
-			((SELECT COUNT(*) FROM payables item WHERE item.project_id=project.id)
-			 +(SELECT COUNT(*) FROM receivables item WHERE item.project_id=project.id)
-			 +(SELECT COUNT(*) FROM payments item WHERE item.project_id=project.id)
-			 +(SELECT COUNT(*) FROM input_invoices item WHERE item.project_id=project.id)
-			 +(SELECT COUNT(*) FROM output_invoices item WHERE item.project_id=project.id)
-			 +(SELECT COUNT(*) FROM project_cash_requests item WHERE item.project_id=project.id)),
+			((SELECT COUNT(*) FROM accounting_handoffs item WHERE item.project_id=project.id)
+			 +(SELECT COUNT(*) FROM accounting_reconciliation_bases item WHERE item.project_id=project.id)
+			 +(SELECT COUNT(*) FROM accounting_misa_records item WHERE item.project_id=project.id)),
 			(SELECT COUNT(*) FROM stock_movements item WHERE item.project_id=project.id),
 			((SELECT COUNT(*) FROM acceptance_records item WHERE item.project_id=project.id)
 			 +(SELECT COUNT(*) FROM incoming_acceptance_records item WHERE item.project_id=project.id))

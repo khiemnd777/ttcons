@@ -59,48 +59,9 @@ export type DashboardProjectSnapshot = {
   status_counts: DashboardStatusMetric[];
 };
 
-export type DashboardCashflowSummary = {
-  opening_balance: number;
-  total_inflow: number;
-  total_outflow: number;
-  net_flow: number;
-  closing_balance: number;
-  payment_count: number;
-  pending_payment_count: number;
-  pending_payment_total: number;
-  unclassified_count: number;
-  non_cash_count: number;
-};
-
-export type DashboardCashflowSeries = {
-  period_start: string;
-  inflow_amount: number;
-  outflow_amount: number;
-  net_amount: number;
-  running_balance: number;
-  payment_count: number;
-};
-
-export type DashboardCashflowProject = {
-  project_id: string;
-  project_name: string;
-  inflow_amount: number;
-  outflow_amount: number;
-  net_amount: number;
-  payment_count: number;
-};
-
 export type DashboardData = {
   meta: DashboardPeriodMeta;
-  capabilities: {
-    finance_visible: boolean;
-  };
   project_snapshot: DashboardProjectSnapshot;
-  cashflow?: {
-    summary: DashboardCashflowSummary;
-    series: DashboardCashflowSeries[];
-    projects: DashboardCashflowProject[];
-  };
 };
 
 export type DashboardProjectItem = {
@@ -111,10 +72,6 @@ export type DashboardProjectItem = {
   progress_percent: number;
   open_issues: number;
   pending_approvals: number;
-  finance_visible: boolean;
-  inflow_amount?: number;
-  outflow_amount?: number;
-  net_amount?: number;
 };
 
 export type DashboardProjectsPage = {

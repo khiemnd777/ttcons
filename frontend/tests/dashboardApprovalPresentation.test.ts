@@ -26,7 +26,7 @@ test('activity review remains read-only and uses the shared accessible dialog', 
   assert.match(activitySource, /\['dashboard-activities', actorID, range, search, activityType\]/);
 });
 
-test('retains finance capability gates in the existing cashflow panel', () => {
-  assert.match(dashboardSource, /<CashflowPanel data=\{dashboard.data\}/);
-  assert.match(summarySource, /if \(!data.capabilities.finance_visible \|\| !cashflow\) return null/);
+test('dashboard retains operational summary and has no internal finance panel', () => {
+  assert.match(dashboardSource, /<ProjectSnapshotPanel snapshot=\{dashboard.data.project_snapshot\}/);
+  assert.doesNotMatch(dashboardSource + summarySource, /CashflowPanel|finance_visible|data.cashflow|Dòng tiền theo kỳ/);
 });

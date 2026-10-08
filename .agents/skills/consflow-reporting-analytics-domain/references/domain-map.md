@@ -1,10 +1,16 @@
 # Reporting Analytics Domain Map
 
+## Current Accounting Retirement Boundary — V150/V151
+
+- V150 removes internal money/tax/profit/accounting endpoints, CSV and panels. Dashboard response is meta/project_snapshot only; project row/sort contracts contain no finance/net fields. No zero/fallback money is returned.
+- Current owners: routes_reporting.go, handlers_reports.go, service_reports.go, repository_reports.go, types_reports.go; DashboardPage/DashboardSummaryPanels/dashboardTypes; ReportsPage/reportRegistry/OperationalReportPanel; authored Work Reports owners unchanged.
+- Keep project/procurement/warehouse/staff Statistics, scoped options/cursors, operational Dashboard activity/snapshot and authored reports/PDF/evidence. MISA/source reconciliation belongs accounting domain and is not a replacement cashflow report.
+- Procurement budget_status and project estimated_budget/contract_amount remain planning context; do not confuse them with the removed accounting_budgets ledger.
+
 ## Independent Supervisor Report Review
 
 - V146 + `repository_work_reports.go` persist Supervisor classification and per-user/per-revision receipts. `scope=supervision` has server-side project/Supervisor/read-state filters, default25/max50 limit and offset; `scopes.supervision` is unread current-revision count. PM review queue also stays pending after another reviewer acknowledges.
 - Detail returns actor-specific capabilities and receipt history; requests send current `revision_no`. Repository reauthorizes current active actor under report lock; unique receipts make duplicate acknowledgement idempotent, and stale revisions/needs-changes cannot be overwritten. Shared report state remains compatible; no all-reviewer workflow gate.
-- Company override applies to exact Supervisor reports/evidence/PDF, not unrelated authored reports or financial analytics. Legacy finance project scope remains separate. Notifications preserve original recipient and co-deliver classified report delivery to active global deputies; shared viewer still uses exact protected report revision evidence endpoints.
 
 ## Work Report Revision PDF Presentation
 
@@ -14,39 +20,24 @@
 
 ## Dashboard Activity Replaces Portfolio
 
-- Activity presentation uses four aligned desktop columns (project, content, actor, time/action) and stacked mobile rows. Shared `format.ts` supplies `dd-mm-yyyy` day headers, `HH:mm` row times and `HH:mm dd-mm-yyyy` detail timestamps in Vietnam time. Cashflow date/range labels also use the shared date helper; this changes no report period, grouping query, totals, visibility or source event semantics.
-- Dashboard purpose now includes recent project developments through a read-only cross-project activity feed beneath the existing snapshot/cashflow panels. Frontend owners: `DashboardActivityPanel.tsx`, `dashboardActivity.ts`, `dashboardTypes.ts`; backend owners: `service_dashboard_activity.go`, `repository_dashboard_activity.go`, existing report handler/types/routes.
 - `/reports/dashboard/activities` uses only recorded system activity, current Operations/project and linked Work Item scope, client visibility and non-cancelled/non-withdrawn records. `report.view` grants the Dashboard route but cannot substitute for source visibility. Typed projection excludes raw metadata/attachments and never updates unread counts or workflow state.
-- Seven Vietnam calendar days and 20 rows are default; range/search/type and snapshot-bound keyset paging are server-owned. Activity windows are independent of cashflow periods. Recorded `from_status -> to_status` describes the historical event, not the current Work Item state. The feed does not imply unrecorded business events were captured.
-- The old portfolio UI and its financial columns are removed. `/reports/dashboard/projects` remains backend compatibility; snapshot/cashflow/finance gates and exports retain their contracts. No migration or new event producers.
 
 ## Accounting Reconciliation Dashboard Scope (V133)
 
-- Dashboard finance visibility accepts `project.reconciliation.view` in addition to the existing finance permissions; portfolio project scope comes from the same all-company `ProjectAccessFilter` used by source lists.
-- The money projection remains the canonical approved `payments` ledger with the existing period/direction/date semantics. The observer marker changes authorization scope only; it does not introduce MISA sync or alternate totals.
 - `report.view` is still required for Dashboard access and does not disclose finance by itself. The Accounting migration grants both `report.view` and the reconciliation marker additively.
-- Technical/legacy accounting reports remain outside ordinary Accounting navigation; source reconciliation uses Dashboard, Statistics and project business workspaces.
 
 ## Owners
 
-- Accounting Handoff has no ordinary finance report. Its source queue lives in `frontend/src/modules/project-finance/AccountingHandoffPage.tsx` and backend `accounting_handoff.go`; the old project-finance management report remains visible only when the compatibility workspace returns `mode=legacy`.
-- Frontend modules: `frontend/src/modules/dashboard`, compatibility-named statistics implementation under `frontend/src/modules/reports`, authored reports under `frontend/src/modules/work-reports`, `frontend/src/modules/accounting/AccountingBooksPanel.tsx`, `frontend/src/modules/accounting/CashflowPanel.tsx`
-- Statistics workspace/panels: `ReportsPage.tsx` exports `StatisticsPage`, `reportRegistry.ts`, `ReportFilters.tsx`, `OperationalReportPanel.tsx`; authored work-report register/detail: `WorkReportsPage.tsx`; legacy professional panels remain `TaxReportPanel.tsx`, `ProfitReportPanel.tsx`, `CashflowPanel.tsx`
 - Backend routes: `backend/internal/core/routes.go` bootstrap plus bounded `backend/internal/core/routes_*.go` registrars
-- Backend logic: aggregate SQL/options remain in `handlers_reports.go`, `service_reports.go`, `repository_reports.go` dashboard/options plus `repository_reports_{cashflow,tax,profit}.go` query owners, `types_reports.go`; statistics/export and authored-report lifecycle are in `handlers_work_reports.go`, `service_work_reports.go`, `repository_work_reports.go`, `types_work_reports.go`, `tabular_exports.go`, `work_report_pdf.go`; shared multi-sheet Open XML generation is in `xlsx_workbook.go`, with project XLSX/JSON package composition in `project_excel.go` contracts plus `project_excel_{service,validation,repository,export}.go` owners; shared registration remains `routes.go` bootstrap plus bounded `routes_*.go` registrars
 - Shared UI/contracts: `frontend/src/components/DataTable.tsx`, `frontend/src/lib/types/domain.ts` compatibility barrel plus bounded `frontend/src/lib/types/domain/*.ts` contracts, `frontend/src/lib/utils/format.ts`, `frontend/src/lib/utils/status.ts`; Dashboard keeps its new period/report contract module-local in `dashboardTypes.ts`
 
 ## Routes
 
-- Accounting Handoff: `/project-finance/projects?search&cursor&limit&selected_id` and compatibility workspace `/projects/:id/project-finance`; legacy-only project-finance export remains available to pinned old projects.
 - Dashboard: `/reports/dashboard?period_type&year&period_no`, `/reports/dashboard/activities?range&search&activity_type&cursor&limit`; `/reports/dashboard/projects?search&status&sort&direction&cursor&limit` remains compatibility only.
 - Statistics options: `/statistics/options?search&cursor&limit&selected_id` returns only non-cancelled projects inside actor scope as `{projects:{items,has_more,next_cursor,selected}}`; limit defaults to 20 and is capped at 50.
 - Statistics aggregates: `/statistics/projects`, `/statistics/warehouse`, `/statistics/procurement`, `/statistics/staff`; each accepts optional `project_id`, search/sort/direction and has `/export?format=pdf|xlsx|csv`. Professional accounting has no `/statistics/accounting` route.
 - Authored work reports: `/work-reports`, `/work-reports/projects`, `/work-reports/recipients`, `/work-reports/daily-reports/:id`, submit/review/register-export, revision-PDF and `/work-reports/:id/revisions/:revision/evidence/:evidenceId/file` routes. The product page is `/reports`; legacy `/reports/:reportKey` redirects to `/statistics/:reportKey`.
-- Legacy aggregate/finance compatibility APIs under `/reports/*` remain available for Dashboard and technical/admin consumers; they do not define the product meaning of `/reports`.
-- Finance reports: `/reports/cashflow`, `/reports/cashflow/export`, `/reports/tax`, `/reports/tax/export`, `/reports/profit`, `/reports/profit/export`
 - Project reference workbook: `GET /projects/export?scope=filtered|selected&ids&search&status&sort&direction`; it is owned by Projects but shares the Open XML generator and report/export concurrency class.
-- Accounting ledger reports: `/accounting/reports/trial-balance`, `/accounting/reports/general-ledger`, `/accounting/reports/profit-loss`, `/accounting/reports/vat`
 
 ## Source Domains
 
@@ -54,17 +45,13 @@
 - Commercial/procurement: BOQ, procurement, quantities, variance.
 - Materials/warehouse: stock movements, material balances, surplus.
 - Quality/handover: acceptance, rework, handover blockers.
-- Accounting/finance: AP, AR, invoices, payments, cashflow, tax, profit.
 - Admin/governance: staff and permission-aware visibility.
 
 ## Invariants
 
-- `/statistics` exposes project, procurement, warehouse and staff aggregates only. Legacy accounting/cashflow/tax/profit APIs stay available for Dashboard/admin/history support but their panels are not registered in Statistics.
 - `/reports` means an authored work-report register: a worker sends a source-backed report to an eligible manager, the recipient either requests changes with a required comment or acknowledges it, and every send/resend produces an immutable revision snapshot plus append-only event. Recipient detail resolves report content and evidence from the same selected revision; acknowledgement remains receipt/read confirmation, never quality acceptance, quantity confirmation or Work Item completion. The initial adapter is `operation_daily_reports`; this does not create a second construction-content editor.
 - Accounting Handoff deliberately exposes no cost/revenue/profit/VAT/cashflow calculation or export. Summary values are dossier counts, and any source amount is read-only reference context. MISA remains authoritative for accounting reports.
-- Legacy mode alone retains the former project-finance CSV/report semantics and permission redaction; it must not query legacy AP/AR/payment/invoice/ledger tables as a substitute for its material-cost source.
 - Global Accounting Handoff keeps draft and applied project scope separate: only Apply writes `project`, while Reset removes it and returns to the no-project state. Workspace data and actions always use the applied project ID; the project-scoped route remains fixed to its route ID.
-- Statistics and Accounting Handoff share asynchronous picker/page presentation and internal request/cursor mechanics, not permission routes. Statistics reads `/statistics/options`; Accounting Handoff reads `/project-finance/projects`, which filters by `accounting_handoff.view` while retaining `project_finance.view` for legacy compatibility. Neither surface eagerly loads all projects.
 - Statistics uses `statistics.view` for list/options and `statistics.export` for export; work reports use distinct `work_report.view|create|submit|review|export|manage`. `report.view` remains the Dashboard/legacy compatibility permission and is not repurposed as authored-report access.
 - Frontend `/statistics` and `/statistics/:reportKey` expose only definitions allowed by `statistics.view`; the base/invalid/unavailable key redirects to the first visible statistic. Exactly one panel is lazy-mounted. `/reports` is guarded by `work_report.view`; author, recipient and project-scoped manager checks are repeated server-side per record.
 - `/statistics/options`, list results and exports use the same actor project scope. `project_id` and option `selected_id` are UUID-validated before repository access. Search and controlled sort/direction are included in the export query and validated against format-specific columns.
@@ -75,15 +62,10 @@
 - Warehouse report aggregates stock movements and site surplus in separate CTEs before joining materials. Accounting aggregates payables, receivables and budgets independently and uses ordinary `SUM`; `SUM(DISTINCT amount)` is forbidden because equal legitimate obligations must all count.
 - Staff report includes only active staff membership in accessible, non-cancelled projects and counts distinct accessible projects. Full-company staff remains the `staff.view` Staff module, not a report-scope bypass.
 - `/dashboard` is labelled `Dashboard` and precedes `Bàn làm việc` in global navigation when the actor has `report.view`; `/my-work` remains the authenticated landing page. Dashboard is a non-mutating management summary; personal, departmental and role-owned action/approval queues remain in My Work and Dashboard must not mount approval mutations.
-- `/reports/dashboard` accepts one semantic period (`month|quarter|year`, year and applicable period number), normalizes it in `Asia/Ho_Chi_Minh`, rejects invalid/future periods, truncates the current period at today and returns typed `meta`, `capabilities`, current `project_snapshot` and optional `cashflow`. The project snapshot is current state and never changes when only the selected cashflow period changes.
+- `/reports/dashboard` validates period metadata in Asia/Ho_Chi_Minh and returns only meta plus current project_snapshot. There are no cashflow/capabilities/financial metrics in the response; operational activity windows remain independent.
 - Dashboard project snapshot applies `ProjectAccessFilter`, excludes cancelled projects and aggregates open issues plus pending approvals independently so one-to-many joins cannot multiply counts. Active projects are planning, in-progress, acceptance or handover; status composition uses returned counts over the current scoped total.
-- Dashboard cashflow is the canonical approved-payment ledger used by `/reports/cashflow`: direction/date classification, opening/closing balance, warnings, period series and project breakdown remain source-backed. It never treats `project_cash_requests.processed`, unapproved vouchers or workflow-form answers as cash movement.
-- Dashboard finance is fail-closed. Global cashflow requires `report.finance.view`, `accounting.view` or the V133 `project.reconciliation.view` marker; the compatibility portfolio API additionally checks financial access for each project and omits inaccessible money fields. `report.view` alone grants the Dashboard route but no financial values.
-- `/reports/dashboard/projects` remains a compatibility API for bounded server search/status/sort, scoped finance and opaque period-bound cursors. Dashboard no longer calls or renders it; its project portfolio has been replaced by `/reports/dashboard/activities`.
-- Dashboard links only to existing registered report definitions. Loading, API errors, true empty results, missing finance capability and cashflow reconciliation warnings must remain visually distinct. Dashboard JSON reads continue using the bounded report concurrency guard; exports keep the separate export guard.
 - UI filters and PDF/Excel/CSV exports use the same query semantics.
 - Project XLSX/JSON export preserves explorer search/status/sort semantics, excludes cancelled/out-of-scope rows through `ProjectAccessFilter`, and caps filtered output at 10,000 and selection at 100. XLSX emits the established seven sheets; JSON v1 emits re-import-shaped `projects`, read-only `project_snapshots` and Pipeline/Form/Field/client references. Missing or selected/runtime-mismatched historical references are explicit metadata/warnings in either representation; they do not block export or mutate the project/runtime. `contract_amount_snapshot` is reporting context only and is never part of the import contract; JSON money is an exact decimal string.
-- The VAT period purchase ledger, sales ledger and declaration CSV are exported from the exact period-detail source used by `TaxWorkspace`; an unprepared declaration export falls back to the current canonical summary, while a prepared/filed/locked export uses the latest immutable return snapshot.
 - Statistics owns one compact global `Công trình` filter inside the header above catalog/content. It separates draft/applied state, persists applied `project_id` across statistic navigation and keeps format selection beside the active aggregate. The async picker reads `/statistics/options`, debounces code/name search, pages by opaque cursor and never eagerly loads the full option set.
 - Statistics presentation is responsive without changing aggregate semantics: below `md`, project/procurement/warehouse/staff rows render as specific cards with controlled mobile sorting; from `md` upward they remain tables. Search, sorting, pagination, applied project filter, permission-aware source links, loading/error/empty and export scope share the same row contract. Procurement rows are grouped by `project + status + budget_status`, carry the scoped project ID/code/name, display the project on desktop/mobile and always open `/projects/:id/procurement`. Export uses this same project-level grain. Legacy `/reports/procurement` retains its compatibility aggregate by status/budget only.
 - Work Reports uses server-applied project/status/date/search filters and actor scopes. `mine` is the formal sent register; explicit `source` contains authored eligible drafts without a formal overlay. Source rows open `/projects/:id/operations?tab=timeline&report=<source-id>`. Content creation is shown only with `work_report.create`, `operation.report` and `operation.view`, and opens Operations. Author recipient selection, first send and resubmit are owned by Operations: create/edit form supports atomic save+send, while saved-source detail offers direct send through the same shared PM/sole-recipient recommendation. Unchanged `needs_changes` remains edit-only; changed source may resend. The `/reports` detail owns the two-column recipient review workspace, request-changes/acknowledge, immutable event/revision history, revision-bound read-only evidence and per-revision PDF; it never duplicates author submit controls. Evidence metadata is attached per revision, and protected storage opens only after Work Report view plus author/recipient/manager scope and exact snapshot membership succeed. Historical and unauthorized actions remain absent/read-only.
@@ -93,9 +75,7 @@
 - A typed Operations create/update with `delivery.mode=submit` must atomically persist the mutable source and immutable formal revision/event/audit; create may also apply the existing Work Item first-start in that transaction. Delivery failure rolls the source transaction back. This atomicity does not complete/approve the Work Item, move a pipeline Node, or alter any previous report revision.
 - Deleted Staff/User identities remain absent from active allocation metrics and recipient selectors. Dynamic Work Report and Audit queries keep existing author/recipient/reviewer/actor names, add companion deleted flags and apply the shared suffix in UI and dynamic CSV/XLSX register exports. Immutable work-report revision snapshots, hashes and per-revision PDFs are not regenerated or relabelled.
 - Cashflow is payment-ledger based unless changed deliberately.
-- `CashflowPanel` keeps report/export query parity. Project Accounting defaults the date range to the project start date (or full-history fallback), while global Accounting defaults to the current month; pending amount, unclassified count and non-cash count are visible report-contract warnings rather than frontend-derived guesses.
 - Tax reporting uses canonical `invoice_tax_lines` and requires a live posted source journal for the default `posted` view; a direct invoice status value is not evidence of posting. Posted tax adjustments join the same source-backed aggregation, while source reversals remove the original invoice tax contribution. Counterparty tax-code warnings remain based on the invoice partner tax identifier, not the configured VAT rate code. Profit remains invoice-ledger based unless changed deliberately.
-- The accounting Trial Balance, General Ledger, P&L and VAT ledger are posted-journal/source-tax reports scoped through `ProjectAccessFilter`. Trial Balance and P&L include reversal journals as independent offsetting entries; VAT reporting excludes tax lines whose source journal is not posted or has been reversed by the canonical source transition.
 - Warnings are part of the report contract, not decorative UI.
 - Tax warnings for missing tax code/VAT arithmetic and the profit unclassified-cost warning can set the controlled ledger search to their exact backend warning flag. Aggregate-only or excluded-row warnings remain informational because their rows are not present in the active ledger.
 - Warehouse aggregate reports treat a completed source/target transfer as net zero across all warehouses while per-warehouse position queries subtract from the source and add to the target; legacy transfer rows without a target remain outbound-only.
@@ -103,7 +83,7 @@
 ## Developer Sample Data
 
 - Sample projects remain inside ordinary project/report scope unless cancelled. Project explorer, detail and operational project statistics expose `is_sample`; UI and CSV/XLSX/PDF-compatible tabular rows label the sample flag rather than filtering it out.
-- Financial/report aggregates consume the same source ledgers as ordinary projects. Do not create a parallel sample-only report source or silently exclude sample amounts.
+- Operational aggregates consume the same source records as ordinary projects. Do not create a parallel sample-only report source or silently exclude sample projects; no money-report aggregate remains.
 
 ## Cross-Domain Checks
 

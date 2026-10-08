@@ -3,13 +3,42 @@ package core
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+func TestCreateDraftSampleDataProjectIntegration(t *testing.T) {
+	if os.Getenv("CONSFLOW_TEST_DATABASE_URL") == "" {
+		t.Skip("set CONSFLOW_TEST_DATABASE_URL to run DB-backed sample data tests")
+	}
+	database := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(database), "sample-data-test-secret")
+	actorID, actorName := setupSampleDataDeveloperActor(t, database)
+	pipeline := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, false)
+	key := uuid.NewString()
+	t.Cleanup(func() { cancelSampleDataIntegration(t, database, key) })
+	req := SampleDataCreateRequest{Profile: "draft", PipelineTemplateID: pipeline.ID, IdempotencyKey: key}
+	result, err := service.CreateSampleDataProject(ctx, req, actorID, actorName)
+	if err != nil || cleanID(result["id"]) == "" || result["status"] != "draft" || number(result["progress_percent"]) != 0 || cleanID(result["current_pipeline_run_id"]) != "" {
+		t.Fatalf("book-free draft must not create runtime work: result=%#v err=%v", result, err)
+	}
+	replayed, err := service.CreateSampleDataProject(ctx, req, actorID, actorName)
+	if err != nil || cleanID(replayed["id"]) != cleanID(result["id"]) || !boolValue(replayed["replayed"]) {
+		t.Fatalf("draft retry must replay original project: result=%#v err=%v", replayed, err)
+	}
+	req.Profile, req.ProgressPercent = "planning", 5
+	if _, err := service.CreateSampleDataProject(ctx, req, actorID, actorName); err == nil || !strings.Contains(err.Error(), "idempotency") {
+		t.Fatalf("changed-profile idempotency retry must conflict: %v", err)
+	}
+}
 
 func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
 	if os.Getenv("CONSFLOW_TEST_DATABASE_URL") == "" {
@@ -22,7 +51,7 @@ func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
 	service.ConfigureUploads(t.TempDir(), defaultMaxUploadBytes)
 
 	actorID, actorName := setupSampleDataDeveloperActor(t, database)
-	pipeline, accountingBook := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, true)
+	pipeline := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, true)
 	reprovisioned, err := service.CreateSampleDataUsers(ctx, SampleDataUserCreateRequest{PipelineTemplateID: pipeline.ID}, actorID, actorName)
 	if err != nil {
 		t.Fatal(err)
@@ -63,28 +92,29 @@ func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
 
 	result, err := service.CreateSampleDataProject(ctx, SampleDataCreateRequest{
 		Profile: "completed", ProgressPercent: 100, PipelineTemplateID: pipeline.ID,
-		AccountingBookID: accountingBook.ID, IdempotencyKey: idempotencyKey,
+		IdempotencyKey: idempotencyKey,
 	}, actorID, actorName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	projectID := cleanID(result["id"])
 	if projectID == "" || !boolValue(result["is_sample"]) || int(number(result["progress_percent"])) != 100 ||
-		cleanID(result["pipeline_template_id"]) != pipeline.ID || cleanID(result["accounting_book_id"]) != accountingBook.ID {
+		cleanID(result["pipeline_template_id"]) != pipeline.ID {
 		t.Fatalf("unexpected completed sample result: %#v", result)
 	}
 	assertSampleRunStepWorkItemCompletionSync(t, database, projectID)
 	replayed, err := service.CreateSampleDataProject(ctx, SampleDataCreateRequest{
 		Profile: "completed", ProgressPercent: 100, PipelineTemplateID: pipeline.ID,
-		AccountingBookID: accountingBook.ID, IdempotencyKey: idempotencyKey,
+		IdempotencyKey: idempotencyKey,
 	}, actorID, actorName)
 	if err != nil || cleanID(replayed["id"]) != projectID || !boolValue(replayed["replayed"]) {
 		t.Fatalf("completed idempotency replay mismatch: result=%#v err=%v", replayed, err)
 	}
 	for table, minimum := range map[string]int{
 		"pipeline_runs": 1, "work_items": totalSteps, "workflow_form_instances": 1,
-		"evidence_records": pipeline.SelectedStepCount, "approval_requests": 1, "project_material_costs": 1,
-		"payables": 1, "receivables": 1, "journal_entries": 2, "handover_records": 1,
+		"evidence_records": pipeline.SelectedStepCount, "approval_requests": 1, "handover_records": 1,
+		"accounting_handoffs": 2, "boq_releases": 1, "construction_handoffs": 1,
+		"subcontractor_checklist_reconciliations": 1, "owner_client_checklist_reconciliations": 1,
 	} {
 		var count int
 		if err := database.QueryRowContext(ctx, `SELECT count(*) FROM `+table+` WHERE project_id=$1`, projectID).Scan(&count); err != nil {
@@ -93,6 +123,172 @@ func TestCreateCompletedSampleDataProjectIntegration(t *testing.T) {
 		if count < minimum {
 			t.Fatalf("%s count=%d, want at least %d", table, count, minimum)
 		}
+	}
+	assertSampleCurrentDomainGates(t, ctx, repo, projectID)
+	for _, table := range []string{"payables", "receivables", "payments", "project_material_costs", "project_cash_requests", "journal_entries", "accounting_misa_records"} {
+		var exists bool
+		if err := database.QueryRowContext(ctx, `SELECT to_regclass($1) IS NOT NULL`, "public."+table).Scan(&exists); err != nil {
+			t.Fatal(err)
+		}
+		if !exists {
+			continue
+		}
+		var count int
+		if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+table+` WHERE project_id=$1`, projectID).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("sample must not fabricate %s rows: count=%d err=%v", table, count, err)
+		}
+	}
+}
+
+func assertSampleCurrentDomainGates(t *testing.T, ctx context.Context, repo *Repository, projectID string) {
+	t.Helper()
+	steps, err := repo.Query(ctx, `SELECT work.id,work.project_id,step.domain_action_key FROM work_items work JOIN pipeline_run_steps step ON step.id=work.run_step_id WHERE work.project_id=$1 AND work.status='completed' AND step.domain_action_key IS NOT NULL`, projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range steps {
+		action := cleanOptionalText(step["domain_action_key"])
+		var outcome workflowAutomationOutcome
+		switch action {
+		case "contract.require_execution_ready":
+			outcome, err = repo.automateClientContractExecutionGate(ctx, step)
+		case "procurement.generate_from_boq":
+			outcome, err = repo.automateClientBOQProcurement(ctx, step, "", "")
+		default:
+			outcome, err = repo.automateClientOperationalSourceGate(ctx, step, action)
+		}
+		if err != nil || outcome.Status != "succeeded" {
+			t.Fatalf("canonical source gate %s did not pass: outcome=%#v err=%v", action, outcome, err)
+		}
+	}
+}
+
+func TestCompletedSampleDataSourceRollbackIntegration(t *testing.T) {
+	if os.Getenv("CONSFLOW_TEST_DATABASE_URL") == "" {
+		t.Skip("set CONSFLOW_TEST_DATABASE_URL to run DB-backed sample data tests")
+	}
+	database := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	repo := NewRepository(database)
+	service := NewService(repo, "sample-data-test-secret")
+	service.ConfigureUploads(t.TempDir(), defaultMaxUploadBytes)
+	actorID, actorName := setupSampleDataDeveloperActor(t, database)
+	pipeline := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, true)
+	blueprint, err := repo.LoadSampleDataBlueprint(ctx, pipeline.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := buildSampleDataPlan(blueprint, SampleDataCreateRequest{Profile: "completed", ProgressPercent: 100, PipelineTemplateID: pipeline.ID}, actorID, actorName, uuid.NewString(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.storeSampleDataArtifacts(ctx, &plan); err != nil {
+		t.Fatal(err)
+	}
+	// Inject a late unsupported gate after valid domain sources are generated.
+	// The transaction must roll back the project, memberships and every source.
+	injected := false
+	for nodeIndex := range plan.Nodes {
+		for stepIndex := range plan.Nodes[nodeIndex].Steps {
+			step := &plan.Nodes[nodeIndex].Steps[stepIndex]
+			if !injected && step.Selected && cleanOptionalText(step.Definition.Record["domain_action_key"]) == "" {
+				step.Definition.Record["domain_action_key"] = "source.unimplemented_sample_gate"
+				injected = true
+			}
+		}
+	}
+	if !injected {
+		t.Fatal("fixture has no form-only step to inject source gate")
+	}
+	if _, err := repo.CreateSampleData(ctx, plan); err == nil || !strings.Contains(err.Error(), "bộ kiểm chứng") {
+		t.Fatalf("unknown source gate must fail closed: %v", err)
+	}
+	for _, table := range []string{"projects", "pipeline_runs", "work_items", "accounting_handoffs", "contracts", "boq_releases", "construction_handoffs", "handover_records"} {
+		key := "project_id"
+		if table == "projects" {
+			key = "id"
+		}
+		var count int
+		if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+table+` WHERE `+key+`=$1`, plan.ProjectID).Scan(&count); err != nil || count != 0 {
+			t.Fatalf("failed sample leaked %s rows: count=%d err=%v", table, count, err)
+		}
+	}
+	var generationCount int
+	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM sample_data_generations WHERE idempotency_key=$1`, plan.IdempotencyKey).Scan(&generationCount); err != nil || generationCount != 0 {
+		t.Fatalf("failed sample leaked generation: count=%d err=%v", generationCount, err)
+	}
+}
+
+func TestSampleDataContractHasNoAccountingPrerequisites(t *testing.T) {
+	for _, value := range []any{SampleDataCreateRequest{Profile: "draft"}, SampleDataOptions{}} {
+		payload, err := json.Marshal(value)
+		if err != nil || strings.Contains(string(payload), "accounting_book") {
+			t.Fatalf("sample API must not require or expose accounting books: %s err=%v", payload, err)
+		}
+	}
+}
+
+func TestSampleStructuredListPreservesSourceFieldTypes(t *testing.T) {
+	value := sampleFormFieldValue(Record{
+		"field_type": "structured_list",
+		"validation_json": map[string]any{"item_fields": []any{
+			map[string]any{"key": "responsible_role", "type": "select", "options": []any{map[string]any{"value": "QA/QC", "label": "QA/QC"}}},
+			map[string]any{"key": "evidence_required", "type": "checkbox"},
+			map[string]any{"key": "scheduled_date", "type": "date"},
+		}},
+	}, "DEMO", time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC))
+	items := recordsFromAny(value)
+	if len(items) != 1 || items[0]["responsible_role"] != "QA/QC" || items[0]["evidence_required"] != true || items[0]["scheduled_date"] != "2026-10-05" {
+		t.Fatalf("structured source rows must retain selectable role, boolean and date values: %#v", value)
+	}
+}
+
+func TestPlanningSampleDataConcurrentRetryIntegration(t *testing.T) {
+	if os.Getenv("CONSFLOW_TEST_DATABASE_URL") == "" {
+		t.Skip("set CONSFLOW_TEST_DATABASE_URL to run DB-backed sample data tests")
+	}
+	database := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(database), "sample-data-test-secret")
+	uploads := t.TempDir()
+	service.ConfigureUploads(uploads, defaultMaxUploadBytes)
+	actorID, actorName := setupSampleDataDeveloperActor(t, database)
+	pipeline := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, false)
+	key := uuid.NewString()
+	t.Cleanup(func() { cancelSampleDataIntegration(t, database, key) })
+	type result struct {
+		record Record
+		err    error
+	}
+	results := make(chan result, 2)
+	start := make(chan struct{})
+	for attempt := 0; attempt < 2; attempt++ {
+		go func() {
+			<-start
+			record, err := service.CreateSampleDataProject(ctx, SampleDataCreateRequest{Profile: "planning", ProgressPercent: 25, PipelineTemplateID: pipeline.ID, IdempotencyKey: key}, actorID, actorName)
+			results <- result{record, err}
+		}()
+	}
+	close(start)
+	first, second := <-results, <-results
+	if first.err != nil || second.err != nil || cleanID(first.record["id"]) == "" || cleanID(first.record["id"]) != cleanID(second.record["id"]) {
+		t.Fatalf("concurrent retries must yield one project: first=%#v second=%#v", first, second)
+	}
+	var count int
+	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM sample_data_generations WHERE idempotency_key=$1`, key).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("concurrent generation count=%d err=%v", count, err)
+	}
+	projectID := cleanID(first.record["id"])
+	if err := filepath.Walk(uploads, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && !strings.Contains(path, projectID) {
+			t.Errorf("concurrent retry left an unreferenced artifact: %s", path)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -107,7 +303,7 @@ func TestCreatePlanningSampleDataAssignmentsIntegration(t *testing.T) {
 	service.ConfigureUploads(t.TempDir(), defaultMaxUploadBytes)
 
 	actorID, actorName := setupSampleDataDeveloperActor(t, database)
-	pipeline, _ := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, false)
+	pipeline := sampleDataIntegrationSources(t, ctx, service, actorID, actorName, false)
 	blueprint, err := repo.LoadSampleDataBlueprint(ctx, pipeline.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -253,6 +449,9 @@ func TestSampleDataPipelineCompatibilityDoesNotDependOnEnvironmentIDsOrRevision(
 	if option.ID != cleanID(blueprint.Template["id"]) || option.Revision != 3 || option.SelectedStepCount != 5 {
 		t.Fatalf("unexpected dynamic pipeline option: %#v", option)
 	}
+	if option.CompletedCompatible || !hasSampleDataBlocker(option.CompletedBlockers, "COMPLETED_SOURCE_BINDING_MISSING") {
+		t.Fatalf("planning compatibility must not imply completed source coverage: %#v", option)
+	}
 	blueprint.Template["definition_hash"] = nil
 	missingHash := sampleDataPipelineCompatibility(blueprint)
 	if missingHash.Compatible || len(missingHash.Blockers) != 1 || missingHash.Blockers[0].Code != "PIPELINE_HASH_MISSING" {
@@ -273,10 +472,7 @@ func TestSampleDataPipelineCompatibilityDoesNotDependOnEnvironmentIDsOrRevision(
 	blueprint.Roles[0] = readyRole
 	blueprint.Actors = map[string][]sampleDataStaffActor{roleName: {actor}}
 
-	accounting := &sampleDataAccountingContext{
-		ID: uuid.NewString(), BankAccountID: uuid.NewString(), CostAccountID: uuid.NewString(), RevenueAccountID: uuid.NewString(),
-	}
-	plan, err := buildSampleDataPlan(blueprint, accounting, SampleDataCreateRequest{
+	plan, err := buildSampleDataPlan(blueprint, SampleDataCreateRequest{
 		Profile: "planning", ProgressPercent: 65, PipelineTemplateID: option.ID,
 	}, actor.UserID, actor.FullName, uuid.NewString(), time.Date(2026, 8, 23, 10, 0, 0, 0, time.UTC))
 	if err != nil {
@@ -310,7 +506,7 @@ func hasSampleDataBlocker(blockers []SampleDataBlocker, code string) bool {
 	return false
 }
 
-func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Service, actorID, actorName string, requireAccounting bool) (SampleDataPipelineOption, SampleDataAccountingBookOption) {
+func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Service, actorID, actorName string, requireCompleted bool) SampleDataPipelineOption {
 	t.Helper()
 	options, err := service.SampleDataOptions(ctx)
 	if err != nil {
@@ -318,7 +514,7 @@ func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Se
 	}
 	var selectedPipeline SampleDataPipelineOption
 	for _, pipeline := range options.Pipelines {
-		if pipeline.Compatible || pipeline.SampleUsersProvisionable {
+		if (pipeline.Compatible || pipeline.SampleUsersProvisionable) && (!requireCompleted || len(pipeline.CompletedBlockers) == 0) {
 			selectedPipeline = pipeline
 			break
 		}
@@ -335,7 +531,7 @@ func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Se
 	}
 	selectedPipeline = SampleDataPipelineOption{}
 	for _, pipeline := range options.Pipelines {
-		if pipeline.Compatible {
+		if pipeline.Compatible && (!requireCompleted || pipeline.CompletedCompatible) {
 			selectedPipeline = pipeline
 			break
 		}
@@ -343,17 +539,7 @@ func sampleDataIntegrationSources(t *testing.T, ctx context.Context, service *Se
 	if selectedPipeline.ID == "" {
 		t.Fatalf("test environment has no compatible Pipeline after provisioning: %#v", options.Pipelines)
 	}
-	var selectedBook SampleDataAccountingBookOption
-	for _, book := range options.AccountingBooks {
-		if book.Compatible {
-			selectedBook = book
-			break
-		}
-	}
-	if requireAccounting && selectedBook.ID == "" {
-		t.Fatalf("test environment has no compatible accounting book: %#v", options.AccountingBooks)
-	}
-	return selectedPipeline, selectedBook
+	return selectedPipeline
 }
 
 func setupSampleDataDeveloperActor(t *testing.T, database *sql.DB) (string, string) {

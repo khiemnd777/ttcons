@@ -13,11 +13,15 @@ func (s *Service) AccountingHandoffDetail(ctx context.Context, projectID, source
 	if !validActivityUUID(projectID) || !validActivityUUID(sourceID) || !statusIn(sourceType, "procurement_request", "contract_milestone") {
 		return nil, validationError("Hồ sơ nguồn không hợp lệ")
 	}
-	allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"accounting_handoff.view"})
+	canReadHandoff, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"accounting_handoff.view"})
 	if err != nil {
 		return nil, err
 	}
-	if !allowed {
+	canReadReconciliation, err := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"accounting_reconciliation.view"})
+	if err != nil {
+		return nil, err
+	}
+	if !canReadHandoff && !canReadReconciliation {
 		return nil, forbiddenError("Bạn không có quyền xem hồ sơ kế toán của công trình")
 	}
 	project, err := s.repo.QueryOne(ctx, `SELECT id,code,name FROM projects WHERE id=$1 AND status <> 'cancelled'`, projectID)
@@ -32,7 +36,8 @@ func (s *Service) AccountingHandoffDetail(ctx context.Context, projectID, source
 		LEFT JOIN users receiver ON receiver.id=h.acknowledged_by
 		LEFT JOIN users returner ON returner.id=h.returned_by
 		WHERE h.project_id=$1 AND h.source_type=$2 AND h.source_id=$3 AND h.status <> 'cancelled'
-	`, projectID, sourceType, sourceID)
+		AND $4
+	`, projectID, sourceType, sourceID, canReadHandoff)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +58,7 @@ func (s *Service) AccountingHandoffDetail(ctx context.Context, projectID, source
 	files := []Record{}
 	restricted := !canReadSource
 	if canReadSource {
-		current, err = s.repo.accountingHandoffCurrentSource(ctx, projectID, sourceType, sourceID)
+		current, err = s.repo.accountingHandoffCurrentSource(ctx, projectID, sourceType, sourceID, canReadReconciliation)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -76,7 +81,7 @@ func (s *Service) AccountingHandoffDetail(ctx context.Context, projectID, source
 		status = fmt.Sprint(handoff["status"])
 	}
 	// Reuse the canonical readiness rules; detail never adds a new completion gate.
-	if current != nil {
+	if current != nil && canReadHandoff {
 		candidates, queryErr := s.repo.AccountingHandoffCandidates(ctx, projectID)
 		if queryErr != nil {
 			return nil, queryErr
@@ -107,10 +112,10 @@ func (s *Service) AccountingHandoffDetail(ctx context.Context, projectID, source
 	}
 	return Record{"project": project, "project_id": projectID, "source_type": sourceType, "source_id": sourceID, "current": current,
 		"handoff": handoff, "related": related, "files": files, "restricted": restricted,
-		"source_access": canReadSource, "status": status, "capabilities": capabilities}, nil
+		"source_access": canReadSource, "handoff_access": canReadHandoff, "status": status, "capabilities": capabilities}, nil
 }
 
-func (r *Repository) accountingHandoffCurrentSource(ctx context.Context, projectID, sourceType, sourceID string) (Record, error) {
+func (r *Repository) accountingHandoffCurrentSource(ctx context.Context, projectID, sourceType, sourceID string, includeReconciliationSources bool) (Record, error) {
 	if sourceType == "procurement_request" {
 		return r.QueryOne(ctx, `SELECT request.id,request.request_code AS source_code,request.title AS source_title,
 			request.supplier_partner_id AS partner_id,COALESCE(partner.name,request.supplier_name,'') AS counterparty_name,request.total_estimated_amount AS reference_amount,
@@ -122,8 +127,10 @@ func (r *Repository) accountingHandoffCurrentSource(ctx context.Context, project
 		c.counterparty_partner_id AS partner_id,c.counterparty_name,m.net_amount AS reference_amount,c.currency,
 		m.status AS source_status,c.id AS contract_id,c.contract_code,m.acceptance_id
 		FROM contract_milestones m JOIN contracts c ON c.id=m.contract_id
-		WHERE m.id=$1 AND c.project_id=$2 AND c.contract_type='main_client' AND c.direction='receivable'
-		AND m.status <> 'cancelled' AND c.status NOT IN ('cancelled','terminated')`, sourceID, projectID)
+		WHERE m.id=$1 AND c.project_id=$2
+		AND ((c.contract_type='main_client' AND c.direction='receivable')
+		     OR ($3 AND c.contract_type='subcontractor' AND c.direction='payable'))
+		AND m.status <> 'cancelled' AND c.status NOT IN ('cancelled','terminated')`, sourceID, projectID, includeReconciliationSources)
 }
 
 // Source permissions and work-item visibility are evaluated before returning

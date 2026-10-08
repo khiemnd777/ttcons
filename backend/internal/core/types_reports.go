@@ -52,10 +52,6 @@ type DashboardPeriodMeta struct {
 	CanMoveForward bool   `json:"can_move_forward"`
 }
 
-type DashboardCapabilities struct {
-	FinanceVisible bool `json:"finance_visible"`
-}
-
 type DashboardStatusMetric struct {
 	Status string `json:"status"`
 	Total  int    `json:"total"`
@@ -72,48 +68,9 @@ type DashboardProjectSnapshot struct {
 	StatusCounts      []DashboardStatusMetric `json:"status_counts"`
 }
 
-type DashboardCashflowSummary struct {
-	OpeningBalance      float64 `json:"opening_balance"`
-	TotalInflow         float64 `json:"total_inflow"`
-	TotalOutflow        float64 `json:"total_outflow"`
-	NetFlow             float64 `json:"net_flow"`
-	ClosingBalance      float64 `json:"closing_balance"`
-	PaymentCount        int     `json:"payment_count"`
-	PendingPaymentCount int     `json:"pending_payment_count"`
-	PendingPaymentTotal float64 `json:"pending_payment_total"`
-	UnclassifiedCount   int     `json:"unclassified_count"`
-	NonCashCount        int     `json:"non_cash_count"`
-}
-
-type DashboardCashflowSeries struct {
-	PeriodStart    string  `json:"period_start"`
-	InflowAmount   float64 `json:"inflow_amount"`
-	OutflowAmount  float64 `json:"outflow_amount"`
-	NetAmount      float64 `json:"net_amount"`
-	RunningBalance float64 `json:"running_balance"`
-	PaymentCount   int     `json:"payment_count"`
-}
-
-type DashboardCashflowProject struct {
-	ProjectID     string  `json:"project_id"`
-	ProjectName   string  `json:"project_name"`
-	InflowAmount  float64 `json:"inflow_amount"`
-	OutflowAmount float64 `json:"outflow_amount"`
-	NetAmount     float64 `json:"net_amount"`
-	PaymentCount  int     `json:"payment_count"`
-}
-
-type DashboardCashflow struct {
-	Summary  DashboardCashflowSummary   `json:"summary"`
-	Series   []DashboardCashflowSeries  `json:"series"`
-	Projects []DashboardCashflowProject `json:"projects"`
-}
-
 type DashboardReportResponse struct {
 	Meta            DashboardPeriodMeta      `json:"meta"`
-	Capabilities    DashboardCapabilities    `json:"capabilities"`
 	ProjectSnapshot DashboardProjectSnapshot `json:"project_snapshot"`
-	Cashflow        *DashboardCashflow       `json:"cashflow,omitempty"`
 }
 
 type DashboardProjectsRequest struct {
@@ -127,17 +84,13 @@ type DashboardProjectsRequest struct {
 }
 
 type DashboardProjectItem struct {
-	ID               string   `json:"id"`
-	Code             string   `json:"code"`
-	Name             string   `json:"name"`
-	Status           string   `json:"status"`
-	ProgressPercent  float64  `json:"progress_percent"`
-	OpenIssues       int      `json:"open_issues"`
-	PendingApprovals int      `json:"pending_approvals"`
-	FinanceVisible   bool     `json:"finance_visible"`
-	InflowAmount     *float64 `json:"inflow_amount,omitempty"`
-	OutflowAmount    *float64 `json:"outflow_amount,omitempty"`
-	NetAmount        *float64 `json:"net_amount,omitempty"`
+	ID               string  `json:"id"`
+	Code             string  `json:"code"`
+	Name             string  `json:"name"`
+	Status           string  `json:"status"`
+	ProgressPercent  float64 `json:"progress_percent"`
+	OpenIssues       int     `json:"open_issues"`
+	PendingApprovals int     `json:"pending_approvals"`
 }
 
 type DashboardProjectsPage struct {
@@ -176,29 +129,4 @@ type OperationalReportRequest struct {
 	Search    string `json:"search"`
 	Sort      string `json:"sort"`
 	Direction string `json:"direction"`
-}
-
-type CashflowReportRequest struct {
-	ProjectID string `json:"project_id"`
-	FromDate  string `json:"from"`
-	ToDate    string `json:"to"`
-	GroupBy   string `json:"group_by"`
-	Status    string `json:"status"`
-}
-
-type TaxReportRequest struct {
-	ProjectID string `json:"project_id"`
-	FromDate  string `json:"from"`
-	ToDate    string `json:"to"`
-	GroupBy   string `json:"group_by"`
-	Source    string `json:"source"`
-	Status    string `json:"status"`
-}
-
-type ProfitReportRequest struct {
-	ProjectID string `json:"project_id"`
-	FromDate  string `json:"from"`
-	ToDate    string `json:"to"`
-	GroupBy   string `json:"group_by"`
-	Status    string `json:"status"`
 }

@@ -29,7 +29,7 @@ test('project workspace groups open their canonical entrypoints for an admin', (
     'project.view', 'pipeline.view', 'planning.view', 'boq.view',
     'contract.view', 'procurement.view', 'warehouse.view',
     'operation.view', 'quality.view', 'acceptance.view', 'rework.view',
-    'handover.view', 'accounting_handoff.view', 'project_finance.view',
+    'handover.view', 'accounting_handoff.view',
     'audit.view',
   ];
 
@@ -68,7 +68,7 @@ test('project workspace exposes the lean accounting handoff permission without l
 test('project workspace groups fall back to the first child the user may view', () => {
   assert.deepEqual(routeMap([
     'project.view', 'boq.view', 'warehouse.view', 'acceptance.view',
-    'project_finance.view', 'audit.view',
+    'accounting_handoff.view', 'audit.view',
   ]), {
     overview: '/projects/project-1',
     discussion: '/projects/project-1/discussion',
@@ -80,12 +80,17 @@ test('project workspace groups fall back to the first child the user may view', 
   });
 });
 
+test('retired finance permission alone does not expose accounting handoff navigation', () => {
+  const groups = visibleProjectWorkspaceGroups(permissionCheck(['project.view', 'project_finance.view']), 'workspace');
+  assert.equal(groups.some((group) => group.children?.some((child) => child.to === 'accounting')), false);
+});
+
 test('accounting reconciliation observer sees the business tree but not project audit', () => {
   const groups = visibleProjectWorkspaceGroups(permissionCheck([
     'project.reconciliation.view', 'project.view', 'pipeline.view', 'planning.view',
     'boq.view', 'contract.view', 'procurement.view', 'warehouse.view',
     'operation.view', 'quality.view', 'acceptance.view', 'rework.view',
-    'handover.view', 'accounting_handoff.view', 'project_finance.view', 'audit.view',
+    'handover.view', 'accounting_handoff.view', 'audit.view',
   ]));
   const children = groups.flatMap((group) => group.children.map((child) => child.label));
 

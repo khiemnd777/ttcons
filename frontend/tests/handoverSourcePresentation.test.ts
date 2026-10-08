@@ -46,10 +46,6 @@ test('presents every current checklist item code with its Vietnamese business la
     warehouse_closure: 'Đóng kho và xử lý vật tư dư',
     operation_manuals: 'Tài liệu vận hành và bảo trì',
     warranty_documents: 'Hồ sơ bảo hành',
-    ap_reconciliation: 'Chi phí vật tư đã xác nhận (hồ sơ cũ)',
-    ar_reconciliation: 'Đề nghị thu/chi đã xử lý (hồ sơ cũ)',
-    project_material_costs: 'Chi phí vật tư đã xác nhận',
-    project_cash_requests: 'Đề nghị thu/chi đã xử lý',
     signed_handover_minutes: 'Biên bản bàn giao hai bên',
   };
 
@@ -129,34 +125,36 @@ test('keeps local and s3 linked evidence behind the protected evidence file endp
   assert.equal(linkedSourcePresentations({ ...item, evidence_storage_provider: 'future-provider' })[0].openMode, 'none');
 });
 
-test('builds precise source targets for acceptance, warehouse and project finance', () => {
+test('builds precise source targets for acceptance and warehouse', () => {
   const items = [
     checklistItem({ item_code: 'final_acceptance', source_type: 'acceptance', source_id: 'acceptance-1' }),
     checklistItem({ item_code: 'warehouse_closure', source_type: 'system_check' }),
-    checklistItem({ item_code: 'ap_reconciliation', source_type: 'system_check' }),
-    checklistItem({ item_code: 'ar_reconciliation', source_type: 'system_check' }),
   ];
   const handover = detail(items, {});
 
   assert.equal(automaticSourcePresentation(items[0], handover)?.targetPath, '/projects/project-1/acceptance?record=acceptance-1');
   assert.equal(automaticSourcePresentation(items[1], handover)?.targetPath, '/projects/project-1/warehouse?tab=site');
-  assert.equal(automaticSourcePresentation(items[2], handover)?.targetPath, '/projects/project-1/accounting?tab=costs');
-  assert.equal(automaticSourcePresentation(items[3], handover)?.targetPath, '/projects/project-1/accounting?tab=requests');
 });
 
 test('presents the stored readiness snapshot without inventing live detail rows', () => {
-  const payable = checklistItem({ item_code: 'ap_reconciliation', source_type: 'system_check', status: 'pending' });
-  const handover = detail([payable], { unconfirmed_material_costs: 3, unconfirmed_material_costs_amount: 450000000 });
-  const source = automaticSourcePresentation(payable, handover);
+  const warehouse = checklistItem({ item_code: 'warehouse_closure', source_type: 'system_check', status: 'pending' });
+  const handover = detail([warehouse], { pending_surplus: 3 });
+  const source = automaticSourcePresentation(warehouse, handover);
 
   assert.equal(source?.result, 'failed');
   assert.equal(source?.checkedAt, '2026-07-16T04:00:00Z');
   assert.deepEqual(source?.metrics.map((metric) => [metric.label, metric.value]), [
-    ['Chi phí vật tư chưa xác nhận', 3],
-    ['Tổng chi phí chưa xác nhận', 450000000],
+    ['Vật tư dư chưa xử lý', 3],
   ]);
 
-  const unchecked = automaticSourcePresentation(checklistItem({ item_code: 'ar_reconciliation', source_type: 'system_check' }), detail([]));
+  const unchecked = automaticSourcePresentation(checklistItem({ item_code: 'warehouse_closure', source_type: 'system_check' }), detail([]));
   assert.equal(unchecked?.result, 'unchecked');
   assert.equal(unchecked?.metrics[0].value, undefined);
+});
+
+test('retired cost and cash source codes expose no automatic finance navigation', () => {
+  for (const item_code of ['ap_reconciliation', 'ar_reconciliation', 'project_material_costs', 'project_cash_requests']) {
+    assert.equal(checklistItemCodeLabel(item_code), 'Nội dung khác');
+    assert.equal(automaticSourcePresentation(checklistItem({ item_code, source_type: 'system_check' }), detail([])), null);
+  }
 });

@@ -8,7 +8,7 @@ import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { reportPath, visibleReportDefinitions } from '../reports/reportRegistry';
 import { convertDashboardPeriod, dashboardPeriodFromSearchParams, dashboardPeriodLabel, dashboardPeriodQuery, moveDashboardPeriod } from './dashboardPeriod';
-import { CashflowPanel, DashboardError, DashboardLoading, ProjectSnapshotPanel } from './DashboardSummaryPanels';
+import { DashboardError, DashboardLoading, ProjectSnapshotPanel } from './DashboardSummaryPanels';
 import { DashboardActivityPanel } from './DashboardActivityPanel';
 import type { DashboardData, DashboardPeriod, DashboardPeriodType } from './dashboardTypes';
 
@@ -39,7 +39,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard tổng hợp" description="Theo dõi toàn cảnh, diễn biến công trình, dòng tiền và báo cáo quản trị trong phạm vi được phân quyền." horizontalFrom="xl" actions={(
+      <PageHeader title="Dashboard tổng hợp" description="Theo dõi toàn cảnh, diễn biến công trình và báo cáo vận hành trong phạm vi được phân quyền." horizontalFrom="xl" actions={(
         <>
           <DashboardPeriodToolbar period={period} canMoveForward={dashboard.data?.meta.can_move_forward ?? false} onChange={applyPeriod} />
           <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={refreshing} onClick={refreshDashboard}>
@@ -50,7 +50,7 @@ export function DashboardPage() {
       {dashboard.isLoading ? <DashboardLoading /> : dashboard.isError || !dashboard.data ? (
         <DashboardError onRetry={() => void dashboard.refetch()} />
       ) : (
-        <div className="space-y-5"><ProjectSnapshotPanel snapshot={dashboard.data.project_snapshot} /><CashflowPanel data={dashboard.data} /></div>
+        <div className="space-y-5"><ProjectSnapshotPanel snapshot={dashboard.data.project_snapshot} /></div>
       )}
       <DashboardActivityPanel key={actorID} actorID={actorID} />
       <ReportLinksPanel reports={reports} />

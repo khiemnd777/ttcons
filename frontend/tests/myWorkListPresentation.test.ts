@@ -125,10 +125,9 @@ test('My Work presents source-backed quick filters inside the selected work scop
 });
 
 test('My Work uses the standard mode rail and keeps mobile source actions visible', async () => {
-  const [page, card, accountingQueue] = await Promise.all([
+  const [page, card] = await Promise.all([
     myWorkPageSource(),
     source('../src/modules/work-items/WorkItemCard.tsx'),
-    source('../src/modules/project-finance/AccountingRequestQueue.tsx'),
   ]);
 
   assert.match(page, /<WorkspaceTabs tabs=\{modeTabs\} activeTab=\{mode\}/);
@@ -139,8 +138,7 @@ test('My Work uses the standard mode rail and keeps mobile source actions visibl
   assert.match(page, /window\.matchMedia\('\(max-width: 767px\)'\)\.matches\) onOpen\(entry\.item\)/);
   assert.match(page, /md:max-h-\[720px\] md:overflow-y-auto/);
   assert.match(card, /showMobileActionLabel[\s\S]*<span className="mr-2 md:hidden">\{openLabel\}<\/span>/);
-  assert.match(accountingQueue, /requests\.length === 0\) return null/);
-  assert.match(accountingQueue, /query\.isError && requests\.length === 0[\s\S]*Thử lại/);
+  assert.doesNotMatch(page, /AccountingRequestQueue|accounting_request\.view|accounting-request-queue/);
 });
 
 test('My Work routes the removed accounting-specific quick bucket to the dedicated Accounting lane', async () => {

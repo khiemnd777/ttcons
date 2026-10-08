@@ -12,7 +12,6 @@ test('manual desktop tables keep the blank action header and action cell first',
   const operations = await source('../src/modules/operations/ConstructionWorkspaceLists.tsx');
   const planning = await source('../src/modules/planning/PlanningPage.tsx');
   const handover = await source('../src/modules/handover/HandoverWorkspace.tsx');
-  const journal = await source('../src/modules/accounting/ManualJournalDialog.tsx');
   const warehouse = await source('../src/modules/warehouse/WarehousePage.tsx');
   const quality = await source('../src/modules/quality/QualityPage.tsx');
 
@@ -23,8 +22,6 @@ test('manual desktop tables keep the blank action header and action cell first',
   assert.match(planning, /<tr[^>]*>\s*<th[^>]*><span className="sr-only">Thao tác<\/span><\/th>\s*<th[^>]*>Công việc<\/th>/);
   assert.match(handover, /<tr><th[^>]*><span className="sr-only">Thao tác<\/span><\/th><th[^>]*>Nội dung<\/th>/);
   assert.match(handover, /return <tr><td[^>]*><ChecklistAction/);
-  assert.match(journal, /<tr><th[^>]*><span className="sr-only">Thao tác<\/span><\/th><th[^>]*>Tài khoản/);
-  assert.match(journal, /return <tr[^>]*>\s*<td[^>]*><button[^>]*type="button"/);
   assert.match(warehouse, /<tr><th[^>]*><span className="sr-only">Thao tác<\/span><\/th><th[^>]*>Vật tư<\/th>/);
   assert.match(quality, /<tr><th[^>]*><span className="sr-only">Thao tác<\/span><\/th><th[^>]*>#<\/th>/);
 });

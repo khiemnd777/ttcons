@@ -37,7 +37,6 @@ func registerCommercialRoutes(protected fiber.Router, h *Handler) {
 	protected.Post("/contracts/:id/activate", h.ActivateContract)
 	protected.Post("/contracts/:id/milestones", h.CreateContractMilestone)
 	protected.Post("/contract-milestones/:id/eligible", h.EligibleContractMilestone)
-	protected.Post("/contract-milestones/:id/open-obligation", h.OpenContractMilestoneObligation)
 	protected.Post("/contracts/:id/variations", h.CreateContractVariation)
 	protected.Post("/contract-variations/:id/submit", h.SubmitContractVariation)
 	protected.Post("/contract-variations/:id/qs-review", h.QSReviewContractVariation)
@@ -46,5 +45,4 @@ func registerCommercialRoutes(protected fiber.Router, h *Handler) {
 	protected.Post("/contract-variations/:id/reject", h.RejectContractVariation)
 	protected.Post("/contract-variations/:id/generate-procurement", h.GenerateContractVariationProcurement)
 	protected.Post("/contract-variations/:id/incorporate", h.IncorporateContractVariation)
-	protected.Post("/contract-retentions/:id/release", h.ReleaseContractRetention)
 }

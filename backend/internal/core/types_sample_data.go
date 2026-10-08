@@ -1,6 +1,6 @@
 package core
 
-const sampleDataBlueprintVersion = 4
+const sampleDataBlueprintVersion = 5
 
 const sampleDataUserPassword = "Dev240489."
 
@@ -10,7 +10,6 @@ type SampleDataCreateRequest struct {
 	Profile            string `json:"profile"`
 	ProgressPercent    int    `json:"progress_percent"`
 	PipelineTemplateID string `json:"pipeline_template_id"`
-	AccountingBookID   string `json:"accounting_book_id"`
 	IdempotencyKey     string `json:"idempotency_key"`
 }
 
@@ -46,27 +45,19 @@ type SampleDataPipelineOption struct {
 	SampleUsersReady         bool                     `json:"sample_users_ready"`
 	SampleUsersProvisionable bool                     `json:"sample_users_provisionable"`
 	Compatible               bool                     `json:"compatible"`
+	CompletedCompatible      bool                     `json:"completed_compatible"`
+	CompletedBlockers        []SampleDataBlocker      `json:"completed_blockers"`
 	Blockers                 []SampleDataBlocker      `json:"blockers"`
 	RoleCoverage             []SampleDataRoleCoverage `json:"role_coverage"`
 	MissingRoles             []string                 `json:"missing_roles"`
 }
 
-type SampleDataAccountingBookOption struct {
-	ID           string              `json:"id"`
-	Code         string              `json:"code"`
-	Name         string              `json:"name"`
-	BaseCurrency string              `json:"base_currency"`
-	Compatible   bool                `json:"compatible"`
-	Blockers     []SampleDataBlocker `json:"blockers"`
-}
-
 type SampleDataOptions struct {
-	Ready             bool                             `json:"ready"`
-	BlueprintVersion  int                              `json:"blueprint_version"`
-	ProgressPresets   []int                            `json:"progress_presets"`
-	Pipelines         []SampleDataPipelineOption       `json:"pipelines"`
-	AccountingBooks   []SampleDataAccountingBookOption `json:"accounting_books"`
-	EnvironmentPolicy string                           `json:"environment_policy"`
+	Ready             bool                       `json:"ready"`
+	BlueprintVersion  int                        `json:"blueprint_version"`
+	ProgressPresets   []int                      `json:"progress_presets"`
+	Pipelines         []SampleDataPipelineOption `json:"pipelines"`
+	EnvironmentPolicy string                     `json:"environment_policy"`
 }
 
 type sampleDataStaffActor struct {
@@ -112,17 +103,6 @@ type sampleDataBlueprint struct {
 	Actors   map[string][]sampleDataStaffActor
 }
 
-type sampleDataAccountingContext struct {
-	ID               string
-	Code             string
-	Name             string
-	BaseCurrency     string
-	BankAccountID    string
-	CostAccountID    string
-	RevenueAccountID string
-	HasOpenPeriod    bool
-}
-
 type sampleDataArtifact struct {
 	ID       string
 	Provider string
@@ -157,32 +137,36 @@ type sampleDataPlannedNode struct {
 	Steps      []sampleDataPlannedStep
 }
 
+type sampleDataPlannedCheck struct {
+	ItemID, WorkItemID, CheckID string
+	Source                      Record
+	Actor                       sampleDataStaffActor
+	Evidence                    sampleDataArtifact
+}
+
 type sampleDataPlan struct {
-	GenerationID      string
-	ProjectID         string
-	RunID             string
-	Profile           string
-	ProgressPercent   int
-	ProjectCode       string
-	ProjectName       string
-	ProjectStatus     string
-	CurrentNodeID     string
-	CompletedAt       string
-	TemplateID        string
-	TemplateHash      string
-	TemplateRevision  int
-	SelectedStepCount int
-	AccountingBookID  string
-	BankAccountID     string
-	CostAccountID     string
-	RevenueAccountID  string
-	Nodes             []sampleDataPlannedNode
-	Edges             []Record
-	Actors            map[string][]sampleDataStaffActor
-	AllActors         []sampleDataStaffActor
-	ActorID           string
-	ActorName         string
-	GeneratorID       string
-	GeneratorName     string
-	IdempotencyKey    string
+	GenerationID       string
+	ProjectID          string
+	RunID              string
+	Profile            string
+	ProgressPercent    int
+	ProjectCode        string
+	ProjectName        string
+	ProjectStatus      string
+	CurrentNodeID      string
+	CompletedAt        string
+	TemplateID         string
+	TemplateHash       string
+	TemplateRevision   int
+	SelectedStepCount  int
+	Nodes              []sampleDataPlannedNode
+	ConstructionChecks []sampleDataPlannedCheck
+	Edges              []Record
+	Actors             map[string][]sampleDataStaffActor
+	AllActors          []sampleDataStaffActor
+	ActorID            string
+	ActorName          string
+	GeneratorID        string
+	GeneratorName      string
+	IdempotencyKey     string
 }

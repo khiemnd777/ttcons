@@ -1,5 +1,18 @@
 # Workflow Orchestration Domain Map
 
+## Current Accounting Retirement Boundary — V150/V151
+
+- V150 withdraws obsolete definitions and removes APAR/invoice/payment scaffolds and financial_ready edges. Unknown execution/source actions fail closed with a visible blocker.
+- Construction has no collected-money threshold; issued-material blocker remains. Current Rev9 design/BOQ/commercial/construction/reconciliation/acceptance/physical handover gates remain canonical.
+- source.accounting_handoff_close_ready still requires physical handover and all current candidate dossiers acknowledged; acknowledgement is not payment. Physical handover has no internal finance flags or queries.
+- Sample v5 creates/validates current sources before committing terminal statuses; no status bypass or synthetic MISA. Existing approval/audit/form/runtime invariants remain.
+
+## Developer Project Observation Boundary
+
+- `WorkItemAccessProfile.IsDeveloper` identifies only the active global internal system Developer; `profileCanObserveAllProjectWork` permits full project Work Item/timeline/evidence/activity reads, including sample projects. The mixed Developer/Deputy read predicate preserves Developer sample-project observation.
+- `IsManager`, Admin/Director/PM identity, `UserHasProjectScope`, `CanActOnWorkItem`, `IsWorkItemResponsible`, approval eligibility and personal responsibility queues are not broadened. Global technical observation never becomes execution/approval or ownership. Source functional permissions and all existing workflow state/signature/gate/immutable-history constraints still apply to writes.
+- Owners: `repository_access.go`, `repository_work_item{_activity,_queries}.go`; regression `developer_project_access_test.go`. No route, schema, template or historical snapshot mutation.
+
 ## Project Manager Label Compatibility
 
 - Current role presentation uses Quản lý dự án for `pm`. Stored PM / Project Manager labels remain valid in template/run/work-item responsibilities and approval requirements; V149 does not rewrite any historical definition or runtime copy.
@@ -101,7 +114,6 @@
 - Engine v2 steps snapshot `surface_kind` and `domain_action_key`; the backend target resolver uses those stable keys before node/surface fallback and never routes by user-visible display text.
 - Official contract steps 24 and 29-31/33 use `surface_kind='contract'`; step 32 remains the approval surface. Pending runtime steps receive the new surface/permission snapshot, while completed historical steps are not rewritten.
 - Official quality steps 36-37 use `surface_kind='quality'` with `quality.create` and `quality.recurring_manage`; only pending runtime steps receive the new surface/permission snapshot.
-- Official Rev8 finance-management steps 42-45 and 48-52 use legacy `project_finance.*` permissions and wording for internal cash-request handoff, material-cost capture and management closure. V83 updated future reusable template definitions only; it did not rewrite active/historical runtime artifacts. Rev9 replaces only the final close step with `accounting_handoff.acknowledge` and routes it to `Bàn giao kế toán`; all earlier topology/forms/source ledgers remain unchanged.
 - Submitting `builtin_construction_daily_report` invokes an idempotent operations-ledger bridge in the same transaction before workflow completion payload is persisted. V106 may later deliver that source through the separate authored `work_reports` lifecycle without changing work-item/node completion semantics.
 - The operations timeline consumes that bridge's structured daily-report answers without changing workflow completion semantics. Direct manual reports use their own typed create/update and report-evidence-upload contract, but still do not create work items, workflow form instances, approvals or completion events; new files remain normal work-item evidence. Any report with `workflow_form_instance_id` is read-only in Operations and rejects direct update/upload, preserving the source form as authoritative. `AmendWorkflowForm` resyncs a built-in daily-report source only before its first formal send or while the recipient has set `needs_changes`; `submitted`, `acknowledged` and pre-V106 read-only sources reject amendment. Formal resubmission then snapshots a new immutable work-report revision, never rewriting the earlier revision. Legacy summary rows remain readable. Outgoing work-item acceptance and the project acceptance workspace share `AcceptanceEditor.tsx`, while form/signature/PDF gates and work-item action permissions remain authoritative.
 - Engine v2 hard `domain_action_key` automation runs before work-item completion. Blocked/failed outcomes are recorded idempotently and leave the work item incomplete; display-name dispatch remains legacy-only.
@@ -164,13 +176,8 @@
 - Check template authoring, runtime copies, work-item gates, activity, and frontend status labels together when changing workflow transitions.
 - Do not let convenience UI bypass approval, required-form, evidence, signature, PDF, material, receivable, or blocker gates.
 
-## Golden Sample
+## Current Sample Data
 
-- `GOLDEN-REAL-001` and `GOLDEN-NO-DESIGN-001` jointly cover all 12 official nodes, 52 steps and 51 form-bound steps. The flagship skips the no-design BOQ node; the companion skips the design nodes, preserving real branch semantics.
-- `backend/seed/validate_golden_project.sql` asserts exact form-version submission, required answers, accepted evidence and approval/PDF coverage.
-- `GOLDEN-LIVE-001` snapshots the same official engine-v2 contract at node `Khảo sát`: node 1 is `in_progress`, all 52 run steps are pending, six first-node work items are ready, 51 exact form instances are draft, and no completion evidence or domain ledger is pre-seeded.
-- Golden Live seeds fourteen active App members, including dedicated `Thiết kế`, `Sale` and `Pháp lý` actors. PM has the `planning.view`/`planning.edit` permission required by its assigned official steps; the inactive client fixture is not an actor or project member.
-- `GOLDEN-REV6-LEAN-001` (project/run `...026`) is the additive Rev6 lean-form review runtime. It preserves the exact published template/hash at engine 4, records a submitted `entry_route=survey_required` intake, keeps Survey current with six ready work items and later work pending, and snapshots all 50 form-backed steps with 43 `lean_capture_v2` instances. It must not rebind Batch3 or any historical Golden runtime.
 - Official seeded approval policies must use V46 keys (`roles`, `quorum`, `requester_cannot_approve`, `comment_required`, `signature_required`) and mode `any`; legacy aliases such as `required_roles` are invalid for runtime approval normalization.
 
 ## Official Client Workflow Rev3
@@ -179,7 +186,6 @@
 - The Rev3 root uses legacy `project_entry_mode`: `survey_required` follows Survey -> Review/Meeting -> optional Design; `client_boq` requires an active `client_boq` project document and enters the BOQ-without-design node directly. This condition is compatibility-only and must not return to the authoring catalog.
 - Outbound contract is before takeoff, price sourcing, negotiation, input contract, planning and construction. Its runtime gate requires an immutable App signature link, paper dispatch and returned signed scan. UI completion or a legacy `signed` status alone cannot satisfy it.
 - Rev3 role snapshots distinguish `Giám sát` field ownership from `QA/QC` client quality-dossier ownership. Contract steps snapshot QS, Kế toán, Pháp lý, Mua hàng, Bộ phận HĐ, PM and Giám đốc.
-- `GOLDEN-REV3-BOQ-001` (project `...023`) is the untouched client-BOQ runtime fixture: 15 nodes, 51 work items and 49 draft forms. Project 022 remains bound to its original engine-2 runtime as the preservation regression.
 
 ## Official Client Workflow Rev4
 
@@ -187,7 +193,6 @@
 - Rev4 keeps the same 15 unique node business codes, 16 edges and 51 unique step business codes. It adds `Mua hàng` beside QS at `boq_without_design.pricing`, makes `planning.client_quality_file` QA/QC-owned with checklist+document evidence, and makes `construction.item_reporting` Giám sát-owned with checklist+photo evidence.
 - `report_config_json` contains only the approved client-node-to-Rev4-business-code appendix definition (14 references, including the split client Node 6). It is presentation metadata, excluded from runtime/UAT reporting and from the definition hash.
 - V87 preserves Rev3 and corrects only Rev4 `planning.client_quality_file` from the misleading `daily_report` type to document-backed `document_upload`; its published checklist form, quality surface, role and evidence gates remain intact.
-- `GOLDEN-REV4-ENTRY-001` (project `...024`) is the untouched entry-state control on Rev4/engine 3. `GOLDEN-REV4-CONSTRUCTION-001` (project `...025`) is an explicit synthetic construction-stage UX fixture: all non-construction nodes remain pending and only `construction.item_reporting` is ready. Neither fixture rebinds a legacy runtime or changes the template definition.
 
 ## Official Client Workflow Rev5
 
@@ -203,9 +208,6 @@
 
 - V102 publishes immutable engine-4 template `40000000-0000-0000-0000-000000000025` from Rev5. It preserves all 15 node codes, 51 step codes, Connector routing, intake form, branch-decision form, built-in forms and domain surfaces; only 43 step occurrences backed by the V41 business-form set are remapped to lean V2.
 - The 45 lean form definitions remain independently published even when a current Rev5 step no longer references four legacy forms. This is reference-data evolution, not an in-place rewrite; Rev5, existing runs, form instances, answers, signatures, seals, PDFs, activities and audit history remain untouched.
-- Only projects still selecting Rev5 with no `pipeline_runs` move to Rev6. The local/dev seed sequence reapplies V92 and V102 after reset so Rev6 remains available without rebinding Golden Rev4 runtime fixtures.
-- Seed parity must reapply V41 before V66 so the later immutable revisions clone the official business-form mappings rather than the seed file's legacy generic-form references; V92 and V102 then restore the latest published routing/form revision.
-- `backend/seed/golden_client_workflow_rev6_lean.sql` creates the idempotent `GOLDEN-REV6-LEAN-001` Survey-state runtime after V102; `backend/seed/validate_golden_project.sql` asserts its 15 nodes, 51 steps/work items, exact form versions, 50 instances, 43 lean references and absence of the five removed universal fields.
 
 ## Official Client Workflow Rev7
 
@@ -213,20 +215,15 @@
 - `validation_json.default_source` drives server `suggested_answers` for current date, actor name and step title without overwriting persisted answers. `capture_mode=optional` is presentation metadata only; required/conditional validation remains server-authoritative.
 - Rev7 runtime presentation may alias the labels/help text of exact `operational_capture_v3` form-code/field-key pairs, but must not mutate published form versions, field keys, stored answers or historical runtimes. The shared workflow-form renderer keeps primary and `Thông tin bổ sung` fields in one explicit column at every breakpoint.
 - Hard automation membership follows the official `template_family_id=...020`, not only the original template ID. Rev7 `source.*` and existing domain actions run fail-closed before completion; work-item detail exposes the same read-only source status through `business_source`.
-- `GOLDEN-REV7-OPS-001` (project/run `...027`) is the additive Survey-state Rev7 fixture. It contains 15 nodes, 50 work items/steps, 27 exact form instances and 22 explicit source/action-only steps.
 
 ## Official Client Workflow Rev8
 
 - V105 publishes immutable engine-4 template `40000000-0000-0000-0000-000000000027` from Rev7. It preserves all 15 nodes and 16 connectors but replaces 50 step declarations with 21 work packages: design path 20, post-survey no-design path 18 and direct client-BOQ path 15. Exactly one primary role owns each step; only `survey_review` and `handover_finance` retain node approval policies.
 - Four published `operational_capture_v3` work-package forms combine Survey, Design, construction planning and subcontractor acceptance fields. Their source Rev7 versions and every existing run/form remain immutable; only projects selecting Rev7 with no run move to Rev8.
-- Rev8 composite source gates return server-owned `business_source.checks` for input contract, subcontractor acceptance, final acceptance, physical handover and project-finance close. The UI may present these facts but completion remains fail-closed in `RunRequiredWorkflowAutomationForWorkItem`.
-- In Rev8, physical handover and legacy project-finance close are distinct steps. The handover step still requires final acceptance, required documents, closed issues/NCR/rework/actions, warehouse closure and handled surplus; pending project material costs/cash requests block only `closure.finance`. Rev9 retains the split but replaces those legacy blockers with acknowledged source dossiers. Rev7 and historical runs retain their pinned gate semantics.
-- `GOLDEN-REV8-LEAN-001` (project/run `...028`) is the additive Survey-state fixture with 15 nodes, 21 work items/steps, 15 exact form instances and six source/action-only steps.
 
 ## Official Client Workflow Rev9
 
 - V131 publishes immutable engine-4 template `40000000-0000-0000-0000-000000000028` by cloning Rev8's 15 nodes, 16 connectors, 21 steps, form bindings and two node approval policies. It changes only the final step to `Xác nhận bàn giao hồ sơ kế toán`, permission `accounting_handoff.acknowledge`, action `source.accounting_handoff_close_ready`.
-- Only projects still selecting Rev8 with no run and no live legacy `project_material_costs`/`project_cash_requests` adopt Rev9. Existing Rev8 projects with legacy records and every active/historical run remain pinned; runtime steps, work items, answers, approvals, audits and PDFs are never rewritten.
 - Rev9 final completion is fail-closed on physical handover plus every current Procurement/main-client milestone candidate being `acknowledged`. The source gate does not post a journal, record payment/tax, mutate Procurement/Contract state or call MISA.
 - Workflow Form draft/submission and Work Item execution remain distinct records but share one first-write transaction: after normal validation/scope/permission/current-node checks, the first successful save or submit transitions an active `ready|needs_changes` Work Item to `in_progress`, sets `started_at`, synchronizes its run step and records one `started` activity/audit. Opening/read-only access and failed writes never start work; future unstarted items still require the explicit early-start reason and snapshot token. Submission does not complete the Work Item or bypass form/evidence/approval/domain automation gates.
 - A direct Operations construction report is a second approved first-work surface, not a client-side shortcut around Work Item lifecycle. After ordinary report validation plus actor action scope and exact current construction-Node recheck, its repository transaction inserts the report and applies the same shared `persistWorkItemStartedTx` invariant for `pending|ready|needs_changes`; `in_progress` is idempotent and `blocked` remains blocked. The transition synchronizes only the linked Work Item/Run Step and writes source-tagged activity/audit; it never advances the Node/run pointer, completes the item or clears blockers. Report edit and the form-backed bridge do not repeat the transition. Historical report-linked ready items are not backfilled without a separate reviewed repair.

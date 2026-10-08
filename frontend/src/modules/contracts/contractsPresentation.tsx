@@ -28,10 +28,6 @@ export function milestoneEligibleAction(row: ContractMilestone): NonNullable<Act
   return { title: 'Xác nhận mốc đủ điều kiện', description: row.milestone_name, endpoint: `/contract-milestones/${row.id}/eligible`, success: 'Đã xác nhận mốc đủ điều kiện' };
 }
 
-export function milestoneObligationAction(row: ContractMilestone): NonNullable<ActionDialog> {
-  return { title: 'Mở công nợ từ mốc thanh toán', description: `${row.milestone_name} · sau giữ lại ${currency(row.net_amount)}`, endpoint: `/contract-milestones/${row.id}/open-obligation`, success: 'Đã mở công nợ từ mốc thanh toán' };
-}
-
 export function variationSubmitAction(row: ContractVariation): NonNullable<ActionDialog> {
   return { title: 'Gửi QS rà soát phát sinh', description: row.title, endpoint: `/contract-variations/${row.id}/submit`, success: 'Đã gửi phát sinh cho QS' };
 }
@@ -95,11 +91,6 @@ export function dispatchMethodLabel(method?: string) {
 export function acceptanceLabel(row: ContractMilestone) {
   if (!row.acceptance_required) return 'Không yêu cầu';
   return row.acceptance_id ? 'Có nghiệm thu liên kết' : 'Thiếu hồ sơ nghiệm thu';
-}
-
-export function obligationLabel(row: ContractMilestone) {
-  if (!row.obligation_id) return null;
-  return `${directionLabel(row.obligation_type)} · Đã mở công nợ`;
 }
 
 export function contractStatusLabel(status?: string) {

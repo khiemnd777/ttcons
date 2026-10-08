@@ -11,8 +11,7 @@ const destinations: [RecordKind, string][] = [
   ['acceptance', '/acceptance'], ['handover', '/handover'], ['stock_movement', `/source-records/stock_movement/${id}`],
   ['rework', '/rework'], ['supplier_quotation', '/boq'], ['stock_document', '/warehouse'], ['partner', '/core-data/output'],
   ['replanning', '/rework'], ['planning_daily_report', `/work-items/${other}`], ['meeting_minutes', `/work-items/${other}`],
-  ['planning_checklist', `/work-items/${other}`], ['role', '/roles'], ['audit', '/audit'], ['payable', '/debt/payables'],
-  ['receivable', '/debt/receivables'], ['payment', `/source-records/payment/${id}`],
+  ['planning_checklist', `/work-items/${other}`], ['role', '/roles'], ['audit', '/audit'],
 ];
 for (const [kind, suffix] of destinations) test(`${kind}: exact destination retains source identity`, () => {
   const url = new URL(recordPath(target(kind))!, 'http://localhost');
@@ -38,7 +37,7 @@ test('invalid IDs and URLs never produce navigation or data reads', async () => 
 });
 
 test('exact ID selection never falls back to the first row or crosses projects', () => {
-  const t = target('payable');
+  const t = target('rework');
   const exact = { id, project_id: projectId, status: 'approved' };
   assert.equal(selectSourceRecord(t, [{ ...exact, id: other }, exact]), exact);
   for (const rows of [[], [{ ...exact, id: other }], [{ ...exact, project_id: other }], [{ ...exact, status: 'cancelled' }], [{ ...exact, deleted_at: '2026-01-01' }]]) {
@@ -76,7 +75,6 @@ test('links respect destination permission and excluded accounting-observer acce
   assert.equal(canOpenRecord(target('procurement_request'), permissions('project.view', 'procurement.view')), true);
   assert.equal(canOpenRecord(target('stock_document'), permissions('project.view', 'material.view')), false);
   assert.equal(canOpenRecord(target('audit'), permissions('project.view', 'audit.view', 'project.reconciliation.view')), false);
-  assert.equal(canOpenRecord(target('payment'), permissions('accounting.payment_approve')), true);
   assert.equal(canOpenRecord(target('incoming_acceptance'), permissions('warehouse.view')), true);
 });
 

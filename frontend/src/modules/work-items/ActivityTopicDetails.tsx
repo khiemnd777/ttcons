@@ -83,9 +83,6 @@ const topicFields: Partial<Record<ActivityTopicScope, Field[]>> = {
   acceptance: [text('acceptance_code', 'Mã biên bản'), text('title', 'Nghiệm thu'), status, result, text('location', 'Vị trí'), date('acceptance_date', 'Ngày nghiệm thu'), text('client_representative', 'Đại diện chủ đầu tư'), text('contractor_representative', 'Đại diện nhà thầu'), text('scope_summary', 'Phạm vi'), text('notes', 'Ghi chú')],
   rework: [text('title', 'Sửa lỗi'), text('description', 'Mô tả'), date('due_date', 'Hạn xử lý'), status],
   handover: [status, date('handover_date', 'Ngày dự kiến'), text('final_acceptance_title', 'Nghiệm thu cuối'), text('client_representative', 'Đại diện chủ đầu tư'), text('company_representative', 'Đại diện nhà thầu'), text('notes', 'Ghi chú'), timestamp('completed_at', 'Hoàn tất')],
-  payable: [text('payable_code', 'Mã phải trả'), text('vendor_name', 'Nhà cung cấp / đối tác'), status, money('gross_amount', 'Giá trị'), money('paid_amount', 'Đã trả'), money('remaining_amount', 'Còn phải trả'), date('due_date', 'Hạn thanh toán'), text('notes', 'Ghi chú')],
-  receivable: [text('receivable_code', 'Mã phải thu'), text('client_name', 'Khách hàng'), status, text('milestone_name', 'Đợt thanh toán'), money('gross_amount', 'Giá trị'), money('received_amount', 'Đã thu'), money('remaining_amount', 'Còn phải thu'), date('due_date', 'Hạn thanh toán')],
-  payment: [text('payment_code', 'Mã phiếu'), { key: 'payment_type', label: 'Loại phiếu', render: row => enumLabel('payment_type', row.payment_type) }, status, money('amount', 'Số tiền'), { key: 'payment_method', label: 'Phương thức', render: row => enumLabel('payment_method', row.payment_method) }, timestamp('paid_at', 'Đã thanh toán'), timestamp('created_at', 'Ngày lập')],
 };
 const acceptanceFields: Field[] = [text('title', 'Tiêu chí'), text('description', 'Mô tả'), { key: 'decision', label: 'Kết luận', render: row => row.decision ? <StatusBadge status={row.decision} /> : '—' }, text('required_action', 'Yêu cầu xử lý'), date('due_date', 'Hạn xử lý'), text('note', 'Ghi chú')];
 const handoverFields: Field[] = [text('title', 'Nội dung'), status, text('notes', 'Ghi chú'), timestamp('verified_at', 'Đã xác minh')];
@@ -96,21 +93,16 @@ const topicSections: Partial<Record<ActivityTopicScope, { title: string; keys: s
   acceptance: [{ title: 'Phạm vi nghiệm thu', keys: ['location', 'acceptance_date', 'scope_summary'] }, { title: 'Các bên tham gia', keys: ['client_representative', 'contractor_representative'] }, { title: 'Ghi chú', keys: ['notes'] }],
   rework: [{ title: 'Nội dung cần xử lý', keys: ['description', 'due_date'] }],
   handover: [{ title: 'Nguồn & thời hạn bàn giao', keys: ['final_acceptance_title', 'handover_date', 'completed_at'] }, { title: 'Các bên tham gia', keys: ['client_representative', 'company_representative'] }, { title: 'Ghi chú', keys: ['notes'] }],
-  payable: [{ title: 'Đối tác & thời hạn', keys: ['vendor_name', 'due_date'] }, { title: 'Giá trị đối chiếu', keys: ['gross_amount', 'paid_amount', 'remaining_amount'] }, { title: 'Ghi chú', keys: ['notes'] }],
-  receivable: [{ title: 'Khách hàng & kỳ thu', keys: ['client_name', 'milestone_name', 'due_date'] }, { title: 'Giá trị đối chiếu', keys: ['gross_amount', 'received_amount', 'remaining_amount'] }],
-  payment: [{ title: 'Thông tin phiếu', keys: ['payment_type', 'payment_method', 'paid_at', 'created_at'] }],
 };
 
 export function TopicRecordSummary({ topic, record }: { topic: ActivityTopic; record: Record<string, any> }) {
-  const amountKey = topic.scope === 'payable' || topic.scope === 'receivable' ? 'remaining_amount' : topic.scope === 'payment' ? 'amount' : '';
-  const amountLabel = topic.scope === 'payable' ? 'Còn phải trả' : topic.scope === 'receivable' ? 'Còn phải thu' : 'Số tiền';
-  const code = record.acceptance_code || record.movement_code || record.payable_code || record.receivable_code || record.payment_code;
+  const code = record.acceptance_code || record.movement_code;
   const movement = topic.scope === 'stock_movement';
   return <RecordSummary eyebrow={code} title={movement ? record.material_name || topic.label : record.title || topic.label}
     subtitle={movement ? enumLabel('movement_type', record.movement_type) : undefined}
     status={record.status || (topic.scope === 'acceptance' && record.result) ? <div className="flex flex-wrap gap-2">{record.status ? <StatusBadge status={record.status} /> : null}{topic.scope === 'acceptance' && record.result ? <StatusBadge status={record.result} /> : null}</div> : undefined}
-    value={movement ? `${record.quantity == null ? '—' : Number(record.quantity).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} ${record.unit ?? ''}` : amountKey ? record[amountKey] == null ? '—' : <CurrencyText value={record[amountKey]} /> : undefined}
-    valueLabel={movement ? 'Số lượng luân chuyển' : amountLabel} />;
+    value={movement ? `${record.quantity == null ? '—' : Number(record.quantity).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} ${record.unit ?? ''}` : undefined}
+    valueLabel={movement ? 'Số lượng luân chuyển' : undefined} />;
 }
 
 function Checklist({ rows, fields, onViewSource }: { rows: unknown; fields: Field[]; onViewSource?: (row: ChecklistItem) => void }) {

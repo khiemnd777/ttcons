@@ -648,9 +648,9 @@ func TestActivityTargetTableFirstPassScopes(t *testing.T) {
 		{scope: "acceptance", table: "acceptance_records", ok: true},
 		{scope: "rework", table: "rework_requests", ok: true},
 		{scope: "handover", table: "handover_records", ok: true},
-		{scope: "payable", table: "payables", ok: true},
-		{scope: "receivable", table: "receivables", ok: true},
-		{scope: "payment", table: "payments", ok: true},
+		{scope: "payable", ok: false},
+		{scope: "receivable", ok: false},
+		{scope: "payment", ok: false},
 		{scope: "daily_report", ok: false},
 	}
 	for _, tt := range tests {

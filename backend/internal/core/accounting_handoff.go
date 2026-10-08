@@ -8,40 +8,6 @@ import (
 	"strings"
 )
 
-func (r *Repository) ProjectFinanceMode(ctx context.Context, projectID string) (string, error) {
-	row, err := r.QueryOne(ctx, `
-		SELECT CASE
-		WHEN EXISTS (
-			SELECT 1
-			FROM pipeline_runs run
-			JOIN pipeline_run_nodes node ON node.run_id=run.id
-			JOIN pipeline_run_steps step ON step.run_node_id=node.id
-			WHERE run.project_id=$1 AND run.status='in_progress'
-			  AND step.domain_action_key='source.accounting_handoff_close_ready'
-		) THEN false
-		WHEN EXISTS (
-			SELECT 1
-			FROM pipeline_runs run
-			JOIN pipeline_run_nodes node ON node.run_id=run.id
-			JOIN pipeline_run_steps step ON step.run_node_id=node.id
-			WHERE run.project_id=$1 AND run.status='in_progress'
-			  AND step.domain_action_key='source.project_finance_close_ready'
-		) THEN true
-		ELSE EXISTS (
-			SELECT 1 FROM project_material_costs WHERE project_id=$1 AND status <> 'cancelled'
-		) OR EXISTS (
-			SELECT 1 FROM project_cash_requests WHERE project_id=$1 AND status <> 'cancelled'
-		) END AS legacy
-	`, projectID)
-	if err != nil {
-		return "", err
-	}
-	if boolValue(row["legacy"]) {
-		return "legacy", nil
-	}
-	return "handoff", nil
-}
-
 func (r *Repository) AccountingHandoffCandidates(ctx context.Context, projectID string) ([]Record, error) {
 	return r.Query(ctx, `
 		WITH procurement_sources AS (
@@ -76,7 +42,7 @@ func (r *Repository) AccountingHandoffCandidates(ctx context.Context, projectID 
 			       milestone.milestone_name AS source_title,contract.counterparty_name,
 			       milestone.net_amount AS reference_amount,contract.currency,
 			       milestone.status AS source_status,NULL::text AS order_reference,
-			       (milestone.status IN ('active','eligible','obligation_opened','paid')) AS status_ready,
+			       (milestone.status IN ('active','eligible')) AS status_ready,
 			       (NULLIF(btrim(contract.counterparty_name),'') IS NOT NULL) AS counterparty_ready,
 			       ((NOT milestone.acceptance_required) OR EXISTS (
 			          SELECT 1 FROM acceptance_records acceptance
@@ -89,7 +55,7 @@ func (r *Repository) AccountingHandoffCandidates(ctx context.Context, projectID 
 			JOIN contracts contract ON contract.id=milestone.contract_id
 			WHERE contract.project_id=$1 AND contract.direction='receivable'
 			  AND contract.contract_type='main_client' AND contract.status IN ('active','completed')
-			  AND milestone.status IN ('active','eligible','obligation_opened','paid')
+			  AND milestone.status IN ('active','eligible')
 		), sources AS (
 			SELECT * FROM procurement_sources
 			UNION ALL
@@ -435,7 +401,7 @@ func accountingHandoffSourceTx(ctx context.Context, tx *sql.Tx, projectID, sourc
 			       milestone.milestone_code AS source_code,milestone.milestone_name AS source_title,
 			       contract.counterparty_name,milestone.net_amount AS reference_amount,contract.currency,
 			       milestone.status AS source_status,milestone.acceptance_required,milestone.acceptance_id,
-			       (milestone.status IN ('active','eligible','obligation_opened','paid')
+			       (milestone.status IN ('active','eligible')
 			        AND NULLIF(btrim(contract.counterparty_name),'') IS NOT NULL
 			        AND ((NOT milestone.acceptance_required) OR EXISTS (
 			          SELECT 1 FROM acceptance_records acceptance

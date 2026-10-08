@@ -93,7 +93,7 @@ var (
 	}
 	projectFinanceWorkItemPolicy = workItemDomainMutationPolicy{
 		Mutation:   "project_finance_updated",
-		ActionKeys: []string{"source.project_finance_close_ready", "source.accounting_handoff_close_ready"},
+		ActionKeys: []string{"source.accounting_handoff_close_ready"},
 		Workspaces: []string{executionWorkspaceProjectFinance},
 	}
 )

@@ -455,9 +455,6 @@ var activityTargetScopes = map[string]bool{
 	"acceptance":          true,
 	"rework":              true,
 	"handover":            true,
-	"payable":             true,
-	"receivable":          true,
-	"payment":             true,
 }
 
 var activityAttentionQueues = map[string]bool{

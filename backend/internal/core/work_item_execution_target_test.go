@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -54,16 +55,16 @@ func TestWorkItemExecutionTargetUsesCanonicalBusinessWorkspace(t *testing.T) {
 			action:     "Mở thi công",
 		},
 		{
-			name: "finance source retains its domain query",
+			name: "accounting handoff source retains its domain query",
 			item: Record{
-				"id": "work-4", "project_id": "project-1", "domain_action_key": "source.receivable_ready",
+				"id": "work-4", "project_id": "project-1", "domain_action_key": "source.accounting_handoff_close_ready",
 			},
 			source:     Record{"route": "/projects/project-1/accounting?tab=tasks", "ready": false, "status": "blocked"},
 			kind:       "domain",
 			workspace:  executionWorkspaceProjectFinance,
 			route:      "/projects/project-1/accounting?tab=tasks&task=work-4",
 			completion: "domain_gate",
-			action:     "Mở tài chính công trình",
+			action:     "Mở bàn giao kế toán",
 		},
 		{
 			name:       "unknown legacy work fails closed to detail",
@@ -145,18 +146,6 @@ func TestWorkItemExecutionTargetUsesCanonicalBusinessWorkspace(t *testing.T) {
 			action:     "Mở nghiệm thu",
 		},
 		{
-			name: "Rev8 finance close opens project finance",
-			item: Record{
-				"id": "work-12", "project_id": "project-1", "domain_action_key": "source.project_finance_close_ready",
-			},
-			source:     Record{"route": "/projects/project-1/accounting?tab=tasks", "ready": false, "status": "blocked"},
-			kind:       "domain",
-			workspace:  executionWorkspaceProjectFinance,
-			route:      "/projects/project-1/accounting?tab=tasks&task=work-12",
-			completion: "domain_gate",
-			action:     "Mở tài chính công trình",
-		},
-		{
 			name: "Rev9 accounting handoff opens lean workspace",
 			item: Record{
 				"id": "work-13", "project_id": "project-1", "domain_action_key": "source.accounting_handoff_close_ready",
@@ -192,7 +181,7 @@ func TestWorkItemExecutionTargetUsesCanonicalBusinessWorkspace(t *testing.T) {
 	}
 }
 
-func TestRev8EveryWorkItemHasOneExecutionTarget(t *testing.T) {
+func TestRev9EveryWorkItemHasOneExecutionTarget(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
@@ -206,12 +195,12 @@ func TestRev8EveryWorkItemHasOneExecutionTarget(t *testing.T) {
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
 	})
-	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev8 Target Admin','active')`, actorID, "rev8-target-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev8 Target Admin',$3,'management','active')`, staffID, actorID, "rev8-target-staff-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev9 Target Admin','active')`, actorID, "rev9-target-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev9 Target Admin',$3,'management','active')`, staffID, actorID, "rev9-target-staff-"+actorID+"@test.local")
 	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, actorID, adminRoleID)
-	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev8 Execution Target',$2,'Client','planning','40000000-0000-0000-0000-000000000027')`, projectID, "R8T-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev9 Execution Target',$2,'Client','planning','40000000-0000-0000-0000-000000000028')`, projectID, "R9T-"+projectID[:8])
 	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, staffID)
-	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000027", actorID, "Rev8 Target Admin"); err != nil {
+	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000028", actorID, "Rev9 Target Admin"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -220,7 +209,7 @@ func TestRev8EveryWorkItemHasOneExecutionTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(items) != 21 {
-		t.Fatalf("Rev8 work item count=%d want 21", len(items))
+		t.Fatalf("Rev9 work item count=%d want 21", len(items))
 	}
 	attachExecutionTargets(items)
 	workspaceCounts := map[string]int{}
@@ -230,7 +219,7 @@ func TestRev8EveryWorkItemHasOneExecutionTarget(t *testing.T) {
 			t.Fatalf("work item %s has incomplete execution target: %#v", cleanID(item["id"]), target)
 		}
 		if cleanID(target["workspace"]) == executionWorkspaceWorkItem {
-			t.Fatalf("official Rev8 work item %s fell back to generic detail: %#v", cleanID(item["id"]), target)
+			t.Fatalf("official Rev9 work item %s fell back to generic detail: %#v", cleanID(item["id"]), target)
 		}
 		workspaceCounts[cleanID(target["workspace"])]++
 	}
@@ -247,7 +236,7 @@ func TestRev8EveryWorkItemHasOneExecutionTarget(t *testing.T) {
 	}
 	for workspace, want := range wantWorkspaceCounts {
 		if got := workspaceCounts[workspace]; got != want {
-			t.Fatalf("Rev8 workspace %s count=%d want %d; all=%#v", workspace, got, want, workspaceCounts)
+			t.Fatalf("Rev9 workspace %s count=%d want %d; all=%#v", workspace, got, want, workspaceCounts)
 		}
 	}
 }
@@ -259,65 +248,27 @@ func TestExecutionRouteWithTaskPreservesExistingQueryAndReplacesTask(t *testing.
 	}
 }
 
-func TestRev7EveryWorkItemHasOneExecutionTarget(t *testing.T) {
+func TestWithdrawnWorkflowsCannotGenerateExecutionTargets(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
-	actorID := newID()
-	staffID := newID()
-	projectID := newID()
-	adminRoleID := ensureRole(t, db, "admin", "Admin")
-	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, actorID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
-	})
-	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Execution Target Admin','active')`, actorID, "execution-target-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Execution Target Admin',$3,'management','active')`, staffID, actorID, "execution-target-staff-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, actorID, adminRoleID)
-	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev7 Execution Target',$2,'Client','planning','40000000-0000-0000-0000-000000000026')`, projectID, "R7T-"+projectID[:8])
-	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, staffID)
-	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000026", actorID, "Execution Target Admin"); err != nil {
-		t.Fatal(err)
-	}
-
-	items, err := repo.ListProjectOperationsWorkItems(ctx, projectID, actorID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(items) != 50 {
-		t.Fatalf("Rev7 work item count=%d want 50", len(items))
-	}
-	attachExecutionTargets(items)
-	workspaceCounts := map[string]int{}
-	for _, item := range items {
-		target := recordFromAny(item["execution_target"])
-		if cleanID(target["kind"]) == "" || cleanID(target["workspace"]) == "" || cleanID(target["route"]) == "" || cleanID(target["action_label"]) == "" {
-			t.Fatalf("work item %s has incomplete execution target: %#v", cleanID(item["id"]), target)
-		}
-		if cleanID(target["workspace"]) == executionWorkspaceWorkItem && cleanID(target["kind"]) != "approval" {
-			t.Fatalf("official Rev7 non-approval work item %s fell back to generic detail: %#v", cleanID(item["id"]), target)
-		}
-		workspaceCounts[cleanID(target["workspace"])]++
-	}
-	wantWorkspaceCounts := map[string]int{
-		executionWorkspacePreparation:    16,
-		executionWorkspacePlanning:       3,
-		executionWorkspaceBOQ:            4,
-		executionWorkspaceContracts:      6,
-		executionWorkspaceProcurement:    5,
-		executionWorkspaceOperations:     1,
-		executionWorkspaceAcceptance:     6,
-		executionWorkspaceHandover:       1,
-		executionWorkspaceProjectFinance: 8,
-	}
-	for workspace, want := range wantWorkspaceCounts {
-		if got := workspaceCounts[workspace]; got != want {
-			t.Fatalf("Rev7 workspace %s count=%d want %d; all=%#v", workspace, got, want, workspaceCounts)
-		}
-	}
-	if workspaceCounts[executionWorkspaceWarehouse] != 0 || workspaceCounts[executionWorkspaceWorkItem] != 0 {
-		t.Fatalf("Rev7 unexpectedly used warehouse/generic fallback: %#v", workspaceCounts)
+	for _, templateID := range []string{"40000000-0000-0000-0000-000000000026", "40000000-0000-0000-0000-000000000027"} {
+		t.Run(templateID, func(t *testing.T) {
+			fixture := setupProjectScopeFixture(t, db, []string{"project.view", "pipeline.run"})
+			mustExec(t, db, `UPDATE projects SET pipeline_template_id=$2 WHERE id=$1`, fixture.projectID, templateID)
+			assertCount(t, db, `SELECT COUNT(*) FROM pipeline_templates WHERE id=$1 AND status='deleted'`, 1, templateID)
+			_, err := repo.StartPipeline(ctx, fixture.projectID, templateID, fixture.userID, "Withdrawn workflow test")
+			assertValidationError(t, err)
+			var statusErr StatusError
+			if !errors.As(err, &statusErr) {
+				t.Fatalf("withdrawn template error=%v, want StatusError", err)
+			}
+			details := recordFromAny(statusErr.Details)
+			if cleanID(details["template_id"]) != templateID || cleanID(details["status"]) != "deleted" {
+				t.Fatalf("startup must reject the withdrawn template itself: %#v", details)
+			}
+			assertCount(t, db, `SELECT COUNT(*) FROM pipeline_runs WHERE project_id=$1`, 0, fixture.projectID)
+			assertCount(t, db, `SELECT COUNT(*) FROM work_items WHERE project_id=$1`, 0, fixture.projectID)
+		})
 	}
 }

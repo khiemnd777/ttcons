@@ -93,7 +93,7 @@ func (s *Service) MyAccountingWork(ctx context.Context, filter MyAccountingWorkF
 	if err != nil {
 		return nil, err
 	}
-	allowed, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"accounting_handoff.view", "project_finance.view"})
+	allowed, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"accounting_handoff.view"})
 	if err != nil {
 		return nil, err
 	}

@@ -34,7 +34,6 @@ test('official module workspaces share the context bridge and domain items do no
     '../src/modules/warehouse/WarehousePage.tsx',
     '../src/modules/planning/ConstructionHandoffPanel.tsx',
     '../src/modules/handover/HandoverPage.tsx',
-    '../src/modules/project-finance/ProjectFinancePage.tsx',
     '../src/modules/project-finance/AccountingHandoffPage.tsx',
   ].map((path) => readFile(new URL(path, import.meta.url), 'utf8')));
   for (const source of files) {

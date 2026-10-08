@@ -110,7 +110,7 @@ func optionalQueryInt(c *fiber.Ctx, key string) (int, error) {
 }
 
 func (h *Handler) ReportOptions(c *fiber.Ctx) error {
-	if err := h.requirePermission(c, []string{"report.view", "report.finance.view", "accounting.view"}); err != nil {
+	if err := h.requirePermission(c, []string{"report.view"}); err != nil {
 		return err
 	}
 	req, err := projectOptionsRequest(c)
@@ -141,130 +141,9 @@ func projectOptionsRequest(c *fiber.Ctx) (ReportOptionsRequest, error) {
 	}, nil
 }
 
-func (h *Handler) CashflowReport(c *fiber.Ctx) error {
-	permissions := []string{"report.finance.view", "accounting.view"}
-	if err := h.requirePermission(c, permissions); err != nil {
-		return err
-	}
-	req := cashflowReportRequest(c)
-	if req.ProjectID != "" {
-		if !validActivityUUID(req.ProjectID) {
-			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-	}
-	data, err := h.service.CashflowReport(c.Context(), req, actorID(c))
-	if err != nil {
-		return err
-	}
-	return response.OK(c, data)
-}
-func (h *Handler) CashflowReportCSV(c *fiber.Ctx) error {
-	permissions := []string{"report.finance.view", "accounting.view"}
-	if err := h.requirePermission(c, permissions); err != nil {
-		return err
-	}
-	req := cashflowReportRequest(c)
-	if req.ProjectID != "" {
-		if !validActivityUUID(req.ProjectID) {
-			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-	}
-	data, err := h.service.CashflowReport(c.Context(), req, actorID(c))
-	if err != nil {
-		return err
-	}
-	payload, err := cashflowCSV(data)
-	if err != nil {
-		return err
-	}
-	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
-	c.Set(fiber.HeaderContentDisposition, `attachment; filename="cashflow.csv"`)
-	return c.Send(payload)
-}
-func (h *Handler) TaxReport(c *fiber.Ctx) error {
-	permissions := []string{"report.finance.view", "accounting.view"}
-	if err := h.requirePermission(c, permissions); err != nil {
-		return err
-	}
-	req := taxReportRequest(c)
-	if req.ProjectID != "" {
-		if !validActivityUUID(req.ProjectID) {
-			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-	}
-	data, err := h.service.TaxReport(c.Context(), req, actorID(c))
-	if err != nil {
-		return err
-	}
-	return response.OK(c, data)
-}
-func (h *Handler) TaxReportCSV(c *fiber.Ctx) error {
-	permissions := []string{"report.finance.view", "accounting.view"}
-	if err := h.requirePermission(c, permissions); err != nil {
-		return err
-	}
-	req := taxReportRequest(c)
-	if req.ProjectID != "" {
-		if !validActivityUUID(req.ProjectID) {
-			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-	}
-	data, err := h.service.TaxReport(c.Context(), req, actorID(c))
-	if err != nil {
-		return err
-	}
-	payload, err := taxCSV(data)
-	if err != nil {
-		return err
-	}
-	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
-	c.Set(fiber.HeaderContentDisposition, `attachment; filename="tax-report.csv"`)
-	return c.Send(payload)
-}
-func (h *Handler) ProfitReport(c *fiber.Ctx) error {
-	permissions := []string{"report.finance.view", "accounting.view"}
-	if err := h.requirePermission(c, permissions); err != nil {
-		return err
-	}
-	req := profitReportRequest(c)
-	if req.ProjectID != "" {
-		if !validActivityUUID(req.ProjectID) {
-			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-	}
-	data, err := h.service.ProfitReport(c.Context(), req, actorID(c))
-	if err != nil {
-		return err
-	}
-	return response.OK(c, data)
-}
-func (h *Handler) ProfitReportCSV(c *fiber.Ctx) error {
-	permissions := []string{"report.finance.view", "accounting.view"}
-	if err := h.requirePermission(c, permissions); err != nil {
-		return err
-	}
-	req := profitReportRequest(c)
-	if req.ProjectID != "" {
-		if !validActivityUUID(req.ProjectID) {
-			return validationError("project_id không hợp lệ", Record{"project_id": req.ProjectID})
-		}
-	}
-	data, err := h.service.ProfitReport(c.Context(), req, actorID(c))
-	if err != nil {
-		return err
-	}
-	payload, err := profitCSV(data)
-	if err != nil {
-		return err
-	}
-	c.Set(fiber.HeaderContentType, "text/csv; charset=utf-8")
-	c.Set(fiber.HeaderContentDisposition, `attachment; filename="profit-report.csv"`)
-	return c.Send(payload)
-}
 func (h *Handler) ProjectReport(c *fiber.Ctx) error     { return h.report(c, "projects") }
 func (h *Handler) WarehouseReport(c *fiber.Ctx) error   { return h.report(c, "warehouse") }
 func (h *Handler) ProcurementReport(c *fiber.Ctx) error { return h.report(c, "procurement") }
-func (h *Handler) AccountingReport(c *fiber.Ctx) error  { return h.report(c, "accounting") }
 func (h *Handler) StaffReport(c *fiber.Ctx) error       { return h.report(c, "staff") }
 func (h *Handler) ProjectReportCSV(c *fiber.Ctx) error  { return h.reportCSV(c, "projects") }
 func (h *Handler) WarehouseReportCSV(c *fiber.Ctx) error {
@@ -272,9 +151,6 @@ func (h *Handler) WarehouseReportCSV(c *fiber.Ctx) error {
 }
 func (h *Handler) ProcurementReportCSV(c *fiber.Ctx) error {
 	return h.reportCSV(c, "procurement")
-}
-func (h *Handler) AccountingReportCSV(c *fiber.Ctx) error {
-	return h.reportCSV(c, "accounting")
 }
 func (h *Handler) StaffReportCSV(c *fiber.Ctx) error { return h.reportCSV(c, "staff") }
 
@@ -329,75 +205,11 @@ func operationalReportRequest(c *fiber.Ctx) (OperationalReportRequest, error) {
 	}, nil
 }
 
-func cashflowReportRequest(c *fiber.Ctx) CashflowReportRequest {
-	return CashflowReportRequest{
-		ProjectID: cleanID(c.Query("project_id")),
-		FromDate:  strings.TrimSpace(c.Query("from")),
-		ToDate:    strings.TrimSpace(c.Query("to")),
-		GroupBy:   strings.TrimSpace(c.Query("group_by")),
-		Status:    strings.TrimSpace(c.Query("status")),
-	}
-}
-
-func taxReportRequest(c *fiber.Ctx) TaxReportRequest {
-	return TaxReportRequest{
-		ProjectID: cleanID(c.Query("project_id")),
-		FromDate:  strings.TrimSpace(c.Query("from")),
-		ToDate:    strings.TrimSpace(c.Query("to")),
-		GroupBy:   strings.TrimSpace(c.Query("group_by")),
-		Source:    strings.TrimSpace(c.Query("source")),
-		Status:    strings.TrimSpace(c.Query("status")),
-	}
-}
-
-func profitReportRequest(c *fiber.Ctx) ProfitReportRequest {
-	return ProfitReportRequest{
-		ProjectID: cleanID(c.Query("project_id")),
-		FromDate:  strings.TrimSpace(c.Query("from")),
-		ToDate:    strings.TrimSpace(c.Query("to")),
-		GroupBy:   strings.TrimSpace(c.Query("group_by")),
-		Status:    strings.TrimSpace(c.Query("status")),
-	}
-}
-
-func cashflowCSV(data Record) ([]byte, error) {
-	var buf bytes.Buffer
-	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"occurred_at", "payment_code", "project_name", "category", "direction", "payment_type", "payment_method", "status", "inflow_amount", "outflow_amount", "net_amount", "target_type"}); err != nil {
-		return nil, err
-	}
-	ledger, _ := data["ledger"].([]Record)
-	for _, row := range ledger {
-		if err := writer.Write([]string{
-			fmt.Sprint(row["occurred_at"]),
-			fmt.Sprint(row["payment_code"]),
-			fmt.Sprint(row["project_name"]),
-			fmt.Sprint(row["category"]),
-			fmt.Sprint(row["direction"]),
-			fmt.Sprint(row["payment_type"]),
-			fmt.Sprint(row["payment_method"]),
-			fmt.Sprint(row["status"]),
-			fmt.Sprint(row["inflow_amount"]),
-			fmt.Sprint(row["outflow_amount"]),
-			fmt.Sprint(row["net_amount"]),
-			fmt.Sprint(row["target_type"]),
-		}); err != nil {
-			return nil, err
-		}
-	}
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 func operationalReportCSV(kind string, rows []Record) ([]byte, error) {
 	columns := map[string][]string{
 		"projects":    {"project_id", "name", "is_sample", "status", "progress_percent", "open_issues", "pending_approvals"},
 		"warehouse":   {"material_id", "name", "category", "stock_quantity", "surplus_quantity"},
 		"procurement": {"status", "budget_status", "total", "amount"},
-		"accounting":  {"project_id", "name", "payable_remaining", "receivable_remaining", "used_budget"},
 		"staff":       {"staff_id", "full_name", "department", "position", "project_count"},
 	}
 	keys, ok := columns[kind]
@@ -415,75 +227,6 @@ func operationalReportCSV(kind string, rows []Record) ([]byte, error) {
 			values[index] = fmt.Sprint(row[key])
 		}
 		if err := writer.Write(values); err != nil {
-			return nil, err
-		}
-	}
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func taxCSV(data Record) ([]byte, error) {
-	var buf bytes.Buffer
-	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"invoice_date", "invoice_number", "source", "project_name", "counterparty_name", "tax_code", "amount_before_vat", "vat_amount", "total_amount", "status", "source_type", "source_code", "document_name", "warning_flags"}); err != nil {
-		return nil, err
-	}
-	ledger, _ := data["ledger"].([]Record)
-	for _, row := range ledger {
-		if err := writer.Write([]string{
-			fmt.Sprint(row["invoice_date"]),
-			fmt.Sprint(row["invoice_number"]),
-			fmt.Sprint(row["direction"]),
-			fmt.Sprint(row["project_name"]),
-			fmt.Sprint(row["counterparty_name"]),
-			fmt.Sprint(row["tax_code"]),
-			fmt.Sprint(row["amount_before_vat"]),
-			fmt.Sprint(row["vat_amount"]),
-			fmt.Sprint(row["total_amount"]),
-			fmt.Sprint(row["status"]),
-			fmt.Sprint(row["source_type"]),
-			fmt.Sprint(row["source_code"]),
-			fmt.Sprint(row["document_name"]),
-			fmt.Sprint(row["warning_flags"]),
-		}); err != nil {
-			return nil, err
-		}
-	}
-	writer.Flush()
-	if err := writer.Error(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func profitCSV(data Record) ([]byte, error) {
-	var buf bytes.Buffer
-	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"invoice_date", "invoice_number", "direction", "cost_type", "project_name", "counterparty_name", "amount_before_vat", "revenue_amount", "direct_cost_amount", "indirect_cost_amount", "status", "source_type", "source_code", "classification_reason", "warning_flags"}); err != nil {
-		return nil, err
-	}
-	ledger, _ := data["ledger"].([]Record)
-	for _, row := range ledger {
-		if err := writer.Write([]string{
-			fmt.Sprint(row["invoice_date"]),
-			fmt.Sprint(row["invoice_number"]),
-			fmt.Sprint(row["direction"]),
-			fmt.Sprint(row["cost_type"]),
-			fmt.Sprint(row["project_name"]),
-			fmt.Sprint(row["counterparty_name"]),
-			fmt.Sprint(row["amount_before_vat"]),
-			fmt.Sprint(row["revenue_amount"]),
-			fmt.Sprint(row["direct_cost_amount"]),
-			fmt.Sprint(row["indirect_cost_amount"]),
-			fmt.Sprint(row["status"]),
-			fmt.Sprint(row["source_type"]),
-			fmt.Sprint(row["source_code"]),
-			fmt.Sprint(row["classification_reason"]),
-			fmt.Sprint(row["warning_flags"]),
-		}); err != nil {
 			return nil, err
 		}
 	}

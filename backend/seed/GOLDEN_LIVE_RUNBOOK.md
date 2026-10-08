@@ -1,127 +1,60 @@
-# Golden Live - Sổ tay trải nghiệm vận hành
+# Công trình mẫu — sổ tay vận hành hiện tại
 
-## Truy cập
+Tài liệu giữ đường dẫn cũ để các liên kết tiếp tục hoạt động. Công trình `GOLDEN-LIVE-001` và các UUID cố định trước đây không còn được seed tạo. Luồng hiện tại dùng danh mục demo additive và SampleData v5 qua ứng dụng có xác thực.
 
-- Project: `GOLDEN-LIVE-001` - `Golden Live – Tự vận hành công trình`
-- URL: `http://localhost:5173/projects/30000000-0000-0000-0000-000000000022`
-- Template: `40000000-0000-0000-0000-000000000020`
-- Mật khẩu chung: `123456`
+## Chuẩn bị
 
-Golden Live bắt đầu ở node `Khảo sát`, tiến độ 0%. Không có form đã nộp, evidence, approval hoặc chứng từ nghiệp vụ phát sinh.
-
-## Tài khoản theo vai trò
-
-| Vai trò | Tài khoản |
-|---|---|
-| Admin | `admin@consflow.local` |
-| PM | `pm@consflow.local` |
-| QS | `qs@consflow.local` |
-| Kế toán | `accounting@consflow.local` |
-| Thủ kho | `warehouse@consflow.local` |
-| Giám sát | `supervisor@consflow.local` |
-| Giám đốc | `director@consflow.local` |
-| Mua hàng | `procurement@consflow.local` |
-| QA/QC | `qaqc@consflow.local` |
-| Đội thi công | `construction@consflow.local` |
-| Thầu phụ | `subcontractor@consflow.local` |
-| Thiết kế | `design@consflow.local` |
-| Sale | `sales@consflow.local` |
-| Pháp lý | `legal@consflow.local` |
-| Bộ phận HĐ (Rev3 project 023) | `contract@consflow.local` |
-
-Admin có thể thao tác hầu hết nghiệp vụ nhưng không được dùng thay actor chuyên biệt khi kiểm chứng coverage. Khi requester separation được bật, dùng PM gửi yêu cầu và Giám đốc hoặc vai trò phù hợp để duyệt.
-
-Tài khoản `contract@consflow.local` là project member của fixture `GOLDEN-REV3-BOQ-001` (`30000000-0000-0000-0000-000000000023`), không được bổ sung hồi tố vào runtime lịch sử `GOLDEN-LIVE-001`.
-
-`client@consflow.local` chỉ là fixture âm: tài khoản và hồ sơ nhân sự đều `inactive`, role `client` là đối tác ngoài App. Chủ đầu tư không đăng nhập hoặc trở thành project member; xác nhận của họ được lưu bằng hồ sơ, evidence, biên bản và các trường nghiệp vụ hiện có.
-
-Khi chuyển liên tiếp nhiều tài khoản trong UAT, chạy tuần tự và tôn trọng `Retry-After` nếu API trả `429`; không tính một response rate-limit là bằng chứng negative RBAC.
-
-## Kịch bản công trình
-
-- Khách hàng: Công ty An Phát.
-- Địa điểm: Tầng 8, Quận 3, TP.HCM.
-- Phạm vi: hoàn thiện văn phòng, MEP, trần, sơn, sàn, pantry và chiếu sáng.
-- Ngân sách dự kiến: 2.850.000.000 VND.
-- Giá trị hợp đồng dự kiến: 4.200.000.000 VND.
-- Thời gian dự kiến: 03/08/2026 - 30/01/2027.
-
-## Luồng vận hành đề nghị
-
-### 1. Khảo sát
-
-- PM/Giám sát/QS nhập năm form khảo sát.
-- Giám sát upload evidence ảnh hiện trạng cho step evidence-only.
-- Hoàn tất sáu work item, yêu cầu duyệt node và dùng tài khoản khác để duyệt.
-
-### 2. Họp báo cáo khảo sát
-
-- Nhập khối lượng sơ bộ, layout, 3D, bản vẽ thi công và biên bản họp.
-- Tại form `client_design_branch_decision`, chọn `yes` để đi nhánh Có thiết kế hoặc `no` để đi nhánh Không thiết kế.
-- Sau khi chuyển node, engine sẽ tự skip nhánh còn lại. Muốn thử lại nhánh khác phải reset seed.
-
-### 3-5. Thiết kế và BOQ
-
-- Dùng PM/Thiết kế cho thao tác trong App; lưu xác nhận của chủ đầu tư bằng hồ sơ hoặc evidence nghiệp vụ, không dùng tài khoản Chủ đầu tư.
-- Dùng QS tạo BOQ, khóa định mức và thu thập báo giá.
-- Tạo ít nhất hai báo giá nhà cung cấp, submit/qualify, so sánh và chọn giá.
-- Chỉ generate procurement sau khi BOQ đã duyệt và final price được khóa.
-
-### 6-8. Đầu vào, đàm phán và hợp đồng
-
-- Mua hàng tạo procurement, PO, ngày giao dự kiến và thực hiện lifecycle submit/approve/order.
-- QS/PM tạo hợp đồng chủ đầu tư, thầu phụ và nhà cung cấp.
-- Thực hiện version review/approve/sign/activate, milestone, phụ lục và retention.
-- PM gửi yêu cầu duyệt; Giám đốc duyệt với comment.
-
-### 9. QA/QC và thi công
-
-- QA/QC tạo ITP, submit, approve và activate.
-- Giám sát nộp nhật ký thi công với nhân lực, khối lượng, vật tư và evidence.
-- Tạo một RFI pass và một RFI fail để trải nghiệm NCR.
-- Với RFI fail: nhập root cause, corrective action, hoàn tất rework, tạo RFI tái kiểm rồi đóng NCR.
-
-### 10. Nghiệm thu đầu vào và thầu phụ
-
-- Tạo incoming acceptance cho từng procurement delivery.
-- Kho chỉ thay đổi khi thực hiện explicit stock receive/issue/return.
-- Thực hiện checklist và reconciliation thầu phụ; giữ chênh lệch khối lượng và quyết định xử lý.
-- Tạo AP, lịch thanh toán, tạm ứng, hóa đơn đầu vào và payment allocation.
-
-### 11. Nghiệm thu đầu ra
-
-- Tạo nghiệm thu có điều kiện hoặc fail để thử punch list/rework.
-- Tái nghiệm thu pass nhưng giữ nguyên lịch sử lần trước.
-- Thực hiện owner/client reconciliation, hồ sơ quyết toán, AR, hóa đơn đầu ra và thu tiền nhiều kỳ.
-
-### 12. Bàn giao và đóng tài chính
-
-- Xử lý hết vật tư dư và đóng site balance.
-- Đối soát AP/AR về 0, không còn payment pending.
-- Xác minh đủ tám checklist bàn giao bằng acceptance/evidence/document/system source.
-- Submit, check readiness và complete handover.
-
-## Blocker có chủ đích của engine
-
-- Thiếu exact submitted form hoặc required answer.
-- Thiếu evidence/photo/document bắt buộc.
-- Work item hoặc run step chưa hoàn tất.
-- Node chưa được phê duyệt.
-- BOQ chưa duyệt/chưa khóa giá hoặc procurement chưa đủ lifecycle.
-- NCR/rework/issue còn mở.
-- Vật tư dư chưa xử lý.
-- AP/AR còn số dư hoặc payment còn pending.
-- Handover checklist chưa verified.
-
-Không sửa database để vượt blocker; hoàn thành nghiệp vụ nguồn qua UI/API.
-
-## Reset
-
-Để đưa Golden Live về node Khảo sát và dữ liệu trắng:
+Chỉ dùng môi trường local/disposable có DB và storage riêng. Áp dụng migration hiện tại trước khi bootstrap danh mục:
 
 ```bash
 cd backend
+make migrate
 make seed
+make seed-validate
+make seed-fixtures-check
 ```
 
-Lệnh này reset toàn bộ dữ liệu demo local, tái tạo Golden completed suite và Golden Live, sau đó chạy validator. Không chạy seed trên production.
+`make seed` và `seed-validate` có thể chọn PostgreSQL Compose. Với target cô lập tường minh, dùng quy trình URL riêng trong [seed policy](../../docs/ops/seed-policy.md). Seed không reset, không chạy lại migration và không tạo hồ sơ nghiệp vụ hoàn tất. Giữ PDF fixture để thử tải/đọc minh chứng qua ứng dụng.
+
+## Tạo công trình mẫu
+
+1. Đăng nhập actor có `sample_data.create`; mở **Cấu hình → Dữ liệu mẫu**.
+2. Chọn pipeline published trong môi trường hiện tại. Rev9 chính thức có ID `40000000-0000-0000-0000-000000000028`; vẫn kiểm tra danh sách và blockers trước khi tạo.
+3. Tạo tài khoản mẫu theo vai trò nếu thiếu. Quyền dựa trên role canonical của pipeline, không dựa tên/chức danh.
+4. Chọn `draft` 0%, `planning` theo preset hoặc `completed` 100%; chỉ tạo khi hồ sơ tương thích.
+5. Lưu project ID/code, template revision/hash, generator version, actor và idempotency key; mở công trình bằng ID trả về.
+
+`draft` dùng cho thiết lập mới; `planning` dùng kiểm tra tiến độ mẫu được hỗ trợ; `completed` dùng đọc hồ sơ tổng hợp đã sinh. Hồ sơ hoàn tất là mô phỏng, không chứng minh vận hành hoặc thanh toán thật. Để trải nghiệm thủ công từ đầu, tạo công trình qua startup thông thường.
+
+| API có xác thực và quyền sample_data.create | Nội dung |
+|---|---|
+| `GET /api/settings/sample-data/options` | Blueprint version, pipelines, roles, blockers, progress presets |
+| `POST /api/settings/sample-data/users` | Body có `pipeline_template_id` |
+| `POST /api/settings/sample-data/projects` | Body có `profile`, `progress_percent`, `pipeline_template_id`, `idempotency_key` UUID |
+
+Retry giữ nguyên actor, payload và key; dùng key mới để tạo mẫu mới. Không cập nhật SQL để vượt blockers.
+
+## Trải nghiệm vận hành thủ công
+
+| Phần nghiệp vụ | Thao tác và bằng chứng |
+|---|---|
+| Khảo sát và thiết kế | Form/minh chứng yêu cầu, chọn nhánh thiết kế và duyệt đúng actor |
+| BOQ và mua sắm | Duyệt BOQ, khóa giá, báo giá/so sánh và procurement qua lifecycle hợp lệ |
+| Hợp đồng | Phiên bản, duyệt/ký/activate, mốc/phụ lục và snapshot điều khoản đã ký |
+| Kế hoạch và thi công | Bàn giao kế hoạch, nhật ký, khối lượng, vật tư và minh chứng đúng nguồn |
+| QA/QC và nghiệm thu | RFI/NCR/rework, tái kiểm và reconciliation; giữ lịch sử fail/pass |
+| Kho và bàn giao | Nhập/xuất/trả vật tư tường minh, xử lý tồn công trường và checklist bàn giao |
+| Bàn giao công trình và hồ sơ kế toán | Bàn giao nguồn hồ sơ, tiếp nhận/trả bổ sung có actor/lý do/audit |
+| Đối soát MISA | Xác nhận căn cứ có nguồn/minh chứng, nhập MISA thử nghiệm và phân bổ trực tiếp vào căn cứ |
+
+Đối soát giữ nguyên số tiền căn cứ để hiển thị chênh lệch; tổng phân bổ trên một giao dịch MISA không vượt số tiền giao dịch đó. Hủy phân bổ phải có lý do và giữ lịch sử. Luồng hiện tại đã bỏ đề nghị thanh toán, AP/AR, hóa đơn/VAT, sổ kế toán và đóng tài chính nội bộ. Bàn giao và hồ sơ mẫu hoàn tất không xác nhận đã thu/chi tiền.
+
+## Vai trò và chạy lại
+
+Seed có các tài khoản demo `admin`, `developer`, `pm`, `qs`, `accounting`, `warehouse`, `supervisor`, `director`, `procurement`, `qaqc`, `construction`, `subcontractor`, `design`, `sales`, `legal`, `contract` tại miền `consflow.local`. Membership công trình phải kiểm tra riêng. Tài khoản SampleData sinh dùng miền `dev.local`, tách với demo masters.
+
+Không dùng Admin thay actor cần coverage. Chủ đầu tư ngoài App được xác nhận bằng hồ sơ/minh chứng; demo `client@consflow.local` inactive dùng kiểm tra từ chối đăng nhập. Chuyển role tuần tự và tuân thủ `Retry-After` khi API trả `429`.
+
+Tạo công trình mới với key mới hoặc dùng môi trường disposable mới cho lần chạy độc lập. `make seed` không đưa công trình về Giai đoạn đầu và không xóa dữ liệu. Lưu request/response, actor, IDs, trạng thái trước/sau và audit trước khi xử lý lỗi.
+
+Tham khảo [role-based UAT](../../docs/operations/golden-sample-role-based-uat.md) cho evidence và tiêu chí nghiệm thu. Tài liệu không khẳng định UAT đã chạy; browser verification cần yêu cầu rõ trong turn thực thi.

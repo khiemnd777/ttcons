@@ -7,9 +7,6 @@ export const activityTopicTypes = {
   acceptance: { label: 'Nghiệm thu', endpoint: '/acceptances', list: false },
   rework: { label: 'Yêu cầu sửa lỗi', endpoint: 'reworks', list: true },
   handover: { label: 'Bàn giao', endpoint: '/handover', list: false },
-  payable: { label: 'Phải trả', endpoint: '/payables', list: true },
-  receivable: { label: 'Phải thu', endpoint: '/receivables', list: true },
-  payment: { label: 'Phiếu thu/chi', endpoint: '/payments', list: true },
 } as const;
 
 export type ActivityTopicScope = keyof typeof activityTopicTypes;
@@ -41,8 +38,6 @@ export function activityTopicPath(topic: ActivityTopic): string {
   const type = activityTopicTypes[topic.scope];
   if (!type.list) return `${type.endpoint}/${encodeURIComponent(topic.id)}`;
   if (topic.scope === 'rework') return `/projects/${encodeURIComponent(topic.projectId)}/reworks`;
-  // Legacy payments has no project filter. Select the exact ID/project after its authorized list read.
-  if (topic.scope === 'payment') return type.endpoint;
   return `${type.endpoint}?project_id=${encodeURIComponent(topic.projectId)}`;
 }
 

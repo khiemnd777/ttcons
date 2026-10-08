@@ -63,9 +63,6 @@ const targetScopeOptions = [
   { value: 'acceptance', label: enumLabel('scope_type', 'acceptance') },
   { value: 'rework', label: enumLabel('scope_type', 'rework') },
   { value: 'handover', label: enumLabel('scope_type', 'handover') },
-  { value: 'payable', label: enumLabel('scope_type', 'payable') },
-  { value: 'receivable', label: enumLabel('scope_type', 'receivable') },
-  { value: 'payment', label: enumLabel('scope_type', 'payment') },
 ];
 
 const mentionTypeOptions: Array<{ value: MentionType; label: string }> = [

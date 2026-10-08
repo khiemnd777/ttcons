@@ -40,7 +40,6 @@ const toneByStatus: Record<string, string> = {
   signed: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
   suspended: 'bg-orange-50 text-orange-700 ring-orange-200',
   eligible: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
-  obligation_opened: 'bg-blue-50 text-blue-700 ring-blue-200',
   held: 'bg-slate-100 text-slate-700 ring-slate-200',
   partially_released: 'bg-amber-50 text-amber-700 ring-amber-200',
   released: 'bg-emerald-50 text-emerald-700 ring-emerald-200',

@@ -138,6 +138,35 @@ func TestAccountingHandoffDetailMilestoneExactContractAndFiles(t *testing.T) {
 	}
 }
 
+func TestReconciliationSourceDetailDoesNotGrantHandoffAccess(t *testing.T) {
+	db := openProjectOperationsTestDB(t)
+	ctx := context.Background()
+	f := setupProjectScopeFixture(t, db, []string{"accounting_reconciliation.view", "procurement.view"})
+	s := NewService(NewRepository(db), "test")
+	sourceID := newID()
+	mustExec(t, db, `INSERT INTO procurement_requests(id,project_id,request_code,title,status,total_estimated_amount,supplier_name,order_reference)
+		VALUES($1,$2,$3,'Reconciliation source','ordered',100,'NCC','PO')`, sourceID, f.projectID, "PR-"+sourceID)
+	mustExec(t, db, `INSERT INTO accounting_handoffs(project_id,direction,source_type,source_id,status,source_snapshot_json,handed_off_by)
+		VALUES($1,'payable','procurement_request',$2,'handed_off','{"private_snapshot":"hidden"}'::jsonb,$3)`, f.projectID, sourceID, f.userID)
+	detail, err := s.AccountingHandoffDetail(ctx, f.projectID, "procurement_request", sourceID, f.userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handoff, _ := detail["handoff"].(Record)
+	if detail["current"] == nil || len(handoff) != 0 || boolValue(detail["handoff_access"]) {
+		t.Fatalf("source reader leaked handoff snapshot: %#v", detail)
+	}
+	for _, allowed := range detail["capabilities"].(Record) {
+		if boolValue(allowed) {
+			t.Fatal("source reader received handoff mutation capability")
+		}
+	}
+	mustExec(t, db, `DELETE FROM role_permissions WHERE role_id=$1 AND permission_id IN (SELECT id FROM permissions WHERE key='procurement.view')`, f.roleID)
+	if _, err := s.AccountingHandoffDetail(ctx, f.projectID, "procurement_request", sourceID, f.userID); err == nil {
+		t.Fatal("reconciliation permission alone must not disclose source or snapshot")
+	}
+}
+
 func TestAccountingHandoffDetailConcurrentAcknowledgement(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()

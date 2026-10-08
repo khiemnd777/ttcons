@@ -132,12 +132,6 @@ type ContractVariationRequest struct {
 	SourceConstructionActionID string  `json:"source_construction_action_id"`
 }
 
-type ContractRetentionReleaseRequest struct {
-	Amount  float64 `json:"amount"`
-	DueDate string  `json:"due_date"`
-	Comment string  `json:"comment"`
-}
-
 type QualityITPRequest struct {
 	ITPCode       string                  `json:"itp_code"`
 	Title         string                  `json:"title"`

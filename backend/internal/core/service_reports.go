@@ -16,33 +16,11 @@ func (s *Service) Dashboard(ctx context.Context, req DashboardPeriodRequest, act
 	if err != nil {
 		return DashboardReportResponse{}, err
 	}
-	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view", "project.reconciliation.view"})
-	if err != nil {
-		return DashboardReportResponse{}, err
-	}
 	snapshot, err := s.repo.DashboardReport(ctx, actorID)
 	if err != nil {
 		return DashboardReportResponse{}, err
 	}
-	result := DashboardReportResponse{
-		Meta:            meta,
-		Capabilities:    DashboardCapabilities{FinanceVisible: financeVisible},
-		ProjectSnapshot: snapshot,
-	}
-	if !financeVisible {
-		return result, nil
-	}
-	cashflow, err := s.repo.CashflowReport(ctx, CashflowReportRequest{
-		FromDate: meta.FromDate,
-		ToDate:   meta.ToDate,
-		GroupBy:  meta.GroupBy,
-		Status:   "approved",
-	}, actorID)
-	if err != nil {
-		return DashboardReportResponse{}, err
-	}
-	result.Cashflow = dashboardCashflowFromRecord(cashflow)
-	return result, nil
+	return DashboardReportResponse{Meta: meta, ProjectSnapshot: snapshot}, nil
 }
 
 func (s *Service) DashboardProjects(ctx context.Context, req DashboardProjectsRequest, actorID string) (DashboardProjectsPage, error) {
@@ -51,15 +29,11 @@ func (s *Service) DashboardProjects(ctx context.Context, req DashboardProjectsRe
 		return DashboardProjectsPage{}, err
 	}
 	req.DashboardPeriodRequest = period
-	financeVisible, err := s.repo.UserHasAnyPermission(ctx, actorID, []string{"report.finance.view", "accounting.view", "project.reconciliation.view"})
+	normalized, offset, filterHash, err := normalizeDashboardProjectsRequest(req, meta)
 	if err != nil {
 		return DashboardProjectsPage{}, err
 	}
-	normalized, offset, filterHash, err := normalizeDashboardProjectsRequest(req, meta, financeVisible)
-	if err != nil {
-		return DashboardProjectsPage{}, err
-	}
-	page, err := s.repo.DashboardProjects(ctx, actorID, normalized, meta, financeVisible, offset)
+	page, err := s.repo.DashboardProjects(ctx, actorID, normalized, offset)
 	if err != nil {
 		return DashboardProjectsPage{}, err
 	}
@@ -153,7 +127,7 @@ type dashboardProjectsCursor struct {
 	FilterHash string `json:"filter_hash"`
 }
 
-func normalizeDashboardProjectsRequest(req DashboardProjectsRequest, meta DashboardPeriodMeta, financeVisible bool) (DashboardProjectsRequest, int, string, error) {
+func normalizeDashboardProjectsRequest(req DashboardProjectsRequest, meta DashboardPeriodMeta) (DashboardProjectsRequest, int, string, error) {
 	req.Search = strings.TrimSpace(req.Search)
 	if len([]rune(req.Search)) > 120 {
 		return req, 0, "", validationError("Từ khóa tìm kiếm không được vượt quá 120 ký tự")
@@ -166,11 +140,8 @@ func normalizeDashboardProjectsRequest(req DashboardProjectsRequest, meta Dashbo
 	if req.Sort == "" {
 		req.Sort = "name"
 	}
-	if !statusIn(req.Sort, "name", "status", "progress", "net") {
+	if !statusIn(req.Sort, "name", "status", "progress") {
 		return req, 0, "", validationError("Sắp xếp Dashboard không hợp lệ", Record{"sort": req.Sort})
-	}
-	if req.Sort == "net" && !financeVisible {
-		req.Sort = "name"
 	}
 	req.Direction = strings.ToLower(strings.TrimSpace(req.Direction))
 	if req.Direction == "" {
@@ -185,7 +156,7 @@ func normalizeDashboardProjectsRequest(req DashboardProjectsRequest, meta Dashbo
 	if req.Limit < 1 || req.Limit > 50 {
 		return req, 0, "", validationError("limit phải nằm trong khoảng 1 đến 50", Record{"limit": req.Limit})
 	}
-	filterHash := dashboardProjectsFilterHash(req, meta, financeVisible)
+	filterHash := dashboardProjectsFilterHash(req, meta)
 	req.Cursor = strings.TrimSpace(req.Cursor)
 	if req.Cursor == "" {
 		return req, 0, filterHash, nil
@@ -197,7 +168,7 @@ func normalizeDashboardProjectsRequest(req DashboardProjectsRequest, meta Dashbo
 	return req, cursor.Offset, filterHash, nil
 }
 
-func dashboardProjectsFilterHash(req DashboardProjectsRequest, meta DashboardPeriodMeta, financeVisible bool) string {
+func dashboardProjectsFilterHash(req DashboardProjectsRequest, meta DashboardPeriodMeta) string {
 	raw := strings.Join([]string{
 		meta.PeriodType,
 		fmt.Sprint(meta.Year),
@@ -208,7 +179,6 @@ func dashboardProjectsFilterHash(req DashboardProjectsRequest, meta DashboardPer
 		req.Status,
 		req.Sort,
 		req.Direction,
-		fmt.Sprint(financeVisible),
 		fmt.Sprint(req.Limit),
 	}, "\x1f")
 	sum := sha256.Sum256([]byte(raw))
@@ -233,58 +203,6 @@ func parseDashboardProjectsCursor(value string) (dashboardProjectsCursor, error)
 		return dashboardProjectsCursor{}, errors.New("invalid dashboard cursor")
 	}
 	return cursor, nil
-}
-
-func dashboardCashflowFromRecord(report Record) *DashboardCashflow {
-	summary := recordFromAny(report["summary"])
-	result := &DashboardCashflow{
-		Summary: DashboardCashflowSummary{
-			OpeningBalance:      number(summary["opening_balance"]),
-			TotalInflow:         number(summary["total_inflow"]),
-			TotalOutflow:        number(summary["total_outflow"]),
-			NetFlow:             number(summary["net_flow"]),
-			ClosingBalance:      number(summary["closing_balance"]),
-			PaymentCount:        int(number(summary["payment_count"])),
-			PendingPaymentCount: int(number(summary["pending_payment_count"])),
-			PendingPaymentTotal: number(summary["pending_payment_total"]),
-			UnclassifiedCount:   int(number(summary["unclassified_count"])),
-			NonCashCount:        int(number(summary["non_cash_count"])),
-		},
-		Series:   []DashboardCashflowSeries{},
-		Projects: []DashboardCashflowProject{},
-	}
-	for _, row := range workflowAnswerRecordList(report["series"]) {
-		result.Series = append(result.Series, DashboardCashflowSeries{
-			PeriodStart:    dashboardDateString(row["period_start"]),
-			InflowAmount:   number(row["inflow_amount"]),
-			OutflowAmount:  number(row["outflow_amount"]),
-			NetAmount:      number(row["net_amount"]),
-			RunningBalance: number(row["running_balance"]),
-			PaymentCount:   int(number(row["payment_count"])),
-		})
-	}
-	for _, row := range workflowAnswerRecordList(report["projects"]) {
-		result.Projects = append(result.Projects, DashboardCashflowProject{
-			ProjectID:     cleanID(row["project_id"]),
-			ProjectName:   strings.TrimSpace(fmt.Sprint(row["project_name"])),
-			InflowAmount:  number(row["inflow_amount"]),
-			OutflowAmount: number(row["outflow_amount"]),
-			NetAmount:     number(row["net_amount"]),
-			PaymentCount:  int(number(row["payment_count"])),
-		})
-	}
-	return result
-}
-
-func dashboardDateString(value any) string {
-	if parsed, ok := value.(time.Time); ok {
-		return parsed.In(dashboardLocation).Format("2006-01-02")
-	}
-	text := strings.TrimSpace(fmt.Sprint(value))
-	if len(text) >= 10 {
-		return text[:10]
-	}
-	return text
 }
 
 type reportProjectOptionsCursor struct {
@@ -412,199 +330,5 @@ func (s *Service) Report(ctx context.Context, kind string, req OperationalReport
 }
 
 func operationalReportPermissions(kind string) []string {
-	if kind == "accounting" {
-		return []string{"report.finance.view", "accounting.view"}
-	}
 	return []string{"report.view"}
-}
-
-func (s *Service) CashflowReport(ctx context.Context, req CashflowReportRequest, actorID string) (Record, error) {
-	normalized, err := normalizeCashflowReportRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	if normalized.ProjectID != "" {
-		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"report.finance.view", "accounting.view"})
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem dòng tiền của công trình này", Record{"permissions": []string{"report.finance.view", "accounting.view"}})
-		}
-	}
-	return s.repo.CashflowReport(ctx, normalized, actorID)
-}
-
-func (s *Service) TaxReport(ctx context.Context, req TaxReportRequest, actorID string) (Record, error) {
-	normalized, err := normalizeTaxReportRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	if normalized.ProjectID != "" {
-		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"report.finance.view", "accounting.view"})
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem báo cáo thuế của công trình này", Record{"permissions": []string{"report.finance.view", "accounting.view"}})
-		}
-	}
-	return s.repo.TaxReport(ctx, normalized, actorID)
-}
-
-func (s *Service) ProfitReport(ctx context.Context, req ProfitReportRequest, actorID string) (Record, error) {
-	normalized, err := normalizeProfitReportRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	if normalized.ProjectID != "" {
-		allowed, err := s.repo.CanAccessProjectPermission(ctx, actorID, normalized.ProjectID, []string{"report.finance.view", "accounting.view"})
-		if err != nil {
-			return nil, err
-		}
-		if !allowed {
-			return nil, forbiddenError("Bạn không có quyền xem báo cáo lợi nhuận của công trình này", Record{"permissions": []string{"report.finance.view", "accounting.view"}})
-		}
-	}
-	return s.repo.ProfitReport(ctx, normalized, actorID)
-}
-
-func normalizeCashflowReportRequest(req CashflowReportRequest) (CashflowReportRequest, error) {
-	now := time.Now()
-	from := strings.TrimSpace(req.FromDate)
-	to := strings.TrimSpace(req.ToDate)
-	if from == "" {
-		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	}
-	if to == "" {
-		to = now.Format("2006-01-02")
-	}
-	fromDate, err := time.Parse("2006-01-02", from)
-	if err != nil {
-		return CashflowReportRequest{}, validationError("Ngày bắt đầu không hợp lệ", Record{"from": from})
-	}
-	toDate, err := time.Parse("2006-01-02", to)
-	if err != nil {
-		return CashflowReportRequest{}, validationError("Ngày kết thúc không hợp lệ", Record{"to": to})
-	}
-	if toDate.Before(fromDate) {
-		return CashflowReportRequest{}, validationError("Ngày kết thúc phải sau ngày bắt đầu", Record{"from": from, "to": to})
-	}
-	groupBy := strings.TrimSpace(req.GroupBy)
-	if groupBy == "" {
-		groupBy = "day"
-	}
-	if !statusIn(groupBy, "day", "week", "month") {
-		return CashflowReportRequest{}, validationError("Nhóm thời gian dòng tiền không hợp lệ", Record{"group_by": groupBy})
-	}
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		status = "approved"
-	}
-	if !statusIn(status, "approved", "all") {
-		return CashflowReportRequest{}, validationError("Bộ lọc trạng thái dòng tiền không hợp lệ", Record{"status": status})
-	}
-	return CashflowReportRequest{
-		ProjectID: cleanID(req.ProjectID),
-		FromDate:  from,
-		ToDate:    to,
-		GroupBy:   groupBy,
-		Status:    status,
-	}, nil
-}
-
-func normalizeProfitReportRequest(req ProfitReportRequest) (ProfitReportRequest, error) {
-	now := time.Now()
-	from := strings.TrimSpace(req.FromDate)
-	to := strings.TrimSpace(req.ToDate)
-	if from == "" {
-		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	}
-	if to == "" {
-		to = now.Format("2006-01-02")
-	}
-	fromDate, err := time.Parse("2006-01-02", from)
-	if err != nil {
-		return ProfitReportRequest{}, validationError("Ngày bắt đầu không hợp lệ", Record{"from": from})
-	}
-	toDate, err := time.Parse("2006-01-02", to)
-	if err != nil {
-		return ProfitReportRequest{}, validationError("Ngày kết thúc không hợp lệ", Record{"to": to})
-	}
-	if toDate.Before(fromDate) {
-		return ProfitReportRequest{}, validationError("Ngày kết thúc phải sau ngày bắt đầu", Record{"from": from, "to": to})
-	}
-	groupBy := strings.TrimSpace(req.GroupBy)
-	if groupBy == "" {
-		groupBy = "month"
-	}
-	if !statusIn(groupBy, "month", "quarter") {
-		return ProfitReportRequest{}, validationError("Nhóm kỳ báo cáo lợi nhuận không hợp lệ", Record{"group_by": groupBy})
-	}
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		status = "posted"
-	}
-	if !statusIn(status, "posted", "all") {
-		return ProfitReportRequest{}, validationError("Bộ lọc trạng thái báo cáo lợi nhuận không hợp lệ", Record{"status": status})
-	}
-	return ProfitReportRequest{
-		ProjectID: cleanID(req.ProjectID),
-		FromDate:  from,
-		ToDate:    to,
-		GroupBy:   groupBy,
-		Status:    status,
-	}, nil
-}
-
-func normalizeTaxReportRequest(req TaxReportRequest) (TaxReportRequest, error) {
-	now := time.Now()
-	from := strings.TrimSpace(req.FromDate)
-	to := strings.TrimSpace(req.ToDate)
-	if from == "" {
-		from = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
-	}
-	if to == "" {
-		to = now.Format("2006-01-02")
-	}
-	fromDate, err := time.Parse("2006-01-02", from)
-	if err != nil {
-		return TaxReportRequest{}, validationError("Ngày bắt đầu không hợp lệ", Record{"from": from})
-	}
-	toDate, err := time.Parse("2006-01-02", to)
-	if err != nil {
-		return TaxReportRequest{}, validationError("Ngày kết thúc không hợp lệ", Record{"to": to})
-	}
-	if toDate.Before(fromDate) {
-		return TaxReportRequest{}, validationError("Ngày kết thúc phải sau ngày bắt đầu", Record{"from": from, "to": to})
-	}
-	groupBy := strings.TrimSpace(req.GroupBy)
-	if groupBy == "" {
-		groupBy = "month"
-	}
-	if !statusIn(groupBy, "month", "quarter") {
-		return TaxReportRequest{}, validationError("Nhóm kỳ báo cáo thuế không hợp lệ", Record{"group_by": groupBy})
-	}
-	source := strings.TrimSpace(req.Source)
-	if source == "" {
-		source = "all"
-	}
-	if !statusIn(source, "all", "input", "output") {
-		return TaxReportRequest{}, validationError("Nguồn hoá đơn báo cáo thuế không hợp lệ", Record{"source": source})
-	}
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		status = "posted"
-	}
-	if !statusIn(status, "posted", "all") {
-		return TaxReportRequest{}, validationError("Bộ lọc trạng thái báo cáo thuế không hợp lệ", Record{"status": status})
-	}
-	return TaxReportRequest{
-		ProjectID: cleanID(req.ProjectID),
-		FromDate:  from,
-		ToDate:    to,
-		GroupBy:   groupBy,
-		Source:    source,
-		Status:    status,
-	}, nil
 }

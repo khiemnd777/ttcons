@@ -813,12 +813,6 @@ func activityTargetTable(scopeType string) (string, string, bool) {
 		return "rework_requests", "status", true
 	case "handover":
 		return "handover_records", "status", true
-	case "payable":
-		return "payables", "status", true
-	case "receivable":
-		return "receivables", "status", true
-	case "payment":
-		return "payments", "status", true
 	default:
 		return "", "", false
 	}
@@ -1446,12 +1440,6 @@ func (r *Repository) ProjectActivityOptions(ctx context.Context, projectID strin
 			SELECT 'rework', id, title, NULL::uuid, status FROM rework_requests WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
 			UNION ALL
 			SELECT 'handover', id, 'Bàn giao · ' || status, NULL::uuid, status FROM handover_records WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
-			UNION ALL
-			SELECT 'payable', id, payable_code || ' · ' || vendor_name, NULL::uuid, status FROM payables WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
-			UNION ALL
-			SELECT 'receivable', id, receivable_code || ' · ' || client_name, NULL::uuid, status FROM receivables WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
-			UNION ALL
-			SELECT 'payment', id, payment_code || ' · ' || payment_type, NULL::uuid, status FROM payments WHERE project_id=$1 AND status NOT IN ('cancelled','deleted')
 		) options
 		ORDER BY scope_type, lower(label)
 	`, projectID)
@@ -1577,10 +1565,7 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 			OR COALESCE(sm.movement_code, '') ILIKE $%d
 			OR COALESCE(ar.title, '') ILIKE $%d
 			OR COALESCE(rw.title, '') ILIKE $%d
-			OR COALESCE(pay.payable_code, '') ILIKE $%d
-			OR COALESCE(rec.receivable_code, '') ILIKE $%d
-			OR COALESCE(pm.payment_code, '') ILIKE $%d
-		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
+		)`, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder, placeholder))
 	}
 	if filter.CursorCreatedAt != "" && filter.CursorID != "" {
 		args = append(args, filter.CursorCreatedAt, filter.CursorID)
@@ -1616,9 +1601,6 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 					WHEN wia.scope_type='acceptance' THEN ar.title
 					WHEN wia.scope_type='rework' THEN rw.title
 					WHEN wia.scope_type='handover' THEN 'Bàn giao · ' || hr.status
-					WHEN wia.scope_type='payable' THEN pay.payable_code || ' · ' || pay.vendor_name
-					WHEN wia.scope_type='receivable' THEN rec.receivable_code || ' · ' || rec.client_name
-					WHEN wia.scope_type='payment' THEN pm.payment_code || ' · ' || pm.payment_type
 					ELSE wi.title
 				END,
 				'Project'
@@ -1651,9 +1633,6 @@ func (r *Repository) ProjectActivityThread(ctx context.Context, projectID string
 		LEFT JOIN acceptance_records ar ON ar.id=wia.scope_id AND wia.scope_type='acceptance'
 		LEFT JOIN rework_requests rw ON rw.id=wia.scope_id AND wia.scope_type='rework'
 		LEFT JOIN handover_records hr ON hr.id=wia.scope_id AND wia.scope_type='handover'
-		LEFT JOIN payables pay ON pay.id=wia.scope_id AND wia.scope_type='payable'
-		LEFT JOIN receivables rec ON rec.id=wia.scope_id AND wia.scope_type='receivable'
-		LEFT JOIN payments pm ON pm.id=wia.scope_id AND wia.scope_type='payment'
 		WHERE %s
 		ORDER BY wia.created_at DESC, wia.id DESC
 		LIMIT $%d
@@ -1923,7 +1902,18 @@ func (r *Repository) ProjectOperationsAudit(ctx context.Context, projectID strin
 	if profile.CanReconcileAllProjects && !profile.IsManager {
 		return []Record{}, nil
 	}
-	if profile.IsManager {
+	canViewAudit := profile.IsManager
+	if profile.IsDeveloper && !canViewAudit && !profile.CanReconcileAllProjects {
+		var err error
+		canViewAudit, err = r.UserHasAnyProjectPermission(ctx, profile.UserID, projectID, []string{"audit.view"})
+		if err != nil {
+			return nil, err
+		}
+		if !canViewAudit {
+			return []Record{}, nil
+		}
+	}
+	if canViewAudit {
 		return r.Query(ctx, `
 			SELECT al.*
 			FROM audit_logs al
@@ -2025,6 +2015,8 @@ func projectOperationsVisibility(profile workItemAccessProfile, permissions []st
 	scope := "project_member"
 	if profile.IsAdmin {
 		scope = "admin"
+	} else if profile.IsDeveloper {
+		scope = "developer"
 	} else if profile.IsDirector {
 		scope = "director"
 	} else if profile.CanReconcileAllProjects {
@@ -2037,6 +2029,9 @@ func projectOperationsVisibility(profile workItemAccessProfile, permissions []st
 	if !canObserveAll {
 		hiddenSections = append(hiddenSections, "domain_counts", "project_audit", "unscoped_pipeline_steps")
 	} else if profile.CanReconcileAllProjects && !profile.IsManager {
+		hiddenSections = append(hiddenSections, "project_audit")
+	}
+	if profile.IsDeveloper && !profile.IsManager && !hasAnyString(permissions, []string{"audit.view"}) {
 		hiddenSections = append(hiddenSections, "project_audit")
 	}
 	return Record{
@@ -2240,7 +2235,7 @@ func workItemScopeArgs(profile workItemAccessProfile, managerOverride bool, incl
 
 func workItemScopeSQL(alias string, start int) string {
 	userID := fmt.Sprintf("NULLIF($%d,'')::uuid", start+1)
-	manager := fmt.Sprintf("($%d::boolean AND (NOT %s OR %s))", start, deputyManagerUserSQL(userID), supervisedProjectSQL(alias+".project_id"))
+	manager := fmt.Sprintf("($%d::boolean AND (NOT %s OR %s OR %s))", start, deputyManagerUserSQL(userID), developerProjectSupportUserSQL(userID), supervisedProjectSQL(alias+".project_id"))
 	staffID := fmt.Sprintf("NULLIF($%d,'')::uuid", start+2)
 	staffText := fmt.Sprintf("$%d", start+2)
 	department := fmt.Sprintf("$%d", start+3)

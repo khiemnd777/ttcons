@@ -27,7 +27,10 @@ export function LoginPage() {
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: import.meta.env.DEV
-      ? { email: 'admin@consflow.local', password: '123456' }
+      ? {
+          email: import.meta.env.VITE_LOCAL_LOGIN_EMAIL ?? '',
+          password: import.meta.env.VITE_LOCAL_LOGIN_PASSWORD ?? '',
+        }
       : { email: '', password: '' },
   });
 

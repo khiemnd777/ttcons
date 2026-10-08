@@ -42,7 +42,6 @@ test('global and project business pages share the same compact page chrome', asy
 
   for (const path of [
     'modules/project-finance/AccountingHandoffPage.tsx',
-    'modules/project-finance/ProjectFinancePage.tsx',
   ]) {
     const finance = await source(path);
     assert.match(finance, /<PageHeader/);

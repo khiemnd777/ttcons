@@ -244,7 +244,7 @@ func (r *Repository) ProjectExplorerRevisionSnapshot(ctx context.Context, actorI
 				FROM user_roles ur
 				JOIN roles role ON role.id=ur.role_id
 				WHERE ur.user_id=$1 AND ur.project_id IS NULL AND role.name IN ('admin','director')
-			) AS bypass_access,
+			) OR `+developerProjectSupportUserSQL("$1::uuid")+` AS bypass_access,
 			`+deputyManagerUserSQL("$1::uuid")+` AS supervision_scope,
 			COALESCE((
 				SELECT staff.id::text

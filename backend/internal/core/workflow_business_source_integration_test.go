@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestRev7BusinessSourceIsFailClosedAndUsesCanonicalBOQ(t *testing.T) {
+func TestRev9BusinessSourceIsFailClosedAndUsesCanonicalBOQ(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
@@ -19,14 +19,14 @@ func TestRev7BusinessSourceIsFailClosedAndUsesCanonicalBOQ(t *testing.T) {
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
 	})
-	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev7 Actor','active')`, actorID, "rev7-source-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev7 Actor',$3,'operations','active')`, staffID, actorID, "rev7-source-staff-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev7 Source Project',$2,'Client','planning','40000000-0000-0000-0000-000000000026')`, projectID, "R7S-"+projectID[:8])
-	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["QS"]'::jsonb,true)`, projectID, staffID)
-	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000026", actorID, "Rev7 Actor"); err != nil {
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev9 Actor','active')`, actorID, "rev9-source-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev9 Actor',$3,'operations','active')`, staffID, actorID, "rev9-source-staff-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev9 Source Project',$2,'Client','planning','40000000-0000-0000-0000-000000000028')`, projectID, "R9S-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["PM","QS"]'::jsonb,true)`, projectID, staffID)
+	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000028", actorID, "Rev9 Actor"); err != nil {
 		t.Fatal(err)
 	}
-	workItemID := clientOfficialWorkItemIDByAction(t, db, projectID, "source.boq_items_ready")
+	workItemID := clientOfficialWorkItemIDByAction(t, db, projectID, "source.boq_release_ready")
 	source, err := repo.WorkflowBusinessSourceForWorkItem(ctx, workItemID)
 	if err != nil {
 		t.Fatal(err)
@@ -35,10 +35,33 @@ func TestRev7BusinessSourceIsFailClosedAndUsesCanonicalBOQ(t *testing.T) {
 		t.Fatalf("empty BOQ source=%#v, want fail-closed", source)
 	}
 
-	mustExec(t, db, `
-		INSERT INTO boq_items (project_id,category,work_item_name,unit,quantity,unit_price,status,created_by)
-		VALUES ($1,'A','Canonical BOQ row','m',1,100,'draft',$2)
-	`, projectID, actorID)
+	service := NewService(repo, "test-secret")
+	item, err := service.CreateBOQ(ctx, projectID, Record{"category": "A", "work_item_name": "Canonical BOQ row", "unit": "m", "quantity": 1, "unit_price": 100}, actorID, "Rev9 Actor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	itemID := cleanID(item["id"])
+	// A draft row is insufficient for the current released-BOQ source gate.
+	source, err = repo.WorkflowBusinessSourceForWorkItem(ctx, workItemID)
+	if err != nil || boolValue(source["ready"]) {
+		t.Fatalf("draft BOQ must remain blocked: %#v, %v", source, err)
+	}
+	if _, err := service.BOQProjectAction(ctx, projectID, "submit", WorkItemMutationContext{}, actorID, "Rev9 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.BOQProjectAction(ctx, projectID, "approve", WorkItemMutationContext{}, actorID, "Rev9 Actor"); err == nil {
+		t.Fatal("unlocked norm price must prevent BOQ release")
+	}
+	if _, err := service.LockBOQNormUnitPrice(ctx, itemID, BOQUnitPriceRequest{UnitPrice: 100, Comment: "Norm price checked"}, actorID, "Rev9 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.BOQProjectAction(ctx, projectID, "approve", WorkItemMutationContext{}, actorID, "Rev9 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.LockBOQFinalUnitPrice(ctx, itemID, BOQUnitPriceRequest{UnitPrice: 100, Comment: "Approved manual price without supplier comparison for regression fixture"}, actorID, "Rev9 Actor"); err != nil {
+		t.Fatal(err)
+	}
+	assertCount(t, db, `SELECT COUNT(*) FROM boq_releases WHERE project_id=$1 AND status='released' AND item_count=1 AND items_snapshot_json @> jsonb_build_array(jsonb_build_object('id',$2::text))`, 1, projectID, itemID)
 	source, err = repo.WorkflowBusinessSourceForWorkItem(ctx, workItemID)
 	if err != nil {
 		t.Fatal(err)

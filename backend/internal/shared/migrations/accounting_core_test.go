@@ -65,7 +65,9 @@ func TestAccountingUpgradeAcceptsLegacyFinanceStatuses(t *testing.T) {
 		t.Fatalf("seed legacy finance statuses: %v", err)
 	}
 
-	if _, err := Run(ctx, database, migrationsDir); err != nil {
+	// Preserve verification of the applied historical ledger chain before the
+	// intentional preproduction retirement. V150 rejects business-data upgrades.
+	if _, err := Run(ctx, database, retirementPredecessorDir(t)); err != nil {
 		t.Fatalf("upgrade legacy finance rows through current schema: %v", err)
 	}
 
@@ -119,8 +121,7 @@ func TestAccountingCoreMigrationEnforcesBalancedImmutableJournal(t *testing.T) {
 	database := openMigrationTestDatabase(t, ctx, dsn, schema)
 	defer database.Close()
 
-	migrationsDir := filepath.Join("..", "..", "..", "migrations")
-	if _, err := Run(ctx, database, migrationsDir); err != nil {
+	if _, err := Run(ctx, database, retirementPredecessorDir(t)); err != nil {
 		t.Fatal(err)
 	}
 

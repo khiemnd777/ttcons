@@ -40,10 +40,33 @@
 
 ## Communication Rules
 
-- Agents must use professional Vietnamese pronouns such as "tôi/anh" or neutral wording.
+- Agents must use English as the primary language for Levels 1–4. Use professional, neutral wording. When Vietnamese is explicitly requested, use professional pronouns such as "tôi/anh".
 - Agents must not mirror hostile, insulting, or overly informal pronouns from the user.
 - Even if the user is angry or insulting, agents must remain calm, respectful, and helpful, with a constructive tone.
 - Do not argue about tone unless it is necessary to clarify a task boundary; keep focus on fixing the user's issue.
+
+## TechNote — Four-Level Explanation Trial — Active From 2026-10-06
+
+**TechNote** is the default problem and solution explanation method for agents and subagents in **all repositories**, including Consflow. The canonical instructions are in `~/.codex/AGENTS.md`, section `14. TechNote — Four-Level Explanation Method (All Repositories)`. This trial continues until the user asks to change or end it. No end date or effectiveness assessment is available yet.
+
+- `TechNote` and `TechNote Level 1` request Technical Note Style text. `TechNote Level 2` requests diagrams. `TechNote Level 3` requests an interactive website. `TechNote Level 4` requests a video. Use English at every level.
+- Use the current topic and agreed scope when the invocation has no subject. If no topic is identifiable, ask one short question. Inspect relevant Consflow code and mapping before claiming product behavior. Proactively provide the solution explanation or artifact at the selected level; do not stop at an acknowledgment or require earlier levels again. TechNote remains the default when its name is not invoked.
+- A TechNote invocation selects presentation. It does not approve application changes, migrations or deployment. Preserve the human review gates below. Diagram or artifact examples must distinguish Verified, Proposed and Unknown.
+
+- Mục tiêu: để anh theo kịp việc điều tra, phân tích vấn đề và lựa chọn giải pháp của dự án.
+- Bắt đầu ở Cấp 1. Giải thích từng vấn đề, từng bước; không dồn toàn bộ nguyên nhân, phương án và chi tiết kỹ thuật vào một lượt.
+
+- **Primary language for Levels 1–4: English.** Use English for text, diagram labels, website controls and content, and video scripts, narration, subtitles and annotations. Use another language when explicitly requested. Preserve exact product labels, source quotations, identifiers and domain terms when needed for accuracy; explain their meaning in English. This rule concerns agent explanations, not changes to the application's language or stored records.
+
+1. **Level 1 — Text / Technical Note Style:** Write English technical notes inspired by ASD-STE100 — Simplified Technical English. Use one main idea per sentence, one topic per paragraph and consistent terminology. State actors, conditions, actions and results when relevant. Select useful labels such as Purpose, Current state, Evidence, Proposal, Verification and Next action. Follow the detailed rules in `~/.codex/AGENTS.md`, section `TechNote Level 1 — Technical Note Style`. Do not claim full ASD-STE100 compliance.
+2. **Level 2 — Diagrams:** Use English labels. Show actors, data, actions, conditions and results. Separate data flow, workflow and logic flow when needed. Use the same terminology and examples as Level 1.
+3. **Level 3 — Interactive website:** Use English text and controls. Let the user click through each step and see data and state changes. Include Previous, Next and Replay controls. Preserve the content and examples of the earlier levels.
+4. **Level 4 — Video:** Use English scripts, narration, subtitles and on-screen text. The agent writes the script, draws the visuals and adds synthetic narration. Use short segments for pause and replay.
+
+- Anh chọn khi nào chuyển cấp, xem sâu hơn hoặc quay lại. Các câu như “giải thích chậm hơn”, “vẽ sơ đồ”, “làm trang minh họa”, “làm video” điều chỉnh cách trình bày; không tự cấp quyền thay đổi ứng dụng. Không coi sự im lặng là đã hiểu hoặc đã duyệt.
+- In all four levels, distinguish **Verified**, **Proposed** and **Unknown**. Diagrams, simulations and videos do not turn hypotheses into product evidence.
+- Khi anh yêu cầu Cấp 3 hoặc Cấp 4, không âm thầm thay bằng mô tả text. Kiểm tra công cụ cần thiết; nếu thiếu khả năng xuất website hoặc video có giọng đọc, báo đúng giới hạn và phần còn thiếu. Kịch bản chưa phải video đã xuất.
+- Giữ các human review gates hiện có. Trang minh họa phục vụ giải thích không tự trở thành UI của ứng dụng hoặc được deploy công khai. Browser verification vẫn cần yêu cầu rõ trong lượt hiện tại. Trong khi chờ anh chọn cấp hoặc quyết định, chỉ tiếp tục công việc độc lập đã được phép.
 
 ## Anti-Ambiguity And Code Evidence Rules
 

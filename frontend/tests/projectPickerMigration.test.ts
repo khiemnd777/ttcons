@@ -7,7 +7,6 @@ async function source(path: string) {
 }
 
 const genericPickerPages = [
-  '../src/modules/accounting/AccountingPage.tsx',
   '../src/modules/operations/OperationsPage.tsx',
   '../src/modules/rework/ReworkPage.tsx',
   '../src/modules/acceptance/AcceptancePage.tsx',

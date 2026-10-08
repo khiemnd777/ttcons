@@ -31,7 +31,6 @@ func (s *Service) SampleDataOptions(ctx context.Context) (SampleDataOptions, err
 		BlueprintVersion:  sampleDataBlueprintVersion,
 		ProgressPresets:   append([]int(nil), sampleDataPlanningProgressPresets...),
 		Pipelines:         []SampleDataPipelineOption{},
-		AccountingBooks:   []SampleDataAccountingBookOption{},
 		EnvironmentPolicy: "available_in_all_environments",
 	}
 	for _, blueprint := range blueprints {
@@ -39,14 +38,6 @@ func (s *Service) SampleDataOptions(ctx context.Context) (SampleDataOptions, err
 		options.Pipelines = append(options.Pipelines, option)
 		options.Ready = options.Ready || option.Compatible
 	}
-	accountingContexts, err := s.repo.ListSampleDataAccountingContexts(ctx)
-	if err != nil {
-		return SampleDataOptions{}, err
-	}
-	for _, accounting := range accountingContexts {
-		options.AccountingBooks = append(options.AccountingBooks, sampleDataAccountingCompatibility(accounting))
-	}
-	options.Ready = options.Ready && len(options.AccountingBooks) > 0
 	return options, nil
 }
 
@@ -91,6 +82,7 @@ func sampleDataPipelineCompatibility(blueprint sampleDataBlueprint) SampleDataPi
 		EngineVersion: int(number(blueprint.Template["engine_version"])), NodeCount: len(blueprint.Nodes),
 		SelectedStepCount: sampleSelectedStepCount(blueprint), Blockers: []SampleDataBlocker{},
 		RoleCoverage: []SampleDataRoleCoverage{}, MissingRoles: []string{},
+		CompletedBlockers: sampleCompletedProfileBlockers(blueprint),
 	}
 	structureCompatible := true
 	usersProvisionable := true
@@ -209,7 +201,61 @@ func sampleDataPipelineCompatibility(blueprint sampleDataBlueprint) SampleDataPi
 	option.SampleUsersProvisionable = structureCompatible && usersProvisionable
 	option.SampleUsersReady = rolesReady && len(option.RoleCoverage) > 0
 	option.Compatible = option.StructureCompatible && option.SampleUsersReady
+	option.CompletedCompatible = option.Compatible && len(option.CompletedBlockers) == 0
 	return option
+}
+
+// Completed snapshots require source-backed gate replay. Form answers and
+// terminal statuses alone cannot establish that domain prerequisites passed.
+func sampleCompletedProfileBlockers(blueprint sampleDataBlueprint) []SampleDataBlocker {
+	blockers := []SampleDataBlocker{}
+	for _, requirement := range []struct {
+		surface, action string
+		form            bool
+	}{
+		{"workflow_form", "source.design_documents_ready", false},
+		{"contract", "contract.require_execution_ready", true},
+		{"workflow_form", "source.boq_release_ready", false},
+		{"workflow_form", "source.supplier_quotation_ready", false},
+		{"contract", "source.input_contract_package_ready", false},
+		{"workflow_form", "construction.activate_handoff", true},
+		{"subcontractor_reconciliation", "source.subcontractor_acceptance_package_ready", true},
+		{"owner_client_reconciliation", "source.final_acceptance_package_ready", true},
+		{"finance", "source.accounting_handoff_close_ready", false},
+	} {
+		found := false
+		for _, node := range blueprint.Nodes {
+			for _, step := range node.Steps {
+				if cleanOptionalText(step.Record["surface_kind"]) == requirement.surface && cleanOptionalText(step.Record["domain_action_key"]) == requirement.action && (!requirement.form || cleanID(step.Record["form_version_id"]) != "") {
+					found = true
+				}
+			}
+		}
+		if !found {
+			blockers = append(blockers, SampleDataBlocker{Code: "COMPLETED_SOURCE_BINDING_MISSING", Message: "Pipeline thiếu binding nguồn/biểu mẫu cho hồ sơ mẫu 100%: " + requirement.action})
+		}
+	}
+	seen := map[string]bool{}
+	for _, node := range blueprint.Nodes {
+		if cleanOptionalText(node.Record["business_code"]) == "boq_without_design" {
+			continue
+		}
+		for _, step := range node.Steps {
+			action := cleanOptionalText(step.Record["domain_action_key"])
+			if action == "" || seen[action] {
+				continue
+			}
+			seen[action] = true
+			if sampleCompletedGateQuery(action) != "" {
+				continue
+			}
+			blockers = append(blockers, SampleDataBlocker{
+				Code:    "COMPLETED_SOURCE_VALIDATION_REQUIRED",
+				Message: fmt.Sprintf("Hồ sơ mẫu 100%% chưa có bộ tạo và kiểm chứng nguồn cho điều kiện %s (%s)", step.Record["name"], action),
+			})
+		}
+	}
+	return blockers
 }
 
 func sampleRoleMatches(blueprint sampleDataBlueprint, roleLabel string) []sampleDataRoleAccount {
@@ -234,27 +280,6 @@ func sampleRoleRestricted(roleKey string) bool {
 
 func validSampleRoleKey(roleKey string) bool {
 	return sampleRoleKeyPattern.MatchString(strings.ToLower(strings.TrimSpace(roleKey)))
-}
-
-func sampleDataAccountingCompatibility(accounting sampleDataAccountingContext) SampleDataAccountingBookOption {
-	option := SampleDataAccountingBookOption{
-		ID: accounting.ID, Code: accounting.Code, Name: accounting.Name, BaseCurrency: accounting.BaseCurrency,
-		Blockers: []SampleDataBlocker{},
-	}
-	for _, requirement := range []struct{ id, code, message string }{
-		{accounting.BankAccountID, "ACCOUNT_1121_MISSING", "Thiếu tài khoản 1121 đang hoạt động và cho phép hạch toán"},
-		{accounting.CostAccountID, "ACCOUNT_154_MISSING", "Thiếu tài khoản 154 đang hoạt động và cho phép hạch toán"},
-		{accounting.RevenueAccountID, "ACCOUNT_5111_MISSING", "Thiếu tài khoản 5111 đang hoạt động và cho phép hạch toán"},
-	} {
-		if requirement.id == "" {
-			option.Blockers = append(option.Blockers, SampleDataBlocker{Code: requirement.code, Message: requirement.message})
-		}
-	}
-	if !accounting.HasOpenPeriod {
-		option.Blockers = append(option.Blockers, SampleDataBlocker{Code: "OPEN_PERIOD_MISSING", Message: "Không có kỳ kế toán đang mở cho ngày hiện tại"})
-	}
-	option.Compatible = len(option.Blockers) == 0
-	return option
 }
 
 func sampleBlueprintHasNode(blueprint sampleDataBlueprint, businessCode string) bool {
@@ -298,7 +323,6 @@ func sampleSelectedStepCount(blueprint sampleDataBlueprint) int {
 func (s *Service) CreateSampleDataProject(ctx context.Context, req SampleDataCreateRequest, actorID, actorName string) (Record, error) {
 	req.Profile = strings.ToLower(strings.TrimSpace(req.Profile))
 	req.PipelineTemplateID = strings.TrimSpace(req.PipelineTemplateID)
-	req.AccountingBookID = strings.TrimSpace(req.AccountingBookID)
 	if req.Profile == "draft" {
 		req.ProgressPercent = 0
 	} else if req.Profile == "completed" {
@@ -314,14 +338,6 @@ func (s *Service) CreateSampleDataProject(ctx context.Context, req SampleDataCre
 		return nil, validationError("Pipeline tạo dữ liệu mẫu không hợp lệ", Record{"field": "pipeline_template_id"})
 	}
 	req.PipelineTemplateID = pipelineID.String()
-	requestedAccountingBookID := ""
-	if req.Profile == "completed" {
-		accountingBookID, parseErr := uuid.Parse(req.AccountingBookID)
-		if parseErr != nil {
-			return nil, validationError("Sổ kế toán tạo dữ liệu mẫu không hợp lệ", Record{"field": "accounting_book_id"})
-		}
-		requestedAccountingBookID = accountingBookID.String()
-	}
 	idempotencyKey, err := uuid.Parse(strings.TrimSpace(req.IdempotencyKey))
 	if err != nil {
 		return nil, validationError("Khoá idempotency không hợp lệ", Record{"field": "idempotency_key"})
@@ -330,42 +346,12 @@ func (s *Service) CreateSampleDataProject(ctx context.Context, req SampleDataCre
 		return nil, err
 	} else if existing != nil {
 		sourceMismatch := cleanID(existing["template_id"]) != req.PipelineTemplateID
-		if req.Profile == "completed" {
-			sourceMismatch = sourceMismatch || cleanID(existing["accounting_book_id"]) != requestedAccountingBookID
-		}
 		if cleanID(existing["actor_id"]) != actorID || strings.TrimSpace(fmt.Sprint(existing["profile"])) != req.Profile ||
 			int(number(existing["progress_percent"])) != req.ProgressPercent || sourceMismatch {
 			return nil, conflictError("Khoá idempotency đã được dùng cho một yêu cầu tạo dữ liệu mẫu khác")
 		}
 		return s.repo.sampleDataProjectResult(ctx, cleanID(existing["project_id"]), true)
 	}
-	accountingContexts, err := s.repo.ListSampleDataAccountingContexts(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var accounting *sampleDataAccountingContext
-	if req.Profile == "completed" {
-		for index := range accountingContexts {
-			if accountingContexts[index].ID == requestedAccountingBookID {
-				accounting = &accountingContexts[index]
-				break
-			}
-		}
-		if accounting == nil {
-			return nil, validationError("Sổ kế toán không hoạt động hoặc không tồn tại", Record{"accounting_book_id": requestedAccountingBookID})
-		}
-		accountingOption := sampleDataAccountingCompatibility(*accounting)
-		if !accountingOption.Compatible {
-			return nil, validationError("Sổ kế toán chưa đủ điều kiện tạo hồ sơ hoàn thành", Record{
-				"accounting_book_id": requestedAccountingBookID, "blockers": accountingOption.Blockers,
-			})
-		}
-	} else if len(accountingContexts) > 0 {
-		accounting = &accountingContexts[0]
-	} else {
-		return nil, validationError("Không có sổ kế toán đang hoạt động để gắn với công trình mẫu", Record{"profile": req.Profile})
-	}
-	req.AccountingBookID = accounting.ID
 	blueprint, err := s.repo.LoadSampleDataBlueprint(ctx, req.PipelineTemplateID)
 	if err != nil {
 		return nil, err
@@ -376,7 +362,12 @@ func (s *Service) CreateSampleDataProject(ctx context.Context, req SampleDataCre
 			"pipeline_template_id": req.PipelineTemplateID, "blockers": pipelineOption.Blockers,
 		})
 	}
-	plan, err := buildSampleDataPlan(blueprint, accounting, req, actorID, actorName, idempotencyKey.String(), time.Now())
+	if req.Profile == "completed" && !pipelineOption.CompletedCompatible {
+		return nil, validationError("Pipeline chưa đủ điều kiện tạo hồ sơ mẫu hoàn thành", Record{
+			"pipeline_template_id": req.PipelineTemplateID, "blockers": pipelineOption.CompletedBlockers,
+		})
+	}
+	plan, err := buildSampleDataPlan(blueprint, req, actorID, actorName, idempotencyKey.String(), time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -395,6 +386,13 @@ func (s *Service) CreateSampleDataProject(ctx context.Context, req SampleDataCre
 			}
 		}
 		return nil, err
+	}
+	// A concurrent retry can discover the committed generation only after its
+	// own artifacts were stored. Its unused project prefix is safe to remove.
+	if boolValue(result["replayed"]) && cleanID(result["id"]) != plan.ProjectID {
+		for _, object := range objects {
+			s.deleteStoredObject(object)
+		}
 	}
 	return result, nil
 }
@@ -415,7 +413,7 @@ func validSampleProfileProgress(profile string, progress int) bool {
 	return false
 }
 
-func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAccountingContext, req SampleDataCreateRequest, actorID, actorName, idempotencyKey string, now time.Time) (sampleDataPlan, error) {
+func buildSampleDataPlan(blueprint sampleDataBlueprint, req SampleDataCreateRequest, actorID, actorName, idempotencyKey string, now time.Time) (sampleDataPlan, error) {
 	projectID := uuid.NewString()
 	suffix := strings.ToUpper(strings.ReplaceAll(projectID[:8], "-", ""))
 	prefix, title, status := "NEW", "Công trình mẫu mới", "draft"
@@ -432,12 +430,6 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 		TemplateRevision: int(number(blueprint.Template["revision_no"])), Edges: blueprint.Edges,
 		Actors: map[string][]sampleDataStaffActor{}, GeneratorID: actorID, GeneratorName: actorName, IdempotencyKey: idempotencyKey,
 		SelectedStepCount: sampleSelectedStepCount(blueprint),
-	}
-	if accounting != nil {
-		plan.AccountingBookID = accounting.ID
-		plan.BankAccountID = accounting.BankAccountID
-		plan.CostAccountID = accounting.CostAccountID
-		plan.RevenueAccountID = accounting.RevenueAccountID
 	}
 	if req.Profile == "completed" {
 		plan.CompletedAt = now.Format(time.RFC3339)
@@ -540,6 +532,17 @@ func buildSampleDataPlan(blueprint sampleDataBlueprint, accounting *sampleDataAc
 	}
 	if req.Profile == "completed" {
 		plan.CurrentNodeID = ""
+		handoff := sampleCompletedStep(plan, "workflow_form", "construction.activate_handoff")
+		if handoff != nil {
+			for index, item := range recordsFromAny(handoff.Answers["inspection_items"]) {
+				source := constructionHandoffCandidate("client_construction_handoff_plan", "inspection_items", index, item)
+				actor := sampleFirstActorForRoles(plan, []string{cleanOptionalText(source["responsible_role"])})
+				if actor.UserID == "" {
+					return sampleDataPlan{}, validationError("Thiếu tài khoản mẫu phụ trách hạng mục giám sát", source)
+				}
+				plan.ConstructionChecks = append(plan.ConstructionChecks, sampleDataPlannedCheck{ItemID: newID(), WorkItemID: newID(), CheckID: newID(), Source: source, Actor: actor})
+			}
+		}
 	}
 	return plan, nil
 }
@@ -564,6 +567,9 @@ func sampleActorsForRoleLabel(blueprint sampleDataBlueprint, roleLabel string) [
 
 func sampleFormFieldValue(field Record, projectCode string, now time.Time) any {
 	fieldType := strings.TrimSpace(fmt.Sprint(field["field_type"]))
+	if fieldType == "" || fieldType == "<nil>" {
+		fieldType = cleanOptionalText(field["type"])
+	}
 	label := strings.TrimSpace(fmt.Sprint(field["label"]))
 	switch fieldType {
 	case "checkbox", "boolean":
@@ -577,7 +583,11 @@ func sampleFormFieldValue(field Record, projectCode string, now time.Time) any {
 	case "currency":
 		return 1000000
 	case "select", "radio":
-		return sampleFirstOption(field["options_json"])
+		options := field["options_json"]
+		if options == nil {
+			options = field["options"]
+		}
+		return sampleFirstOption(options)
 	case "multi_select":
 		return []any{sampleFirstOption(field["options_json"])}
 	case "structured_list":
@@ -621,7 +631,10 @@ func recordsFromAny(value any) []Record {
 	switch typed := value.(type) {
 	case []any:
 		for _, item := range typed {
-			if record, ok := item.(map[string]any); ok {
+			switch record := item.(type) {
+			case Record:
+				out = append(out, record)
+			case map[string]any:
 				out = append(out, Record(record))
 			}
 		}
@@ -687,6 +700,19 @@ func (s *Service) storeSampleDataArtifacts(ctx context.Context, plan *sampleData
 				step.FormPDF = &formArtifact
 			}
 		}
+	}
+	for index := range plan.ConstructionChecks {
+		check := &plan.ConstructionChecks[index]
+		content, err := sampleDataPDF(plan.ProjectName, cleanOptionalText(check.Source["title"]), "Minh chứng kiểm tra thi công dữ liệu mẫu", check.Actor.FullName, time.Now())
+		if err != nil {
+			return objects, err
+		}
+		artifact, object, err := s.storeSampleArtifact(ctx, plan.ProjectID, check.WorkItemID, newID(), "ket-qua-kiem-tra.pdf", "application/pdf", content, "evidence")
+		if err != nil {
+			return objects, err
+		}
+		check.Evidence = artifact
+		objects = append(objects, object)
 	}
 	return objects, nil
 }

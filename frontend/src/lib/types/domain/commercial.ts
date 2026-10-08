@@ -191,8 +191,6 @@ export type ContractMilestone = ProjectOperationsRecord & {
   acceptance_required: boolean;
   acceptance_id?: string;
   status: string;
-  obligation_type?: string;
-  obligation_id?: string;
 };
 
 export type ContractVariation = ProjectOperationsRecord & {
@@ -250,20 +248,6 @@ export type ContractDispatch = AnyRecord & {
   returned_scan_document_name?: string;
 };
 
-export type ContractRetention = ProjectOperationsRecord & {
-  contract_id: string;
-  source_milestone_id: string;
-  milestone_code: string;
-  milestone_name: string;
-  direction: string;
-  held_amount: number;
-  released_amount: number;
-  outstanding_amount: number;
-  warranty_end_date?: string;
-  status: string;
-  releases?: Array<Record<string, any>>;
-};
-
 export type Contract = ProjectOperationsRecord & {
   contract_code: string;
   title: string;
@@ -297,9 +281,7 @@ export type Contract = ProjectOperationsRecord & {
 		returned_scan_received: boolean;
 		contract_active: boolean;
 	};
-  retention_outstanding?: number;
   versions?: ContractVersion[];
   milestones?: ContractMilestone[];
   variations?: ContractVariation[];
-  retentions?: ContractRetention[];
 };

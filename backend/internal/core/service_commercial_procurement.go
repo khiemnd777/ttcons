@@ -716,16 +716,3 @@ func (s *Service) ContractVariationAction(ctx context.Context, variationID, acti
 func (s *Service) GenerateProcurementFromContractVariation(ctx context.Context, variationID, actorID, actorName string) (Record, error) {
 	return s.repo.GenerateProcurementFromContractVariation(ctx, cleanID(variationID), actorID, actorName)
 }
-
-func (s *Service) ReleaseContractRetention(ctx context.Context, retentionID string, req ContractRetentionReleaseRequest, actorID, actorName string) (Record, error) {
-	if req.Amount <= 0 || strings.TrimSpace(req.Comment) == "" {
-		return nil, validationError("Số tiền và lý do giải phóng giữ lại là bắt buộc")
-	}
-	dueDate := strings.TrimSpace(req.DueDate)
-	if dueDate != "" {
-		if _, err := time.Parse("2006-01-02", dueDate); err != nil {
-			return nil, validationError("Ngày đến hạn giải phóng giữ lại không hợp lệ")
-		}
-	}
-	return s.repo.ReleaseContractRetention(ctx, cleanID(retentionID), req.Amount, dueDate, strings.TrimSpace(req.Comment), actorID, actorName)
-}

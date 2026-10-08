@@ -146,7 +146,7 @@ func TestClientWorkflowAutomationRecordsBlockedBOQOnce(t *testing.T) {
 	ctx := context.Background()
 	repo := NewRepository(db)
 	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
-	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "BOQ (Có thiết kế)")
+	workItemID := clientOfficialWorkItemIDByAction(t, db, fixture.projectID, "procurement.generate_from_boq")
 	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
 
 	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
@@ -174,7 +174,7 @@ func TestClientWorkflowAutomationGeneratesProcurementIdempotently(t *testing.T) 
 	ctx := context.Background()
 	repo := NewRepository(db)
 	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
-	workItemID := clientOfficialWorkItemIDByNodeName(t, db, fixture.projectID, "BOQ (Có thiết kế)")
+	workItemID := clientOfficialWorkItemIDByAction(t, db, fixture.projectID, "procurement.generate_from_boq")
 	boqID := newID()
 	mustExec(t, db, `
 		INSERT INTO boq_items (
@@ -476,8 +476,7 @@ func TestGenerateProcurementFromBOQRequiresFinalLockedApprovedItems(t *testing.T
 	assertCount(t, db, `SELECT COUNT(*) FROM procurement_request_items WHERE boq_item_id=$1`, 1, approvedBOQID)
 	assertCount(t, db, `SELECT COUNT(*) FROM activity_work_updates WHERE source_id=$1 AND source_type='procurement_request' AND source_snapshot_json->>'status'='waiting_approval'`, 1, requestID)
 	assertCount(t, db, `SELECT COUNT(*) FROM stock_movements WHERE project_id=$1`, 0, projectID)
-	assertCount(t, db, `SELECT COUNT(*) FROM payables WHERE project_id=$1`, 0, projectID)
-	assertCount(t, db, `SELECT COUNT(*) FROM receivables WHERE project_id=$1`, 0, projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pg_class WHERE oid IN (to_regclass('payables'),to_regclass('receivables'))`, 0)
 }
 
 func TestSupplierQuotationSelectionLocksBOQAndSnapshotsProcurement(t *testing.T) {
@@ -644,12 +643,10 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 	if _, err = service.ContractMilestoneAction(ctx, milestoneID, "eligible", "Đủ điều kiện theo tiến độ", actorID, "contract@test.local"); err != nil {
 		t.Fatal(err)
 	}
-	contract, err = service.ContractMilestoneAction(ctx, milestoneID, "open-obligation", "Mở phải thu", actorID, "contract@test.local")
-	if err != nil {
-		t.Fatal(err)
+	if _, err = service.ContractMilestoneAction(ctx, milestoneID, "open-obligation", "", actorID, "contract@test.local"); err == nil {
+		t.Fatal("retired obligation action must be rejected")
 	}
-	assertCount(t, db, `SELECT COUNT(*) FROM receivables WHERE project_id=$1 AND source_type='contract_milestone' AND source_id=$2 AND gross_amount=95000 AND remaining_amount=95000`, 1, projectID, milestoneID)
-	assertCount(t, db, `SELECT COUNT(*) FROM contract_retentions WHERE contract_id=$1 AND source_milestone_id=$2 AND held_amount=5000 AND outstanding_amount=5000`, 1, contractID, milestoneID)
+	assertCount(t, db, `SELECT COUNT(*) FROM contract_milestones WHERE id=$1 AND status='eligible' AND gross_amount=100000 AND retention_amount=5000 AND net_amount=95000`, 1, milestoneID)
 
 	contract, err = service.CreateContractVariation(ctx, contractID, ContractVariationRequest{
 		VariationCode: "PL-01", Title: "Bổ sung phạm vi", VariationType: "mixed", Reason: "Chủ đầu tư yêu cầu bổ sung",
@@ -714,13 +711,6 @@ func TestContractLifecycleCreatesVersionedObligationsVariationAndRetention(t *te
 	}
 	mustExec(t, db, `UPDATE contracts SET current_version_id=$2 WHERE id=$1`, contractID, newVersionID)
 
-	retentions := contract["retentions"].([]Record)
-	retentionID := cleanID(retentions[0]["id"])
-	if _, err = service.ReleaseContractRetention(ctx, retentionID, ContractRetentionReleaseRequest{Amount: 5000, DueDate: time.Now().Format("2006-01-02"), Comment: "Hết bảo hành"}, actorID, "contract@test.local"); err != nil {
-		t.Fatal(err)
-	}
-	assertCount(t, db, `SELECT COUNT(*) FROM contract_retentions WHERE id=$1 AND status='released' AND outstanding_amount=0`, 1, retentionID)
-	assertCount(t, db, `SELECT COUNT(*) FROM receivables WHERE project_id=$1 AND source_type='contract_retention' AND source_id=$2 AND gross_amount=5000`, 1, projectID, retentionID)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='contract_variation_incorporated'`, 1, projectID)
 }
 

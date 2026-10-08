@@ -1316,7 +1316,6 @@ func (r *Repository) ListProjectContracts(ctx context.Context, projectID string)
 			cv.version_no AS current_version_no, cv.version_label AS current_version_label, cv.status AS current_version_status,
 			COALESCE(summary.milestone_count,0) AS milestone_count,
 			COALESCE(summary.variation_count,0) AS variation_count,
-			COALESCE(summary.retention_outstanding,0) AS retention_outstanding,
 			COALESCE(summary.signed_scan_received,false) AS signed_scan_received
 		FROM contracts c
 		LEFT JOIN partners p ON p.id=c.counterparty_partner_id
@@ -1325,7 +1324,6 @@ func (r *Repository) ListProjectContracts(ctx context.Context, projectID string)
 			SELECT
 				(SELECT COUNT(*) FROM contract_milestones cm WHERE cm.contract_id=c.id AND cm.status <> 'cancelled') AS milestone_count,
 				(SELECT COUNT(*) FROM contract_variations v WHERE v.contract_id=c.id AND v.status <> 'rejected') AS variation_count,
-				(SELECT COALESCE(SUM(cr.outstanding_amount),0) FROM contract_retentions cr WHERE cr.contract_id=c.id AND cr.status <> 'forfeited') AS retention_outstanding,
 				EXISTS (
 					SELECT 1
 					FROM contract_dispatches dispatch
@@ -1439,17 +1437,6 @@ func (r *Repository) GetContractDetail(ctx context.Context, contractID string) (
 	if err != nil {
 		return nil, err
 	}
-	retentions, err := r.Query(ctx, `
-		SELECT cr.*, cm.milestone_code, cm.milestone_name,
-			COALESCE((SELECT jsonb_agg(to_jsonb(rr) ORDER BY rr.release_no) FROM contract_retention_releases rr WHERE rr.retention_id=cr.id),'[]'::jsonb) AS releases
-		FROM contract_retentions cr
-		JOIN contract_milestones cm ON cm.id=cr.source_milestone_id
-		WHERE cr.contract_id=$1
-		ORDER BY cr.created_at
-	`, contractID)
-	if err != nil {
-		return nil, err
-	}
 	contract["versions"] = versions
 	contract["workflow_signatures"] = signatures
 	contract["signing_forms"] = signingForms
@@ -1481,7 +1468,6 @@ func (r *Repository) GetContractDetail(ctx context.Context, contractID string) (
 	}
 	contract["milestones"] = milestones
 	contract["variations"] = variations
-	contract["retentions"] = retentions
 	return contract, nil
 }
 
@@ -2121,68 +2107,6 @@ func (r *Repository) ContractMilestoneAction(ctx context.Context, milestoneID, a
 		if err := addAuditTx(ctx, tx, cleanID(milestone["project_id"]), actorID, actorName, "contract_milestone_eligible", "contract_milestone", milestoneID, "Xác nhận milestone đủ điều kiện", Record{"contract_id": milestone["contract_id"], "comment": comment}); err != nil {
 			return nil, err
 		}
-	} else if action == "open-obligation" {
-		if fmt.Sprint(milestone["status"]) == "obligation_opened" && cleanID(milestone["obligation_id"]) != "" {
-			if err := tx.Commit(); err != nil {
-				return nil, err
-			}
-			return r.GetContractDetail(ctx, cleanID(milestone["contract_id"]))
-		}
-		if fmt.Sprint(milestone["status"]) != "eligible" {
-			return nil, validationError("Milestone phải đủ điều kiện trước khi mở công nợ")
-		}
-		dueDate := time.Now().AddDate(0, 0, int(number(milestone["due_days"]))).Format("2006-01-02")
-		if planned := dateOnly(milestone["planned_date"]); planned != "" {
-			base, _ := time.Parse("2006-01-02", planned)
-			dueDate = base.AddDate(0, 0, int(number(milestone["due_days"]))).Format("2006-01-02")
-		}
-		obligationType := fmt.Sprint(milestone["direction"])
-		obligationID := ""
-		codeSuffix := strings.ToUpper(strings.ReplaceAll(fmt.Sprint(milestone["milestone_code"]), " ", "-"))
-		if obligationType == "receivable" {
-			obligationRows, err := queryTx(ctx, tx, `
-				INSERT INTO receivables (project_id,receivable_code,client_partner_id,client_name,source_type,source_id,contract_amount,milestone_name,gross_amount,received_amount,remaining_amount,due_date,status,created_by)
-				VALUES ($1,$2,NULLIF($3,'')::uuid,$4,'contract_milestone',$5,$6,$7,$8,0,$8,$9,'draft',NULLIF($10,'')::uuid)
-				RETURNING id
-			`, milestone["project_id"], fmt.Sprintf("AR-%s-%s", cleanID(milestone["contract_id"])[:8], codeSuffix), cleanID(milestone["counterparty_partner_id"]), milestone["counterparty_name"], milestoneID, milestone["current_amount"], milestone["milestone_name"], milestone["net_amount"], dueDate, actorID)
-			if err != nil {
-				return nil, err
-			}
-			obligationID = cleanID(obligationRows[0]["id"])
-		} else {
-			vendorType := fmt.Sprint(milestone["contract_type"])
-			if vendorType == "main_client" {
-				vendorType = "other"
-			}
-			obligationRows, err := queryTx(ctx, tx, `
-				INSERT INTO payables (project_id,payable_code,vendor_type,vendor_partner_id,vendor_name,source_type,source_id,gross_amount,advance_amount,retention_amount,deduction_amount,paid_amount,remaining_amount,due_date,status,created_by)
-				VALUES ($1,$2,$3,NULLIF($4,'')::uuid,$5,'contract_milestone',$6,$7,0,$8,0,0,$9,$10,'draft',NULLIF($11,'')::uuid)
-				RETURNING id
-			`, milestone["project_id"], fmt.Sprintf("AP-%s-%s", cleanID(milestone["contract_id"])[:8], codeSuffix), vendorType, cleanID(milestone["counterparty_partner_id"]), milestone["counterparty_name"], milestoneID, milestone["gross_amount"], milestone["retention_amount"], milestone["net_amount"], dueDate, actorID)
-			if err != nil {
-				return nil, err
-			}
-			obligationID = cleanID(obligationRows[0]["id"])
-		}
-		if _, err := tx.ExecContext(ctx, `UPDATE contract_milestones SET status='obligation_opened',obligation_type=$2,obligation_id=$3,updated_at=now() WHERE id=$1`, milestoneID, obligationType, obligationID); err != nil {
-			return nil, err
-		}
-		if number(milestone["retention_amount"]) > 0 {
-			warrantyEnd := ""
-			if dateOnly(milestone["planned_date"]) != "" {
-				base, _ := time.Parse("2006-01-02", dateOnly(milestone["planned_date"]))
-				warrantyEnd = base.AddDate(0, 0, int(number(milestone["warranty_days"]))).Format("2006-01-02")
-			}
-			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO contract_retentions (contract_id,source_milestone_id,direction,held_amount,warranty_end_date,status)
-				VALUES ($1,$2,$3,$4,NULLIF($5,'')::date,'held') ON CONFLICT (source_milestone_id) DO NOTHING
-			`, milestone["contract_id"], milestoneID, obligationType, milestone["retention_amount"], warrantyEnd); err != nil {
-				return nil, err
-			}
-		}
-		if err := addAuditTx(ctx, tx, cleanID(milestone["project_id"]), actorID, actorName, "contract_milestone_obligation_opened", "contract_milestone", milestoneID, "Mở công nợ từ milestone hợp đồng", Record{"contract_id": milestone["contract_id"], "obligation_type": obligationType, "obligation_id": obligationID, "net_amount": milestone["net_amount"], "retention_amount": milestone["retention_amount"], "comment": comment}); err != nil {
-			return nil, err
-		}
 	} else {
 		return nil, validationError("Hành động milestone không hợp lệ", Record{"action": action})
 	}
@@ -2610,86 +2534,4 @@ func (r *Repository) GenerateProcurementFromContractVariation(ctx context.Contex
 		return nil, err
 	}
 	return r.GetContractDetail(ctx, cleanID(variation["contract_id"]))
-}
-
-func (r *Repository) ReleaseContractRetention(ctx context.Context, retentionID string, amount float64, dueDate, comment, actorID, actorName string) (Record, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	rows, err := queryTx(ctx, tx, `
-		SELECT cr.*,c.project_id,c.status AS contract_status,c.counterparty_partner_id,c.counterparty_name,c.contract_type
-		FROM contract_retentions cr JOIN contracts c ON c.id=cr.contract_id
-		WHERE cr.id=$1 FOR UPDATE OF cr,c
-	`, retentionID)
-	if err != nil {
-		return nil, err
-	}
-	if len(rows) == 0 {
-		return nil, sql.ErrNoRows
-	}
-	retention := rows[0]
-	if !statusIn(fmt.Sprint(retention["contract_status"]), "active", "completed") || fmt.Sprint(retention["status"]) == "forfeited" {
-		return nil, validationError("Khoản giữ lại không ở trạng thái cho phép giải phóng")
-	}
-	if warrantyEnd := dateOnly(retention["warranty_end_date"]); warrantyEnd != "" && warrantyEnd > time.Now().Format("2006-01-02") {
-		return nil, validationError("Chưa hết thời hạn bảo hành để giải phóng giữ lại", Record{"warranty_end_date": warrantyEnd})
-	}
-	if amount > number(retention["outstanding_amount"])+0.000001 {
-		return nil, validationError("Số tiền giải phóng vượt số dư giữ lại", Record{"outstanding_amount": retention["outstanding_amount"]})
-	}
-	if dueDate == "" {
-		dueDate = time.Now().Format("2006-01-02")
-	}
-	var releaseNo int
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(release_no),0)+1 FROM contract_retention_releases WHERE retention_id=$1`, retentionID).Scan(&releaseNo); err != nil {
-		return nil, err
-	}
-	obligationType := fmt.Sprint(retention["direction"])
-	obligationID := ""
-	if obligationType == "receivable" {
-		obligationRows, err := queryTx(ctx, tx, `
-			INSERT INTO receivables (project_id,receivable_code,client_partner_id,client_name,source_type,source_id,contract_amount,milestone_name,gross_amount,received_amount,remaining_amount,due_date,status,created_by)
-			VALUES ($1,$2,NULLIF($3,'')::uuid,$4,'contract_retention',$5,$6,'Giải phóng giữ lại',$7,0,$7,$8,'draft',NULLIF($9,'')::uuid) RETURNING id
-		`, retention["project_id"], fmt.Sprintf("AR-RET-%s-%02d", retentionID[:8], releaseNo), cleanID(retention["counterparty_partner_id"]), retention["counterparty_name"], retentionID, retention["held_amount"], amount, dueDate, actorID)
-		if err != nil {
-			return nil, err
-		}
-		obligationID = cleanID(obligationRows[0]["id"])
-	} else {
-		vendorType := fmt.Sprint(retention["contract_type"])
-		if vendorType == "service" {
-			vendorType = "service_provider"
-		}
-		obligationRows, err := queryTx(ctx, tx, `
-			INSERT INTO payables (project_id,payable_code,vendor_type,vendor_partner_id,vendor_name,source_type,source_id,gross_amount,advance_amount,retention_amount,deduction_amount,paid_amount,remaining_amount,due_date,status,created_by)
-			VALUES ($1,$2,$3,NULLIF($4,'')::uuid,$5,'contract_retention',$6,$7,0,0,0,0,$7,$8,'draft',NULLIF($9,'')::uuid) RETURNING id
-		`, retention["project_id"], fmt.Sprintf("AP-RET-%s-%02d", retentionID[:8], releaseNo), vendorType, cleanID(retention["counterparty_partner_id"]), retention["counterparty_name"], retentionID, amount, dueDate, actorID)
-		if err != nil {
-			return nil, err
-		}
-		obligationID = cleanID(obligationRows[0]["id"])
-	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO contract_retention_releases (retention_id,release_no,amount,due_date,comment,obligation_type,obligation_id,released_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid)
-	`, retentionID, releaseNo, amount, dueDate, comment, obligationType, obligationID, actorID); err != nil {
-		return nil, err
-	}
-	newReleased := number(retention["released_amount"]) + amount
-	newStatus := "partially_released"
-	if newReleased+0.000001 >= number(retention["held_amount"]) {
-		newStatus = "released"
-	}
-	if _, err := tx.ExecContext(ctx, `UPDATE contract_retentions SET released_amount=$2,status=$3,release_obligation_type=$4,release_obligation_id=$5,released_by=NULLIF($6,'')::uuid,released_at=now(),release_comment=$7,updated_at=now() WHERE id=$1`, retentionID, newReleased, newStatus, obligationType, obligationID, actorID, comment); err != nil {
-		return nil, err
-	}
-	if err := addAuditTx(ctx, tx, cleanID(retention["project_id"]), actorID, actorName, "contract_retention_released", "contract_retention", retentionID, "Giải phóng khoản giữ lại", Record{"contract_id": retention["contract_id"], "amount": amount, "released_amount": newReleased, "outstanding_amount": number(retention["held_amount"]) - newReleased, "obligation_type": obligationType, "obligation_id": obligationID, "comment": comment}); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.GetContractDetail(ctx, cleanID(retention["contract_id"]))
 }

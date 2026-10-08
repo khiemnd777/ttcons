@@ -1,5 +1,10 @@
 # Construction Operations Domain Map
 
+## Current Sample And Accounting Boundary — V150/V151
+
+- Runtime sample generation v5 uses current published workflow and actual construction sources/gates. Retired Golden SQL/Rev4 synthetic sandboxes are no longer created by seed; see backend/seed/GOLDEN_LIVE_RUNBOOK.md for current protected Sample Data setup.
+- Construction keeps report/check/action permissions, source evidence, technical remediation and approvals. No collected-money threshold or internal APAR/payment/ledger source exists. MISA reconciliation does not mutate field execution.
+
 ## Project Manager Display Name
 
 - Current `pm` role presentation is Quản lý dự án, distinct from Phó Quản Lý. Operations report recipient and commercial-variation guidance use the current name; ConstructionHandoffPanel keeps the compatible `PM` saved value with the current visible option label. Report recipients, site work responsibility, handoff states, evidence and historical snapshots are unchanged.
@@ -97,9 +102,8 @@
 - Pair with materials/warehouse when material usage, before/after snapshots, surplus, stock issue, stock return, or site balance changes.
 - Pair with quality/acceptance/handover when evidence, checklist status, punch list, rework, or acceptance readiness changes.
 
-## Golden Sample
+## Current Sample Data
 
-- `GOLDEN-REAL-001` contains accepted evidence for every executed runtime step, three dated construction reports, one active optional check template, pass/fail/recheck result evidence, one resolved simplified action, one pending check with current-state context evidence, subcontractor/client reconciliation, material before/after history and no open simplified action blocker.
 
 ## Rev3 Field Ownership And Variations
 
@@ -108,7 +112,6 @@
 - Rev7 removes the manually entered daily `progress_percent`, duplicate overview-photo reference and confirmation checkbox from the construction report form. Work-item progress/evidence and the form submit audit remain authoritative; `construction.activate_handoff` now participates in the official-family hard gate and requires an activated `construction_handoffs` source record.
 - V88 makes the construction workspace stage-aware: `runtime.construction_active` and per-item `report_eligible` disable new reports/checks/actions before Node Thi công while preserving view/history and later remediation resolution. The check-list filter exposes only eligible items plus sources referenced by existing checks, keeping historical checks filterable without showing future workflow items. Action impact selection is a technical classification only; it never creates a commercial proposal. Action rows expose a linked variation code with a shared Vietnamese status label without treating commercial approval as technical resolution.
 - `Phát sinh ngoài kế hoạch` uses the narrow `contract.variation.propose` permission for Admin/PM/Supervisor. `POST /projects/:id/construction-variation-proposals` requires an eligible source work item, optionally locks a same-work-item impacted construction action, creates append-only variation/audit history and atomically enters `qs_review`. Supervisor does not receive broad `contract.view|create`; the path cannot create procurement or bypass QS/Purchasing/PM-Director. Urgent/normal is scheduling only. Operations uses progressive disclosure for this secondary commercial flow: no empty or missing-contract page alert, compact status only for real non-terminal variations, and proposal entry inside `Cần xử lý` or impacted-action context. Loading, API failure and missing active client contract are separate neutral states; the latter explicitly leaves reporting, checking and remediation available and never exposes an unauthorized Contracts link.
-- Rev4 Operations UAT uses project `...024` as the read-only pre-construction lock control and project `...025` as the synthetic active-construction sandbox. Only 025 may receive valid test reports/checks/actions/variation proposals; its single eligible reporting item and active client contract are fixture prerequisites, not proof of upstream planning or contract execution.
 - Construction variation `amount_delta` is a signed monetary input and uses shared `CurrencyInput` with negative values explicitly enabled; `days_delta`, progress, worker counts, work hours and material quantities remain ordinary numbers.
 - `construction.activate_handoff` remains a Planning source gate, not a Work Item start or completion shortcut. After its form is submitted, the Work Item opens the existing Planning activation dialog while no activated snapshot exists. Activation invalidates Work Item source readiness; the user must then invoke the separate backend `complete` action, presented as `Kiểm tra điều kiện & chốt bước`, so construction handoff creation and workflow completion remain independently audited.
 - An activated handoff and a completed planning Work Item/Run Step only clear planning completion gates; neither action starts construction. The explicit `AdvanceRunNode` transition completes `construction_planning`, starts `construction_execution`, moves `pipeline_runs.current_node_id` and changes generated target-node Work Items from pending to ready. Only that active-node state makes them `report_eligible` and enables new daily reports/checks/actions.

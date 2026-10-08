@@ -19,7 +19,7 @@ export default function RecordSourcePage() {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
   const projectId = params.get('project_id') ?? '';
-  const allowed = ['stock_movement', 'payment', 'incoming_acceptance', 'issue'];
+  const allowed = ['stock_movement', 'incoming_acceptance', 'issue'];
   const target: RecordTarget | null = isRecordKind(kind) && allowed.includes(kind) && isRecordID(recordId) && isRecordID(projectId)
     ? { kind, id: recordId, projectId } : null;
   const close = () => navigate(isRecordID(projectId) && hasPermission('project.view') ? `/projects/${projectId}` : '/my-work', { replace: true });
@@ -27,7 +27,7 @@ export default function RecordSourcePage() {
     <Dialog open title={target ? recordKinds[target.kind].label : 'Hồ sơ không khả dụng'} onClose={close} size="xl" manageFocus
       footer={<div className="flex justify-end"><button type="button" className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold" onClick={close}>Đóng</button></div>}>
       {!target || !user || !canOpenRecord(target, hasPermission) ? <p role="alert">Không tìm thấy hồ sơ hoặc anh không có quyền truy cập.</p>
-        : target.kind === 'payment' || target.kind === 'stock_movement' ? <ActivityTopicDetails key={`${target.kind}:${target.id}`} showSource={false} topic={{ scope: target.kind, id: target.id, projectId, label: recordKinds[target.kind].label }} />
+        : target.kind === 'stock_movement' ? <ActivityTopicDetails key={`${target.kind}:${target.id}`} showSource={false} topic={{ scope: target.kind, id: target.id, projectId, label: recordKinds[target.kind].label }} />
           : <SourceContent key={`${target.kind}:${target.id}`} target={target} actorId={user.id} />}
     </Dialog>
   </>;

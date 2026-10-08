@@ -48,8 +48,7 @@ var pipelineEdgeConditionCatalog = []EdgeConditionDefinition{
 			{Key: "value", Label: "Giá trị cần khớp", Control: "source_field_option", Required: true, DependsOn: "field_key", HelpText: "Chọn một giá trị được định nghĩa bởi trường nguồn."},
 		},
 	},
-	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, danh sách lỗi, kho, chứng từ và công nợ không còn điểm chặn bàn giao.", DefaultLabel: "", Category: "handover"},
-	{Type: "financial_ready", Label: "Sẵn sàng đóng tài chính", Description: "Chuyển khi công nợ phải thu/phải trả không còn khoản đang mở.", DefaultLabel: "", Category: "finance"},
+	{Type: "handover_ready", Label: "Sẵn sàng bàn giao", Description: "Chuyển khi nghiệm thu, danh sách lỗi, kho và hồ sơ bàn giao không còn điểm chặn.", DefaultLabel: "", Category: "handover"},
 }
 
 func PipelineEdgeConditionCatalog() []EdgeConditionDefinition {

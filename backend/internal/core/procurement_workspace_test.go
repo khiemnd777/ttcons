@@ -146,9 +146,8 @@ func TestProcurementDiscussionHistoryVersionsAndQuietDrafts(t *testing.T) {
 	assertCount(t, db, `SELECT count(*) FROM activity_work_updates WHERE source_id=$1`, 3, id)
 	assertCount(t, db, `SELECT count(*) FROM activity_work_updates WHERE source_id=$1 AND source_snapshot_json->>'title'='Reviewed title' AND source_snapshot_json->>'status'='waiting_approval' AND source_snapshot_json->'items'->0->>'estimated_unit_price'='50.00'`, 1, id)
 	assertCount(t, db, `SELECT count(*) FROM procurement_requests WHERE id=$1 AND status='ordered' AND edit_version=7`, 1, id)
-	for _, table := range []string{"stock_movements", "payables", "receivables"} {
-		assertCount(t, db, fmt.Sprintf("SELECT count(*) FROM %s WHERE project_id=$1", table), 0, f.projectID)
-	}
+	assertCount(t, db, `SELECT count(*) FROM stock_movements WHERE project_id=$1`, 0, f.projectID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pg_class WHERE oid IN (to_regclass('payables'),to_regclass('receivables'))`, 0)
 	activity, err := s.repo.QueryOne(ctx, `SELECT activity_id FROM activity_work_updates WHERE source_id=$1 ORDER BY source_event_key LIMIT 1`, id)
 	if err != nil {
 		t.Fatal(err)
@@ -213,7 +212,9 @@ func TestProcurementWorkspaceRoutesAndSourceCapabilities(t *testing.T) {
 }
 
 func TestProcurementWorkspaceListsOnlyActiveProjectScopedApprovers(t *testing.T) {
-	db := openProjectOperationsTestDB(t)
+	// Candidate counts include every authorized global Admin as well as scoped
+	// actors. Isolate this fixture from global users created by other DB tests.
+	db := openIsolatedAccountingTestDB(t)
 	ctx := context.Background()
 	s := NewService(NewRepository(db), "test-secret")
 	f, id, _ := procurementDiscussionFixture(t, db, []string{"procurement.view", "procurement.approve"})

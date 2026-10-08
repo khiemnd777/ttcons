@@ -36,18 +36,11 @@ type SamplePipelineOption = {
   sample_users_ready: boolean;
   sample_users_provisionable: boolean;
   compatible: boolean;
+  completed_compatible: boolean;
+  completed_blockers: SampleDataBlocker[];
   blockers: SampleDataBlocker[];
   role_coverage: SampleRoleCoverage[];
   missing_roles: string[];
-};
-
-type SampleAccountingBookOption = {
-  id: string;
-  code: string;
-  name: string;
-  base_currency: string;
-  compatible: boolean;
-  blockers: SampleDataBlocker[];
 };
 
 type SampleDataOptions = {
@@ -55,7 +48,6 @@ type SampleDataOptions = {
   blueprint_version: number;
   progress_presets: number[];
   pipelines: SamplePipelineOption[];
-  accounting_books: SampleAccountingBookOption[];
   environment_policy: string;
 };
 
@@ -67,7 +59,6 @@ type SampleDataResult = {
   progress_percent: number;
   sample_profile: SampleProfile;
   pipeline_template_id: string;
-  accounting_book_id: string;
   current_pipeline_run_id?: string;
   replayed?: boolean;
 };
@@ -84,7 +75,7 @@ type SampleUserProvisionResult = {
 const profileCards: Array<{ value: SampleProfile; title: string; description: string }> = [
   { value: 'draft', title: 'Công trình mới', description: 'Tạo hồ sơ công trình ở trạng thái Nháp, chưa khởi chạy quy trình.' },
   { value: 'planning', title: 'Đang lập kế hoạch', description: 'Khởi chạy nhánh Có thiết kế, giao việc đúng vai trò và đặt tiến độ đã chọn.' },
-  { value: 'completed', title: 'Đã hoàn thành', description: 'Tạo đầy đủ quy trình, biểu mẫu, phê duyệt, tài chính và minh chứng lịch sử.' },
+  { value: 'completed', title: 'Đã hoàn thành', description: 'Tạo đầy đủ quy trình, biểu mẫu, phê duyệt, nguồn thương mại, nghiệm thu và bàn giao kế toán.' },
 ];
 
 function BlockerList({ blockers }: { blockers: SampleDataBlocker[] }) {
@@ -102,7 +93,6 @@ export function SampleDataPanel() {
   const [profile, setProfile] = useState<SampleProfile>('planning');
   const [progress, setProgress] = useState(40);
   const [pipelineID, setPipelineID] = useState('');
-  const [accountingBookID, setAccountingBookID] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState('');
   const [created, setCreated] = useState<SampleDataResult | null>(null);
@@ -121,20 +111,11 @@ export function SampleDataPanel() {
       : compatible.length === 1 ? compatible[0].id : '');
   }, [options.data]);
 
-  useEffect(() => {
-    if (!options.data) return;
-    const compatible = options.data.accounting_books.filter((item) => item.compatible);
-    setAccountingBookID((current) => options.data?.accounting_books.some((item) => item.id === current)
-      ? current
-      : compatible.length === 1 ? compatible[0].id : '');
-  }, [options.data]);
-
   const createSample = useMutation({
     mutationFn: () => post<SampleDataResult>('/settings/sample-data/projects', {
       profile,
       progress_percent: profile === 'draft' ? 0 : profile === 'completed' ? 100 : progress,
       pipeline_template_id: pipelineID,
-      accounting_book_id: profile === 'completed' ? accountingBookID : '',
       idempotency_key: idempotencyKey,
     }),
     onSuccess: async (result) => {
@@ -185,11 +166,8 @@ export function SampleDataPanel() {
 
   const data = options.data;
   const selectedPipeline = data.pipelines.find((item) => item.id === pipelineID);
-  const selectedAccountingBook = data.accounting_books.find((item) => item.id === accountingBookID);
-  const hasProjectAccountingBook = data.accounting_books.length > 0;
   const canCreate = Boolean(selectedPipeline?.compatible)
-    && hasProjectAccountingBook
-    && (profile !== 'completed' || Boolean(selectedAccountingBook?.compatible));
+    && (profile !== 'completed' || Boolean(selectedPipeline?.completed_compatible));
   const finalProgress = profile === 'draft' ? 0 : profile === 'completed' ? 100 : progress;
   const selectedProfile = profileCards.find((item) => item.value === profile)!;
   const completedSteps = selectedPipeline ? Math.floor(finalProgress * selectedPipeline.selected_step_count / 100) : 0;
@@ -204,12 +182,8 @@ export function SampleDataPanel() {
       toast.warn({ title: 'Pipeline chưa tương thích', description: selectedPipeline.blockers.map((item) => item.message).join('; ') });
       return;
     }
-    if (!hasProjectAccountingBook) {
-      toast.warn({ title: 'Chưa có sổ kế toán', description: 'Môi trường hiện tại cần ít nhất một sổ kế toán đang hoạt động để gắn với công trình.' });
-      return;
-    }
-    if (profile === 'completed' && !selectedAccountingBook?.compatible) {
-      toast.warn({ title: 'Sổ kế toán chưa đủ điều kiện', description: selectedAccountingBook?.blockers.map((item) => item.message).join('; ') || 'Hãy chọn sổ kế toán tương thích.' });
+    if (profile === 'completed' && !selectedPipeline.completed_compatible) {
+      toast.warn({ title: 'Pipeline chưa hỗ trợ hồ sơ hoàn thành', description: selectedPipeline.completed_blockers.map((item) => item.message).join('; ') });
       return;
     }
     setCreated(null);
@@ -251,6 +225,7 @@ export function SampleDataPanel() {
                 </div>
                 <p className="mt-1 break-all text-[11px] text-slate-500">Hash: {selectedPipeline.definition_hash || 'Chưa có'}</p>
                 <BlockerList blockers={selectedPipeline.blockers} />
+                {profile === 'completed' ? <BlockerList blockers={selectedPipeline.completed_blockers} /> : null}
               </div>
             ) : null}
           </div>
@@ -306,23 +281,6 @@ export function SampleDataPanel() {
             </div>
           ) : null}
 
-          {profile === 'completed' ? (
-            <div className="rounded-lg border border-line bg-white p-4">
-              <h3 className="text-sm font-semibold text-ink">4. Chọn sổ kế toán</h3>
-              <p className="mt-1 text-xs text-slate-500">Hồ sơ hoàn thành sinh dữ liệu tài chính; sổ phải có tài khoản 1121, 154, 5111 và kỳ kế toán đang mở.</p>
-              <select className="mt-3 w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-slate-800" value={accountingBookID} onChange={(event) => setAccountingBookID(event.target.value)}>
-                <option value="">Chọn sổ kế toán</option>
-                {data.accounting_books.map((item) => <option key={item.id} value={item.id}>{item.code} · {item.name} · {item.compatible ? 'Tương thích' : 'Không tương thích'}</option>)}
-              </select>
-              {selectedAccountingBook ? (
-                <div className={`mt-3 rounded-md border p-3 text-xs ${selectedAccountingBook.compatible ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>
-                  <p className="font-semibold">{selectedAccountingBook.compatible ? 'Tương thích cho dữ liệu tài chính' : 'Chưa đủ điều kiện'} · {selectedAccountingBook.base_currency}</p>
-                  <BlockerList blockers={selectedAccountingBook.blockers} />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
           {created ? (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
               <div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /><div><p className="text-sm font-semibold text-emerald-900">Đã tạo {created.code}</p><p className="mt-1 text-sm text-emerald-800">{created.name} · {created.progress_percent}%</p></div></div>
@@ -353,8 +311,7 @@ export function SampleDataPanel() {
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Pipeline nguồn</dt><dd className="mt-1 font-semibold text-ink">{selectedPipeline?.name} · Rev{selectedPipeline?.revision}</dd></div>
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Loại hồ sơ</dt><dd className="mt-1 font-semibold text-ink">{selectedProfile.title}</dd></div>
           <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ</dt><dd className="mt-1 font-semibold text-ink">{finalProgress}% · {completedSteps}/{selectedPipeline?.selected_step_count || 0} bước hoàn tất</dd></div>
-          {profile === 'completed' ? <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sổ kế toán</dt><dd className="mt-1 font-semibold text-ink">{selectedAccountingBook?.code} · {selectedAccountingBook?.name}</dd></div> : null}
-          <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dữ liệu sinh kèm</dt><dd className="mt-1 leading-5 text-slate-700">{profile === 'draft' ? 'Thông tin công trình mẫu và thành viên mẫu.' : profile === 'planning' ? 'Pipeline đã chọn, thành viên mẫu, giao việc, biểu mẫu và minh chứng ở các bước đã hoàn tất.' : 'Toàn bộ Pipeline đã chọn, tài khoản mẫu, biểu mẫu, phê duyệt, nghiệp vụ, tài chính, kho, nghiệm thu, bàn giao và minh chứng lịch sử.'}</dd></div>
+          <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dữ liệu sinh kèm</dt><dd className="mt-1 leading-5 text-slate-700">{profile === 'draft' ? 'Thông tin công trình mẫu và thành viên mẫu.' : profile === 'planning' ? 'Pipeline đã chọn, thành viên mẫu, giao việc, biểu mẫu và minh chứng ở các bước đã hoàn tất.' : 'Toàn bộ Pipeline đã chọn, tài khoản mẫu, biểu mẫu, phê duyệt, nguồn thương mại, kho, nghiệm thu, bàn giao công trình và hồ sơ kế toán.'}</dd></div>
           <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium leading-5 text-emerald-900">Không tài khoản người dùng thật nào được thêm hoặc giao việc trong công trình mẫu này.</div>
         </dl>
       </Dialog>

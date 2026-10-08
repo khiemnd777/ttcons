@@ -36,7 +36,6 @@ var systemSettingDefinitions = buildSystemSettingDefinitions()
 
 func buildSystemSettingDefinitions() []systemSettingDefinition {
 	definitions := []systemSettingDefinition{
-		numberSetting("client_payment_min_percent", "business", "Tỷ lệ thu tối thiểu trước thi công", "Tỷ lệ giá trị hợp đồng phải thu trước khi bắt đầu node thi công.", "%", 0, 100, false),
 		multiSelectSetting("surplus_handling_options", "business", "Cách xử lý vật tư dư", "Các phương án được phép chọn khi xử lý vật tư dư tại công trình.", []SystemSettingOption{
 			{Value: "return_to_warehouse", Label: "Lưu kho"},
 			{Value: "return_to_subcontractor", Label: "Trả thầu phụ"},
@@ -297,8 +296,6 @@ func formatSettingNumber(value float64) string {
 
 func systemSettingConfigValue(cfg config.Config, key string) any {
 	switch key {
-	case "client_payment_min_percent":
-		return float64(30)
 	case "surplus_handling_options":
 		return []string{"return_to_warehouse", "return_to_subcontractor"}
 	case "AUTH_ACCESS_TOKEN_MINUTES":
@@ -405,7 +402,7 @@ func applySystemSetting(cfg *config.Config, key string, value any) error {
 	integer64 := func() int64 { numeric, _ := numericSettingValue(value); return int64(numeric) }
 	duration := func() time.Duration { parsed, _ := time.ParseDuration(fmt.Sprint(value)); return parsed }
 	switch key {
-	case "client_payment_min_percent", "surplus_handling_options":
+	case "surplus_handling_options":
 		return nil
 	case "AUTH_ACCESS_TOKEN_MINUTES":
 		cfg.AuthAccessTokenMinutes = integer64()

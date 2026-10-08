@@ -54,8 +54,8 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, mut
 		INSERT INTO handover_records (
 			project_id,handover_code,status,final_acceptance_id,workflow_form_instance_id,handover_date,
 			client_representative,company_representative,documents_ready,warehouse_closed,
-			payables_recorded,receivables_recorded,notes,created_by
-		) VALUES ($1,$2,'draft',NULLIF($3,'')::uuid,NULLIF($4,'')::uuid,NULLIF($5,'')::date,$6,$7,false,false,false,false,NULLIF($8,''),NULLIF($9,'')::uuid)
+			notes,created_by
+		) VALUES ($1,$2,'draft',NULLIF($3,'')::uuid,NULLIF($4,'')::uuid,NULLIF($5,'')::date,$6,$7,false,false,NULLIF($8,''),NULLIF($9,'')::uuid)
 		RETURNING *
 	`, body["project_id"], body["handover_code"], cleanID(body["final_acceptance_id"]), cleanID(body["workflow_form_instance_id"]), body["handover_date"], body["client_representative"], body["company_representative"], body["notes"], actorID)
 	if err != nil {
@@ -68,22 +68,13 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, mut
 	items := []Record{
 		{"item_code": "final_acceptance", "category": "quality", "title": "Biên bản nghiệm thu cuối đạt", "source_type": "acceptance", "source_id": cleanID(body["final_acceptance_id"])},
 		{"item_code": "warehouse_closure", "category": "operation", "title": "Kho công trình và vật tư dư đã đóng", "source_type": "system_check", "source_id": handover["id"]},
-		{"item_code": "project_material_costs", "category": "finance", "title": "Chi phí vật tư công trình đã được xác nhận", "source_type": "system_check", "source_id": handover["id"]},
-		{"item_code": "project_cash_requests", "category": "finance", "title": "Đề nghị thu/chi nội bộ đã được xử lý", "source_type": "system_check", "source_id": handover["id"]},
 		{"item_code": "as_built_documents", "category": "as_built", "title": "Bản vẽ và hồ sơ hoàn công"},
 		{"item_code": "operation_manuals", "category": "operation", "title": "Hướng dẫn vận hành/bảo trì"},
 		{"item_code": "warranty_documents", "category": "warranty", "title": "Cam kết và hồ sơ bảo hành"},
 		{"item_code": "signed_handover_minutes", "category": "legal", "title": "Biên bản bàn giao có xác nhận hai bên"},
 	}
-	splitFinance, err := r.projectUsesSplitHandoverFinanceTx(ctx, tx, cleanID(handover["project_id"]))
-	if err != nil {
-		return nil, err
-	}
 	for _, item := range items {
 		required := true
-		if splitFinance && statusIn(fmt.Sprint(item["item_code"]), "project_material_costs", "project_cash_requests") {
-			required = false
-		}
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO handover_checklist_items (handover_id,project_id,item_code,category,title,required,status,source_type,source_id)
 			VALUES ($1,$2,$3,$4,$5,$6,'pending',NULLIF($7,''),NULLIF($8,'')::uuid)
@@ -158,66 +149,6 @@ func (r *Repository) GetHandoverDetail(ctx context.Context, id string) (Record, 
 	handover["evidence_options"] = evidenceOptions
 	handover["document_options"] = documentOptions
 	return handover, nil
-}
-
-func (r *Repository) ListProjectBudget(ctx context.Context, projectID string) ([]Record, error) {
-	return r.Query(ctx, `
-		SELECT *
-		FROM accounting_budget_balances
-		WHERE project_id=$1 AND status <> 'cancelled'
-		ORDER BY created_at DESC
-	`, projectID)
-}
-
-func (r *Repository) CreateBudget(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
-	return r.insertWithAudit(ctx, "accounting_budgets", budgetColumns(), body, func(row Record) auditEvent {
-		return auditEvent{
-			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
-			EventType: "budget_created", TargetType: "budget",
-			Description: fmt.Sprintf("Tạo ngân sách %s", row["budget_code"]),
-			Metadata:    Record{"status": row["status"], "planned_amount": row["planned_amount"]},
-		}
-	})
-}
-
-func (r *Repository) ApproveBudget(ctx context.Context, id, actorID, actorName string) (Record, error) {
-	return r.withAuditTransaction(ctx, func(tx *sql.Tx) (Record, error) {
-		rows, err := queryTx(ctx, tx, `
-			UPDATE accounting_budgets
-			SET status='approved',
-				approved_amount=planned_amount,
-				remaining_amount=GREATEST(planned_amount-used_amount, 0),
-				approved_by=NULLIF($2,'')::uuid,
-				updated_at=now()
-			WHERE id=$1 AND status IN ('draft','submitted')
-			RETURNING *
-		`, id, actorID)
-		if err != nil {
-			return nil, err
-		}
-		if len(rows) == 0 {
-			return nil, sql.ErrNoRows
-		}
-		return rows[0], nil
-	}, func(row Record) auditEvent {
-		return auditEvent{
-			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
-			EventType: "budget_approved", TargetType: "budget",
-			Description: fmt.Sprintf("Duyệt ngân sách %s", row["budget_code"]),
-			Metadata:    Record{"status": row["status"], "approved_amount": row["approved_amount"]},
-		}
-	})
-}
-
-func (r *Repository) CreatePayment(ctx context.Context, body Record, actorID, actorName string) (Record, error) {
-	return r.insertWithAudit(ctx, "payments", paymentColumns(), body, func(row Record) auditEvent {
-		return auditEvent{
-			ProjectID: cleanID(row["project_id"]), ActorID: actorID, ActorName: actorName,
-			EventType: "payment_created", TargetType: "payment",
-			Description: fmt.Sprintf("Tạo phiếu thanh toán %s", row["payment_code"]),
-			Metadata:    Record{"status": row["status"], "payment_type": row["payment_type"], "amount": row["amount"]},
-		}
-	})
 }
 
 func (r *Repository) AcceptanceAction(ctx context.Context, id, result string, req ActionRequest, actorID, actorName string) (Record, error) {
@@ -463,24 +394,6 @@ func (r *Repository) UpdateHandoverChecklistItem(ctx context.Context, id string,
 	return updated[0], nil
 }
 
-func (r *Repository) projectUsesSplitHandoverFinanceTx(ctx context.Context, tx *sql.Tx, projectID string) (bool, error) {
-	rows, err := queryTx(ctx, tx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM projects project
-			JOIN pipeline_runs run ON run.id=project.current_pipeline_run_id
-			JOIN pipeline_templates template ON template.id=run.template_id
-			WHERE project.id=$1
-			  AND (template.id=$2 OR template.template_family_id=$2)
-			  AND template.revision_no>=8
-		) AS enabled
-	`, projectID, clientOfficialWorkflowTemplateID)
-	if err != nil {
-		return false, err
-	}
-	return len(rows) > 0 && boolValue(rows[0]["enabled"]), nil
-}
-
 func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -499,10 +412,6 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 		return nil, validationError("Cần gửi hồ sơ bàn giao trước khi kiểm tra readiness", Record{"status": handover["status"]})
 	}
 	projectID := cleanID(handover["project_id"])
-	splitFinance, err := r.projectUsesSplitHandoverFinanceTx(ctx, tx, projectID)
-	if err != nil {
-		return nil, err
-	}
 	counts := Record{}
 	checkCount := func(key, query string, args ...any) error {
 		result, err := queryTx(ctx, tx, query, args...)
@@ -535,23 +444,10 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if err := checkCount("pending_surplus", `SELECT COUNT(*) AS total FROM site_material_balances WHERE project_id=$1 AND surplus_quantity > 0 AND surplus_status <> 'handled'`, projectID); err != nil {
 		return nil, err
 	}
-	if err := checkCount("unconfirmed_material_costs", `SELECT COUNT(*) AS total,COALESCE(SUM(total_amount),0) AS amount FROM project_material_costs WHERE project_id=$1 AND status IN ('draft','submitted','needs_changes')`, projectID); err != nil {
-		return nil, err
-	}
-	if err := checkCount("pending_cash_requests", `SELECT COUNT(*) AS total,COALESCE(SUM(amount),0) AS amount FROM project_cash_requests WHERE project_id=$1 AND status NOT IN ('processed','cancelled')`, projectID); err != nil {
-		return nil, err
-	}
 
-	costsReady := number(counts["unconfirmed_material_costs"]) == 0
-	cashRequestsReady := number(counts["pending_cash_requests"]) == 0
 	systemStatuses := map[string]bool{
-		"final_acceptance":       number(counts["final_acceptance"]) > 0,
-		"warehouse_closure":      number(counts["pending_surplus"]) == 0,
-		"project_material_costs": costsReady,
-		"project_cash_requests":  cashRequestsReady,
-		// Compatibility for handover packages created before the project-finance boundary changed.
-		"ap_reconciliation": costsReady,
-		"ar_reconciliation": cashRequestsReady,
+		"final_acceptance":  number(counts["final_acceptance"]) > 0,
+		"warehouse_closure": number(counts["pending_surplus"]) == 0,
 	}
 	for itemCode, passed := range systemStatuses {
 		status := "pending"
@@ -586,21 +482,14 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	if number(counts["pending_surplus"]) > 0 {
 		blockers = append(blockers, "Còn vật tư dư chưa xử lý")
 	}
-	if !splitFinance && !costsReady {
-		blockers = append(blockers, "Còn chi phí vật tư chưa được xác nhận")
-	}
-	if !splitFinance && !cashRequestsReady {
-		blockers = append(blockers, "Còn đề nghị thu/chi nội bộ chưa được xử lý")
-	}
 	pendingItems, err := queryTx(ctx, tx, `
 		SELECT item_code,title
 		FROM handover_checklist_items
 		WHERE handover_id=$1
 		  AND required
 		  AND status <> 'verified'
-		  AND (NOT $2 OR item_code NOT IN ('project_material_costs','project_cash_requests','ap_reconciliation','ar_reconciliation'))
 		ORDER BY created_at
-	`, id, splitFinance)
+	`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -614,15 +503,14 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 	}
 	snapshot := Record{
 		"ready": ready, "blockers": blockers, "counts": counts,
-		"finance_separated": splitFinance,
-		"checked_at":        time.Now().UTC().Format(time.RFC3339),
+		"checked_at": time.Now().UTC().Format(time.RFC3339),
 	}
 	rawSnapshot, _ := json.Marshal(snapshot)
 	updated, err := queryTx(ctx, tx, `
-		UPDATE handover_records SET status=$2,documents_ready=$3,warehouse_closed=$4,payables_recorded=$5,receivables_recorded=$6,
-			readiness_snapshot_json=$7::jsonb,checked_by=NULLIF($8,'')::uuid,checked_at=now(),updated_at=now()
+		UPDATE handover_records SET status=$2,documents_ready=$3,warehouse_closed=$4,
+			readiness_snapshot_json=$5::jsonb,checked_by=NULLIF($6,'')::uuid,checked_at=now(),updated_at=now()
 		WHERE id=$1 RETURNING *
-	`, id, nextStatus, len(pendingItems) == 0, systemStatuses["warehouse_closure"], costsReady, cashRequestsReady, string(rawSnapshot), actorID)
+	`, id, nextStatus, len(pendingItems) == 0, systemStatuses["warehouse_closure"], string(rawSnapshot), actorID)
 	if err != nil {
 		return nil, err
 	}

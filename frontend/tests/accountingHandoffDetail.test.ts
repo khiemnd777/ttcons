@@ -67,6 +67,12 @@ test('snapshot tab never substitutes current fields or attachments for historica
   assert.match(render({ tab: 'snapshot', data: { ...data, handoff: null } }), /Hồ sơ chưa được bàn giao/);
 });
 
+test('source-only access shows current source even on stale snapshot selection and hides stored handoff and actions', () => {
+  const html = render({ tab: 'snapshot', data: { ...data, handoff_access: false } });
+  assert.match(html, /Nguồn hiện tại|150,00|PNK-1/);
+  assert.doesNotMatch(html, /Bản chụp cũ|Thông tin đã bàn giao|Hồ sơ chưa được bàn giao|Thông tin bàn giao|Xác nhận tiếp nhận hồ sơ|Trả để bổ sung/);
+});
+
 test('loading/error/restricted states do not expose stale records or actions', () => {
   assert.match(render({ loading: true }), /Đang tải hồ sơ/);
   assert.doesNotMatch(render({ loading: true }), /PO-1|Xác nhận tiếp nhận/);
@@ -115,7 +121,7 @@ test('every accounting entrypoint opens the shared dialog for the selected sourc
 test('file actions preserve evidence IDs, document IDs and exact workflow PDF exports', () => {
   for (const [name, label] of [['ảnh.png', 'Xem ảnh'], ['file.pdf', 'Xem PDF'], ['file.docx', 'Xem Word'], ['file.xlsx', 'Xem Excel']]) {
     const fixture = harness(); const file = { kind: 'evidence', id: 'exact-evidence', name };
-    const args = { ...props, data: { ...data, files: [file] } };
+    const args = { ...props, data: { ...data, handoff_access: false, files: [file] } };
     const button = find(fixture.render('AccountingHandoffDetailContent', args), (node) => node.type === 'button' && node.props.children === label);
     assert.ok(button, label); button.props.onClick();
     const viewer = find(fixture.render('AccountingHandoffDetailContent', args), (node) => node.type?.name === 'EvidenceReferenceViewer');
@@ -123,7 +129,7 @@ test('file actions preserve evidence IDs, document IDs and exact workflow PDF ex
     assert.equal(viewer.props.reference.record, undefined, 'do not fabricate evidence metadata');
   }
   const fixture = harness();
-  const args = { ...props, data: { ...data, files: [{ kind: 'workflow_pdf', id: 'export-revision-2', name: 'Nghiệm thu.pdf' }, { kind: 'document', id: 'document-id', name: 'Hợp đồng.pdf' }] } };
+  const args = { ...props, data: { ...data, handoff_access: false, files: [{ kind: 'workflow_pdf', id: 'export-revision-2', name: 'Nghiệm thu.pdf' }, { kind: 'document', id: 'document-id', name: 'Hợp đồng.pdf' }] } };
   const tree = fixture.render('AccountingHandoffDetailContent', args);
   assert.equal(find(tree, (node) => node.type?.name === 'DocumentReferenceViewButton').props.file.id, 'document-id');
   find(tree, (node) => node.type === 'button' && node.props.children === 'Xem PDF').props.onClick();

@@ -16,9 +16,6 @@ export const recordKinds = {
   planning_checklist: { label: 'Checklist kế hoạch', permissions: ['planning.view', 'pipeline.view'] },
   role: { label: 'Vai trò', permissions: ['role.view'] },
   audit: { label: 'Sự kiện hệ thống', permissions: ['audit.view'] },
-  payable: { label: 'Phải trả', permissions: ['accounting.payable_view'] },
-  receivable: { label: 'Phải thu', permissions: ['accounting.receivable_view'] },
-  payment: { label: 'Phiếu thu/chi', permissions: ['accounting.view', 'accounting.payment_create', 'accounting.payment_approve'] },
   incoming_acceptance: { label: 'Nghiệm thu đầu vào', permissions: ['acceptance.view', 'operation.view', 'warehouse.view'] },
   contract: { label: 'Hợp đồng', permissions: ['contract.view'] },
   issue: { label: 'Vấn đề công trình', permissions: ['operation.view'] },
@@ -44,7 +41,7 @@ export function recordPath(target: RecordTarget): string | null {
   const paths: Partial<Record<RecordKind, string>> = {
     boq_item: `${project}/boq`, supplier_quotation: `${project}/boq`, procurement_request: `${project}/procurement`,
     acceptance: `${project}/acceptance`, handover: `${project}/handover`, stock_document: `${project}/warehouse`,
-    rework: '/rework', replanning: '/rework', payable: '/debt/payables', receivable: '/debt/receivables',
+    rework: '/rework', replanning: '/rework',
     partner: `/core-data/${target.partnerGroup ?? 'output'}`, role: '/roles', audit: `${project}/audit`, contract: `${project}/contracts`,
   };
   if (target.kind === 'work_item') return `${project}/work-items/${target.id}`;
@@ -82,9 +79,8 @@ export function recordRead(target: RecordTarget): { path: string; collection?: '
   if (direct[target.kind]) return { path: `${direct[target.kind]}/${id}` };
   if (target.kind === 'audit') return { path: `/audit-logs?record_id=${id}${project ? `&project_id=${project}` : ''}`, collection: 'items' };
   const lists: Partial<Record<RecordKind, string>> = {
-    partner: '/partners?status=all', role: '/roles', payment: '/payments', stock_movement: `/stock/movements?project_id=${project}`,
+    partner: '/partners?status=all', role: '/roles', stock_movement: `/stock/movements?project_id=${project}`,
     rework: `/projects/${project}/reworks`, replanning: `/projects/${project}/replannings`, issue: `/projects/${project}/issues`,
-    payable: `/payables?project_id=${project}`, receivable: `/receivables?project_id=${project}`,
   };
   if (!lists[target.kind]) throw new RecordUnavailable();
   return { path: lists[target.kind]!, collection: 'array' };
@@ -113,7 +109,7 @@ export function typedRecordTarget(type: unknown, id: unknown, projectId?: string
     acceptance: 'acceptance', acceptance_record: 'acceptance', incoming_acceptance: 'incoming_acceptance', handover: 'handover',
     stock_document: 'stock_document', stock_movement: 'stock_movement', work_item: 'work_item', rework: 'rework', rework_request: 'rework',
     replanning: 'replanning', replanning_request: 'replanning', supplier_quotation: 'supplier_quotation', partner: 'partner', role: 'role',
-    payable: 'payable', receivable: 'receivable', payment: 'payment', contract: 'contract', issue: 'issue',
+    contract: 'contract', issue: 'issue',
   };
   const kind = aliases[String(type)];
   return kind && isRecordID(id) ? { kind, id, projectId } : null;
@@ -142,9 +138,9 @@ export function relatedRecordTargets(kind: RecordKind, row: Record<string, any>)
   field('stock_document', 'stock_document_id', row.document_code);
   field('stock_document', 'correction_of_document_id', 'Phiếu trước điều chỉnh');
   field('stock_document', 'corrected_by_document_id', 'Phiếu điều chỉnh thay thế');
-  field('payable', 'payable_id'); field('receivable', 'receivable_id'); field('contract', 'contract_id');
+  field('contract', 'contract_id');
   add(typedRecordTarget(row.reference_type, row.reference_id, row.project_id));
   add(typedRecordTarget(row.source_type, row.source_id, row.project_id));
-  if (kind === 'audit' || kind === 'payment') add(typedRecordTarget(row.target_type, row.target_id, row.project_id));
+  if (kind === 'audit') add(typedRecordTarget(row.target_type, row.target_id, row.project_id));
   return result;
 }

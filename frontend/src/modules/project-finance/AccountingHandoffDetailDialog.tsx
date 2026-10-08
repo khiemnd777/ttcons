@@ -24,8 +24,8 @@ export function accountingHandoffDetailPath(target: AccountingHandoffTarget) {
   return `/projects/${encodeURIComponent(target.project_id)}/accounting-handoff-detail?${new URLSearchParams({ source_type: target.source_type, source_id: target.source_id })}`;
 }
 
-export function AccountingHandoffDetailDialog({ target, taskId = '', onClose }: {
-  target: AccountingHandoffTarget; taskId?: string; onClose: () => void;
+export function AccountingHandoffDetailDialog({ target, taskId = '', showReconciliation = true, onClose }: {
+  target: AccountingHandoffTarget; taskId?: string; showReconciliation?: boolean; onClose: () => void;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -57,13 +57,13 @@ export function AccountingHandoffDetailDialog({ target, taskId = '', onClose }: 
   });
   const data = query.isFetchedAfterMount && !query.isError && !query.isFetching ? query.data : undefined;
   function openAction(action: AccountingHandoffAction) {
-    if (!data?.capabilities[action]) return;
+    if (!data?.capabilities[action] || data.handoff_access === false) return;
     const source = data.current ?? data.handoff?.source_snapshot_json;
     setActionDialog({ action, item: { handoff_id: data.handoff?.id, source_code: source?.source_code ?? '', source_title: source?.source_title ?? '', note: data.handoff?.note, external_reference: data.handoff?.external_reference } });
   }
   return <>
     <Dialog open title="Chi tiết hồ sơ kế toán" size="xl" mobileFullscreen manageFocus onClose={() => { if (!mutation.isPending && !actionDialog) onClose(); }}>
-      {data && <AccountingOperationsButton projectId={target.project_id} source={target}/>}
+      {data && showReconciliation && <AccountingOperationsButton projectId={target.project_id} source={target}/>}
       <AccountingHandoffDetailContent data={data} tab={tab} onTab={setTab} loading={query.isFetching || (!query.isFetchedAfterMount && !query.isError)} error={query.isError} onRetry={() => void query.refetch()} onAction={openAction} />
     </Dialog>
     <AccountingHandoffActionDialog dialog={actionDialog} pending={mutation.isPending} onClose={() => { if (!mutation.isPending) setActionDialog(null); }} onSubmit={(values) => { if (actionDialog) mutation.mutate({ action: actionDialog.action, values }); }} />
@@ -77,18 +77,19 @@ export function AccountingHandoffDetailContent({ data, loading, error, tab, onTa
   const [evidence, setEvidence] = useState<AccountingHandoffDetail['files'][number] | null>(null);
   if (error) return <div role="alert">Không tải được hồ sơ hoặc không có quyền truy cập. <button className="text-blue-700 underline" onClick={onRetry}>Thử lại</button></div>;
   if (loading || !data) return <p role="status">Đang tải hồ sơ…</p>;
-  const handoff = data.handoff;
+  const canViewHandoff = data.handoff_access !== false;
+  const handoff = canViewHandoff ? data.handoff : null;
   const snapshot = handoff?.source_snapshot_json;
   const title = data.current ?? snapshot;
   return <div className="space-y-4" data-component="accounting-handoff-detail">
-    <div><p className="font-semibold">{title?.source_code} · {title?.source_title}</p><p className="text-sm text-slate-600">{data.project.code} · {data.project.name}</p><StatusBadge status={data.status} /></div>
+    <div><p className="font-semibold">{title?.source_code} · {title?.source_title}</p><p className="text-sm text-slate-600">{data.project.code} · {data.project.name}</p>{canViewHandoff && <StatusBadge status={data.status} />}</div>
     <p className="rounded bg-blue-50 p-3 text-xs text-blue-900">Giá trị tham chiếu từ hồ sơ nguồn. MISA là nguồn công nợ và thu/chi chính thức; mã tham chiếu không xác nhận đã đồng bộ hoặc thanh toán.</p>
-    <WorkspaceTabs tabs={[{ id: 'current', label: 'Đối chiếu nguồn', icon: ClipboardList }, { id: 'snapshot', label: 'Thông tin đã bàn giao', icon: History }]} activeTab={tab} onChange={onTab} ariaLabel="Chi tiết hồ sơ kế toán" />
-    {tab === 'snapshot' ? <RecordSection title="Thông tin đã bàn giao" description="Bản chụp của lần bàn giao gần nhất được lưu trong hồ sơ; không bổ sung chứng từ hiện tại vào bản chụp.">
+    {canViewHandoff && <WorkspaceTabs tabs={[{ id: 'current', label: 'Đối chiếu nguồn', icon: ClipboardList }, { id: 'snapshot', label: 'Thông tin đã bàn giao', icon: History }]} activeTab={tab} onChange={onTab} ariaLabel="Chi tiết hồ sơ kế toán" />}
+    {canViewHandoff && tab === 'snapshot' ? <RecordSection title="Thông tin đã bàn giao" description="Bản chụp của lần bàn giao gần nhất được lưu trong hồ sơ; không bổ sung chứng từ hiện tại vào bản chụp.">
       {snapshot ? <SourceFields source={snapshot} snapshot /> : <RecordEmpty>Hồ sơ chưa được bàn giao.</RecordEmpty>}
     </RecordSection> : <>
       <RecordSection title="Nguồn hiện tại">
-        {data.current ? <SourceFields source={data.current} /> : <RecordEmpty>{data.source_access ? 'Nguồn không còn khả dụng. Thông tin đã bàn giao vẫn được giữ riêng.' : 'Không thể mở hồ sơ nguồn theo quyền hiện tại.'}</RecordEmpty>}
+        {data.current ? <SourceFields source={data.current} /> : <RecordEmpty>{data.source_access ? canViewHandoff ? 'Nguồn không còn khả dụng. Thông tin đã bàn giao vẫn được giữ riêng.' : 'Nguồn không còn khả dụng.' : 'Không thể mở hồ sơ nguồn theo quyền hiện tại.'}</RecordEmpty>}
         {data.current?.requirements?.length ? <ul className="mt-3 space-y-1 text-sm">{data.current.requirements.map((requirement) => <li key={requirement.key}>{requirement.met ? '✓' : '○'} {requirement.label}{!requirement.met ? ` — ${requirement.guidance}` : ''}</li>)}</ul> : null}
       </RecordSection>
       {data.restricted ? <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">Một số nguồn không thể hiển thị theo quyền hoặc trạng thái hiện tại.</p> : null}
@@ -110,11 +111,11 @@ export function AccountingHandoffDetailContent({ data, loading, error, tab, onTa
         <div><dt>Mã tham chiếu MISA do người dùng ghi nhận</dt><dd>{handoff.external_reference || 'Chưa ghi nhận'}</dd></div><div><dt>Ghi chú</dt><dd className="whitespace-pre-wrap">{handoff.note || '—'}</dd></div>
         {handoff.return_reason ? <div className="text-amber-800"><dt>Nội dung cần bổ sung</dt><dd>{handoff.return_reason}</dd></div> : null}</dl>
     </RecordSection> : null}
-    <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
+    {canViewHandoff && <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
       {data.capabilities.return ? <button className="rounded border border-line px-3 py-2" onClick={() => onAction('return')}>Trả để bổ sung</button> : null}
       {data.capabilities.acknowledge ? <button className="rounded bg-blue-600 px-3 py-2 font-semibold text-white" onClick={() => onAction('acknowledge')}>Xác nhận tiếp nhận hồ sơ</button> : null}
       {data.capabilities.handoff ? <button className="rounded bg-blue-600 px-3 py-2 font-semibold text-white" onClick={() => onAction('handoff')}>{handoff ? 'Bàn giao lại hồ sơ' : 'Bàn giao cho Kế toán'}</button> : null}
-    </div>
+    </div>}
     {evidence?.kind === 'workflow_pdf' ? <ProtectedDocumentViewerDialog name={evidence.name} mimeType="application/pdf" protectedFilePath={`/workflow-form-pdf-exports/${encodeURIComponent(evidence.id)}/file`} sourceLabel="Bản PDF được hồ sơ nghiệm thu tham chiếu" onClose={() => setEvidence(null)} /> : <EvidenceReferenceViewer reference={evidence ? { id: evidence.id, name: evidence.name } : null} onClose={() => setEvidence(null)} />}
   </div>;
 }

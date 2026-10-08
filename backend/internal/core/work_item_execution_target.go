@@ -60,13 +60,6 @@ var executionWorkspaceByActionPrefix = []struct {
 	{Prefix: "owner.", Workspace: executionWorkspaceAcceptance},
 	{Prefix: "acceptance.", Workspace: executionWorkspaceAcceptance},
 	{Prefix: "source.final_acceptance", Workspace: executionWorkspaceAcceptance},
-	{Prefix: "source.payable", Workspace: executionWorkspaceProjectFinance},
-	{Prefix: "source.input_invoice", Workspace: executionWorkspaceProjectFinance},
-	{Prefix: "payable.", Workspace: executionWorkspaceProjectFinance},
-	{Prefix: "source.receivable", Workspace: executionWorkspaceProjectFinance},
-	{Prefix: "receivable.", Workspace: executionWorkspaceProjectFinance},
-	{Prefix: "finance.", Workspace: executionWorkspaceProjectFinance},
-	{Prefix: "source.project_finance", Workspace: executionWorkspaceProjectFinance},
 	{Prefix: "source.accounting_handoff", Workspace: executionWorkspaceProjectFinance},
 	{Prefix: "source.handover", Workspace: executionWorkspaceHandover},
 	{Prefix: "handover.", Workspace: executionWorkspaceHandover},
@@ -82,9 +75,6 @@ func workItemExecutionTarget(item Record, businessSource Record) Record {
 	completionMode := executionCompletionMode(kind)
 	presentation := executionWorkspacePresentations[workspace]
 	actionLabel := presentation.ActionLabel
-	if workspace == executionWorkspaceProjectFinance && !strings.HasPrefix(actionKey, "source.accounting_handoff") {
-		actionLabel = "Mở tài chính công trình"
-	}
 	switch kind {
 	case "approval":
 		actionLabel = "Mở phê duyệt"

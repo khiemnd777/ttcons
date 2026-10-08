@@ -141,7 +141,7 @@ func (s *Service) projectExplorerPage(ctx context.Context, actorID string, reque
 
 func (s *Service) projectExplorerCachedPage(ctx context.Context, actorID string, request ProjectExplorerRequest, revision projectExplorerRevisionSnapshot) (ProjectExplorerPage, error) {
 	runtime := s.projectExplorer
-	indexKey := fmt.Sprintf("consflow:project-explorer:%s:index:%d:%s:%d:%t:%s", projectExplorerCacheSchemaVersion, revision.CatalogVersion, actorID, revision.ActorVersion, revision.SupervisionScope, request.cacheHash())
+	indexKey := fmt.Sprintf("consflow:project-explorer:%s:index:%d:%s:%d:%t:%t:%s", projectExplorerCacheSchemaVersion, revision.CatalogVersion, actorID, revision.ActorVersion, revision.BypassAccess, revision.SupervisionScope, request.cacheHash())
 	startedAt := time.Now()
 	index, hit, err := runtime.cache.getIndex(ctx, indexKey)
 	runtime.operation("get_index", time.Since(startedAt))

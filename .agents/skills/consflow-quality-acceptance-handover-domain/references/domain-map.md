@@ -1,5 +1,11 @@
 # Quality Acceptance Handover Domain Map
 
+## Current Accounting Retirement Boundary — V150/V151
+
+- Physical handover readiness uses completed passing final acceptance, mandatory verified documents, unresolved issues/NCR/rework/actions and surplus handling. Internal cost/cash/APAR checks and payables_recorded/receivables_recorded flags are removed.
+- HandoverSourcePresentation exposes only current acceptance/warehouse/document sources; no old cost/cash/APAR aliases. Current Rev9 final accounting gate separately requires every candidate acknowledged after physical handover.
+- Source-only reconciliation detail can reuse AccountingHandoffDetailDialog under reconciliation.view plus actual source permission. Stored handoff snapshots/actions still require handoff.view; handoff_access=false suppresses those tabs/actions, without implying no historical handoff.
+
 ## Exact Record Source Navigation
 
 - Handover exact links reveal/focus the existing workspace after the matching detail has loaded, once per requested ID, with space for the sticky header; selection or immediate scrolling before layout settles leaves the source below the fold. Shared Dialog ignores covered modals during focus and keyboard handling; nested source/evidence dialogs retain their existing handlers. Nested-modal browser interaction remains a separate verification case.
@@ -68,26 +74,22 @@
 - Pending RFI-backed checks and technical NCR/legacy issue action backfills are view-only on the field surface. Editable canonical actions preserve immutable source/evidence/impact/status and synchronize safe metadata to linked issue/rework rows transactionally, so technical audit history and handover blocker semantics do not drift.
 - Rework completion does not erase acceptance history.
 - Issue updates whose request body contains `status`, rework `approved`/`done`, and replanning approval persist their audit event in the same transaction and fail closed. An invalid audit actor/target or audit insert failure rolls back the status transition. Issue updates without `status` persist metadata edits and attempt the same single `issue_updated` event best-effort; issue/rework/replanning draft creation also remains best-effort, and every audit failure is logged with structured fields.
-- Handover completion requires a submitted package, the exact linked final acceptance to be completed/pass or conditional-pass, all required checklist items verified from accepted evidence/active documents or system sources, no open simplified action/issue/NCR/rework/material-surplus blockers, and a fresh readiness snapshot. Rev7 and older keep legacy finance blockers inside handover. Rev8 separates physical handover and its legacy project-finance close gate. Rev9 separates physical handover and requires every current Accounting Handoff candidate acknowledged at the final `source.accounting_handoff_close_ready` gate.
 - Handover creation previews and locks the exact selected final-acceptance source, prefills available representatives and does not let the client attest checklist/readiness values. The user-facing entity is `Hồ sơ bàn giao`; the project page presents history filters and the hồ sơ list before an inline workspace for the selected/newest record with `Việc cần làm`, `Checklist` and `Thông tin hồ sơ`. `Xem chi tiết` selects and scrolls/focuses this workspace even when the record is already active. It leads with one state-derived next action and maps snapshot blocker text to navigation links for Acceptance, Operations, Warehouse or `Bàn giao kế toán`. These links are presentation-only; the UI does not enforce a single active package or mutate blocker sources.
 - Readiness-owned checklist sources (`final_acceptance`, `warehouse_closure`, `ap_reconciliation`, `ar_reconciliation`) expose a read-only `Xem nguồn` dialog. It must show the exact backend criterion, result/count/amount/time from the last stored readiness snapshot, state that source data may have changed since that check, and offer only permission-allowed navigation to the source module. Evidence/document-linked checklist rows remain manual verification sources and must never be relabelled as automatic. They also expose read-only `Xem nguồn` from the exact item-linked record, including locked handed-over hồ sơ; internally stored `local|s3` evidence continues through the protected evidence-file route, which authorizes before provider-registry `Open` and streams without exposing an object key or filesystem path. `external`, `none` and unknown providers are not treated as protected evidence. Document URLs are opened only when present and safe, placeholder/missing targets are explicit, and `Cập nhật liên kết` is limited to mutable hồ sơ plus handover verification permission.
-- Rev8/older checklist presentation preserves automatic `project_material_costs`, `project_cash_requests`, `ap_reconciliation` and `ar_reconciliation` rows as legacy compatibility. Rev9 closure reads `accounting_handoffs` through its final source gate instead of injecting duplicate monetary checklist declarations. Source navigation uses the ordinary `Bàn giao kế toán` route; raw legacy codes remain tooltip-only.
 
 ## Developer Sample Data
 
 - Completed samples create passed incoming and final acceptance records linked to their runtime work items, forms/PDF and protected evidence, then a `handed_over` record with a verified source-backed checklist.
 - The selected Pipeline must expose portable incoming material acceptance, `outgoing_acceptance` and physical handover `handover/source.handover_completed` bindings. Handover history uses the completed bound work item/evidence rather than any template ID, revision, step ordinal or generic finance fallback.
-- Handover readiness asserts final acceptance, warehouse closure, paid/received finance and evidence history; sample metadata never waives a required source link.
+- Sample v5 validates final acceptance, warehouse closure, mandatory verified documents and protected evidence. Current Rev9 separately checks acknowledged accounting dossiers; no paid/received condition exists.
 
 ## Cross-Domain Checks
 
 - Pair with construction operations when acceptance consumes work-item evidence, checklist results, site reports, or rework activity.
 - Pair with materials/warehouse and procurement when incoming acceptance or handover readiness depends on deliveries, stock, site balance, or surplus.
-- Pair with accounting/finance when Rev9 closure depends on current Accounting Handoff acknowledgement, or when pinned Rev8/older projects retain unconfirmed material-cost/pending cash-request blockers; legacy AP/AR is not an ordinary closure gate.
 
-## Golden Sample
+## Current Sample Data
 
-- `GOLDEN-REAL-001` preserves technical ITP/RFI/NCR/rework history behind one optional active template, four checks, four role-based evidence associations and one resolved action; the remaining pending check has context evidence and is not a handover blocker, while open actions are. Final acceptance and the handed-over package remain complete with 8/8 verified checklist items.
 
 ## Rev3 QA/QC Boundary
 

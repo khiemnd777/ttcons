@@ -10,16 +10,11 @@ import (
 	"io"
 	"log"
 	"math"
-	"mime/multipart"
-	"net/http"
-	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
 	sharedstorage "consflow/backend/internal/shared/storage"
 
-	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
 )
 
@@ -28,112 +23,6 @@ type EvidenceFileResult struct {
 	Size     int64
 	MIMEType string
 	Filename string
-}
-
-func (s *Service) storeInputInvoicePDF(ctx context.Context, projectID, payableID string, fileHeader *multipart.FileHeader) (StoredFileMetadata, storedObjectRef, string, error) {
-	if fileHeader == nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn là bắt buộc")
-	}
-	if fileHeader.Size <= 0 {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn không được rỗng")
-	}
-	if fileHeader.Size > s.maxUploadBytes {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
-	}
-	source, err := fileHeader.Open()
-	if err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", err
-	}
-	defer source.Close()
-
-	header := make([]byte, 512)
-	n, readErr := io.ReadFull(source, header)
-	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
-		return StoredFileMetadata{}, storedObjectRef{}, "", readErr
-	}
-	detectedMIME := http.DetectContentType(header[:n])
-	if detectedMIME != "application/pdf" {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("Hoá đơn đầu vào chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
-	}
-	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", fmt.Errorf("rewind input invoice upload: %w", err)
-	}
-	originalName := cleanUploadFilename(fileHeader.Filename)
-	if originalName == "minh-chung" || originalName == "evidence-file" {
-		originalName = "input-invoice.pdf"
-	}
-	if filepath.Ext(originalName) == "" {
-		originalName += ".pdf"
-	}
-	storageKey := path.Join("input-invoices", cleanID(projectID), cleanID(payableID), uuid.NewString()+".pdf")
-	registry, writeProvider, err := s.storageWriter()
-	if err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", err
-	}
-	object, err := registry.Put(ctx, writeProvider, storageKey, source, sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
-	if err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", err
-	}
-	return StoredFileMetadata{
-		StorageProvider: object.Provider,
-		StorageKey:      object.Key,
-		MIMEType:        "application/pdf",
-		FileSize:        object.Size,
-		ChecksumSHA256:  object.ChecksumSHA256,
-	}, storedObjectRef{Provider: object.Provider, Key: object.Key}, originalName, nil
-}
-
-func (s *Service) storeOutputInvoicePDF(ctx context.Context, projectID, receivableID string, fileHeader *multipart.FileHeader) (StoredFileMetadata, storedObjectRef, string, error) {
-	if fileHeader == nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn là bắt buộc")
-	}
-	if fileHeader.Size <= 0 {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn không được rỗng")
-	}
-	if fileHeader.Size > s.maxUploadBytes {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("File PDF hoá đơn vượt quá dung lượng cho phép", Record{"max_bytes": s.maxUploadBytes})
-	}
-	source, err := fileHeader.Open()
-	if err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", err
-	}
-	defer source.Close()
-
-	header := make([]byte, 512)
-	n, readErr := io.ReadFull(source, header)
-	if readErr != nil && !errors.Is(readErr, io.ErrUnexpectedEOF) && !errors.Is(readErr, io.EOF) {
-		return StoredFileMetadata{}, storedObjectRef{}, "", readErr
-	}
-	detectedMIME := http.DetectContentType(header[:n])
-	if detectedMIME != "application/pdf" {
-		return StoredFileMetadata{}, storedObjectRef{}, "", validationError("Hoá đơn đầu ra chỉ hỗ trợ PDF", Record{"mime_type": detectedMIME})
-	}
-	if _, err := source.Seek(0, io.SeekStart); err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", fmt.Errorf("rewind output invoice upload: %w", err)
-	}
-	originalName := cleanUploadFilename(fileHeader.Filename)
-	if originalName == "minh-chung" || originalName == "evidence-file" {
-		originalName = "output-invoice.pdf"
-	}
-	if filepath.Ext(originalName) == "" {
-		originalName += ".pdf"
-	}
-	storageKey := path.Join("output-invoices", cleanID(projectID), cleanID(receivableID), uuid.NewString()+".pdf")
-	registry, writeProvider, err := s.storageWriter()
-	if err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", err
-	}
-	object, err := registry.Put(ctx, writeProvider, storageKey, source, sharedstorage.PutOptions{ContentType: "application/pdf", ExpectedSize: fileHeader.Size})
-	if err != nil {
-		return StoredFileMetadata{}, storedObjectRef{}, "", err
-	}
-	return StoredFileMetadata{
-		StorageProvider: object.Provider,
-		StorageKey:      object.Key,
-		MIMEType:        "application/pdf",
-		FileSize:        object.Size,
-		ChecksumSHA256:  object.ChecksumSHA256,
-	}, storedObjectRef{Provider: object.Provider, Key: object.Key}, originalName, nil
 }
 
 type storedObjectRef struct {

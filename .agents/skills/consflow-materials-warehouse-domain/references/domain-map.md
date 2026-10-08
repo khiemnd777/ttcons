@@ -1,9 +1,13 @@
 # Materials Warehouse Domain Map
 
+## Current Accounting Retirement Boundary — V150/V151
+
+- accounting_reconciliation.go/AccountingOperationsDialog own read-only source/evidence references; source matching never moves/values stock or creates internal financial records.
+- Warehouse correction no longer relinks retired project_material_costs. Actual stock document/item balances, correction chains, audit and same-project authorized source navigation remain.
+- Completed sample uses actual incoming_acceptance_items.id for stock source lines and real protected construction-check evidence; quantity/source identity and role ownership must remain consistent.
+
 ## Proposal Context From Existing Stock
 
-- V145 proposals may link exact posted `issue` document IDs from the same project. Save checks warehouse permission and identity; submit rechecks posted state. `AccountingOperationsWorkspace` lists these documents separately, without requiring a proposal to exist. Corrected/cancelled or cross-project issues are not eligible.
-- `accounting_requests.go` / `AccountingOperationsDialog.tsx` own the reference adapter, not stock or valuation. No implicit payable, cost, receipt or movement is created by linking existing stock. First searches: `stock_document_ids|referencesValid|AccountingOperationsWorkspace`. Warehouse canonical document viewer remains the destination; movement quantities and physical-unit invariants remain unchanged.
 
 ## Accounting Receipt Trace
 
@@ -88,14 +92,12 @@
 
 - Pair with procurement when receive/order flows create stock movements or material obligations.
 - Procurement `receive` now reconciles submitted incoming-acceptance quantities into `partially_received`/`received`; it does not create `stock_movements`. Warehouse receipt remains an explicit stock action with its own balance ledger and audit.
-- Submitted incoming acceptance and posted stock documents remain canonical readiness/quantity evidence attached to their Procurement source. They do not create separate Accounting Handoff rows; handoff transitions never post, reverse or change warehouse movements/balances. Rev8/legacy projects may still select them as old `project_material_costs` evidence.
 - Pair with construction operations when site usage, before/after snapshots, or surplus handling changes work item state.
 - Pair with quality/acceptance/handover when incoming acceptance, outgoing acceptance, or handover blockers depend on material state.
 - Stock, acceptance, snapshot and surplus quantities remain numeric quantity fields. The ordinary Warehouse UI has no editable monetary field; if a compatibility maintenance surface ever edits `standard_price`, it must still use semantic `currency`/shared `CurrencyInput`.
 
-## Golden Sample
+## Current Sample Data
 
-- `GOLDEN-REAL-001` traces procurement acceptance into explicit receive/issue/return movements, six site balances, a submitted material snapshot and six surplus-return histories; final surplus is zero and every balance is `handled`.
 - Posted stock documents opened from a canonical Warehouse Work Item may carry explicit `work_item_context`; work-item-owned material snapshots and surplus handling derive the same start intent from their persisted link. The stock/source rows, movements, balance/audit and Work Item transition share one transaction. Wrong project/action/workspace, future/terminal work or missing permission rolls back the warehouse mutation; auto-start never changes quantities, invents movements or marks surplus handled.
 
 ## Notification Platform Boundary

@@ -71,8 +71,8 @@ func TestSystemSettingsBackupPreviewClassifiesChangesAndCompatibility(t *testing
 		if entry.Key == "HTTP_READ_TIMEOUT" {
 			continue
 		}
-		if entry.Key == "client_payment_min_percent" {
-			entry.Value = float64(40)
+		if entry.Key == "surplus_handling_options" {
+			entry.Value = []string{"return_to_warehouse"}
 		}
 		settings = append(settings, entry)
 	}
@@ -92,7 +92,7 @@ func TestSystemSettingsBackupPreviewClassifiesChangesAndCompatibility(t *testing
 	if analysis.UnsupportedCount != 1 || analysis.PreservedMissingCount != 1 {
 		t.Fatalf("compatibility counts=%+v", analysis.responseRecord())
 	}
-	if analysis.ExpectedVersions["client_payment_min_percent"] != 7 || len(analysis.Updates) != 1 {
+	if analysis.ExpectedVersions["surplus_handling_options"] != 7 || len(analysis.Updates) != 1 {
 		t.Fatalf("expected versions=%+v updates=%+v", analysis.ExpectedVersions, analysis.Updates)
 	}
 	if analysis.FileHash != systemSettingsBackupHash(raw) {
@@ -133,7 +133,7 @@ func TestSystemSettingsBackupRejectsSensitiveCoreDuplicateAndInvalidValues(t *te
 			name: "invalid known value", wantError: "phải là số",
 			mutate: func(document *systemSettingsBackupDocument) {
 				for index := range document.Settings {
-					if document.Settings[index].Key == "client_payment_min_percent" {
+					if document.Settings[index].Key == "AUTH_ACCESS_TOKEN_MINUTES" {
 						document.Settings[index].Value = "not-a-number"
 					}
 				}

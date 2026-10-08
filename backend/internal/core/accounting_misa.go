@@ -20,12 +20,20 @@ type AccountingMISAImportInput struct {
 	Content  string `json:"content"`
 }
 type AccountingMISAAllocationInput struct {
-	ID          string `json:"id"`
-	RequestID   string `json:"request_id"`
-	RecordID    string `json:"record_id"`
-	Amount      string `json:"amount"`
+	ID       string `json:"id"`
+	BasisID  string `json:"basis_id"`
+	RecordID string `json:"record_id"`
+	Amount   string `json:"amount"`
+}
+
+type AccountingMISAReviewInput struct {
+	BasisID     string `json:"basis_id"`
 	Note        string `json:"note"`
 	Fingerprint string `json:"fingerprint"`
+}
+
+type AccountingMISARevokeInput struct {
+	Reason string `json:"reason"`
 }
 
 func parseAccountingMISA(content string) ([]Record, error) {
@@ -95,39 +103,53 @@ func (s *Service) PreviewAccountingMISA(ctx context.Context, project string, in 
 }
 
 func (r *Repository) previewAccountingMISA(ctx context.Context, project string, in AccountingMISAImportInput, actor string, rows []Record) (Record, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if err := accountingLock(ctx, tx, project); err != nil {
+		return nil, err
+	}
+	authorizer := &Service{repo: r.withReadTransaction(tx)}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
 	for _, row := range rows {
-		var ok bool
-		err := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM partners WHERE id=$1 AND active=true)`, row["partner_id"]).Scan(&ok)
+		partners, err := queryTx(ctx, tx, `SELECT id FROM partners WHERE id=$1 AND active FOR SHARE`, row["partner_id"])
 		if err != nil {
 			return nil, err
 		}
-		if !ok {
+		if len(partners) != 1 {
 			return nil, validationError("Mã đối tác chưa được ánh xạ tới đối tác hoạt động", Record{"external_id": row["external_id"]})
 		}
 	}
 	sum := sha256.Sum256([]byte(in.Content))
 	digest := hex.EncodeToString(sum[:])
-	batch, err := r.QueryOne(ctx, `INSERT INTO accounting_misa_batches(project_id,entity_code,filename,file_content,digest,created_by) VALUES($1,$2,$3,$4,$5,$6)
+	batches, err := queryTx(ctx, tx, `INSERT INTO accounting_misa_batches(project_id,entity_code,filename,file_content,digest,created_by) VALUES($1,$2,$3,$4,$5,$6)
  ON CONFLICT(project_id,entity_code,digest) DO UPDATE SET digest=EXCLUDED.digest RETURNING id,status,digest`, project, in.Entity, in.Filename, in.Content, digest, actor)
 	if err != nil {
 		return nil, err
 	}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	batch := batches[0]
 	batch["rows"] = rows
 	return batch, nil
 }
 
-func (s *Service) AccountingMISAFile(ctx context.Context, project, id, actor string) (string, error) {
-	if err := s.accountingAccess(ctx, project, actor, "accounting_request.view"); err != nil {
-		return "", err
+func (s *Service) AccountingMISAFile(ctx context.Context, project, id, actor string) (Record, error) {
+	if err := s.accountingAccess(ctx, project, actor, "accounting_reconciliation.view"); err != nil {
+		return nil, err
 	}
 	if !validActivityUUID(id) {
-		return "", validationError("Đợt nhập không hợp lệ")
+		return nil, validationError("Đợt nhập không hợp lệ")
 	}
-	row, err := s.repo.QueryOne(ctx, `SELECT file_content FROM accounting_misa_batches WHERE id=$1 AND project_id=$2`, id, project)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprint(row["file_content"]), nil
+	return s.repo.QueryOne(ctx, `SELECT filename,file_content FROM accounting_misa_batches WHERE id=$1 AND project_id=$2`, id, project)
 }
 
 func (s *Service) ConfirmAccountingMISA(ctx context.Context, project, id, actor, name string) (Record, error) {
@@ -149,6 +171,10 @@ func (r *Repository) confirmAccountingMISA(ctx context.Context, project, id, act
 	if err = accountingLock(ctx, tx, project); err != nil {
 		return nil, err
 	}
+	authorizer := &Service{repo: r.withReadTransaction(tx)}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
 	batches, err := queryTx(ctx, tx, `SELECT * FROM accounting_misa_batches WHERE id=$1 AND project_id=$2 FOR UPDATE`, id, project)
 	if err != nil {
 		return nil, err
@@ -165,12 +191,11 @@ func (r *Repository) confirmAccountingMISA(ctx context.Context, project, id, act
 		return nil, err
 	}
 	for _, row := range rows {
-		var partnerExists bool
-		err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM partners WHERE id=$1 AND active=true)`, row["partner_id"]).Scan(&partnerExists)
+		partners, err := queryTx(ctx, tx, `SELECT id FROM partners WHERE id=$1 AND active FOR SHARE`, row["partner_id"])
 		if err != nil {
 			return nil, err
 		}
-		if !partnerExists {
+		if len(partners) != 1 {
 			return nil, validationError("Đối tác không còn hoạt động")
 		}
 		old, err := queryTx(ctx, tx, `SELECT * FROM accounting_misa_records WHERE project_id=$1 AND entity_code=$2 AND external_id=$3 AND line_key=$4 AND kind=$5 AND active FOR UPDATE`, project, b["entity_code"], row["external_id"], row["line_key"], row["kind"])
@@ -202,6 +227,9 @@ func (r *Repository) confirmAccountingMISA(ctx context.Context, project, id, act
 			return nil, err
 		}
 	}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
 	if _, err = tx.ExecContext(ctx, `UPDATE accounting_misa_batches SET status='confirmed',confirmed_at=now() WHERE id=$1`, id); err != nil {
 		return nil, err
 	}
@@ -211,14 +239,20 @@ func (r *Repository) confirmAccountingMISA(ctx context.Context, project, id, act
 	return Record{"id": id, "status": "confirmed"}, tx.Commit()
 }
 
-const accountingFingerprintSQL = `SELECT md5(r.revision::text || ':' || COALESCE(string_agg(a.id::text || ':' || a.amount::text || ':' || a.record_id::text,',' ORDER BY a.id),'')) FROM accounting_requests r LEFT JOIN accounting_misa_allocations a ON a.request_id=r.id AND a.active WHERE r.id=$1 GROUP BY r.id,r.revision`
+const accountingBasisFingerprintExpr = `md5(to_jsonb(b)::text || ':' || COALESCE(a.keys,''))`
+const accountingFingerprintSQL = `SELECT ` + accountingBasisFingerprintExpr + ` FROM accounting_reconciliation_bases b
+ LEFT JOIN LATERAL (SELECT string_agg(id::text || ':' || amount::text || ':' || record_id::text,',' ORDER BY id) AS keys
+ FROM accounting_misa_allocations WHERE basis_id=b.id AND active) a ON true WHERE b.id=$1`
 
 func (s *Service) AllocateAccountingMISA(ctx context.Context, project string, in AccountingMISAAllocationInput, actor, name string) (Record, error) {
 	if err := s.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
 		return nil, err
 	}
-	if !validActivityUUID(in.ID) || !validActivityUUID(in.RequestID) || !validActivityUUID(in.RecordID) {
-		return nil, validationError("Chọn đề nghị, giao dịch và mã thao tác")
+	if !validActivityUUID(in.ID) || !validActivityUUID(in.BasisID) || !validActivityUUID(in.RecordID) {
+		return nil, validationError("Chọn căn cứ, giao dịch và mã thao tác")
+	}
+	if err := s.accountingBasisAccess(ctx, project, in.BasisID, actor); err != nil {
+		return nil, err
 	}
 	return s.repo.allocateAccountingMISA(ctx, project, in, actor, name)
 }
@@ -232,13 +266,24 @@ func (r *Repository) allocateAccountingMISA(ctx context.Context, project string,
 	if err = accountingLock(ctx, tx, project); err != nil {
 		return nil, err
 	}
+	authorizer := &Service{repo: r.withReadTransaction(tx)}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
+	basis, err := r.accountingBasisTx(ctx, tx, project, in.BasisID, actor)
+	if err != nil {
+		return nil, err
+	}
+	if err := accountingMoney(in.Amount, fmt.Sprint(basis["currency"]), false); err != nil {
+		return nil, err
+	}
 	prior, err := queryTx(ctx, tx, `SELECT * FROM accounting_misa_allocations WHERE id=$1`, in.ID)
 	if err != nil {
 		return nil, err
 	}
 	if len(prior) > 0 {
 		p := prior[0]
-		if cleanID(p["project_id"]) == project && cleanID(p["request_id"]) == in.RequestID && cleanID(p["record_id"]) == in.RecordID && boolValue(p["active"]) {
+		if cleanID(p["project_id"]) == project && cleanID(p["basis_id"]) == in.BasisID && cleanID(p["record_id"]) == in.RecordID && boolValue(p["active"]) {
 			var same bool
 			err = tx.QueryRowContext(ctx, `SELECT amount=$2::numeric FROM accounting_misa_allocations WHERE id=$1`, in.ID, in.Amount).Scan(&same)
 			if err != nil {
@@ -250,7 +295,7 @@ func (r *Repository) allocateAccountingMISA(ctx context.Context, project string,
 		}
 		return nil, validationError("Mã thao tác đã dùng với phân bổ khác; tải lại hồ sơ")
 	}
-	records, err := queryTx(ctx, tx, `SELECT m.* FROM accounting_misa_records m WHERE m.id=$1 AND m.project_id=$2 AND m.active AND m.kind='transaction' FOR UPDATE`, in.RecordID, project)
+	records, err := queryTx(ctx, tx, `SELECT m.* FROM accounting_misa_records m JOIN accounting_misa_batches b ON b.id=m.batch_id WHERE m.id=$1 AND m.project_id=$2 AND m.active AND m.kind='transaction' AND b.status='confirmed' FOR UPDATE OF m`, in.RecordID, project)
 	if err != nil {
 		return nil, err
 	}
@@ -261,14 +306,12 @@ func (r *Repository) allocateAccountingMISA(ctx context.Context, project string,
 	if err = accountingMoney(in.Amount, fmt.Sprint(record["currency"]), false); err != nil {
 		return nil, err
 	}
+	for _, key := range []string{"partner_id", "direction", "currency"} {
+		if fmt.Sprint(basis[key]) != fmt.Sprint(record[key]) {
+			return nil, validationError("Căn cứ và giao dịch khác đối tác, chiều giao dịch hoặc tiền tệ")
+		}
+	}
 	var compatible bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM accounting_requests r JOIN accounting_request_bases b ON b.id=r.basis_id WHERE r.id=$1 AND r.project_id=$2 AND r.status='acknowledged' AND b.partner_id=$3 AND b.direction=$4 AND b.currency=$5 AND r.amount>= $6::numeric+COALESCE((SELECT SUM(amount) FROM accounting_misa_allocations WHERE request_id=r.id AND active),0))`, in.RequestID, project, record["partner_id"], record["direction"], record["currency"], in.Amount).Scan(&compatible)
-	if err != nil {
-		return nil, err
-	}
-	if !compatible {
-		return nil, validationError("Đề nghị chưa tiếp nhận, khác đối tác/tiền tệ/hướng hoặc vượt số tiền đề nghị")
-	}
 	err = tx.QueryRowContext(ctx, `SELECT amount >= $2::numeric+COALESCE((SELECT SUM(amount) FROM accounting_misa_allocations WHERE record_id=$1 AND active),0) FROM accounting_misa_records WHERE id=$1`, in.RecordID, in.Amount).Scan(&compatible)
 	if err != nil {
 		return nil, err
@@ -276,12 +319,18 @@ func (r *Repository) allocateAccountingMISA(ctx context.Context, project string,
 	if !compatible {
 		return nil, validationError("Phân bổ vượt giá trị giao dịch")
 	}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
+	if err := authorizer.accountingBasisAccess(ctx, project, in.BasisID, actor); err != nil {
+		return nil, err
+	}
 	id := in.ID
-	_, err = tx.ExecContext(ctx, `INSERT INTO accounting_misa_allocations(id,project_id,request_id,record_id,amount,created_by) VALUES($1,$2,$3,$4,$5,$6)`, id, project, in.RequestID, in.RecordID, in.Amount, actor)
+	_, err = tx.ExecContext(ctx, `INSERT INTO accounting_misa_allocations(id,project_id,basis_id,record_id,amount,created_by) VALUES($1,$2,$3,$4,$5,$6)`, id, project, in.BasisID, in.RecordID, in.Amount, actor)
 	if err != nil {
 		return nil, err
 	}
-	if err = addAuditTx(ctx, tx, project, actor, name, "accounting_misa_allocated", "accounting_request", in.RequestID, "Phân bổ kết quả nhập MISA", Record{"allocation_id": id, "record_id": in.RecordID, "amount": in.Amount}); err != nil {
+	if err = addAuditTx(ctx, tx, project, actor, name, "accounting_misa_allocated", "accounting_reconciliation_basis", in.BasisID, "Ghép giao dịch MISA với căn cứ đối soát", Record{"allocation_id": id, "record_id": in.RecordID, "amount": in.Amount}); err != nil {
 		return nil, err
 	}
 	return Record{"id": id}, tx.Commit()
@@ -306,6 +355,20 @@ func (r *Repository) revokeAccountingAllocation(ctx context.Context, project, id
 	if err = accountingLock(ctx, tx, project); err != nil {
 		return nil, err
 	}
+	authorizer := &Service{repo: r.withReadTransaction(tx)}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
+	rows, err := queryTx(ctx, tx, `SELECT id FROM accounting_misa_allocations WHERE id=$1 AND project_id=$2 AND active FOR UPDATE`, id, project)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != 1 {
+		return nil, validationError("Phân bổ không còn hiệu lực")
+	}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
 	result, err := tx.ExecContext(ctx, `UPDATE accounting_misa_allocations SET active=false,revoked_by=$3,revoked_at=now(),revoke_reason=$4 WHERE id=$1 AND project_id=$2 AND active`, id, project, actor, reason)
 	if err != nil {
 		return nil, err
@@ -320,17 +383,20 @@ func (r *Repository) revokeAccountingAllocation(ctx context.Context, project, id
 	return Record{"id": id}, tx.Commit()
 }
 
-func (s *Service) ReviewAccountingMISA(ctx context.Context, project string, in AccountingMISAAllocationInput, actor, name string) (Record, error) {
+func (s *Service) ReviewAccountingMISA(ctx context.Context, project string, in AccountingMISAReviewInput, actor, name string) (Record, error) {
 	if err := s.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
 		return nil, err
 	}
-	if !validActivityUUID(in.RequestID) || strings.TrimSpace(in.Note) == "" {
-		return nil, validationError("Cần đề nghị và ghi chú đối soát")
+	if !validActivityUUID(in.BasisID) || strings.TrimSpace(in.Note) == "" {
+		return nil, validationError("Cần căn cứ và ghi chú đối soát")
+	}
+	if err := s.accountingBasisAccess(ctx, project, in.BasisID, actor); err != nil {
+		return nil, err
 	}
 	return s.repo.reviewAccountingMISA(ctx, project, in, actor, name)
 }
 
-func (r *Repository) reviewAccountingMISA(ctx context.Context, project string, in AccountingMISAAllocationInput, actor, name string) (Record, error) {
+func (r *Repository) reviewAccountingMISA(ctx context.Context, project string, in AccountingMISAReviewInput, actor, name string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -339,28 +405,33 @@ func (r *Repository) reviewAccountingMISA(ctx context.Context, project string, i
 	if err = accountingLock(ctx, tx, project); err != nil {
 		return nil, err
 	}
-	var ok bool
-	err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM accounting_requests WHERE id=$1 AND project_id=$2 AND status='acknowledged')`, in.RequestID, project).Scan(&ok)
-	if err != nil {
+	authorizer := &Service{repo: r.withReadTransaction(tx)}
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
 		return nil, err
 	}
-	if !ok {
-		return nil, validationError("Đề nghị chưa được tiếp nhận")
+	if _, err := r.accountingBasisTx(ctx, tx, project, in.BasisID, actor); err != nil {
+		return nil, err
 	}
 	var fingerprint string
-	err = tx.QueryRowContext(ctx, accountingFingerprintSQL, in.RequestID).Scan(&fingerprint)
+	err = tx.QueryRowContext(ctx, accountingFingerprintSQL, in.BasisID).Scan(&fingerprint)
 	if err != nil {
 		return nil, err
 	}
 	if fingerprint != in.Fingerprint {
 		return nil, validationError("Phân bổ đã đổi; tải lại trước khi xác nhận")
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO accounting_misa_reviews(project_id,request_id,fingerprint,note,actor_id) VALUES($1,$2,$3,$4,$5)`, project, in.RequestID, fingerprint, in.Note, actor)
+	if err := authorizer.accountingAccess(ctx, project, actor, "accounting_misa.reconcile"); err != nil {
+		return nil, err
+	}
+	if err := authorizer.accountingBasisAccess(ctx, project, in.BasisID, actor); err != nil {
+		return nil, err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO accounting_misa_reviews(project_id,basis_id,fingerprint,note,actor_id) VALUES($1,$2,$3,$4,$5)`, project, in.BasisID, fingerprint, in.Note, actor)
 	if err != nil {
 		return nil, err
 	}
-	if err = addAuditTx(ctx, tx, project, actor, name, "accounting_misa_reviewed", "accounting_request", in.RequestID, "Xác nhận đối soát dữ liệu đã nhập", Record{"fingerprint": fingerprint, "note": in.Note}); err != nil {
+	if err = addAuditTx(ctx, tx, project, actor, name, "accounting_misa_reviewed", "accounting_reconciliation_basis", in.BasisID, "Xác nhận đối soát dữ liệu đã nhập", Record{"fingerprint": fingerprint, "note": in.Note}); err != nil {
 		return nil, err
 	}
-	return Record{"id": in.RequestID}, tx.Commit()
+	return Record{"id": in.BasisID}, tx.Commit()
 }

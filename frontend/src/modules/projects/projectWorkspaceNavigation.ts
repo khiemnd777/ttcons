@@ -114,10 +114,10 @@ export const PROJECT_WORKSPACE_GROUPS: ProjectWorkspaceGroup[] = [
     description: 'Bàn giao công trình và hồ sơ nghiệp vụ cho Kế toán',
     to: 'handover',
     icon: Handshake,
-    permissions: ['handover.view', 'accounting_handoff.view', 'project_finance.view'],
+    permissions: ['handover.view', 'accounting_handoff.view'],
     children: [
       { label: 'Bàn giao', to: 'handover', icon: KeyRound, permissions: ['handover.view'] },
-      { label: 'Bàn giao kế toán', to: 'accounting', icon: ReceiptText, permissions: ['accounting_handoff.view', 'project_finance.view'] },
+      { label: 'Bàn giao kế toán', to: 'accounting', icon: ReceiptText, permissions: ['accounting_handoff.view'] },
     ],
   },
   {

@@ -15,6 +15,7 @@ import (
 type Repository struct {
 	db             *sql.DB
 	systemSettings *SystemSettingsStore
+	reader         queryContext
 }
 
 func NewRepository(db *sql.DB) *Repository {
@@ -26,7 +27,20 @@ func (r *Repository) ConfigureSystemSettings(store *SystemSettingsStore) {
 }
 
 func (r *Repository) Query(ctx context.Context, query string, args ...any) ([]Record, error) {
-	return queryRecords(ctx, r.db, query, args...)
+	return queryRecords(ctx, r.querySource(), query, args...)
+}
+
+func (r *Repository) querySource() queryContext {
+	if r.reader != nil {
+		return r.reader
+	}
+	return r.db
+}
+
+// Authorization inside a held write transaction must use that connection, not
+// request another pooled connection. Mutation ownership remains with the caller.
+func (r *Repository) withReadTransaction(tx *sql.Tx) *Repository {
+	return &Repository{db: r.db, systemSettings: r.systemSettings, reader: tx}
 }
 
 const readTransactionSettingsSQL = `SET LOCAL jit = off`
@@ -56,7 +70,7 @@ func queryRecords(ctx context.Context, db queryContext, query string, args ...an
 }
 
 func (r *Repository) QueryOne(ctx context.Context, query string, args ...any) (Record, error) {
-	return queryOneRecord(ctx, r.db, query, args...)
+	return queryOneRecord(ctx, r.querySource(), query, args...)
 }
 
 func queryOneRecord(ctx context.Context, db queryContext, query string, args ...any) (Record, error) {
@@ -274,12 +288,8 @@ func hasUpdatedAt(table string) bool {
 	case "users", "staff", "projects", "pipeline_templates", "pipeline_template_nodes", "pipeline_run_nodes",
 		"procurement_requests", "boq_items", "issues", "acceptance_records", "rework_requests", "replanning_requests",
 		"construction_check_templates", "construction_checks", "construction_action_items",
-		"handover_records", "accounting_budgets", "payables", "receivables", "payments", "advance_requests",
-		"accounting_books", "accounting_accounts", "accounting_periods", "journal_entries", "accounting_posting_rules",
-		"tax_codes", "tax_periods", "invoice_tax_lines",
-		"system_settings", "work_items", "evidence_records", "workflow_form_templates", "workflow_form_versions",
-		"workflow_form_instances", "workflow_form_signatures", "input_invoices", "output_invoices",
-		"payable_payment_schedules", "receivable_payment_schedules", "client_advance_receipts", "partners":
+		"handover_records", "system_settings", "work_items", "evidence_records", "workflow_form_templates", "workflow_form_versions",
+		"workflow_form_instances", "workflow_form_signatures", "partners":
 		return true
 	default:
 		return false
@@ -320,17 +330,11 @@ func safeTable(table string) string {
 		"boq_items", "supplier_quotations", "procurement_requests", "procurement_request_items", "contracts", "warehouses", "materials", "stock_movements",
 		"site_material_balances", "operation_daily_reports", "issues", "acceptance_records", "acceptance_checklist_items",
 		"construction_check_templates", "construction_checks", "construction_action_items", "construction_action_events",
-		"rework_requests", "replanning_requests", "handover_records", "accounting_budgets", "payables", "receivables",
-		"payments", "advance_requests", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
+		"rework_requests", "replanning_requests", "handover_records", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
 		"role_permissions", "user_roles", "users", "work_items", "work_item_assignments", "work_item_activities",
 		"evidence_records", "workflow_form_templates", "workflow_form_versions", "workflow_form_fields",
 		"workflow_form_instances", "workflow_form_answers", "workflow_form_events", "workflow_form_signatures",
-		"workflow_form_pdf_exports", "boq_unit_price_events", "input_invoices", "output_invoices",
-		"payable_payment_schedules", "payment_allocations", "receivable_payment_schedules", "client_advance_receipts",
-		"receipt_allocations", "partners", "accounting_books", "accounting_accounts", "accounting_periods",
-		"journal_entries", "journal_entry_lines", "accounting_posting_rules", "budget_movements", "tax_codes",
-		"tax_periods", "invoice_tax_lines", "tax_adjustments", "accounting_backfill_issues",
-		"project_material_costs", "project_cash_requests", "accounting_handoffs":
+		"workflow_form_pdf_exports", "boq_unit_price_events", "partners", "accounting_handoffs":
 		return table
 	default:
 		return ""
@@ -447,23 +451,7 @@ func replanningColumns() []ColumnSpec {
 }
 
 func handoverColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("handover_code"), col("status"), col("final_acceptance_id"), col("workflow_form_instance_id"), col("handover_date"), col("client_representative"), col("company_representative"), col("documents_ready"), col("warehouse_closed"), col("payables_recorded"), col("receivables_recorded"), jsonCol("readiness_snapshot_json"), col("notes"), col("created_by"), col("approved_by")}
-}
-
-func budgetColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("budget_code"), col("name"), col("planned_amount"), col("approved_amount"), col("used_amount"), col("remaining_amount"), col("status"), col("approved_by")}
-}
-
-func payableColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("budget_id"), col("cost_account_id"), col("payable_code"), col("vendor_type"), col("vendor_partner_id"), col("vendor_name"), col("source_type"), col("source_id"), col("gross_amount"), col("advance_amount"), col("retention_amount"), col("deduction_amount"), col("paid_amount"), col("remaining_amount"), col("due_date"), col("status"), col("created_by"), col("approved_by")}
-}
-
-func receivableColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("revenue_account_id"), col("receivable_code"), col("client_partner_id"), col("client_name"), col("source_type"), col("source_id"), col("contract_amount"), col("milestone_name"), col("gross_amount"), col("received_amount"), col("remaining_amount"), col("due_date"), col("status"), col("created_by"), col("approved_by")}
-}
-
-func paymentColumns() []ColumnSpec {
-	return []ColumnSpec{col("project_id"), col("accounting_book_id"), col("budget_id"), col("cash_account_id"), col("payment_code"), col("payment_type"), col("target_type"), col("target_id"), col("tax_period_id"), col("amount"), col("payment_method"), col("status"), col("paid_at"), col("created_by"), col("approved_by")}
+	return []ColumnSpec{col("project_id"), col("handover_code"), col("status"), col("final_acceptance_id"), col("workflow_form_instance_id"), col("handover_date"), col("client_representative"), col("company_representative"), col("documents_ready"), col("warehouse_closed"), jsonCol("readiness_snapshot_json"), col("notes"), col("created_by"), col("approved_by")}
 }
 
 func staffColumns() []ColumnSpec {

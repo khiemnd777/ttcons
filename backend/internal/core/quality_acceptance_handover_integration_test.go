@@ -8,77 +8,6 @@ import (
 	"time"
 )
 
-func TestClientWorkflowAutomationCreatesOutgoingAcceptanceAndReceivableDrafts(t *testing.T) {
-	db := openProjectOperationsTestDB(t)
-	ctx := context.Background()
-	repo := NewRepository(db)
-	fixture := setupClientOfficialWorkflowFixture(t, db, 180000000)
-	workItemID := clientOfficialWorkItemIDByAction(t, db, fixture.projectID, "finance.scaffold_outgoing_acceptance")
-	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
-	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM acceptance_records
-		WHERE project_id=$1
-			AND node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
-			AND type='final'
-			AND status='draft'
-			AND summary_json->>'automation_scaffold'='true'
-	`, 1, fixture.projectID, workItemID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM receivables rec
-		JOIN acceptance_records acc ON acc.id=rec.source_id
-		WHERE acc.project_id=$1
-			AND acc.node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
-			AND rec.source_type='acceptance'
-			AND rec.status='draft'
-			AND rec.gross_amount=180000000
-			AND rec.remaining_amount=180000000
-	`, 1, fixture.projectID, workItemID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM receivable_payment_schedules rps
-		JOIN receivables rec ON rec.id=rps.receivable_id
-		JOIN acceptance_records acc ON acc.id=rec.source_id
-		WHERE acc.project_id=$1
-			AND acc.node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
-			AND rps.schedule_code='LICH-THU-TIEN-001'
-			AND rps.milestone_name='Thu tiền đầu ra sau nghiệm thu'
-			AND rps.status='draft'
-			AND rps.planned_amount=180000000
-			AND rps.remaining_amount=180000000
-	`, 1, fixture.projectID, workItemID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM output_invoices oi
-		JOIN receivables rec ON rec.id=oi.receivable_id
-		JOIN acceptance_records acc ON acc.id=rec.source_id
-		WHERE acc.project_id=$1
-			AND acc.node_id=(SELECT run_node_id FROM work_items WHERE id=$2)
-	`, 0, fixture.projectID, workItemID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM workflow_automation_events
-		WHERE source_type='pipeline_run_node'
-			AND source_id=(SELECT run_node_id FROM work_items WHERE id=$1)
-			AND action_key='finance.scaffold_outgoing_acceptance'
-			AND status='blocked'
-			AND target_type='receivable'
-			AND blocker_reason='Cần tải lên và phát hành hóa đơn đầu ra thật'
-			AND run_count=$2
-	`, 1, workItemID, 1)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM work_item_activities wia
-		JOIN work_items wi ON wi.id=wia.work_item_id
-		WHERE wi.run_node_id=(SELECT run_node_id FROM work_items WHERE id=$1)
-			AND activity_type='blocker'
-			AND comment='Cần tải lên và phát hành hóa đơn đầu ra thật'
-			AND metadata_json->>'automation_action'='finance.scaffold_outgoing_acceptance'
-	`, 1, workItemID)
-}
-
 func TestQualityITPRFINCRReinspectionAndRecurringLifecycle(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	ctx := context.Background()
@@ -263,8 +192,8 @@ func TestBatch7FailedAcceptanceCreatesSingleOpenRework(t *testing.T) {
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('acceptance_failed','rework_requested')`, 3, projectID)
 }
 
-func TestBatch7HandoverBlockedAuditIncludesProjectFinanceBlockers(t *testing.T) {
-	db := openProjectOperationsTestDB(t)
+func TestHandoverBlockedAuditIncludesMissingDocuments(t *testing.T) {
+	db := openIsolatedAccountingTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
 
@@ -272,11 +201,7 @@ func TestBatch7HandoverBlockedAuditIncludesProjectFinanceBlockers(t *testing.T) 
 	projectID := newID()
 	acceptanceID := newID()
 	handoverID := newID()
-	materialCostID := newID()
-	cashRequestID := newID()
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM project_cash_requests WHERE id=$1`, cashRequestID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM project_material_costs WHERE id=$1`, materialCostID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM handover_records WHERE id=$1`, handoverID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM acceptance_records WHERE id=$1`, acceptanceID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
@@ -290,17 +215,10 @@ func TestBatch7HandoverBlockedAuditIncludesProjectFinanceBlockers(t *testing.T) 
 	`, acceptanceID, projectID, actorID)
 	mustExec(t, db, `
 		INSERT INTO handover_records
-			(id, project_id, handover_code, status, final_acceptance_id, documents_ready, warehouse_closed, payables_recorded, receivables_recorded, created_by)
-		VALUES ($1,$2,$3,'submitted',$4,true,true,true,true,$5)
+			(id, project_id, handover_code, status, final_acceptance_id, documents_ready, warehouse_closed, created_by)
+		VALUES ($1,$2,$3,'submitted',$4,true,true,$5)
 	`, handoverID, projectID, "HO-B7-"+handoverID[:8], acceptanceID, actorID)
-	mustExec(t, db, `
-		INSERT INTO project_material_costs (id,project_id,vendor_name,description,amount_before_vat,vat_amount,total_amount,status,created_by)
-		VALUES ($1,$2,'Batch7 Supplier','Vật tư chưa xác nhận',100,10,110,'submitted',$3)
-	`, materialCostID, projectID, actorID)
-	mustExec(t, db, `
-		INSERT INTO project_cash_requests (id,project_id,request_code,direction,title,counterparty_name,amount,status,created_by)
-		VALUES ($1,$2,$3,'outbound','Đề nghị chi chưa xử lý','Batch7 Supplier',110,'submitted',$4)
-	`, cashRequestID, projectID, "B7R-"+cashRequestID[:8], actorID)
+	mustExec(t, db, `INSERT INTO handover_checklist_items (handover_id,project_id,item_code,category,title,required,status) VALUES ($1,$2,'signed_handover_minutes','legal','Biên bản bàn giao có xác nhận hai bên',true,'pending')`, handoverID, projectID)
 
 	blocked, err := repo.CompleteHandover(ctx, handoverID, ActionRequest{Reason: "Kiểm tra bàn giao"}, actorID, "Batch7 Actor")
 	if err != nil {
@@ -310,14 +228,14 @@ func TestBatch7HandoverBlockedAuditIncludesProjectFinanceBlockers(t *testing.T) 
 		t.Fatalf("handover = status %v ready %v, want blocked/false", blocked["status"], blocked["ready"])
 	}
 	blockers, _ := blocked["blockers"].([]string)
-	if !containsString(blockers, "Còn chi phí vật tư chưa được xác nhận") || !containsString(blockers, "Còn đề nghị thu/chi nội bộ chưa được xử lý") {
-		t.Fatalf("blockers = %#v, want project-finance blockers", blockers)
+	if !containsString(blockers, "Thiếu/xác minh chưa đạt: Biên bản bàn giao có xác nhận hai bên") {
+		t.Fatalf("blockers = %#v, want missing handover document blocker", blockers)
 	}
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type='handover_blocked'`, 1, projectID)
 }
 
-func TestRev8PhysicalHandoverCompletesBeforeProjectFinanceClose(t *testing.T) {
-	db := openProjectOperationsTestDB(t)
+func TestRev9PhysicalHandoverCompletesBeforeAccountingHandoffClose(t *testing.T) {
+	db := openIsolatedAccountingTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
 
@@ -326,60 +244,52 @@ func TestRev8PhysicalHandoverCompletesBeforeProjectFinanceClose(t *testing.T) {
 	projectID := newID()
 	acceptanceID := newID()
 	handoverID := newID()
-	materialCostID := newID()
-	cashRequestID := newID()
+	procurementID := newID()
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, staffID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, actorID)
 	})
-	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev8 Handover Actor','active')`, actorID, "rev8-handover-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev8 Handover Actor',$3,'operations','active')`, staffID, actorID, "rev8-handover-staff-"+actorID+"@test.local")
-	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev8 Handover',$2,'Client','handover','40000000-0000-0000-0000-000000000027')`, projectID, "R8H-"+projectID[:8])
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:pw','Rev9 Handover Actor','active')`, actorID, "rev9-handover-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO staff (id,user_id,full_name,email,department,status) VALUES ($1,$2,'Rev9 Handover Actor',$3,'operations','active')`, staffID, actorID, "rev9-handover-staff-"+actorID+"@test.local")
+	mustExec(t, db, `INSERT INTO projects (id,name,code,client_name,status,pipeline_template_id) VALUES ($1,'Rev9 Handover',$2,'Client','handover','40000000-0000-0000-0000-000000000028')`, projectID, "R9H-"+projectID[:8])
 	mustExec(t, db, `INSERT INTO project_members (project_id,staff_id,role_ids,active) VALUES ($1,$2,'["PM"]'::jsonb,true)`, projectID, staffID)
-	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000027", actorID, "Rev8 Handover Actor"); err != nil {
+	if _, err := repo.StartPipeline(ctx, projectID, "40000000-0000-0000-0000-000000000028", actorID, "Rev9 Handover Actor"); err != nil {
 		t.Fatal(err)
 	}
 	mustExec(t, db, `
 		INSERT INTO acceptance_records (id,project_id,type,title,requested_by,approved_by,status,result)
-		VALUES ($1,$2,'final','Rev8 final acceptance',$3,$3,'completed','pass')
+		VALUES ($1,$2,'final','Rev9 final acceptance',$3,$3,'completed','pass')
 	`, acceptanceID, projectID, actorID)
 	mustExec(t, db, `
 		INSERT INTO handover_records
-			(id,project_id,handover_code,status,final_acceptance_id,documents_ready,warehouse_closed,payables_recorded,receivables_recorded,created_by)
-		VALUES ($1,$2,$3,'submitted',$4,true,true,false,false,$5)
-	`, handoverID, projectID, "HO-R8-"+handoverID[:8], acceptanceID, actorID)
-	mustExec(t, db, `
-		INSERT INTO project_material_costs (id,project_id,vendor_name,description,amount_before_vat,vat_amount,total_amount,status,created_by)
-		VALUES ($1,$2,'Rev8 Supplier','Chi phí chờ xác nhận',100,10,110,'submitted',$3)
-	`, materialCostID, projectID, actorID)
-	mustExec(t, db, `
-		INSERT INTO project_cash_requests (id,project_id,request_code,direction,title,counterparty_name,amount,status,created_by)
-		VALUES ($1,$2,$3,'outbound','Đề nghị chi chờ xử lý','Rev8 Supplier',110,'submitted',$4)
-	`, cashRequestID, projectID, "R8R-"+cashRequestID[:8], actorID)
+			(id,project_id,handover_code,status,final_acceptance_id,documents_ready,warehouse_closed,created_by)
+		VALUES ($1,$2,$3,'submitted',$4,true,true,$5)
+	`, handoverID, projectID, "HO-R9-"+handoverID[:8], acceptanceID, actorID)
+	mustExec(t, db, `INSERT INTO procurement_requests (id,project_id,request_code,title,status,total_estimated_amount,supplier_name,order_reference,requested_by) VALUES ($1,$2,$3,'Ordered material dossier','ordered',100,'Supplier','PO-TEST',$4)`, procurementID, projectID, "PR-R9-"+procurementID[:8], actorID)
 
-	completed, err := repo.CompleteHandover(ctx, handoverID, ActionRequest{Comment: "Bàn giao vật lý"}, actorID, "Rev8 Handover Actor")
+	completed, err := repo.CompleteHandover(ctx, handoverID, ActionRequest{Comment: "Bàn giao vật lý"}, actorID, "Rev9 Handover Actor")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if completed["status"] != "handed_over" {
-		t.Fatalf("Rev8 handover status=%v, want handed_over despite pending finance", completed["status"])
+		t.Fatalf("Rev9 handover status=%v, want handed_over despite pending finance", completed["status"])
 	}
 
-	financeWorkItemID := clientOfficialWorkItemIDByAction(t, db, projectID, "source.project_finance_close_ready")
+	financeWorkItemID := clientOfficialWorkItemIDByAction(t, db, projectID, "source.accounting_handoff_close_ready")
 	source, err := repo.WorkflowBusinessSourceForWorkItem(ctx, financeWorkItemID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if boolValue(source["ready"]) || source["status"] != "blocked" {
-		t.Fatalf("Rev8 finance source=%#v, want blocked after physical handover", source)
+		t.Fatalf("Rev9 finance source=%#v, want blocked after physical handover", source)
 	}
 	checks, ok := source["checks"].([]Record)
-	if !ok || len(checks) != 3 {
-		t.Fatalf("Rev8 finance checks=%#v, want 3 composite checks", source["checks"])
+	if !ok || len(checks) != 2 {
+		t.Fatalf("Rev9 finance checks=%#v, want physical handover and accounting dossier checks", source["checks"])
 	}
-	if !boolValue(checks[0]["ready"]) || boolValue(checks[1]["ready"]) || boolValue(checks[2]["ready"]) {
-		t.Fatalf("Rev8 finance check states=%#v, want handover ready and finance pending", checks)
+	if !boolValue(checks[0]["ready"]) || boolValue(checks[1]["ready"]) {
+		t.Fatalf("Rev9 finance check states=%#v, want handover ready and accounting dossier pending", checks)
 	}
 }
 
@@ -609,7 +519,10 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 	if completed["status"] != "handed_over" || completed["completed_at"] == nil {
 		t.Fatalf("handover completion = status %v completed_at %v, want handed_over timestamp", completed["status"], completed["completed_at"])
 	}
-	assertCount(t, db, `SELECT COUNT(*) FROM handover_checklist_items WHERE handover_id=$1 AND required AND status='verified'`, 8, handoverID)
+	// Physical handover retains six quality/material/document criteria; the two
+	// retired internal-finance criteria are no longer part of this contract.
+	assertCount(t, db, `SELECT COUNT(*) FROM handover_checklist_items WHERE handover_id=$1 AND required AND status='verified'`, 6, handoverID)
+	assertCount(t, db, `SELECT COUNT(*) FROM handover_checklist_items WHERE handover_id=$1 AND item_code NOT IN ('final_acceptance','warehouse_closure','as_built_documents','operation_manuals','warranty_documents','signed_handover_minutes')`, 0, handoverID)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE project_id=$1 AND event_type IN ('handover_submitted','handover_ready','handover_completed')`, 4, fixture.projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM acceptance_records WHERE project_id=$1 AND type='final' AND status='completed' AND result='pass'`, 1, fixture.projectID)
 }

@@ -3,7 +3,6 @@ export * from './domain/projectsWorkflowDefinitions';
 export * from './domain/commercial';
 export * from './domain/constructionQuality';
 export * from './domain/activityEvidence';
-export * from './domain/accounting';
 export * from './domain/reports';
 export * from './domain/workflowForms';
 export * from './domain/materialsWarehouse';

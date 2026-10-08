@@ -3,18 +3,13 @@ package core
 import (
 	"consflow/backend/internal/shared/response"
 	"encoding/json"
+	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"mime"
 )
 
 func (h *Handler) AccountingOperationsWorkspace(c *fiber.Ctx) error {
 	v, e := h.service.AccountingOperationsWorkspace(c.Context(), c.Params("id"), actorID(c))
-	if e != nil {
-		return e
-	}
-	return response.OK(c, v)
-}
-func (h *Handler) AccountingRequestQueue(c *fiber.Ctx) error {
-	v, e := h.service.AccountingRequestQueue(c.Context(), actorID(c))
 	if e != nil {
 		return e
 	}
@@ -36,28 +31,6 @@ func (h *Handler) CreateAccountingBasis(c *fiber.Ctx) error {
 		return e
 	}
 	return response.Created(c, v)
-}
-func (h *Handler) SaveAccountingRequest(c *fiber.Ctx) error {
-	var in AccountingRequestInput
-	if e := accountingBody(c, &in); e != nil {
-		return e
-	}
-	v, e := h.service.SaveAccountingRequest(c.Context(), c.Params("id"), in, actorID(c), actorName(c))
-	if e != nil {
-		return e
-	}
-	return response.OK(c, v)
-}
-func (h *Handler) AccountingRequestAction(c *fiber.Ctx) error {
-	var in AccountingRequestActionInput
-	if e := accountingBody(c, &in); e != nil {
-		return e
-	}
-	v, e := h.service.AccountingRequestAction(c.Context(), c.Params("id"), c.Params("request"), c.Params("action"), in, actorID(c), actorName(c))
-	if e != nil {
-		return e
-	}
-	return response.OK(c, v)
 }
 func (h *Handler) PreviewAccountingMISA(c *fiber.Ctx) error {
 	var in AccountingMISAImportInput
@@ -89,7 +62,7 @@ func (h *Handler) AllocateAccountingMISA(c *fiber.Ctx) error {
 	return response.Created(c, v)
 }
 func (h *Handler) RevokeAccountingAllocation(c *fiber.Ctx) error {
-	var in AccountingRequestActionInput
+	var in AccountingMISARevokeInput
 	if e := accountingBody(c, &in); e != nil {
 		return e
 	}
@@ -100,7 +73,7 @@ func (h *Handler) RevokeAccountingAllocation(c *fiber.Ctx) error {
 	return response.OK(c, v)
 }
 func (h *Handler) ReviewAccountingMISA(c *fiber.Ctx) error {
-	var in AccountingMISAAllocationInput
+	var in AccountingMISAReviewInput
 	if e := accountingBody(c, &in); e != nil {
 		return e
 	}
@@ -116,7 +89,7 @@ func (h *Handler) AccountingMISAFile(c *fiber.Ctx) error {
 		return e
 	}
 	c.Set("Content-Type", "text/csv; charset=utf-8")
-	c.Set("Content-Disposition", `attachment; filename="misa-source.csv"`)
+	c.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": fmt.Sprint(v["filename"])}))
 	c.Set("X-Content-Type-Options", "nosniff")
-	return c.SendString(v)
+	return c.SendString(fmt.Sprint(v["file_content"]))
 }

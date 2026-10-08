@@ -1,156 +1,72 @@
-# Golden Sample role-based UAT
+# SampleData v5 — UAT theo vai trò
 
-Runbook này kiểm tra Golden Sample theo vai trò mà không làm bẩn fixture hoàn tất hoặc dữ liệu dùng chung. Mặc định chỉ dùng API, SQL chỉ đọc và các lệnh kiểm tra không có trình duyệt. Luồng nghiệp vụ đầy đủ của sandbox được mô tả tại [Golden Live runbook](../../backend/seed/GOLDEN_LIVE_RUNBOOK.md).
+Runbook dùng công trình mẫu tạo qua API có xác thực và công trình thử thao tác thủ công trên môi trường disposable. Fixed Golden project IDs, chuỗi SQL Golden và validator cũ đã bỏ. Hướng dẫn tại [công trình mẫu runbook](../../backend/seed/GOLDEN_LIVE_RUNBOOK.md) và [seed policy](../ops/seed-policy.md).
 
-## Phạm vi và fixture
+## Target và chuẩn bị
 
-| Fixture | Mục đích | Chế độ | Reset |
-|---|---|---|---|
-| `GOLDEN-REAL-001` (`30000000-0000-0000-0000-000000000020`) | Baseline hoàn tất nhánh `Có thiết kế` | Chỉ đọc; không action API, SQL chỉ `SELECT` | Không |
-| `GOLDEN-NO-DESIGN-001` (`30000000-0000-0000-0000-000000000021`) | Baseline hoàn tất nhánh `Không thiết kế` | Chỉ đọc; không action API, SQL chỉ `SELECT` | Không |
-| `GOLDEN-LIVE-001` (`30000000-0000-0000-0000-000000000022`) | Sandbox thực thi từ node `Khảo sát` | Được mutate trên DB UAT cô lập | Có, theo chu kỳ bên dưới |
-
-Hai fixture hoàn tất là mẫu đối chiếu của cùng một suite, không phải hai runtime cần chạy lại. Mọi thay đổi trên chúng là `FAIL` và phải dừng UAT.
-
-## Cổng an toàn DB UAT
-
-Chỉ chạy UAT ghi dữ liệu trên PostgreSQL local/disposable có tên riêng, ví dụ `consflow_uat_<run-id>`, cùng một upload directory riêng. Không dùng production, staging, DB local dùng chung hoặc thư mục upload dùng chung.
-
-Trước mọi migrate/reset/action, ghi kết quả các lệnh sau vào evidence package và đối chiếu tên DB bằng mắt:
+Mỗi lần chạy cần DB/storage riêng, tên rõ ràng và operator chịu trách nhiệm. Xác minh target trước migrate, seed hoặc action API. Không dùng production, staging hoặc DB/storage local dùng chung cho UAT ghi.
 
 ```bash
-export UAT_DATABASE_URL='postgres://consflow:consflow@127.0.0.1:5432/consflow_uat_<run-id>?sslmode=disable'
-export UAT_EXPECTED_DB='consflow_uat_<run-id>'
-export UAT_BASE_URL='http://127.0.0.1:8080'
 psql "$UAT_DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc \
   "select current_database(), current_user, inet_server_addr(), inet_server_port()"
-psql "$UAT_DATABASE_URL" -v ON_ERROR_STOP=1 -Atqc \
-  "select current_database() = '$UAT_EXPECTED_DB'"
-```
-
-Chỉ tiếp tục khi dòng thứ hai trả `t` và metadata đúng target đã phê duyệt. Dừng ngay nếu URL rỗng, tên DB không khớp, target có dấu hiệu production/staging/shared hoặc chưa có người chịu trách nhiệm reset.
-
-> `backend/Makefile` ưu tiên PostgreSQL Compose đang chạy và khi đó `make seed` luôn ghi vào DB `consflow`. Vì vậy không dùng `make seed` cho UAT cô lập khi Compose đang chạy. Reset cô lập phải dùng URL tường minh như dưới đây. Tất cả seed bắt đầu bằng `TRUNCATE ... CASCADE` và xóa toàn bộ dữ liệu trong target.
-
-## Chuẩn bị và lệnh không dùng trình duyệt
-
-Các lệnh kiểm tra không ghi DB:
-
-```bash
 git rev-parse HEAD
 cd backend
 make migrate-check
 make seed-fixtures-check
-psql "$UAT_DATABASE_URL" -v ON_ERROR_STOP=1 -f seed/validate_golden_project.sql
+```
+
+Đối chiếu DB name với target đã duyệt, rồi bootstrap bằng URL tường minh:
+
+```bash
+DATABASE_URL="$UAT_DATABASE_URL" MIGRATIONS_DIR=migrations go run ./cmd/migrate
+psql "$UAT_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f seed/seed.sql -f seed/validate_current_seed.sql
 curl -fsS "$UAT_BASE_URL/api/health"
 curl -fsS "$UAT_BASE_URL/api/ready"
 ```
 
-Nếu cần tạo/reset DB disposable đã qua cổng an toàn, migrate rồi chạy chuỗi seed bằng đúng một `UAT_DATABASE_URL`:
+Backend thử phải trỏ đúng DB/storage đó. Không dùng `make seed` khi cần target tường minh vì Makefile có nhánh Compose. Seed additive, không reset dữ liệu, không chép PDF vào storage và không tạo công trình.
 
-```bash
-cd backend
-DATABASE_URL="$UAT_DATABASE_URL" make migrate
-psql "$UAT_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f seed/seed.sql \
-  -f seed/golden_project.sql \
-  -f seed/golden_project_domains.sql \
-  -f seed/golden_project_closure.sql \
-  -f seed/golden_project_construction.sql \
-  -f seed/golden_project_finance.sql \
-  -f seed/golden_live_project.sql \
-  -f seed/validate_golden_project.sql
-```
+## Bộ công trình thử
 
-Kết quả cuối phải có `GOLDEN_SAMPLE_VALIDATION_PASSED`. Không xóa thư mục upload bằng lệnh recursive; cấu hình backend dùng upload directory disposable riêng và chép fixture từ `backend/seed/uploads` theo quy trình môi trường đã duyệt.
+Đăng nhập actor có `sample_data.create`, đọc `GET /api/settings/sample-data/options`, kiểm tra `blueprint_version=5`, pipeline published, role coverage và blockers. Provision tài khoản thiếu qua `POST /api/settings/sample-data/users`; tạo qua `POST /api/settings/sample-data/projects` hoặc **Cấu hình → Dữ liệu mẫu**.
 
-## Chu kỳ Golden Live
-
-| Chu kỳ | Nhánh | Reset Golden Live? | Quy tắc |
-|---|---|---|---|
-| C0 | Baseline | Có, trước UAT ghi đầu tiên | Seed toàn DB UAT cô lập, chạy validator, chụp metadata |
-| C1 | `Có thiết kế` (`yes`) | Không trong chu kỳ | Chạy J0-J9, lưu evidence/sign-off trước reset |
-| C2 | `Không thiết kế` (`no`) | Có, giữa C1 và C2 | Reset toàn DB UAT cô lập; không chạy song song với C1 |
-| C3 | Negative RBAC/read-only | Không nếu mọi write bị từ chối | Nếu write ngoài dự kiến thành công: đánh `FAIL`, chụp evidence rồi reset target cô lập |
-
-Không reset để “xóa” lỗi trước khi đã lưu request/response, actor, entity ID, audit và snapshot trước/sau. Không reset `GOLDEN-REAL-001` hoặc `GOLDEN-NO-DESIGN-001` riêng lẻ.
-
-## Hành trình J0-J9
-
-| ID | Hành trình | Bằng chứng tối thiểu |
+| Case | Hồ sơ | Mục đích |
 |---|---|---|
-| J0 | Đăng nhập, project scope, menu/API được phép và write bị cấm | actor/role, HTTP status, project membership, một positive và một negative permission check |
-| J1 | Khảo sát, form/evidence, biên bản họp và chọn nhánh | exact form/answer/evidence IDs, work-item transitions, approval actor khác requester |
-| J2 | Nhánh thiết kế hoặc bỏ qua thiết kế | nhánh đã chọn, node được mở, nhánh đối nghịch được skip, không có mutation trên fixture hoàn tất |
-| J3 | BOQ, báo giá, khóa giá và sinh procurement | BOQ/quote/selection/procurement IDs, status trước/sau, không sinh trùng |
-| J4 | Procurement, incoming acceptance và kho | PO/delivery/acceptance/document/movement IDs; accepted quantity tách khỏi quantity đã nhập kho |
-| J5 | Hợp đồng, version, milestone, phụ lục và retention | actor/reviewer/signer, immutable signed version, AP/AR chỉ mở ở gate hợp lệ |
-| J6 | Kế hoạch, handoff thi công, nhật ký và kiểm tra hiện trường | form revision/hash, generated work/check IDs, daily report/evidence, idempotent handoff |
-| J7 | QA/QC, RFI/NCR/rework, nghiệm thu đầu ra | fail/pass history, NCR/rework/reinspection IDs, criterion-evidence links, không mất lịch sử |
-| J8 | AP/AR, lịch, tạm ứng, hóa đơn, phân bổ và đối soát | ledger IDs/amounts/status, requester separation, không tạo fake invoice/payment/stock movement |
-| J9 | Vật tư dư, checklist bàn giao, readiness, đóng tài chính và audit | blocker trước/sau, tám checklist, handover/audit IDs, AP/AR/pending payment về điều kiện đóng |
+| S0 | `draft`, 0% | Thiết lập mới, chưa có runtime hoàn tất |
+| S1 | `planning`, preset từ options | Đọc tiến độ/runtime tại mức được hỗ trợ |
+| S2 | `completed`, 100% | Đọc nguồn hồ sơ, nghiệm thu và bàn giao tổng hợp đã sinh |
+| S3 | Retry cùng actor/payload/key | Cùng công trình, không nhân đôi hồ sơ/artifacts |
+| S4 | Key cũ với actor/payload khác | Conflict, không tạo side effect |
+| S5 | Thiếu quyền, template/role không tương thích | Từ chối rõ ràng, không tạo công trình một phần |
 
-## Ma trận 14 vai trò App
+Mẫu mới dùng UUID/idempotency key riêng; ghi IDs trả về. S2 là synthetic, không chứng minh thanh toán hay xác nhận MISA. Không mutate S2 trong case chỉ đọc; dùng công trình riêng cho actions.
 
-Ký hiệu: `P` hành động positive-path; `D` quyết định/duyệt bằng actor khác requester; `R` chỉ đọc/đối chiếu; `N` negative write phải bị từ chối; `-` không áp dụng. Đây là trách nhiệm tối thiểu, không cho phép dùng Admin thay cho kiểm tra role-specific.
+## Nghiệp vụ và vai trò
 
-| Vai trò / tài khoản | J0 | J1 | J2 | J3 | J4 | J5 | J6 | J7 | J8 | J9 |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Admin `admin@consflow.local` | P | R | R | R | R | R | R | R | R | R |
-| PM `pm@consflow.local` | P/N | P/D | P/D | P/D | R | P/D | P/D | R/D | R | P/D |
-| QS `qs@consflow.local` | P/N | P | P | P | P | P | P | P | P/R | R |
-| Kế toán `accounting@consflow.local` | P/R/N | R/N | R/N | R | P/R | P/D/R | R/N | R | P/D/R | P/D/R |
-| Thủ kho `warehouse@consflow.local` | P/N | N | N | R | P | N | P | P/R | N | P |
-| Giám sát `supervisor@consflow.local` | P/N | P | R | N | R | N | P | P | N | P |
-| Giám đốc `director@consflow.local` | P/N | D | D | D | D | D | D | D | D | D |
-| Mua hàng `procurement@consflow.local` | P/N | N | N | P | P | P | R | R | R | R |
-| QA/QC `qaqc@consflow.local` | P/N | R | R | N | P | N | P | P/D | N | P/D |
-| Đội thi công `construction@consflow.local` | P/N | P | N | N | R | N | P | P | N | P/R |
-| Thầu phụ `subcontractor@consflow.local` | P/N | N | N | N | R | P/R | P | P | N | R |
-| Thiết kế `design@consflow.local` | P/N | P | P | R | N | N | P | R | N | R |
-| Sale `sales@consflow.local` | P/N | P | P/R | P | R | P/R | R | R | R | R |
-| Pháp lý `legal@consflow.local` | P/N | N | N | R | N | P/D | N | N | R | R |
+Quyền/membership hiện tại quyết định expected result; tên/chức danh không cấp quyền. Ghi actor, role key, permission và project scope trước positive/negative cases. Không dùng Admin thay coverage chuyên biệt.
 
-Golden Live có actor/project member chuyên biệt cho `Thiết kế`, `Sale` và `Pháp lý`. Các step yêu cầu một trong ba vai trò này phải dùng đúng actor tương ứng; nếu account hoặc membership bị thiếu, ghi `BLOCKED-COVERAGE` và không dùng Admin để biến coverage thiếu thành `PASS`. `client@consflow.local` không nằm trong ma trận App: đây là fixture `inactive` dùng để xác nhận đăng nhập bị từ chối; hồ sơ/evidence nghiệp vụ mới là bằng chứng xác nhận của chủ đầu tư.
+| Phạm vi | Positive case và invariant |
+|---|---|
+| Khảo sát/thiết kế | Form/minh chứng đúng nguồn, Giai đoạn mở đúng điều kiện, nhánh và duyệt đúng actor |
+| BOQ/mua sắm | Duyệt/khóa giá trước sinh procurement; retry không sinh trùng |
+| Hợp đồng | Lifecycle phiên bản, ký và source immutable; không mở nghĩa vụ AP/AR nội bộ |
+| Kho/thi công | Accepted quantity tách stock movement; nhật ký/minh chứng giữ nguồn |
+| QA/QC/nghiệm thu | Fail/rework/tái kiểm giữ lịch sử và quyền quyết định |
+| Bàn giao | Vật tư/quality/checklist đủ điều kiện; tiếp nhận/trả bổ sung có actor/lý do/audit |
+| Căn cứ đối soát | `accounting_reconciliation.view/manage` theo actual grants; nguồn/minh chứng/amount bất biến, hiển thị chênh lệch |
+| MISA | `accounting_misa.reconcile`; provenance import, đúng project/partner/direction/currency, cap giao dịch và revoke có lý do |
 
-Riêng actor Kế toán phải có thêm bộ evidence đối soát toàn công ty:
+Với kế toán, kiểm tra nguồn toàn công ty theo observer permissions hiện tại và write ngoài quyền bị từ chối. Khả năng đọc không chứng minh được sửa nguồn. API quản trị/audit và write nghiệp vụ khác kiểm tra theo catalog quyền thực tế.
 
-1. Nhìn thấy Dashboard finance và ít nhất hai công trình không cùng membership trực tiếp, đồng thời mở được dữ liệu nguồn BOQ, hợp đồng, mua sắm, kho, thi công và bàn giao của từng công trình.
-2. `Bàn làm việc › Nghiệp vụ Kế toán` hiển thị hồ sơ `handed_off` toàn công ty; tiếp nhận và trả bổ sung chạy đúng transition, return reason, actor/time và audit.
-3. Một write thuộc nghiệp vụ Kế toán được phân quyền phải thành công ngoài membership; một write PM/procurement/contract/project activity phải trả `403` và không tạo side effect.
-4. Menu và direct route của Pipeline Builder, Workflow Forms, Staff, Role/Permission, Audit/Event Logs và Settings không khả dụng trong chế độ đối soát; gọi trực tiếp API Audit toàn cục/công trình phải trả `403`; các menu nghiệp vụ công trình còn lại vẫn hiển thị.
-5. Đối chiếu rằng quyền cũ không bị thu hồi: mọi positive path Kế toán đã có trong ma trận trước V133 vẫn chạy trong membership dự án.
+Endpoint đã bỏ của sổ kế toán/AP/AR/payment/invoice/tax/report tài chính/đề nghị thanh toán phải không còn đăng ký; không đưa vào positive journey. Bàn giao hiện tại không đòi nợ nội bộ về 0 và không dùng collection gate. Kiểm tra blockers vận hành còn hiệu lực; không sửa SQL để vượt gate.
 
-Rev3 có fixture riêng `GOLDEN-REV3-BOQ-001` (project 023) và actor `Bộ phận HĐ` là `contract@consflow.local`. Khi kiểm thử Rev3, actor này phải nhìn thấy work item hợp đồng được giao nhưng không được dùng để thay QS/Kế toán/Pháp lý/Mua hàng/PM/Giám đốc ở các quyết định cần tách vai trò. Project 022 và ma trận 14 vai trò App phía trên không được rebound sang Rev3.
+Chuyển role tuần tự và tuân thủ `Retry-After`; `429` không chứng minh negative RBAC. Kiểm tra cùng-key tạo mẫu không trùng, cạnh tranh phân bổ không vượt MISA amount, lỗi giữa chừng rollback và không để artifacts không được tham chiếu.
 
-Chuyển role tuần tự và tôn trọng `Retry-After` khi login/auth trả `429`. Một response rate-limit làm case bị nhiễu và phải chạy lại; không được tính là negative RBAC `PASS`.
+## Evidence và nghiệm thu
 
-## Evidence package
+Lưu theo `run-id`: source SHA/working-tree state, timestamp, operator/reviewer, DB name/storage target, migrations, generator version, template revision/hash, actor/role/scope, request/response đã che secrets, IDs, before/after, audit/activity và defect links. Không lưu password, token, cookie, DSN chứa credentials hoặc tài liệu nhạy cảm.
 
-Mỗi lần chạy dùng một `run-id` và lưu ngoài thư mục source chứa secret. Không ghi password, bearer/refresh token, cookie, DSN đầy đủ hoặc nội dung file nhạy cảm.
+Case chỉ PASS khi expected/actual có bằng chứng và side effects đúng. Failed/blocked/skipped giữ trạng thái; không cộng thành PASS. Baseline chỉ đọc giữ nguyên; writes ngoài quyền, mất lịch sử/nguồn, nhân đôi hồ sơ, vượt MISA cap hoặc reset nhầm target là FAIL. Tạo môi trường disposable mới khi cần lần chạy trắng; seed không reset. Lưu evidence lỗi trước xử lý target.
 
-```text
-uat-evidence/<run-id>/
-  00-run-metadata.md
-  01-db-guard.txt
-  02-fixture-baseline.txt
-  03-role-matrix.csv
-  C1-design/J0...J9/
-  C2-no-design/J0...J9/
-  90-negative-rbac.md
-  99-signoff.md
-```
-
-`00-run-metadata.md` phải có commit SHA, timestamp/timezone, operator/reviewer, environment, base URL, DB name (không có credentials), upload target, fixture IDs và browser authorization `yes/no`. Mỗi case ghi: case ID, cycle/journey, actor/role, precondition, action/endpoint, expected/actual HTTP status, entity IDs, before/after status, audit/activity ID, SQL/API evidence file, result và defect link. File upload ghi tên fixture, MIME, size và checksum; không nhúng secret.
-
-## Tiêu chí PASS/FAIL
-
-- Một cell là `PASS` khi mọi `P/D/R/N` trong cell có evidence và kết quả đúng; `BLOCKED` không được tính là pass.
-- Một journey là `PASS` khi tất cả cell áp dụng pass, blocker dự kiến xuất hiện đúng lúc, requester separation/audit được giữ và không có side effect cấm.
-- Suite chỉ `PASS` khi C1 và C2 cùng pass, validator pass trước/sau, hai completed fixture không đổi, nhánh đối nghịch được skip, mutation có actor/timestamp/ID truy vết và mọi balance/approval/history invariant còn đúng.
-- Suite là `FAIL` ngay khi có cross-project/cross-role write, mutation completed fixture, bypass gate, approval sai actor, mất lịch sử, trùng side effect, fake invoice/payment/stock movement, reset nhầm target hoặc evidence không đủ để tái hiện.
-- Defect chưa xử lý hoặc actor chuyên biệt bị thiếu/sai membership phải ghi `BLOCKED` kèm owner và điều kiện unblock; không hạ chuẩn bằng Admin hoặc SQL trực tiếp.
-
-## Cổng ủy quyền trình duyệt
-
-Roadmap hoặc review package đã duyệt không phải là quyền chạy trình duyệt. Chỉ dùng Browser, Chrome, Playwright hoặc headless browser khi người dùng yêu cầu rõ browser verification ngay trong turn thực thi đó. Khi chưa có quyền, chạy API/DB/non-browser checks, ghi `browser_authorized: no` và báo `browser verification skipped`. Sau khi được phép, vẫn phải qua cổng DB UAT cô lập và không được dùng browser session để truy cập production/shared data.
+API/DB checks là kiểm chứng kỹ thuật của môi trường thử, không tự chứng minh UX. Chỉ chạy Browser/Playwright/headless browser khi người dùng yêu cầu rõ trong turn thực thi. Khi chưa chạy, ghi `browser verification skipped` và `NOT UX ACCEPTED`. Runbook không khẳng định UAT đã hoàn tất.

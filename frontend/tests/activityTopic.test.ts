@@ -37,8 +37,6 @@ test('every selectable source uses its actual read API, with legacy list semanti
     procurement_request: `/procurement-requests/${recordId}`, acceptance: `/acceptances/${recordId}`,
     handover: `/handover/${recordId}`, rework: `/projects/${projectId}/reworks`,
     stock_movement: `/stock/movements?project_id=${projectId}`,
-    payable: `/payables?project_id=${projectId}`, receivable: `/receivables?project_id=${projectId}`,
-    payment: '/payments',
   };
   for (const [scope_type, path] of Object.entries(paths)) {
     const topic = activityTopic({ scope_type, scope_id: recordId }, projectId)!;
@@ -55,9 +53,9 @@ test('detail reads reject mismatched project/record and unavailable source rows 
   }
 });
 
-test('legacy list lookup requires both exact record and project even when titles match', () => {
-  const topic = activityTopic({ scope_type: 'payment', scope_id: recordId }, projectId)!;
-  const selected = { id: recordId, project_id: projectId, status: 'approved', payment_code: 'PC-01' };
+test('stock list lookup requires both exact record and project even when titles match', () => {
+  const topic = activityTopic({ scope_type: 'stock_movement', scope_id: recordId }, projectId)!;
+  const selected = { id: recordId, project_id: projectId, status: 'approved', movement_code: 'KHO-01' };
   const rows = [{ ...selected, id: otherRecord }, { ...selected, project_id: otherProject }, selected];
   assert.equal(activityTopicRecord(topic, rows), selected);
   assert.throws(() => activityTopicRecord(topic, rows.slice(0, 2)), ActivityTopicUnavailable);

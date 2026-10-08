@@ -1,5 +1,12 @@
 # Commercial Procurement Domain Map
 
+## Current Accounting Retirement Boundary — V150/V151
+
+- Internal obligation opening and retained-money release actions/routes/permissions/tracking tables are removed. Contract versions/signatures/dispatch/milestone eligibility/variations and commercial retention percentages/amounts remain project source information.
+- accounting_reconciliation.go confirms expected comparison bases from ordered procurement or active eligible main-client/subcontractor milestones and protected evidence. There is no installment proposal/reservation/payment command or source-net cap on accountant-confirmed expected value.
+- Source dimensions/project/partner/currency/direction and evidence are checked under transaction; commercial sources never mutate from MISA matching. Procurement planning estimates/budget_status remain operational context, not accounting balances.
+- Current handoff readiness remains same-project supplier/PO/acceptance/stock context; no internal APAR/invoice/journal source is created.
+
 ## Project Manager Display Name
 
 - Current `pm` presentation is Quản lý dự án. ContractsPage, contractsPresentation and shared status labels use this name in variation approval notices. Keep event keys/statuses, grants, stored `next_roles` and source transitions intact; V149 role compatibility is owned by Admin Governance/Workflow maps.
@@ -7,8 +14,6 @@
 
 ## Accounting Proposal Source Boundary
 
-- `accounting_requests.go::accountingSourceTx` accepts ordered-or-later procurement with an active linked partner, main-client receivable milestones and subcontractor payable milestones from active/completed contracts. Supplier contract milestones are excluded to avoid presenting a second parallel source for purchased material. First searches: `accountingSourceTx|CreateAccountingBasis`.
-- Source amount/currency/identity is snapshotted into a separately confirmed proposal basis; procurement estimated amount is reference-only. New proposals never call `ContractMilestoneAction(open-obligation)` or mutate legacy AP/AR, contract/milestone state, acceptance, procurement or warehouse balances. Legacy contract obligations remain compatibility behavior.
 
 ## Required-Approval Work Item Gate Recovery
 
@@ -83,9 +88,6 @@
 - Subcontractor reconciliation maps confirmed quantity and variance to BOQ/work item evidence.
 - Owner/client reconciliation maps client decision and required action to acceptance/work item evidence.
 - The contract workspace may reorganize and localize lifecycle records, but must keep signed-version immutability, variation-to-draft-version behavior and existing capability gates visible in the available actions.
-- An approved payable with an approved budget creates an accounting commitment. A verified procurement/vendor input invoice recognizes actual cost and reduces that commitment in the append-only budget movement ledger; payment is a separate cash event and must not recognize the same cost again.
-- Procurement, contract and invoice source IDs remain traceable on journals and budget movements. Commercial code must not insert or update posted journal lines, static budget actuals or paid balances outside the canonical accounting posting transaction.
-- An ordered-or-later same-project procurement with supplier and PO is one payable-direction Accounting Handoff candidate. Its amount, accepted quantity and explicit stock receipt counts are read-only source context; handoff/acknowledgement never mutates procurement, acceptance, warehouse, legacy payable/invoice/journal or MISA. Rev8/legacy projects may still use old project-material-cost evidence without changing this source ledger.
 
 ## Developer Sample Data
 
@@ -96,11 +98,10 @@
 
 - Pair with materials/warehouse when procurement receive, stock movement, material balance, or surplus handling can change.
 - Pair with quality/acceptance when owner/client reconciliation, outgoing acceptance, punch list, or handover readiness depends on commercial records.
-- Pair with accounting/finance when procurement, invoices, payables, advances, payments, or vendor ledgers depend on BOQ or purchase data.
+- Pair with accounting reconciliation when procurement/contract source dossiers feed immutable comparison bases or imported MISA matching; no invoice/APAR/payment ledger owner remains.
 
-## Golden Sample
+## Current Sample Data
 
-- `GOLDEN-REAL-001` is the review fixture for six approved/final-locked BOQ lines, a three-supplier/eighteen-line quote matrix, six selections, two received procurement requests, three active signed contracts, milestone obligations, variation history and released retention.
 
 ## Rev3 Contract Execution And Outside-Plan Variations
 
@@ -110,7 +111,6 @@
 - An outside-plan variation records `priority=urgent|normal`, optional construction `source_work_item_id`, and optional V88 `source_construction_action_id`. Contract authors may still create a draft, while the narrow construction proposal endpoint requires an active main-client receivable contract and eligible construction source, rejects duplicate active proposals per action, and atomically creates then submits to `qs_review`. Technical remediation is independent. Status continues `draft/submitted -> qs_review -> purchasing_sourcing -> pending_approval -> approved -> procurement_created`; urgent never skips a role gate, events are append-only, and procurement generation stays idempotent through `procurement_request_id`.
 - Rev3 moves input takeoff/price sourcing after outbound-contract readiness. The single negotiation node precedes the input-contract/advance node; BOQ/procurement approval invariants remain unchanged.
 - Rev4 `...023` keeps those gates and adds `Mua hàng` beside `QS` only on `boq_without_design.pricing`; this responsibility snapshot does not approve the BOQ, lock final prices or generate procurement by itself.
-- Rev4 Operations UAT project `...025` seeds one active main-client receivable contract solely so the construction proposal UI can enter `qs_review`. That synthetic contract is not evidence of App signature, paper dispatch, signed-scan return, upstream execution readiness, or commercial approval completion.
 - BOQ prices, supplier quotation prices/discounts, procurement values, contract/version/milestone/retention amounts and variation value deltas are monetary inputs and must use shared `CurrencyInput` or semantic `currency`, honoring the quotation/contract currency when present. Quantities, tax percentages, payment-term days and schedule ordering remain `number`.
 - BOQ release/procurement generation, supplier quotation/qualification/selection, input-contract procurement transitions and contract save/version/sign/dispatch/scan/activation accept explicit Work Item mutation context from the canonical task route. The source mutation and `ready -> in_progress` transition are one transaction and the backend matches the exact official action family (including payable vs receivable contract direction). No action skips BOQ approval, price locking, procurement, signature, paper dispatch, scan or activation gates; calls without context keep their ordinary module behavior.
 

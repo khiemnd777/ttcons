@@ -1,5 +1,24 @@
 # Project Planning Domain Map
 
+## Startup / Member Role Catalog Cleanup — 2026-10-05
+
+- ProjectStartupWizard and ProjectMembersPanel share `ProjectMemberOptions`. Operational labels describe responsibilities; project role UUIDs grant permissions. Preserve this distinction and existing project.view/member.manage/pipeline.run eligibility rules.
+- Local fixture cleanup retained the existing project/member records and 19 canonical roles; the real-project API now offers 16 project access roles and 18 operational labels without Batch2 Viewer. No startup transition or member-selection contract changed.
+- Source defect was isolated to test-role lifecycle; do not hide data defects using a name blacklist or broadly remove valid custom/member role labels.
+
+## Current Accounting Retirement Boundary — V150/V151
+
+- V150 removes project accounting_book_id/default/FK. Manual startup/import/sample creates require no internal book and preserve creator/audit/outbox/startup ownership/authorization and code idempotency.
+- Current workflow library only exposes compatible active definitions; exact old standard/demo/official Rev1–Rev8 are withdrawn. Rev9 remains active, forms/definition content and applied migration checksums stay intact.
+- Sample blueprint v5 has draft/planning/completed without book/account/period options. Completed creates actual Rev9 source dossiers and validates every gate before commit; no fabricated payments/journals/MISA.
+- Project/partner deletion impacts now inspect current handoff/reconciliation bases/MISA records, alongside operational history. Existing Developer support and sample isolation semantics stay unchanged.
+
+## Developer Project Support
+
+- Active global system Developer may observe all non-cancelled real/sample projects and edit metadata under existing permissions without membership. Support scope comes from `developerProjectSupportUserSQL`/`IsDeveloper`; it does not make the actor PM, project creator, member, assigned worker or approver.
+- Project list/options/progress/Explorer and workspace operations/timeline/evidence use the shared access helpers. Explorer index keys include the bypass scope for safe rollout/revocation. Manual startup/member/PM handover and workflow transition invariants remain in their existing owners; no template/runtime/history rewrite or migration.
+- Existing `ProjectsPage`, `ProjectWorkspaceLayout`, `FormDrawer` and `SimpleForm` are unchanged. First searches: `developerProjectSupportUserSQL|ProjectAccessFilter|CanAccessProjectPermission|profileCanObserveAllProjectWork`; regression `developer_project_access_test.go`.
+
 ## Project Manager Presentation
 
 - Canonical `pm` displays as Quản lý dự án; project member/PM ownership and the separately scoped Phó Quản Lý role remain distinct. Project startup, membership chips/filters/dialog choices, current Planning/Preparation/work summaries and PM handoff messages use the current name.
@@ -139,18 +158,13 @@
 - Pair with construction operations when planning outputs become field execution work or project activity.
 - Pair with reporting when changing planning metrics, filters, date scopes, owner scopes, or CSV/reportable fields.
 
-## Golden Sample
+## Current Sample Data
 
-- Use `GOLDEN-REAL-001` as the completed flagship project and `GOLDEN-NO-DESIGN-001` as the mutually exclusive branch companion when reviewing project-first navigation, planning runtime and form-backed planning records.
-- Use `GOLDEN-LIVE-001` to experience real planning/runtime transitions. It intentionally starts at 0% with only the Khảo sát node active; reset it with local/dev `make seed` after an operational walkthrough.
-- Golden Live has fourteen active App members. `client@consflow.local` is inactive and not a project member; client confirmation stays in project documents, forms/evidence and business snapshots.
-- Use `GOLDEN-REV6-LEAN-001` (project/run `...026`) for Rev6 form-capture review. Its valid submitted intake choice opens Survey with all six survey work items ready, while 44 later items remain pending; the runtime keeps 50 exact form snapshots, including 43 lean V2 instances, without changing Batch3 or older Golden projects.
 
 ## Legacy Rev3/Rev4 Project Intake
 
 - `projects.workflow_entry_mode` is `survey_required` by default or `client_boq`; it can change only before a pipeline run exists. Starting `client_boq` fails closed without an active project-scoped `client_boq` document, then uses the template's explicit edge condition to skip survey/meeting/design.
 - Historical project creation uploaded BOQ evidence through the protected project-document API before starting the runtime. This remains compatibility context only; new project forms must not author `workflow_entry_mode`.
-- Use `GOLDEN-REV3-BOQ-001` (project 023) to review the untouched Rev3 client-BOQ branch. Project 022 is the preservation control and must remain on its original runtime/template snapshot.
 - For Rev4/engine-3 UAT, project 024 is the production-shaped entry-state control at `project_intake`; project 025 is a labelled synthetic construction-stage snapshot and must not be used to infer that planning handoff or earlier node gates completed.
 
 ## Rev5 Project Intake
@@ -161,11 +175,7 @@
 - Projects still selecting Rev4 and having no run are moved to Rev5 by V92. Existing project runs are never rebound or rewritten.
 - Projects still selecting Rev5 and having no run are moved to Rev6 by V102. Rev6 changes only official business-form references to immutable lean V2 definitions; project metadata, routing, existing project runs and historical form instances are never rebound or rewritten.
 - Projects still selecting Rev6 and having no run move to Rev7 through V103. Rev7 removes only the duplicate `planning.assignment_meeting`; `planning.assignment_minutes` becomes the single meeting source, followed by QA dossier and construction handoff at normalized order indexes 1/2/3. Existing projects with runs remain pinned to their original revision.
-- The additive `golden_client_workflow_rev6_lean.sql` fixture is the canonical project-first review state for that revision. It records the completed intake answer/history instead of fabricating an unexplained jump to Survey, and `validate_golden_project.sql` guards its runtime/form snapshot counts.
-- The additive `golden_client_workflow_rev7_operational.sql` fixture is the equivalent Rev7 review state and must retain 50 steps plus 27 form instances.
 - Projects still selecting Rev7 with no run move to immutable Rev8 through V105. Rev8 keeps the 15-node graph but snapshots 21 one-owner work packages, 15 form-backed occurrences, six source-only gates and only two node approval policies. Existing runs remain pinned.
-- The additive `golden_client_workflow_rev8_lean.sql` fixture is the Rev8 Survey-state review control and must retain 15 nodes, 21 steps/work items, 15 exact form instances and the submitted intake routing answer.
-- V131 publishes immutable Rev9 from Rev8 and replaces only the final close step with Accounting Handoff acknowledgement. Only no-run projects still selecting Rev8 and having no live legacy project-finance rows adopt it; existing runs and projects with old finance records remain pinned. Rev9 retains 15 nodes, 21 steps, the same form references/connectors and two node approval policies.
 - Project estimated budget and contract amount are monetary inputs and use semantic `currency`/shared `CurrencyInput`; project progress, dates and other non-money numeric planning values do not.
 - In `Kế hoạch công việc`, the first successful form save/submit visibly includes `Bắt đầu` and atomically starts the active Work Item, so a submitted form must never fall back to the generic `Bắt đầu` CTA. For `construction.activate_handoff`, submitted/source-blocked detail opens the existing Planning handoff review/activation dialog through a project-scoped one-time navigation intent; after activation, the separate backend-gated `Kiểm tra điều kiện & chốt bước` remains required. Activation never auto-completes the Work Item.
 - Planning construction-handoff activation accepts explicit `work_item_context` from the canonical task route and atomically starts the matching `construction.activate_handoff` Work Item only after the handoff snapshot is successfully created. Replay/open/read paths do not start it; project/current-Node/permission/source-revision validation remains authoritative, and activation still does not complete the Work Item or advance the pipeline.

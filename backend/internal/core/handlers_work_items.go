@@ -65,7 +65,7 @@ func (h *Handler) MyWorkNavigationSummary(c *fiber.Ctx) error {
 }
 
 func (h *Handler) MyAccountingWork(c *fiber.Ctx) error {
-	if err := h.requirePermission(c, []string{"accounting_handoff.view", "project_finance.view"}); err != nil {
+	if err := h.requirePermission(c, []string{"accounting_handoff.view"}); err != nil {
 		return err
 	}
 	page, err := h.service.MyAccountingWork(c.Context(), MyAccountingWorkFilter{

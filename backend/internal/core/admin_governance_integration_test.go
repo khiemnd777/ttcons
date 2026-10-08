@@ -415,7 +415,7 @@ func TestAdminStaffAccountSecurityManagement(t *testing.T) {
 }
 
 func TestProjectOperationsAccessPolicy(t *testing.T) {
-	db := openProjectOperationsTestDB(t)
+	db := openIsolatedProjectOperationsTestDB(t)
 	ctx := context.Background()
 	repo := NewRepository(db)
 
@@ -429,16 +429,19 @@ func TestProjectOperationsAccessPolicy(t *testing.T) {
 	noScopeUserID := newID()
 	projectRoleNoPermissionUserID := newID()
 	projectRolePermissionUserID := newID()
-	var projectPermissionRoleID string
+	var noPermissionRoleID, projectPermissionRoleID string
 
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id IN ($1,$2,$3,$4,$5,$6)`, adminUserID, directorUserID, pmUserID, noScopeUserID, projectRoleNoPermissionUserID, projectRolePermissionUserID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id IN ($1,$2)`, projectID, cancelledProjectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, pmStaffID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id IN ($1,$2,$3,$4,$5,$6)`, adminUserID, directorUserID, pmUserID, noScopeUserID, projectRoleNoPermissionUserID, projectRolePermissionUserID)
-		if projectPermissionRoleID != "" {
-			_, _ = db.ExecContext(ctx, `DELETE FROM role_permissions WHERE role_id=$1`, projectPermissionRoleID)
-			_, _ = db.ExecContext(ctx, `DELETE FROM roles WHERE id=$1`, projectPermissionRoleID)
+		for _, roleID := range []string{noPermissionRoleID, projectPermissionRoleID} {
+			if roleID == "" {
+				continue
+			}
+			mustExec(t, db, `DELETE FROM role_permissions WHERE role_id=$1`, roleID)
+			mustExec(t, db, `DELETE FROM roles WHERE id=$1`, roleID)
 		}
 	})
 
@@ -446,8 +449,16 @@ func TestProjectOperationsAccessPolicy(t *testing.T) {
 	adminRoleID := ensureRole(t, db, "admin", "Quản trị")
 	directorRoleID := ensureRole(t, db, "director", "Giám đốc")
 	pmRoleID := ensureRole(t, db, "pm", "PM")
-	noPermissionRoleID := ensureRole(t, db, "batch2_viewer_"+suffix[:8], "Batch2 Viewer")
-	projectPermissionRoleID = ensureRole(t, db, "batch2_project_viewer_"+suffix[:8], "Batch2 Project Viewer")
+	// These are custom test roles, never canonical system identities.
+	createFixtureRole := func(name, displayName string) string {
+		var roleID string
+		if err := db.QueryRowContext(ctx, `INSERT INTO roles(name,display_name,system_role) VALUES ($1,$2,false) RETURNING id`, name, displayName).Scan(&roleID); err != nil {
+			t.Fatal(err)
+		}
+		return roleID
+	}
+	noPermissionRoleID = createFixtureRole("batch2_viewer_"+suffix[:8], "Batch2 Viewer")
+	projectPermissionRoleID = createFixtureRole("batch2_project_viewer_"+suffix[:8], "Batch2 Project Viewer")
 	mustExec(t, db, `INSERT INTO role_permissions (role_id, permission_id) VALUES ($1,$2),($3,$2),($4,$2) ON CONFLICT DO NOTHING`, directorRoleID, operationViewID, pmRoleID, projectPermissionRoleID)
 
 	mustExec(t, db, `INSERT INTO users (id, email, password_hash, full_name, status) VALUES ($1,$2,'demo:pw','Admin','active')`, adminUserID, "admin-"+suffix+"@test.local")

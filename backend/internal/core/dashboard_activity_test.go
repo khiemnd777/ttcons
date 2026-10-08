@@ -168,16 +168,19 @@ func TestDashboardActivityClientAndCompanyObserver(t *testing.T) {
 	ctx := context.Background()
 	client := setupProjectScopeFixture(t, db, []string{"project.view", "report.view"})
 	mustExec(t, db, `UPDATE roles SET display_name='Chủ đầu tư' WHERE id=$1`, client.roleID)
+	// Visibility fixtures must precede the application snapshot regardless of DB clock skew.
+	eventAt := time.Now().UTC().Add(-time.Second).Truncate(time.Microsecond)
 	for _, visibility := range []string{"internal", "client"} {
-		mustExec(t, db, `INSERT INTO work_item_activities(project_id,scope_type,scope_id,activity_type,comment,visibility) VALUES ($1,'project',$1,'system_event',$2,$2)`, client.projectID, visibility)
+		mustExec(t, db, `INSERT INTO work_item_activities(project_id,scope_type,scope_id,activity_type,comment,visibility,created_at) VALUES ($1,'project',$1,'system_event',$2,$2,$3)`, client.projectID, visibility, eventAt)
 	}
+	mustExec(t, db, `INSERT INTO work_item_activities(project_id,scope_type,scope_id,activity_type,comment,visibility,created_at) VALUES ($1,'project',$1,'system_event','Future client activity','client',$2)`, client.projectID, eventAt.Add(time.Hour))
 	service := NewService(NewRepository(db), "dashboard-test")
 	page, err := service.DashboardActivities(ctx, DashboardActivitiesRequest{}, client.userID)
 	if err != nil || len(page.Items) != 1 || page.Items[0].Comment != "client" {
 		t.Fatalf("client visibility = %#v, %v", page, err)
 	}
 	observer := setupProjectScopeFixture(t, db, []string{"project.reconciliation.view", "report.view"})
-	mustExec(t, db, `INSERT INTO work_item_activities(project_id,scope_type,scope_id,activity_type,comment) VALUES ($1,'project',$1,'system_event','Company observer')`, client.otherProjectID)
+	mustExec(t, db, `INSERT INTO work_item_activities(project_id,scope_type,scope_id,activity_type,comment,created_at) VALUES ($1,'project',$1,'system_event','Company observer',$2)`, client.otherProjectID, eventAt)
 	page, err = service.DashboardActivities(ctx, DashboardActivitiesRequest{Search: "Company observer"}, observer.userID)
 	if err != nil || len(page.Items) != 1 || page.Items[0].ProjectID != client.otherProjectID {
 		t.Fatalf("company visibility = %#v, %v", page, err)

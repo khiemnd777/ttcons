@@ -284,7 +284,7 @@ func setupClientOfficialWorkflowFixture(t *testing.T, db *sql.DB, contractAmount
 	t.Helper()
 	ctx := context.Background()
 	repo := NewRepository(db)
-	templateID := clientOfficialWorkflowTemplateID
+	templateID := "40000000-0000-0000-0000-000000000028"
 	actorID := newID()
 	actorStaffID := newID()
 	projectID := newID()

@@ -1423,9 +1423,6 @@ func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 		"replanning.approve",
 		"handover.view",
 		"handover.create",
-		"accounting.budget_view",
-		"accounting.budget_approve",
-		"accounting.payment_create",
 	})
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1 AND project_id IS NULL`, fixture.userID)
@@ -1499,36 +1496,6 @@ func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 		t.Fatalf("handover created_by = %v, want %s", handover["created_by"], fixture.userID)
 	}
 
-	budget, err := service.CreateBudget(ctx, fixture.projectID, BudgetCreateRequest{BudgetCode: "BUD-CORE-" + suffix, Name: "Core budget", PlannedAmount: 1200}, fixture.userID, "Scoped User")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if budget["status"] != "draft" || number(budget["approved_amount"]) != 0 || number(budget["used_amount"]) != 0 || number(budget["remaining_amount"]) != 0 {
-		t.Fatalf("budget derived state = status %v approved %v used %v remaining %v, want draft/0/0/0", budget["status"], budget["approved_amount"], budget["used_amount"], budget["remaining_amount"])
-	}
-	budget, err = service.ApproveBudget(ctx, cleanID(budget["id"]), fixture.userID, "Scoped User")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if budget["status"] != "approved" || cleanID(budget["approved_by"]) != fixture.userID {
-		t.Fatalf("budget approval = status %v approved_by %v", budget["status"], budget["approved_by"])
-	}
-	if number(budget["approved_amount"]) != 1200 || number(budget["remaining_amount"]) != 1200 {
-		t.Fatalf("budget approved amounts = approved %v remaining %v, want 1200/1200", budget["approved_amount"], budget["remaining_amount"])
-	}
-
-	payment, err := service.CreatePayment(ctx, PaymentCreateRequest{
-		ProjectID: fixture.projectID, PaymentCode: "PMT-CORE-" + suffix,
-		PaymentType: "outbound", TargetType: "issue", TargetID: cleanID(issue["id"]),
-		BudgetID: cleanID(budget["id"]), Amount: 450, PaymentMethod: "bank_transfer",
-	}, fixture.userID, "Scoped User")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cleanID(payment["created_by"]) != fixture.userID {
-		t.Fatalf("payment created_by = %v, want %s", payment["created_by"], fixture.userID)
-	}
-
 	assertCount(t, db, `
 		SELECT COUNT(*)
 		FROM audit_logs
@@ -1540,12 +1507,9 @@ func TestBusinessCoreLifecycleServiceRecordsActors(t *testing.T) {
 				'rework_completed',
 				'replanning_created',
 				'replanning_approved',
-				'handover_created',
-				'budget_created',
-				'budget_approved',
-				'payment_created'
+				'handover_created'
 			)
-	`, 10, fixture.projectID)
+	`, 7, fixture.projectID)
 	assertCount(t, db, `SELECT COUNT(*) FROM audit_logs WHERE target_id=$1 AND event_type='warehouse_created'`, 1, warehouseID)
 }
 
@@ -1758,7 +1722,7 @@ func TestClientOfficialWorkflowTemplateMigrationShape(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	templateID := "40000000-0000-0000-0000-000000000020"
 
-	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_templates WHERE id=$1 AND status='published'`, 1, templateID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_templates WHERE id=$1 AND status='deleted'`, 1, templateID)
 	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_template_nodes WHERE template_id=$1`, 12, templateID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
@@ -1802,7 +1766,7 @@ func TestOfficialWorkflowRevisionTwoWordingAndRoles(t *testing.T) {
 	db := openProjectOperationsTestDB(t)
 	templateID := "40000000-0000-0000-0000-000000000021"
 
-	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_templates WHERE id=$1 AND status='published'`, 1, templateID)
+	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_templates WHERE id=$1 AND status='deleted'`, 1, templateID)
 	assertCount(t, db, `SELECT COUNT(*) FROM pipeline_template_nodes WHERE template_id=$1`, 13, templateID)
 	assertCount(t, db, `
 		SELECT COUNT(*)
@@ -1970,7 +1934,7 @@ func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
 	actorID := newID()
 	actorStaffID := newID()
 	projectID := newID()
-	templateID := "40000000-0000-0000-0000-000000000020"
+	templateID := "40000000-0000-0000-0000-000000000028"
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(ctx, `DELETE FROM projects WHERE id=$1`, projectID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM staff WHERE id=$1`, actorStaffID)
@@ -1987,6 +1951,12 @@ func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
 
 	run, err := repo.StartPipeline(ctx, projectID, templateID, actorID, "Test Actor")
 	if err != nil {
+		t.Fatal(err)
+	}
+	intakeNodeID := runNodeIDByName(t, run, "Tiếp nhận dự án")
+	mustExec(t, db, `UPDATE workflow_form_instances SET answers_snapshot_json='{"entry_route":"survey_required"}'::jsonb WHERE project_id=$1 AND run_node_id=$2`, projectID, intakeNodeID)
+	satisfyRunNodeForAdvance(t, db, intakeNodeID, actorID)
+	if _, err := repo.AdvanceRunNode(ctx, intakeNodeID, actorID, "Test Actor"); err != nil {
 		t.Fatal(err)
 	}
 	surveyNodeID := runNodeIDByName(t, run, "Khảo sát")
@@ -2024,82 +1994,6 @@ func TestClientOfficialWorkflowRoutesByDesignDecisionFormAnswer(t *testing.T) {
 		FROM pipeline_run_nodes
 		WHERE project_id=$1 AND name='Thiết kế' AND status='in_progress'
 	`, 0, projectID)
-}
-
-func TestClientWorkflowAutomationCreatesIncomingScheduleAndInvoiceBlocker(t *testing.T) {
-	db := openProjectOperationsTestDB(t)
-	ctx := context.Background()
-	repo := NewRepository(db)
-	fixture := setupClientOfficialWorkflowFixture(t, db, 150000000)
-	workItemID := clientOfficialWorkItemIDByAction(t, db, fixture.projectID, "finance.scaffold_incoming_acceptance")
-	procurementID := newID()
-	mustExec(t, db, `
-		INSERT INTO procurement_requests (id, project_id, request_code, title, requested_by, status, total_estimated_amount)
-		VALUES ($1,$2,$3,'Đầu vào đã duyệt',$4,'approved',75000000)
-	`, procurementID, fixture.projectID, "PR-IN-"+procurementID[:8], fixture.actorID)
-	mustExec(t, db, `
-		INSERT INTO procurement_request_items (request_id, quantity_planned, quantity_requested, unit, estimated_unit_price, supplier_name, approval_status)
-		VALUES ($1,1,1,'gói',75000000,'Nhà cung cấp kiểm thử','approved')
-	`, procurementID)
-	mustExec(t, db, `UPDATE work_items SET status='completed' WHERE id=$1`, workItemID)
-	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
-	assertValidationError(t, repo.RunRequiredWorkflowAutomationForWorkItem(ctx, workItemID, fixture.actorID, "Client Actor"))
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM incoming_acceptance_records
-		WHERE project_id=$1
-			AND procurement_request_id=$2
-			AND source_type='procurement'
-			AND status='draft'
-	`, 1, fixture.projectID, procurementID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM payables
-		WHERE project_id=$1
-			AND source_type='procurement'
-			AND source_id=$2
-			AND status='draft'
-			AND gross_amount=75000000
-			AND remaining_amount=75000000
-	`, 1, fixture.projectID, procurementID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM payable_payment_schedules pps
-		JOIN payables pay ON pay.id=pps.payable_id
-		WHERE pay.project_id=$1
-			AND pay.source_id=$2
-			AND pps.schedule_code='LICH-THANH-TOAN-001'
-			AND pps.milestone_name='Thanh toán đầu vào sau nghiệm thu'
-			AND pps.status='draft'
-			AND pps.planned_amount=75000000
-			AND pps.remaining_amount=75000000
-	`, 1, fixture.projectID, procurementID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM input_invoices ii
-		JOIN payables pay ON pay.id=ii.payable_id
-		WHERE pay.project_id=$1 AND pay.source_id=$2
-	`, 0, fixture.projectID, procurementID)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM workflow_automation_events
-		WHERE source_type='pipeline_run_node'
-			AND source_id=(SELECT run_node_id FROM work_items WHERE id=$1)
-			AND action_key='finance.scaffold_incoming_acceptance'
-			AND status='blocked'
-			AND target_type='payable'
-			AND blocker_reason='Cần tải lên và xác minh hóa đơn đầu vào thật'
-			AND run_count=$2
-	`, 1, workItemID, 2)
-	assertCount(t, db, `
-		SELECT COUNT(*)
-		FROM work_item_activities wia
-		JOIN work_items wi ON wi.id=wia.work_item_id
-		WHERE wi.run_node_id=(SELECT run_node_id FROM work_items WHERE id=$1)
-			AND activity_type='blocker'
-			AND comment='Cần tải lên và xác minh hóa đơn đầu vào thật'
-			AND metadata_json->>'automation_action'='finance.scaffold_incoming_acceptance'
-	`, 1, workItemID)
 }
 
 func TestWorkflowFormAnswerValueMatches(t *testing.T) {

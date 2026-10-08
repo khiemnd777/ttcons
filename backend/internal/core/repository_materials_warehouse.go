@@ -681,9 +681,6 @@ func (r *Repository) UpdateStockDocument(ctx context.Context, documentID string,
 	`, documentID, replacementID, req.CorrectionReason, actorID); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE project_material_costs SET stock_document_id=$2,updated_at=now() WHERE stock_document_id=$1`, documentID, replacementID); err != nil {
-		return nil, err
-	}
 	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, req.ProjectID, req.WorkItemContext, warehouseWorkItemPolicy, "stock_document", replacementID, actorID, actorName)
 	if err != nil {
 		return nil, err

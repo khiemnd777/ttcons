@@ -484,18 +484,6 @@ func canonicalSystemSettingValue(value any) string {
 	return string(raw)
 }
 
-func (s *SystemSettingsStore) ClientPaymentMinPercent(ctx context.Context) float64 {
-	value, err := s.liveValue(ctx, "client_payment_min_percent")
-	if err != nil {
-		return 30
-	}
-	numeric, ok := numericSettingValue(value)
-	if !ok {
-		return 30
-	}
-	return numeric
-}
-
 func (s *SystemSettingsStore) SurplusHandlingOptions(ctx context.Context) []string {
 	value, err := s.liveValue(ctx, "surplus_handling_options")
 	if err != nil {

@@ -1,5 +1,29 @@
 # Admin Governance Domain Map
 
+## Local Fixture Role Cleanup — 2026-10-05
+
+- Preserve canonical role keys/UUIDs/grants, Admin/Developer access and legitimate custom role support. Role display name and `system_role` are insufficient evidence to authorize deletion.
+- The proven Batch2 Viewer leak belongs to `TestProjectOperationsAccessPolicy`; its two custom fixtures now use schema isolation and checked cleanup. Repeated regression verification runs on a disposable database.
+- Approved local data operation removed exactly 18 unreferenced inventoried role UUIDs after fresh all-table references/backup/restore checks. Fingerprints retained all other public table content plus canonical role content. Production was not operated on.
+
+## Current Accounting Retirement Boundary — V150/V151
+
+- V150 removes obsolete accounting.*, project_finance.*, report.finance.view, contract.retention_release grants and client_payment_min_percent setting. Current settings registry/UI cannot expose that gate; backup tests use remaining supported settings.
+- V151 replaces accounting_request.* with accounting_reconciliation.view/manage. Grants derive actual old view/review assignments before removal; keep existing single accounting_misa.reconcile, no invented MISA grants.
+- repository_access.go company observer allowlists enumerate only current reconciliation/handoff reads/actions. Canonical roles/Developer support/project scope/actor/audit restrictions are preserved.
+- Seed is additive/idempotent demo master records only; it cannot truncate existing data/replay migrations or create fake completed business records.
+
+## Local Login Prefill Boundary
+
+- `LoginPage.tsx` reads `VITE_LOCAL_LOGIN_EMAIL`/`VITE_LOCAL_LOGIN_PASSWORD` only under `import.meta.env.DEV`. Real values are local-only Git-ignored `.env.development.local` configuration; production fields and missing-config fields are empty. Preserve manual submit, shared password masking and existing backend authentication. This is a frontend convenience, not an account, role, session or production credential change.
+- Do not record actual passwords in source, tests, docs or maps. Validate dev configuration and exclusion from production artifacts before claiming the local configuration is verified.
+
+## Developer Technical Support Project Scope
+
+- Global canonical system `developer` grants company project scope only for active non-deleted non-sample internal accounts without external-only roles. Per-project Developer assignments and display-name matches do not grant company scope. `developerProjectSupportUserSQL` and `WorkItemAccessProfile.IsDeveloper` own this distinction; Admin/Director/Manager/PM flags remain separate.
+- Every non-cancelled real/sample project can be listed/opened; mutations still require the exact functional permission and existing business-state/immutable-history checks. No new role, permission, membership, credential or migration is created. Work Item execution/responsibility and approval decision overrides are unchanged.
+- Direct/bulk project/operations scope, Work Item/evidence/activity observation and Explorer cache revision/key agree. Embedded Audit requires `audit.view`; Accounting exclusion remains intact. Existing UI owners are reused without markup changes. Tests: `developer_project_access_test.go` exercises PostgreSQL handlers/persistence plus Redis warm-cache legacy-key avoidance, revocation and inactive/deleted identities.
+
 ## PM Display Name Agreement
 
 - The internal system role key `pm` means Quản lý dự án; `deputy_manager` means Phó Quản Lý. V149 renames only `roles.display_name` for canonical PM and preserves role IDs, grants, user/project assignments and account identities. Existing migrations and historical snapshots are immutable.
@@ -9,14 +33,12 @@
 ## Deputy Manager Role Boundary
 
 - V146 adds system App role `deputy_manager` / Phó Quản Lý and reserved `project.supervision.view`; role identity and marker assignments are guarded in PostgreSQL and `ReplaceRolePermissions`. Catalog/import/member role options are dynamic; the pipeline role-label catalog includes Phó Quản Lý. No existing PM or human account assignment is rewritten.
-- Company scope requires an active non-deleted real internal account, global system role and current marker. `CanSuperviseAllProjects` never sets `IsManager`, Admin/Director or Accounting reconciliation. Narrow explicit view/report-review permissions bypass membership only on real active projects. Financial queries retain legacy scope even for mixed roles.
+- Company scope requires an active non-deleted real internal account, global system role and current marker. `CanSuperviseAllProjects` never sets `IsManager`, Admin/Director or Accounting reconciliation. Narrow explicit view/report-review permissions bypass membership only on real active projects. Accounting reconciliation retains separate project permission scope even for mixed roles.
 - Admin bootstrap treats the marker as a reserved exception. Explorer scope is rechecked and cached-empty indexes invalidate on marker restoration (V147) or sample-project scope changes (V148). Actor/revision receipts and report locks protect independent acknowledgements and prevent stale reviews. First searches: `deputyManagerUserSQL|SupervisionProjectAccessFilter|supervisionCompanyScopeAllowed|comment_only`.
 - Supervision filter options use grant/member candidate sets (`supervisionSupervisorOptionsSQL`), retaining service profile checks and the current Deputy predicate within SQL. Global/scoped/member identity comes from canonical role grants and supported member aliases; text positions/display names of other roles do not qualify. User active/deleted/sample and project cancelled/sample boundaries are preserved; no new access grant or cache is introduced.
 
 ## Accounting Proposal And MISA Scope
 
-- V145 + `backend/seed/seed.sql` define `accounting_request.view|submit|review` and `accounting_misa.reconcile`: Accounting/Admin/Developer all four, PM/Procurement view+submit, Director/QS view. `repository_access.go` enumerates these specific permissions for actors already carrying the company reconciliation marker; it grants no unrelated mutation or Audit access.
-- New project endpoints validate explicit permission and non-cancelled project through `accountingAccess`. `/me/accounting-requests` filters project scope and then exact view plus review/submit capability. No synthetic task, role identity shortcut, auth/session change or original-file public URL. First searches: `accountingAccess|AccountingRequestQueue|projectReconciliationGlobalActionPermissions`.
 
 ## Project Permission Actor Presentation
 
@@ -62,13 +84,12 @@
 - Business audit/settings: `/audit-logs`, `/projects/:id/audit-logs`, `GET|PUT /settings`, `GET /settings/backup`, `POST /settings/backup/preview|restore`
 - Developer Sample Data: `GET /settings/sample-data/options`, `POST /settings/sample-data/projects`
 - Runtime Event Logs: protected `GET /event-logs`, `GET /event-logs/:id`; product page `/event-logs`
-- Statistics governance: `/statistics/options`, `/statistics/staff` and `/statistics/staff/export`; authored-report governance: `/work-reports/*`; legacy Dashboard/professional-report routes remain `/reports/*`
+- Statistics: /statistics/options, /statistics/staff and exports; authored reports /work-reports/*; operational Dashboard /reports/dashboard and activities. Money/tax/profit routes were removed.
 
 ## Tables And Migrations
 
 - `users`, `staff`, `roles`, `permissions`, `user_roles`, `role_permissions`, `project_members`
 - `auth_sessions`, `auth_email_tokens`; users-only `users.recovery_email` and `users.recovery_email_verified_at` from V107; token retention indexes from V108; Admin-only default `staff.account_security.manage` grant from V109
-- `partners`, V116 `bulk_deletion_batches` for partner/project idempotent deletion results, V117 `project_excel_imports` and V118 `workflow_definition_imports` for secret-free same-actor import replay, V120 additive `source_format` on both batch tables; V121 sample identity on `projects` plus `sample_data_generations`; V122 selected accounting-book source on sample generation replay; V123 paired `users.is_sample|sample_role_id`, one sample account per role and sample/real scope triggers
 - typed/versioned `system_settings`, business `audit_logs`, runtime `event_logs`
 - Relevant migrations: `V1`, `V36`, `V37`, `V60`, `V68`, legacy accounting RBAC additions in `V73`, project-finance boundary/RBAC in `V83`, external-only client access in `V89`, actor/project explorer cache revisions/outbox retention in `V97`-`V100`, revision-scoped workflow-form confirmations in `V101`, `statistics.*`/`work_report.*` separation plus authored-report history in `V106`, typed settings plus system Developer role in `V110`, sanitized Event Logs plus reserved permission in `V111`, the production-safe base role/permission catalog in `V112`, partner/project bulk deletion replay state in `V116`, Project permissions/idempotency in `V117`, Workflow Definition governance/idempotency in `V118`, sensitive grant role-rename hardening in `V119`, XLSX/JSON import provenance in `V120`, Developer Sample Data governance/state in `V121`, and portable selected accounting source in `V122`
 
@@ -93,7 +114,7 @@
 - Aggregate navigation is labelled `Thống kê`, requires `statistics.view`, and uses `statistics.export` for PDF/Excel/CSV. V106 copies existing `report.view` role grants to both statistics permissions so the former aggregate audience keeps access; `report.view` remains the Dashboard/legacy compatibility gate and does not authorize authored employee reports.
 - Authored `Báo cáo` navigation requires `work_report.view`. Field roles carrying `operation.report` receive view/create/submit/export; Admin/Director/PM receive their explicit review/manage subset from V106. Backend checks do not rely on those role names: list scopes require the corresponding permission, every project filter/detail/export combines project permission with `ProjectAccessFilter`/`CanAccessProjectPermission`, and direct report detail/PDF additionally requires author, recipient or project-scoped `work_report.manage`. Review requires recipient identity unless the actor has project-scoped manage.
 - Generic notifications are authenticated recipient projections, never a new authorization source. List/summary/read/archive reapply current non-cancelled project scope plus each row's permission snapshot; exact recipient ownership is mandatory. Dispatch excludes inactive/deleted accounts and every account carrying an `external_only` role, then evaluates required-delivery/preference rules. Stored safe internal paths are routing hints and destinations repeat normal route/RBAC/record checks. Recipient-targeted SSE contains invalidation metadata only and one app-level actor provider revision-reconciles after reconnect; identity changes still clear React Query state. V126 adds `notification.manage` only to Admin/Developer for future diagnostics, but no diagnostics UI/route is exposed by this implementation.
-- `Bàn giao kế toán` is gated by `accounting_handoff.view`; submit and Accounting acknowledgement/return/re-handoff use `accounting_handoff.submit|acknowledge` with project scope. V131 grants Accounting all three, PM/Procurement view+submit, Director/QS view, and Admin/Developer all. These grants are authorization only: `UserHasGlobalRole(actor,"accounting")` is the separate responsibility predicate for My Work and considers only global role assignments. `project_finance.*` remains only for pinned legacy mode. Legacy `report.finance.view`/`accounting.*` remain absent from non-admin roles.
+- `Bàn giao kế toán` is gated by `accounting_handoff.view`; submit and Accounting acknowledgement/return/re-handoff use `accounting_handoff.submit|acknowledge` with project scope. V131 grants Accounting all three, PM/Procurement view+submit, Director/QS view, and Admin/Developer all. These grants are authorization only: `UserHasGlobalRole(actor,"accounting")` is the separate responsibility predicate for My Work and considers only global role assignments. V150 removes project_finance.*, report.finance.view and accounting.* entirely; current handoff grants remain.
 - Staff report is a project-allocation view: only active staff memberships in accessible non-cancelled projects are returned and distinct accessible projects are counted. Full-company staff is available only through the `staff.view` Staff module.
 - `project.member.manage` is granted to Admin/Director/PM and always combined with project scope. Project member responses expose server capabilities plus focused role grant flags for `project.view`, `project.member.manage` and `pipeline.run`. Single mutation and the max-50 unique-Staff bulk startup mutation synchronize only project-scoped `user_roles`, never remove global roles, never expose Admin/Director as assignable project roles, and write project audit per member; bulk rolls back every member/role/audit if any row fails. Saved active memberships are immutable within the startup wizard, while deactivation remains the separately authorized Member workspace action.
 - Partner catalog updates preserve downstream snapshots for historical documents.
@@ -112,7 +133,7 @@
 - The project explorer index cache is actor-scoped, not role-name scoped. Membership, staff-user linkage, user-role and role-permission mutations bump the affected actor revision in the same database transaction. Redis index IDs are still rechecked with current `ProjectAccessFilter` before any cached row is returned; cache keys or frontend visibility never authorize access.
 - `roles.external_only` classifies business counterparts that cannot act in the App. V89 marks `client`, fails when migration would strand an external-only open work item/pending approval or a mixed-role user, removes App permissions, revokes sessions, inactivates linked users/staff/project memberships and preserves `user_roles` plus historical workflow/runtime labels. Login lookup, session creation/refresh/active checks, role edit, role-permission assignment, user-role assignment and project-member save all fail closed independently of frontend filtering.
 - V68 adds the system roles `Thiết kế`, `Sale`, `Pháp lý` with the minimum permission sets needed by their official-workflow steps and grants existing `Đội thi công` pipeline/planning access. The migration does not auto-assign users or project memberships and does not broaden existing runtime role snapshots.
-- Accounting Handoff permissions are independent capability gates: view, submit and acknowledge. Submit covers initial/re-handoff; acknowledge covers Accounting acknowledgement/return. All actions combine permission with project scope and source readiness. Old project-finance material-cost/cash-request/report capabilities remain compatibility-only for legacy-mode projects; ledger/tax permissions remain admin-only historical support.
+- Accounting Handoff view/submit/acknowledge remain project-scoped source readiness gates. V150 removes internal ledger/project-finance capabilities; V151 adds accounting_reconciliation.view/manage with existing accounting_misa.reconcile.
 - Manual posting, source posting, reversal, period close/reopen and migration-reconciliation resolution write actor/time/reason audit in the same transaction. Reconciliation resolution is one-way: a second resolution returns conflict and cannot overwrite the original conclusion.
 
 ## Developer Sample Data
@@ -120,7 +141,6 @@
 - V121 and `ReplaceRolePermissions` reserve `sample_data.create` to the system `developer` role; Admin and every other role must fail closed at both repository and database assignment boundaries, including role rename.
 - V123 and repository member/RBAC paths enforce two-way identity isolation. Sample users cannot receive global roles, a role other than `sample_role_id`, a role in a real project, or membership/PM ownership in a real project. Real users cannot receive a project role, membership or PM ownership in a sample project. Generic project-member options filter by the selected project's `is_sample`; generated historical sample projects are not retroactively rewritten.
 - `GET /settings/sample-data/options` and `POST /settings/sample-data/projects` are protected capability routes. Production/demo availability is intentional; environment name is not an authorization control.
-- Generation records retain actor, request profile/progress, selected target-environment Pipeline/hash/accounting book, project result and UUID idempotency. A replay is valid only for the same actor, profile, progress and both selected sources. Audit metadata must remain explicitly simulated and must not include secrets.
 - Sample blueprint v4 persists every simulated completed Work Item with its linked Run Step also `completed` and validates all linked terminal pairs before the generation transaction commits. V124 repairs only the earlier generated `is_sample=true`, Work Item completed / Run Step submitted pattern; real projects and every Node/run pointer are explicitly outside migration scope.
 
 ## Cross-Domain Checks
@@ -131,11 +151,10 @@
 - Pair with commercial, quality, and accounting domains when partner catalog fields or snapshot semantics change.
 - Check audit logs and actor propagation when changing any privileged action, approval action, or session lifecycle behavior.
 
-## Golden Live Accounts
+## Current Sample Data
 
 - The canonical local/dev display identities are `Ngân Kế Toán` for `accounting@consflow.local` and `Hoàng Long` for `director@consflow.local`; `users.full_name` and the linked `staff.full_name` must remain aligned, while historical audit/activity actor-name snapshots are not rewritten by an account rename.
 - Local/dev seed includes active App users for procurement, QA/QC, construction team, subcontractor, design, sales, legal and contract-department roles. `client@consflow.local` is an inactive negative-login fixture linked only to the external-only, permissionless `client` role; it is never a positive UAT actor.
-- `GOLDEN-LIVE-001` has fourteen active App project members, including dedicated `Thiết kế`, `Sale` and `Pháp lý` actors. Client confirmation is evidenced through documents/forms/evidence and business fields, never by a client login or active membership.
 - V72 grants `planning.view` and `planning.edit` to PM because the official workflow assigns PM to planning-gated steps. This does not bypass project scope or work-item role assignment: `CanActOnWorkItem` remains the first mutation gate.
 
 ## Rev3 Contract Governance

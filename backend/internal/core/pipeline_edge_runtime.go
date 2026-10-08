@@ -24,7 +24,6 @@ var runEdgeConditionEvaluators = map[string]runEdgeConditionEvaluator{
 	"procurement_approved":        evaluateProcurementApprovedEdge,
 	"workflow_form_answer_equals": evaluateWorkflowFormAnswerEqualsEdge,
 	"handover_ready":              evaluateHandoverReadyEdge,
-	"financial_ready":             evaluateFinancialReadyEdge,
 }
 
 // Published runtime snapshots are immutable. This registry only keeps old runs
@@ -166,21 +165,6 @@ func evaluateWorkflowFormAnswerEqualsEdge(r *Repository, ctx context.Context, tx
 
 func evaluateHandoverReadyEdge(r *Repository, ctx context.Context, tx *sql.Tx, _, fromNode Record) (bool, string, error) {
 	return r.handoverReadyCondition(ctx, tx, fmt.Sprint(fromNode["project_id"]))
-}
-
-func evaluateFinancialReadyEdge(r *Repository, ctx context.Context, tx *sql.Tx, _, fromNode Record) (bool, string, error) {
-	openDebt, err := r.scalarNumberTx(ctx, tx, `
-		SELECT COUNT(*) AS total FROM (
-			SELECT id FROM payables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0
-			UNION ALL
-			SELECT id FROM receivables WHERE project_id=$1 AND status <> 'cancelled' AND remaining_amount > 0
-		) open_debt
-	`, fromNode["project_id"])
-	if err != nil {
-		return false, "", err
-	}
-	matched := openDebt == 0
-	return matched, boolReason(matched, "Không còn công nợ phải thu hoặc phải trả đang mở", "Công nợ phải thu hoặc phải trả vẫn còn mở"), nil
 }
 
 func evaluateLegacyProjectEntryModeEdge(_ *Repository, ctx context.Context, tx *sql.Tx, edge, fromNode Record) (bool, string, error) {

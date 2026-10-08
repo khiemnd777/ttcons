@@ -458,13 +458,11 @@ func TestS3StorageProviderMigrationsFullChainPreservesImmutableTriggers(t *testi
 		"workflow_form_signatures_visual_storage_provider_check",
 		"workflow_form_signatures_visual_storage_key_check",
 		"workflow_form_pdf_exports_provider_check",
-		"input_invoices_storage_provider_check",
-		"output_invoices_storage_provider_check",
 	}).Scan(&s3Constraints); err != nil {
 		t.Fatalf("verify full-chain S3 constraints: %v", err)
 	}
-	if s3Constraints != 7 {
-		t.Fatalf("full-chain S3 constraints = %d, want 7", s3Constraints)
+	if s3Constraints != 5 {
+		t.Fatalf("full-chain S3 constraints = %d, want 5 current evidence/signature/PDF constraints", s3Constraints)
 	}
 
 	var canonicalConstraints int
@@ -479,13 +477,11 @@ func TestS3StorageProviderMigrationsFullChainPreservesImmutableTriggers(t *testi
 		"evidence_records_internal_storage_key_canonical_check",
 		"workflow_form_signatures_visual_storage_key_canonical_check",
 		"workflow_form_pdf_exports_storage_key_canonical_check",
-		"input_invoices_storage_key_canonical_check",
-		"output_invoices_storage_key_canonical_check",
 	}).Scan(&canonicalConstraints); err != nil {
 		t.Fatalf("verify full-chain V71 canonical constraints: %v", err)
 	}
-	if canonicalConstraints != 5 {
-		t.Fatalf("full-chain V71 canonical constraints = %d, want 5", canonicalConstraints)
+	if canonicalConstraints != 3 {
+		t.Fatalf("full-chain V71 canonical constraints = %d, want 3 current evidence/signature/PDF constraints", canonicalConstraints)
 	}
 }
 

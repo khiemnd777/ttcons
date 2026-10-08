@@ -147,39 +147,6 @@ func sampleRoleEmail(roleKey string) string {
 	return strings.ToLower(strings.TrimSpace(roleKey)) + "@dev.local"
 }
 
-func (r *Repository) ListSampleDataAccountingContexts(ctx context.Context) ([]sampleDataAccountingContext, error) {
-	rows, err := r.Query(ctx, `
-		SELECT book.id::text,book.book_code,book.name,book.base_currency,
-			COALESCE(MAX(CASE WHEN account.account_code='1121' AND account.active AND account.is_postable THEN account.id::text END),'') AS bank_account_id,
-			COALESCE(MAX(CASE WHEN account.account_code='154' AND account.active AND account.is_postable THEN account.id::text END),'') AS cost_account_id,
-			COALESCE(MAX(CASE WHEN account.account_code='5111' AND account.active AND account.is_postable THEN account.id::text END),'') AS revenue_account_id,
-			EXISTS (
-				SELECT 1 FROM accounting_periods period
-				WHERE period.book_id=book.id
-				  AND CURRENT_DATE BETWEEN period.date_from AND period.date_to
-				  AND period.status='open'
-			) AS has_open_period
-		FROM accounting_books book
-		LEFT JOIN accounting_accounts account ON account.book_id=book.id
-		WHERE book.active
-		GROUP BY book.id,book.book_code,book.name,book.base_currency
-		ORDER BY lower(book.name),book.id
-	`)
-	if err != nil {
-		return nil, err
-	}
-	contexts := make([]sampleDataAccountingContext, 0, len(rows))
-	for _, row := range rows {
-		contexts = append(contexts, sampleDataAccountingContext{
-			ID: cleanID(row["id"]), Code: strings.TrimSpace(fmt.Sprint(row["book_code"])),
-			Name: strings.TrimSpace(fmt.Sprint(row["name"])), BaseCurrency: strings.TrimSpace(fmt.Sprint(row["base_currency"])),
-			BankAccountID: cleanID(row["bank_account_id"]), CostAccountID: cleanID(row["cost_account_id"]),
-			RevenueAccountID: cleanID(row["revenue_account_id"]), HasOpenPeriod: boolValue(row["has_open_period"]),
-		})
-	}
-	return contexts, nil
-}
-
 func sampleRequiredRoles(blueprint sampleDataBlueprint) []string {
 	seen := map[string]bool{}
 	roles := []string{}
@@ -362,18 +329,15 @@ func (r *Repository) CreateSampleData(ctx context.Context, plan sampleDataPlan) 
 	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext('consflow-sample-data'))`); err != nil {
 		return nil, err
 	}
-	var existingActor, existingProfile, existingProject, existingTemplate, existingAccountingBook string
+	var existingActor, existingProfile, existingProject, existingTemplate string
 	var existingProgress int
 	err = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(actor_id::text,''),profile,progress_percent,COALESCE(project_id::text,''),
-			COALESCE(template_id::text,''),COALESCE(accounting_book_id::text,'')
+			COALESCE(template_id::text,'')
 		FROM sample_data_generations WHERE idempotency_key=$1
-	`, plan.IdempotencyKey).Scan(&existingActor, &existingProfile, &existingProgress, &existingProject, &existingTemplate, &existingAccountingBook)
+	`, plan.IdempotencyKey).Scan(&existingActor, &existingProfile, &existingProgress, &existingProject, &existingTemplate)
 	if err == nil {
 		sourceMismatch := existingTemplate != plan.TemplateID
-		if plan.Profile == "completed" {
-			sourceMismatch = sourceMismatch || existingAccountingBook != plan.AccountingBookID
-		}
 		if existingActor != plan.GeneratorID || existingProfile != plan.Profile || existingProgress != plan.ProgressPercent || sourceMismatch {
 			return nil, conflictError("Khoá idempotency đã được dùng cho một yêu cầu tạo dữ liệu mẫu khác")
 		}
@@ -392,13 +356,13 @@ func (r *Repository) CreateSampleData(ctx context.Context, plan sampleDataPlan) 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO projects (
 			id,name,code,client_name,address,planned_start_date,planned_end_date,
-			estimated_budget,contract_amount,status,pipeline_template_id,accounting_book_id,pm_staff_id,
+			estimated_budget,contract_amount,status,pipeline_template_id,pm_staff_id,
 			progress_percent,workflow_entry_mode,is_sample,sample_profile,sample_blueprint_version
 		) VALUES (
 			$1,$2,$3,'Công ty Demo Consflow','Công trình mẫu · TP.HCM',CURRENT_DATE-interval '180 days',CURRENT_DATE+interval '180 days',
-			3600000000,5200000000,$4,$5,$6,NULLIF($7,'')::uuid,$8,'survey_required',true,$9,$10
+			3600000000,5200000000,$4,$5,NULLIF($6,'')::uuid,$7,'survey_required',true,$8,$9
 		)
-	`, plan.ProjectID, plan.ProjectName, plan.ProjectCode, plan.ProjectStatus, plan.TemplateID, plan.AccountingBookID,
+	`, plan.ProjectID, plan.ProjectName, plan.ProjectCode, plan.ProjectStatus, plan.TemplateID,
 		samplePMStaffID(plan), plan.ProgressPercent, plan.Profile, sampleDataBlueprintVersion); err != nil {
 		return nil, err
 	}
@@ -422,16 +386,16 @@ func (r *Repository) CreateSampleData(ctx context.Context, plan sampleDataPlan) 
 	result = Record{
 		"project_id": plan.ProjectID, "project_code": plan.ProjectCode, "project_name": plan.ProjectName,
 		"profile": plan.Profile, "progress_percent": plan.ProgressPercent, "is_sample": true,
-		"pipeline_template_id": plan.TemplateID, "accounting_book_id": plan.AccountingBookID,
+		"pipeline_template_id": plan.TemplateID,
 	}
 	resultJSON, _ := json.Marshal(result)
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO sample_data_generations (
 			id,idempotency_key,actor_id,profile,progress_percent,blueprint_version,
-			template_id,template_definition_hash,accounting_book_id,project_id,result_json
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+			template_id,template_definition_hash,project_id,result_json
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
 	`, plan.GenerationID, plan.IdempotencyKey, plan.GeneratorID, plan.Profile, plan.ProgressPercent,
-		sampleDataBlueprintVersion, plan.TemplateID, plan.TemplateHash, plan.AccountingBookID, plan.ProjectID, string(resultJSON)); err != nil {
+		sampleDataBlueprintVersion, plan.TemplateID, plan.TemplateHash, plan.ProjectID, string(resultJSON)); err != nil {
 		return nil, err
 	}
 	if err := addAuditTx(ctx, tx, plan.ProjectID, plan.GeneratorID, plan.GeneratorName,
@@ -449,7 +413,7 @@ func (r *Repository) CreateSampleData(ctx context.Context, plan sampleDataPlan) 
 func (r *Repository) sampleDataProjectResult(ctx context.Context, projectID string, replayed bool) (Record, error) {
 	row, err := r.QueryOne(ctx, `
 		SELECT id::text,name,code,status,progress_percent,is_sample,sample_profile,
-			sample_blueprint_version,current_pipeline_run_id::text,pipeline_template_id::text,accounting_book_id::text
+			sample_blueprint_version,current_pipeline_run_id::text,pipeline_template_id::text
 		FROM projects WHERE id=$1 AND status <> 'cancelled'
 	`, projectID)
 	if err != nil {
@@ -589,6 +553,9 @@ func insertSampleRuntimeTx(ctx context.Context, tx *sql.Tx, plan sampleDataPlan)
 }
 
 func insertSampleRuntimeStepTx(ctx context.Context, tx *sql.Tx, plan sampleDataPlan, node sampleDataPlannedNode, step sampleDataPlannedStep) error {
+	if step.Actor.UserID != "" {
+		plan.ActorID, plan.ActorName = step.Actor.UserID, step.Actor.FullName
+	}
 	roles, _ := json.Marshal(step.Definition.Record["required_role_ids"])
 	var submittedBy, submittedAt, reviewedAt, startedAt, completedAt any
 	if step.Completed {
@@ -666,13 +633,14 @@ func insertSampleRuntimeStepTx(ctx context.Context, tx *sql.Tx, plan sampleDataP
 func insertSampleFormsEvidenceApprovalsTx(ctx context.Context, tx *sql.Tx, plan sampleDataPlan) error {
 	for _, node := range plan.Nodes {
 		for _, step := range node.Steps {
+			stepActorID, stepActorName := step.Actor.UserID, step.Actor.FullName
 			for index, artifact := range step.Evidence {
 				evidenceType := "document"
 				documentType := "record"
 				if strings.HasPrefix(artifact.MIMEType, "image/") {
 					evidenceType, documentType = "photo", "photo"
 				}
-				payload, _ := json.Marshal(Record{"simulated": true, "generated_by": plan.ActorID, "blueprint_version": sampleDataBlueprintVersion})
+				payload, _ := json.Marshal(Record{"simulated": true, "generated_by": stepActorID, "blueprint_version": sampleDataBlueprintVersion})
 				if _, err := tx.ExecContext(ctx, `
 					INSERT INTO evidence_records (
 						id,work_item_id,project_id,target_type,target_id,evidence_type,document_type,name,title,
@@ -686,7 +654,7 @@ func insertSampleFormsEvidenceApprovalsTx(ctx context.Context, tx *sql.Tx, plan 
 					fmt.Sprintf("Minh chứng %02d · %s", index+1, step.Definition.Record["name"]),
 					"Minh chứng hợp lệ của dữ liệu mẫu, lưu trong storage hiện hành.",
 					"/evidence/"+artifact.ID+"/file", artifact.MIMEType, artifact.Size,
-					"Dữ liệu mẫu · "+fmt.Sprint(step.Definition.Record["name"]), string(payload), plan.ActorID,
+					"Dữ liệu mẫu · "+fmt.Sprint(step.Definition.Record["name"]), string(payload), stepActorID,
 					artifact.Provider, artifact.Key, artifact.Checksum); err != nil {
 					return fmt.Errorf("insert evidence for step %s: %w", step.RunStepID, err)
 				}
@@ -716,7 +684,7 @@ func insertSampleFormsEvidenceApprovalsTx(ctx context.Context, tx *sql.Tx, plan 
 				WHERE version.id=$16
 			`, step.FormInstanceID, plan.ProjectID, step.WorkItemID, plan.RunID, node.RunNodeID, step.RunStepID,
 				step.Definition.Record["id"], step.Definition.Record["name"], formStatus, currentRevision, answersJSON,
-				string(roles), plan.ActorID, cleanID(submittedBy), submittedAt, cleanID(step.Definition.Record["form_version_id"])); err != nil {
+				string(roles), stepActorID, cleanID(submittedBy), submittedAt, cleanID(step.Definition.Record["form_version_id"])); err != nil {
 				return fmt.Errorf("insert form instance for step %s: %w", step.RunStepID, err)
 			}
 			createdMetadata, _ := json.Marshal(Record{"simulated": true, "source": "sample_data_generator"})
@@ -724,7 +692,7 @@ func insertSampleFormsEvidenceApprovalsTx(ctx context.Context, tx *sql.Tx, plan 
 				INSERT INTO workflow_form_events (
 					instance_id,project_id,work_item_id,actor_id,event_type,to_status,comment,metadata_json
 				) VALUES ($1,$2,$3,$4,'created','draft','Khởi tạo biểu mẫu dữ liệu mẫu',$5::jsonb)
-			`, step.FormInstanceID, plan.ProjectID, step.WorkItemID, plan.ActorID, string(createdMetadata)); err != nil {
+			`, step.FormInstanceID, plan.ProjectID, step.WorkItemID, stepActorID, string(createdMetadata)); err != nil {
 				return fmt.Errorf("insert form created event for step %s: %w", step.RunStepID, err)
 			}
 			if !step.Completed {
@@ -737,7 +705,7 @@ func insertSampleFormsEvidenceApprovalsTx(ctx context.Context, tx *sql.Tx, plan 
 					INSERT INTO workflow_form_answers (
 						instance_id,field_key,field_type,value_json,revision_no,updated_by
 					) VALUES ($1,$2,$3,$4::jsonb,1,$5)
-				`, step.FormInstanceID, key, field["field_type"], string(valueJSON), plan.ActorID); err != nil {
+				`, step.FormInstanceID, key, field["field_type"], string(valueJSON), stepActorID); err != nil {
 					return fmt.Errorf("insert form answer %s for step %s: %w", key, step.RunStepID, err)
 				}
 			}
@@ -746,10 +714,10 @@ func insertSampleFormsEvidenceApprovalsTx(ctx context.Context, tx *sql.Tx, plan 
 					instance_id,project_id,work_item_id,actor_id,event_type,from_status,to_status,
 					comment,metadata_json
 				) VALUES ($1,$2,$3,$4,'submitted','draft','submitted','Đã nộp biểu mẫu dữ liệu mẫu',$5::jsonb)
-			`, step.FormInstanceID, plan.ProjectID, step.WorkItemID, plan.ActorID, string(createdMetadata)); err != nil {
+			`, step.FormInstanceID, plan.ProjectID, step.WorkItemID, stepActorID, string(createdMetadata)); err != nil {
 				return fmt.Errorf("insert form submitted event for step %s: %w", step.RunStepID, err)
 			}
-			signaturePayload, _ := json.Marshal(Record{"simulated": true, "form_instance_id": step.FormInstanceID, "generated_by": plan.ActorID})
+			signaturePayload, _ := json.Marshal(Record{"simulated": true, "form_instance_id": step.FormInstanceID, "generated_by": stepActorID})
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO workflow_form_signatures (
 					project_id,work_item_id,form_instance_id,form_version_id,form_revision_no,purpose,
@@ -772,7 +740,7 @@ func insertSampleFormsEvidenceApprovalsTx(ctx context.Context, tx *sql.Tx, plan 
 				`, step.FormPDF.ID, plan.ProjectID, step.WorkItemID, step.FormInstanceID, step.Definition.Record["form_version_id"],
 					"Hồ sơ mẫu · "+fmt.Sprint(step.Definition.Record["name"]), step.FormPDF.Name, step.FormPDF.Provider,
 					step.FormPDF.Key, step.FormPDF.MIMEType, step.FormPDF.Size, step.FormPDF.Checksum,
-					string(pdfMetadata), plan.ActorID, plan.ActorName, step.FormInstanceID); err != nil {
+					string(pdfMetadata), stepActorID, stepActorName, step.FormInstanceID); err != nil {
 					return fmt.Errorf("insert form PDF for step %s: %w", step.RunStepID, err)
 				}
 			}

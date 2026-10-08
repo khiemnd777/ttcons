@@ -9,7 +9,6 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { SampleDataBadge } from '../../components/SampleDataBadge';
 import { get } from '../../lib/api/client';
 import type {
-  AccountingReportRow,
   ProcurementReportRow,
   ProjectReportRow,
   StaffReportRow,
@@ -17,7 +16,7 @@ import type {
 } from '../../lib/types/domain';
 import { useAuth } from '../../lib/auth/AuthContext';
 
-export type OperationalReportKind = 'projects' | 'warehouse' | 'procurement' | 'accounting' | 'staff';
+export type OperationalReportKind = 'projects' | 'warehouse' | 'procurement' | 'staff';
 
 type OperationalReportPanelProps = {
   kind: OperationalReportKind;
@@ -32,7 +31,6 @@ const reportEmptyCopy: Record<OperationalReportKind, string> = {
   projects: 'Chưa có công trình trong phạm vi lọc',
   warehouse: 'Chưa có dữ liệu vật tư trong phạm vi lọc',
   procurement: 'Chưa có yêu cầu mua sắm trong phạm vi lọc',
-  accounting: 'Chưa có dữ liệu công nợ trong phạm vi lọc',
   staff: 'Chưa có nhân sự trong các công trình thuộc phạm vi lọc',
 };
 
@@ -129,26 +127,6 @@ function operationalTable(
     );
   }
 
-  if (kind === 'accounting') {
-    return (
-      <DataTable<AccountingReportRow>
-        {...common}
-        rows={rows as AccountingReportRow[]}
-        searchPlaceholder="Tìm công trình..."
-        defaultSort={{ key: 'name', direction: 'asc' }}
-        getRowKey={(row) => row.project_id}
-        renderMobileCard={(row) => <AccountingReportCard row={row} />}
-        columns={[
-          { key: 'name', header: 'Công trình', sortable: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> },
-          { key: 'payable_remaining', header: 'Còn phải trả', align: 'right', sortable: true, render: (row) => <CurrencyText value={row.payable_remaining} /> },
-          { key: 'receivable_remaining', header: 'Còn phải thu', align: 'right', sortable: true, render: (row) => <CurrencyText value={row.receivable_remaining} /> },
-          { key: 'used_budget', header: 'Ngân sách đã dùng', align: 'right', sortable: true, render: (row) => <CurrencyText value={row.used_budget} /> },
-          { key: 'action', header: '', align: 'right', render: (row) => <SourceLink to={`/projects/${row.project_id}/accounting`} label="Mở kế toán" permission="accounting.view" /> },
-        ]}
-      />
-    );
-  }
-
   return (
     <DataTable<StaffReportRow>
       {...common}
@@ -219,20 +197,6 @@ function ProcurementReportCard({ row }: { row: ProcurementReportRow }) {
         <ReportMetric label="Giá trị" value={<CurrencyText value={row.amount} />} />
       </div>
       <SourceLink mobile to={procurementStatisticsSourcePath(row.project_id)} label="Mở mua sắm" permission="procurement.view" />
-    </article>
-  );
-}
-
-function AccountingReportCard({ row }: { row: AccountingReportRow }) {
-  return (
-    <article className="rounded-lg border border-line bg-white p-4 shadow-sm">
-      <h3 className="break-words font-semibold leading-5 text-ink">{row.name}</h3>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <ReportMetric label="Còn phải trả" value={<CurrencyText value={row.payable_remaining} />} />
-        <ReportMetric label="Còn phải thu" value={<CurrencyText value={row.receivable_remaining} />} />
-        <div className="col-span-2"><ReportMetric label="Ngân sách đã dùng" value={<CurrencyText value={row.used_budget} />} /></div>
-      </div>
-      <SourceLink mobile to={`/projects/${row.project_id}/accounting`} label="Mở kế toán" permission="accounting.view" />
     </article>
   );
 }
