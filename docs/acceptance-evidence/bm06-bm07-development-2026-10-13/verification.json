@@ -1,0 +1,187 @@
+{
+  "passed": true,
+  "checks": {
+    "bm06-form_actual_download_bytes": true,
+    "bm06-form_original_headers": true,
+    "bm06-form_project_header": true,
+    "bm06-form_private_native_google": true,
+    "bm06-form_same_tab_names": true,
+    "bm06-form_google_value_parity": true,
+    "bm06-form_google_header_selection_100": true,
+    "bm06-daily_actual_download_bytes": true,
+    "bm06-daily_original_headers": true,
+    "bm06-daily_project_header": true,
+    "bm06-daily_private_native_google": true,
+    "bm06-daily_same_tab_names": true,
+    "bm06-daily_google_value_parity": true,
+    "bm06-daily_google_header_selection_100": true,
+    "bm07_actual_download_bytes": true,
+    "bm07_original_headers": true,
+    "bm07_project_header": true,
+    "bm07_private_native_google": true,
+    "bm07_same_tab_names": true,
+    "bm07_google_value_parity": true,
+    "bm07_google_header_selection_100": true,
+    "google_no_effective_errors": true,
+    "bm06_exact_submitted_v5_r2": true,
+    "bm06_frozen_state_exact_task_identity": true,
+    "bm06_source_missing_facts_not_invented": true,
+    "bm06-form_exact_ten_values_real_zero": true,
+    "bm06-form_signatures": true,
+    "bm06-daily_exact_ten_values_real_zero": true,
+    "bm06-daily_signatures": true,
+    "bm07_exact_three_photo_rows_one_tab": true,
+    "bm07_unknown_capture_time_remains_blank": true,
+    "bm07_source_row_metadata": true,
+    "bm07_signatures": true,
+    "bm07_F8_identity_and_fit": true,
+    "bm07_F8_native_cell_ui": true,
+    "bm07_F8_original_checksum_and_derivative": true,
+    "bm07_F9_identity_and_fit": true,
+    "bm07_F9_native_cell_ui": true,
+    "bm07_F9_original_checksum_and_derivative": true,
+    "bm07_F9_original_pixels": true,
+    "bm07_F10_identity_and_fit": true,
+    "bm07_F10_native_cell_ui": true,
+    "bm07_F10_original_checksum_and_derivative": true,
+    "bm07_F10_original_pixels": true,
+    "bm07_three_only_drawings_and_budget": true,
+    "all_old_rows_retained_unchanged": true,
+    "only_four_actual_export_audits_added": true,
+    "bm06_form_and_events_unchanged": true,
+    "bm07_all_source_evidence_unchanged": true,
+    "all_storage_unchanged": true,
+    "same_database_migrations158": true,
+    "all979_current_hashes_match_build": true,
+    "only_approved_renderer_and_test_changed": true,
+    "only_backend_recreated_same_development": true,
+    "build_update_readiness": true
+  },
+  "files": {
+    "BM06-form": {
+      "bytes": 14248,
+      "sha256": "2894782fbc26e05ef1a2eff8deaf662aaa05139a5ffee0d2a04054cc80327d53",
+      "tabs": [
+        "2026-10-09_01",
+        "Hình ảnh"
+      ],
+      "row5_height": 33.0
+    },
+    "BM06-daily": {
+      "bytes": 14219,
+      "sha256": "9afdd11da1b026549e2698bcf0ba31318f64ebb471a3c5f17e971c08cc12529f",
+      "tabs": [
+        "2026-10-09_01",
+        "Hình ảnh"
+      ],
+      "row5_height": 33.0
+    },
+    "BM07": {
+      "bytes": 38562,
+      "sha256": "f3a2faa1d3ce5e1587993e8d5f1549388d551fbc60dbfb370a057ff6224b006c",
+      "tabs": [
+        "BM-GS-07"
+      ],
+      "row5_height": 33.0
+    }
+  },
+  "google_parity": {
+    "BM06-form": {
+      "compared": 350,
+      "mismatches": []
+    },
+    "BM06-daily": {
+      "compared": 350,
+      "mismatches": []
+    },
+    "BM07": {
+      "compared": 109,
+      "mismatches": []
+    }
+  },
+  "google_errors": [],
+  "images": [
+    {
+      "cell": "F8",
+      "evidence_id": "8057abdc-e188-4605-b996-77f339d961a2",
+      "media_part": "xl/media/image1.png",
+      "media_sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0",
+      "bytes": 5244,
+      "size": [
+        1280,
+        822
+      ],
+      "original_size": [
+        1400,
+        900
+      ],
+      "extent_emu": [
+        1600200,
+        1027628
+      ]
+    },
+    {
+      "cell": "F9",
+      "evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+      "media_part": "xl/media/image2.png",
+      "media_sha256": "06de76dd3433c3a7a8855d3328b72cba297d15f357ae971ae2afff050467bc5b",
+      "bytes": 16017,
+      "size": [
+        900,
+        560
+      ],
+      "original_size": [
+        900,
+        560
+      ],
+      "extent_emu": [
+        1600200,
+        995680
+      ]
+    },
+    {
+      "cell": "F10",
+      "evidence_id": "9fdb5b88-b61e-42a0-bac2-3f84946a1930",
+      "media_part": "xl/media/image3.png",
+      "media_sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+      "bytes": 15833,
+      "size": [
+        900,
+        560
+      ],
+      "original_size": [
+        900,
+        560
+      ],
+      "extent_emu": [
+        1600200,
+        995680
+      ]
+    }
+  ],
+  "old_unique_rows_checked": 2894,
+  "changed_or_lost_rows": [],
+  "new_rows": [
+    [
+      "audit_logs",
+      "20cd7c7e-8bf6-4b1a-b460-2a66672b6701"
+    ],
+    [
+      "audit_logs",
+      "42290276-f381-4b54-a421-b2fa1c47964f"
+    ],
+    [
+      "audit_logs",
+      "6a86f9e4-d53d-4e18-bef5-1ab3a7476179"
+    ],
+    [
+      "audit_logs",
+      "bcc87a15-5265-4e8a-bb66-108753bb2149"
+    ]
+  ],
+  "source_delta": [
+    "backend/internal/core/bm_gs_workbook.go",
+    "backend/internal/core/bm_gs_risk_header_test.go"
+  ],
+  "limits": "Development Admin; BM06 pinned v5 submitted R2 one next-plan row, BM07 three landscape synthetic imported files. User UX signoff pending. No actual camera/device/portrait/square/tall/capacity/other roles/Excel desktop/print rerun. Audit source revision_no=0 denotes the current-source export contract; form R2 is separately proven from immutable events. Four audits include one BM07 repeat for download retention."
+}

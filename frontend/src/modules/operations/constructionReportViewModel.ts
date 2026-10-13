@@ -1,7 +1,16 @@
+import { loadDailyCapture, loadDailyWorkRows, type BlockerCaptureDraft, type NextPlanDraft, type MaterialArrivalDraft, type SupervisionAssessment } from './constructionDailyCapture';
+
+function capturedProgressValue(value: unknown): number | undefined {
+  for (let depth = 0; depth < 8 && value && typeof value === 'object' && !Array.isArray(value) && 'value' in value; depth++) value = (value as Record<string, unknown>).value;
+  const numeric = typeof value === 'number' || (typeof value === 'string' && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value.trim()));
+  const number = Number(value);
+  return numeric && Number.isFinite(number) && number >= 0 && number <= 100 ? number : undefined;
+}
 export type ConstructionReportViewModel = {
   reportDate: string;
   weather: string;
   progressPercent: number;
+  hasProgress: boolean;
   done: string[];
   current: string[];
   next: string[];
@@ -10,6 +19,10 @@ export type ConstructionReportViewModel = {
   timelineProblems: string[];
   crew: string[];
   materials: string[];
+  nextDetails: string[];
+  blockerDetails: string[];
+  supervision: string[];
+  materialArrivals: string[];
   evidenceIds: string[];
   workItemId: string;
   workflowFormInstanceId: string;
@@ -26,7 +39,11 @@ export type ConstructionReportEditModel = {
   next: string[];
   blockers: string[];
   fieldNotes: string;
-  crewItems: Array<{ crew_name: string; worker_count: string; work_hours: string; note: string }>;
+  crewItems: Array<{ row_id: string; crew_name: string; worker_count: string; work_hours: string; note: string; representative: string; contact: string }>;
+  supervisionAssessments: SupervisionAssessment[];
+  materialArrivalItems: MaterialArrivalDraft[];
+  nextPlanItems: NextPlanDraft[];
+  blockerItems: BlockerCaptureDraft[];
   materialItems: Array<{ material_name: string; quantity: string; unit: string; note: string }>;
   evidenceIds: string[];
   primaryEvidenceId: string;
@@ -59,7 +76,7 @@ export function constructionReportViewModel(row: Record<string, any>): Construct
     const name = cleanText(item.crew_name) || cleanText(item.trade) || 'Tổ đội';
     const workers = numberText(item.worker_count, 'người');
     const hours = numberText(item.work_hours, 'giờ');
-    return [name, workers, hours, cleanText(item.note)].filter(Boolean).join(' · ');
+    return [name, workers, hours, cleanText(item.note), item.representative ? `Đại diện: ${cleanText(item.representative)}` : '', item.contact ? `Liên hệ: ${cleanText(item.contact)}` : ''].filter(Boolean).join(' · ');
   }, row.manpower_summary);
   const materials = structuredResourceList(structured.material_usage_items, (item) => {
     const name = cleanText(item.material_name) || cleanText(item.material_code) || 'Vật tư';
@@ -75,6 +92,17 @@ export function constructionReportViewModel(row: Record<string, any>): Construct
     ...photos,
   ]);
   const workflowFormInstanceId = cleanText(row.workflow_form_instance_id);
+  const capturedProgress = capturedProgressValue(structured.progress_percent);
+  const manualProgress = row.progress_percent;
+  const hasProgress = workflowFormInstanceId ? capturedProgress !== undefined : (typeof manualProgress === 'number' || typeof manualProgress === 'string') && String(manualProgress).trim() !== '' && Number.isFinite(Number(manualProgress));
+  const progressPercent = workflowFormInstanceId ? capturedProgress ?? 0 : hasProgress ? Math.min(100, Math.max(0, Number(manualProgress))) : 0;
+  const detailRows = (rows: Record<string, any>[], titleKey: string, labels: Record<string, string>) => rows.map(item => [cleanText(item[titleKey]), ...Object.entries(labels).filter(([key]) => key === 'progress_percent' ? capturedProgressValue(item[key]) !== undefined : item[key] != null && cleanText(item[key]) !== '').map(([key, label]) => `${label}: ${key === 'progress_percent' ? `${capturedProgressValue(item[key])}%` : key === 'severity' ? ({ low: 'Thấp', medium: 'Trung bình', high: 'Cao', critical: 'Nghiêm trọng' }[cleanText(item[key])] ?? cleanText(item[key])) : cleanText(item[key])}`)].filter(Boolean).join(' · ')).filter(Boolean);
+  const nextDetails = detailRows(asRecordList(structured.next_plan_items), 'title', { instruction_code: 'Mã chỉ dẫn', location: 'Vị trí', subcontractor: 'Thầu phụ / tổ đội', receiver: 'Người nhận', contact: 'Liên hệ', issued_date: 'Ngày giao', due_date: 'Hạn thực hiện', progress_percent: 'Tiến độ', state: 'Tình trạng' });
+  const blockerDetails = detailRows(structuredBlockers, 'content', { risk_code: 'Mã rủi ro', detected_at: 'Ngày phát hiện', cause: 'Nguyên nhân', impact: 'Ảnh hưởng', severity: 'Mức độ', proposed_action: 'Biện pháp', owner: 'Người phụ trách', target_date: 'Hạn xử lý', status: 'Tình trạng' });
+  const assessmentLabels: Record<string, string> = { pass: 'Đạt', fail: 'Không đạt', not_applicable: 'Không áp dụng', not_assessed: 'Chưa đánh giá' };
+  const criterionLabels: Record<string, string> = { progress: 'Tiến độ', workforce: 'Nhân công', deliveries: 'Vật tư nhập trường', quality: 'Chất lượng', completed_quantity: 'Khối lượng hoàn thành', variation: 'Phát sinh', mep: 'MEP', safety: 'An toàn', acceptance: 'Nghiệm thu', risk: 'Rủi ro', images: 'Ảnh hiện trường', instructions: 'Chỉ dẫn' };
+  const supervision = asRecordList(structured.supervision_assessments).map(item => [criterionLabels[item.code] ?? cleanText(item.code), assessmentLabels[item.assessment] ?? cleanText(item.assessment), cleanText(item.note)].filter(Boolean).join(' · '));
+  const materialArrivals = detailRows(asRecordList(structured.material_arrival_items), 'material_name', { specification: 'Quy cách', origin: 'Xuất xứ', quantity: 'Số lượng', unit: 'Đơn vị', note: 'Ghi chú' });
   const hasCanonicalStructure = Boolean(
     completed.length
     || asRecordList(structured.next_plan_items).length
@@ -87,7 +115,8 @@ export function constructionReportViewModel(row: Record<string, any>): Construct
   return {
     reportDate: cleanText(row.report_date),
     weather: cleanText(row.weather),
-    progressPercent: Math.min(100, Math.max(0, Number(row.progress_percent ?? 0) || 0)),
+    progressPercent,
+    hasProgress,
     done: unique(done),
     current: unique(current),
     next: unique(next),
@@ -96,6 +125,10 @@ export function constructionReportViewModel(row: Record<string, any>): Construct
     timelineProblems: hasCanonicalStructure ? blockers : unique([...blockers, ...fieldNotes]),
     crew,
     materials,
+    nextDetails: nextDetails.length ? nextDetails : unique(next),
+    blockerDetails: blockerDetails.length ? [...blockerDetails, ...blockers.filter(title => !structuredBlockers.some(item => cleanText(item.content) === title))] : blockers,
+    supervision,
+    materialArrivals,
     evidenceIds,
     workItemId: cleanText(row.work_item_id),
     workflowFormInstanceId,
@@ -106,11 +139,16 @@ export function constructionReportViewModel(row: Record<string, any>): Construct
 export function constructionReportEditModel(row: Record<string, any>): ConstructionReportEditModel {
   const view = constructionReportViewModel(row);
   const structured = asRecord(row.structured_json);
+  const capture = loadDailyCapture(structured);
+  const workRows = loadDailyWorkRows(structured, view.next, view.blockers);
   const crewItems = asRecordList(structured.crew_items).map((item) => ({
+    row_id: cleanText(item.row_id) || crypto.randomUUID(),
     crew_name: cleanText(item.crew_name) || cleanText(item.trade),
     worker_count: cleanText(item.worker_count),
     work_hours: cleanText(item.work_hours),
     note: cleanText(item.note),
+    representative: cleanText(item.representative),
+    contact: cleanText(item.contact),
   }));
   const materialItems = asRecordList(structured.material_usage_items).map((item) => ({
     material_name: cleanText(item.material_name) || cleanText(item.material_code),
@@ -129,6 +167,10 @@ export function constructionReportEditModel(row: Record<string, any>): Construct
     blockers: view.blockers.length ? view.blockers : [''],
     fieldNotes: cleanText(row.issues_summary),
     crewItems,
+    supervisionAssessments: capture.assessments,
+    materialArrivalItems: capture.arrivals,
+    nextPlanItems: workRows.nextPlans,
+    blockerItems: workRows.blockers,
     materialItems,
     evidenceIds: view.evidenceIds,
     primaryEvidenceId: cleanText(row.primary_evidence_id) || view.evidenceIds[0] || '',

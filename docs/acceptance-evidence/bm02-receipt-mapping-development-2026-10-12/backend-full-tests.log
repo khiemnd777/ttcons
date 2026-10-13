@@ -1,0 +1,25 @@
+go: downloading entgo.io/ent v0.14.5
+go: downloading github.com/prometheus/client_golang v1.20.5
+go: downloading github.com/prometheus/procfs v0.15.1
+go: downloading google.golang.org/protobuf v1.34.2
+go: downloading github.com/prometheus/common v0.55.0
+go: downloading github.com/prometheus/client_model v0.6.1
+go: downloading github.com/beorn7/perks v1.0.1
+go: downloading github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+?   	consflow/backend/cmd/bootstrap-admin	[no test files]
+?   	consflow/backend/cmd/migrate	[no test files]
+ok  	consflow/backend/cmd/server	0.546s
+?   	consflow/backend/cmd/storage-migrate	[no test files]
+?   	consflow/backend/ent/schema	[no test files]
+ok  	consflow/backend/internal/core	257.783s
+ok  	consflow/backend/internal/shared/bootstrapadmin	4.483s
+ok  	consflow/backend/internal/shared/cache	1.728s
+ok  	consflow/backend/internal/shared/config	4.290s
+ok  	consflow/backend/internal/shared/db	3.431s
+ok  	consflow/backend/internal/shared/eventlog	1.322s
+ok  	consflow/backend/internal/shared/mailer	2.115s
+ok  	consflow/backend/internal/shared/middleware	2.560s
+ok  	consflow/backend/internal/shared/migrations	81.429s
+ok  	consflow/backend/internal/shared/observability	3.011s
+?   	consflow/backend/internal/shared/response	[no test files]
+ok  	consflow/backend/internal/shared/storage	7.797s

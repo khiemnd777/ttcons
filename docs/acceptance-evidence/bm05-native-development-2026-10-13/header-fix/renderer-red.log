@@ -1,0 +1,31 @@
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook/short
+    bm_gs_risk_header_test.go:61: project header requires B5:K5 merged area
+    bm_gs_risk_header_test.go:69: project header height=65.4, want <=60pt for merged-area fixture: <nil>
+    bm_gs_risk_header_test.go:71: full project name retained; row5 height=65.4pt
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook/long
+    bm_gs_risk_header_test.go:61: project header requires B5:K5 merged area
+    bm_gs_risk_header_test.go:69: project header height=347.55, want <=60pt for merged-area fixture: <nil>
+    bm_gs_risk_header_test.go:71: full project name retained; row5 height=347.55pt
+--- FAIL: TestBMGS05ProjectHeaderMergedWorkbook (0.03s)
+    --- FAIL: TestBMGS05ProjectHeaderMergedWorkbook/short (0.01s)
+    --- FAIL: TestBMGS05ProjectHeaderMergedWorkbook/long (0.01s)
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-08
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-02
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-01
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-03
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-04
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-06
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-07
+--- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges (0.05s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-08 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-02 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-01 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-03 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-04 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-06 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-07 (0.01s)
+FAIL
+FAIL	consflow/backend/internal/core	0.506s
+FAIL

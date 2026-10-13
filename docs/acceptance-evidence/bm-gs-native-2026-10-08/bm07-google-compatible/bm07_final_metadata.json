@@ -1,0 +1,34 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1vjzyxWF5ImPpx7Atjr03w2QaYH6RaCNREkJv6rEkjJk",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1vjzyxWF5ImPpx7Atjr03w2QaYH6RaCNREkJv6rEkjJk/edit",
+    "properties": {
+      "title": "BM07 — File tải trực tiếp từ Xuất báo cáo — Đã sửa tương thích 2026-10-08",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 349641001,
+          "title": "BM-GS-07",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        }
+      }
+    ]
+  },
+  "isError": false
+}

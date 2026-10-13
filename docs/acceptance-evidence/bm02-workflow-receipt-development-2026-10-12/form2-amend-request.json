@@ -1,0 +1,31 @@
+{
+  "answers": {
+    "completed_items": [
+      {
+        "actual_quantity": 9,
+        "crew_name": "[Synthetic] Tổ workflow",
+        "evidence_id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+        "note": "[Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh",
+        "result": "done",
+        "title": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+        "unit": "m2",
+        "work_area": "[Synthetic] Khu thử BM02"
+      }
+    ],
+    "construction_scope": "flooring",
+    "crew_items": [
+      {
+        "crew_name": "[Synthetic] Tổ workflow",
+        "note": "[Synthetic] Phiếu Lần 2",
+        "row_id": "31e61729-4844-4359-927f-b13b082d4bcf",
+        "work_hours": 7,
+        "worker_count": 6
+      }
+    ],
+    "report_date": "2026-10-12",
+    "reported_by": "Consflow Admin",
+    "weather": "rain"
+  },
+  "reason": "[Synthetic] Bổ sung theo yêu cầu người nhận: Lần 2, đổi khối lượng/nhân lực/ảnh",
+  "expected_revision": 1
+}

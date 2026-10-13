@@ -1,0 +1,21 @@
+{
+  "checksum_sha256": "8ab0b48c5da202f8d903067110a68df53684d9a0657869462f053b81fa9d2442",
+  "created_at": "2026-10-12T23:23:33Z",
+  "document_type": "as_built_documents",
+  "file_size": 2070,
+  "file_url": null,
+  "id": "79a51736-e6f5-4898-9bc2-cf34dfc5021b",
+  "mime_type": "application/pdf",
+  "name": "[Synthetic] BM08 as_built_documents",
+  "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+  "release_status": "released",
+  "released_at": "2026-10-12T23:23:33Z",
+  "released_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "revision_no": 1,
+  "status": "active",
+  "storage_key": "project-documents/94f3512a-6625-40a8-a2ce-e3bf67619c66/project_intake/94f3512a-6625-40a8-a2ce-e3bf67619c66/ceebd6ff-9444-41d2-9cd7-194607b49096.pdf",
+  "storage_provider": "local",
+  "target_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+  "target_type": "project_intake",
+  "uploaded_by": "f5250196-91bb-4df6-9666-b318a7036b42"
+}

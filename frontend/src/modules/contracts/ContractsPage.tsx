@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
+import { resolveBMGSContractVariation } from '../_shared/bmgsSourceNavigation';
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -108,7 +109,16 @@ export function ContractsPage() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState('');
-  const sourceLink = useRecordDeepLink({ kind: 'contract', projectId: id, onOpen: record => { setSelectedId(record.id); setMobileDetailOpen(true); } });
+  const [linkedVariationId, setLinkedVariationId] = useState('');
+  const [variationLinkError, setVariationLinkError] = useState(false);
+  const sourceLink = useRecordDeepLink({ kind: 'contract', projectId: id, requestContext: searchParams.get('variation') ?? '', onOpen: record => {
+    setSelectedId(record.id); setMobileDetailOpen(true); setLinkedVariationId(''); setVariationLinkError(false);
+    if (searchParams.has('variation')) {
+      setActiveTab('variations');
+      try { setLinkedVariationId(String(resolveBMGSContractVariation(searchParams, record, id)?.id ?? '')); }
+      catch { setVariationLinkError(true); }
+    }
+  } });
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DetailTab>('execution');
   const [query, setQuery] = useState('');
@@ -153,6 +163,10 @@ export function ContractsPage() {
     canVariationPurchase: hasAnyPermission(['contract.variation_purchase']),
     canVariationProcurement: hasAnyPermission(['procurement.create', 'contract.variation_purchase']),
   };
+  function dismissLinkedVariation() {
+    setLinkedVariationId(''); setVariationLinkError(false);
+    setSearchParams(current => { const next = new URLSearchParams(current); next.delete('variation'); return next; }, {replace: true});
+  }
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -318,6 +332,7 @@ export function ContractsPage() {
   return (
     <>
       {sourceLink.feedback}
+      <Dialog open={variationLinkError} title="Phát sinh không khả dụng" onClose={dismissLinkedVariation} manageFocus><p role="alert">Không tìm thấy phát sinh trong hợp đồng đã chọn hoặc anh không có quyền truy cập.</p></Dialog>
       <PageHeader
         title="Hợp đồng"
         description="Theo dõi giá trị, ký duyệt, thanh toán, phụ lục và khoản giữ lại của công trình."
@@ -1015,7 +1030,7 @@ function VariationTable({ contract, canReview, canApprove, canCreate, canQS, can
     <ResponsiveRecords
       headers={['', 'Mức độ', 'Mã', 'Nội dung', 'Thay đổi giá trị', 'Thay đổi ngày', 'Trạng thái']}
       rows={rows.map((row) => [
-        rowAction(row),
+        <div className="flex flex-wrap gap-2">{rowAction(row)}</div>,
         <PriorityBadge priority={row.priority} />,
         <span className="font-semibold">{row.variation_code}</span>,
         <div><div>{row.title}</div><div className="mt-1 text-xs text-slate-500">{row.reason}</div></div>,
@@ -1024,7 +1039,7 @@ function VariationTable({ contract, canReview, canApprove, canCreate, canQS, can
         <StatusBadge status={row.status} />,
       ])}
       cards={rows.map((row) => (
-        <RecordCard key={row.id} title={`${row.variation_code} · ${row.title}`} status={row.status} action={rowAction(row)}>
+        <RecordCard key={row.id} title={`${row.variation_code} · ${row.title}`} status={row.status} action={<div className="flex flex-wrap gap-2">{rowAction(row)}</div>}>
           <RecordValue label="Mức độ"><PriorityBadge priority={row.priority} /></RecordValue>
           <RecordValue label="Lý do" full>{row.reason || 'Chưa có lý do'}</RecordValue>
           <RecordValue label="Thay đổi giá trị"><SignedCurrency value={row.amount_delta} /></RecordValue>

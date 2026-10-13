@@ -1,0 +1,174 @@
+[
+  {
+    "id": "42290276-f381-4b54-a421-b2fa1c47964f",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "actor_name": "admin@thuthiemcons.com",
+    "event_type": "native_source_exported",
+    "target_type": "native_source",
+    "target_id": null,
+    "description": "Xuất hồ sơ nguồn theo mẫu client",
+    "metadata_json": {
+      "images": [
+        {
+          "evidence_id": "864d4247-3f3e-48be-97b7-5dafd16b6e9d",
+          "input_bytes": 6069,
+          "output_bytes": 5244,
+          "checksum_sha256": "050f1fabbe6147ad938bbc2dd7a2847b3256bae03a62d6479568431077da3d0d",
+          "source_revision_key": "workflow_form:35416810-63ab-4175-8340-5be6e13bb51b:0:864d4247-3f3e-48be-97b7-5dafd16b6e9d"
+        }
+      ],
+      "sources": [
+        {
+          "id": "35416810-63ab-4175-8340-5be6e13bb51b",
+          "kind": "workflow_form",
+          "revision_no": 0
+        }
+      ],
+      "file_bytes": 14248,
+      "template_code": "BM-GS-06"
+    },
+    "created_at": "2026-10-13T05:33:20.691571+00:00"
+  },
+  {
+    "id": "bcc87a15-5265-4e8a-bb66-108753bb2149",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "actor_name": "admin@thuthiemcons.com",
+    "event_type": "native_source_exported",
+    "target_type": "native_source",
+    "target_id": null,
+    "description": "Xuất hồ sơ nguồn theo mẫu client",
+    "metadata_json": {
+      "images": [
+        {
+          "evidence_id": "864d4247-3f3e-48be-97b7-5dafd16b6e9d",
+          "input_bytes": 6069,
+          "output_bytes": 5244,
+          "checksum_sha256": "050f1fabbe6147ad938bbc2dd7a2847b3256bae03a62d6479568431077da3d0d",
+          "source_revision_key": "daily_report:bd131f5c-ccf0-4c3f-b862-7d2dfc551eb4:0:864d4247-3f3e-48be-97b7-5dafd16b6e9d"
+        }
+      ],
+      "sources": [
+        {
+          "id": "bd131f5c-ccf0-4c3f-b862-7d2dfc551eb4",
+          "kind": "daily_report",
+          "revision_no": 0
+        }
+      ],
+      "file_bytes": 14219,
+      "template_code": "BM-GS-06"
+    },
+    "created_at": "2026-10-13T05:34:27.852788+00:00"
+  },
+  {
+    "id": "6a86f9e4-d53d-4e18-bef5-1ab3a7476179",
+    "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "actor_name": "admin@thuthiemcons.com",
+    "event_type": "native_source_exported",
+    "target_type": "native_source",
+    "target_id": null,
+    "description": "Xuất hồ sơ nguồn theo mẫu client",
+    "metadata_json": {
+      "images": [
+        {
+          "evidence_id": "8057abdc-e188-4605-b996-77f339d961a2",
+          "input_bytes": 6069,
+          "output_bytes": 5244,
+          "checksum_sha256": "050f1fabbe6147ad938bbc2dd7a2847b3256bae03a62d6479568431077da3d0d",
+          "source_revision_key": "evidence:8057abdc-e188-4605-b996-77f339d961a2:0:8057abdc-e188-4605-b996-77f339d961a2"
+        },
+        {
+          "evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+          "input_bytes": 15800,
+          "output_bytes": 16017,
+          "checksum_sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+          "source_revision_key": "evidence:dd9e5c97-a54d-43ea-8ea4-e380788b6a1b:0:dd9e5c97-a54d-43ea-8ea4-e380788b6a1b"
+        },
+        {
+          "evidence_id": "9fdb5b88-b61e-42a0-bac2-3f84946a1930",
+          "input_bytes": 15669,
+          "output_bytes": 15833,
+          "checksum_sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+          "source_revision_key": "evidence:9fdb5b88-b61e-42a0-bac2-3f84946a1930:0:9fdb5b88-b61e-42a0-bac2-3f84946a1930"
+        }
+      ],
+      "sources": [
+        {
+          "id": "8057abdc-e188-4605-b996-77f339d961a2",
+          "kind": "evidence",
+          "revision_no": 0
+        },
+        {
+          "id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+          "kind": "evidence",
+          "revision_no": 0
+        },
+        {
+          "id": "9fdb5b88-b61e-42a0-bac2-3f84946a1930",
+          "kind": "evidence",
+          "revision_no": 0
+        }
+      ],
+      "file_bytes": 38561,
+      "template_code": "BM-GS-07"
+    },
+    "created_at": "2026-10-13T05:36:15.39088+00:00"
+  },
+  {
+    "id": "20cd7c7e-8bf6-4b1a-b460-2a66672b6701",
+    "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "actor_name": "admin@thuthiemcons.com",
+    "event_type": "native_source_exported",
+    "target_type": "native_source",
+    "target_id": null,
+    "description": "Xuất hồ sơ nguồn theo mẫu client",
+    "metadata_json": {
+      "images": [
+        {
+          "evidence_id": "8057abdc-e188-4605-b996-77f339d961a2",
+          "input_bytes": 6069,
+          "output_bytes": 5244,
+          "checksum_sha256": "050f1fabbe6147ad938bbc2dd7a2847b3256bae03a62d6479568431077da3d0d",
+          "source_revision_key": "evidence:8057abdc-e188-4605-b996-77f339d961a2:0:8057abdc-e188-4605-b996-77f339d961a2"
+        },
+        {
+          "evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+          "input_bytes": 15800,
+          "output_bytes": 16017,
+          "checksum_sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+          "source_revision_key": "evidence:dd9e5c97-a54d-43ea-8ea4-e380788b6a1b:0:dd9e5c97-a54d-43ea-8ea4-e380788b6a1b"
+        },
+        {
+          "evidence_id": "9fdb5b88-b61e-42a0-bac2-3f84946a1930",
+          "input_bytes": 15669,
+          "output_bytes": 15833,
+          "checksum_sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+          "source_revision_key": "evidence:9fdb5b88-b61e-42a0-bac2-3f84946a1930:0:9fdb5b88-b61e-42a0-bac2-3f84946a1930"
+        }
+      ],
+      "sources": [
+        {
+          "id": "8057abdc-e188-4605-b996-77f339d961a2",
+          "kind": "evidence",
+          "revision_no": 0
+        },
+        {
+          "id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+          "kind": "evidence",
+          "revision_no": 0
+        },
+        {
+          "id": "9fdb5b88-b61e-42a0-bac2-3f84946a1930",
+          "kind": "evidence",
+          "revision_no": 0
+        }
+      ],
+      "file_bytes": 38562,
+      "template_code": "BM-GS-07"
+    },
+    "created_at": "2026-10-13T05:36:25.832358+00:00"
+  }
+]

@@ -77,6 +77,17 @@ export const evidenceFileAccept = [
 
 export const evidenceSupportedFileHint = 'PNG/JPG/JPEG/WebP/GIF, PDF, Word (DOC/DOCX), Excel (XLS/XLSX)';
 
+export function evidenceAcceptForKinds(kinds?: readonly EvidenceFileKind[]) {
+  if (!kinds) return evidenceFileAccept;
+  return Object.entries(classificationByMime).filter(([, value]) => kinds.includes(value.kind)).map(([mime]) => mime)
+    .concat(Object.entries(classificationByExtension).filter(([, value]) => kinds.includes(value.kind)).map(([extension]) => extension)).join(',');
+}
+
+export function evidenceFileAllowed(file: EvidenceFileDescriptor, kinds?: readonly EvidenceFileKind[]) {
+  const classification = classifyEvidenceFile(file);
+  return Boolean(classification && (!kinds || kinds.includes(classification.kind)));
+}
+
 export function classifyEvidenceFile(file: EvidenceFileDescriptor): EvidenceFileClassification | null {
   const mimeType = String(file.type ?? '').trim().toLowerCase().split(';', 1)[0];
   const mimeClassification = classificationByMime[mimeType];

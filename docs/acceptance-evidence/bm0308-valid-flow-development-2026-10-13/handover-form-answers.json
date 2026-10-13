@@ -1,0 +1,17 @@
+{
+  "check_date": "2026-10-13",
+  "client_representative": "[Synthetic] Đại diện CĐT thử",
+  "company_representative": "Consflow Admin",
+  "handover_scope": "handover_item",
+  "scope_detail": "[Synthetic] Khu WC tầng 1 hoàn thiện thử",
+  "checklist_items": [
+    {
+      "title": "[Synthetic] Hoàn thiện chống thấm và lát gạch",
+      "output_ref": "[Synthetic] OUT-01",
+      "status": "done",
+      "client_decision": "pass",
+      "comment": "[Synthetic] Quan sát và kiểm tra đạt trong fixture UAT"
+    }
+  ],
+  "final_client_note": "[Synthetic] Chỉ nghiệm thu thử luồng hồ sơ trên Development; không có hiệu lực pháp lý."
+}

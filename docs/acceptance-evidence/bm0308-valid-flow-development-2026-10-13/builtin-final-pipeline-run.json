@@ -1,0 +1,106 @@
+{
+  "completed_at": null,
+  "completion_issues": [],
+  "current_node_id": "c58ea988-6c03-4a9d-8a9f-2315a67cf419",
+  "engine_version": 2,
+  "id": "20c79a7e-6f27-432a-bb7d-1c329adbd734",
+  "nodes": [
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "incoming_acceptance",
+      "completed_at": null,
+      "completion_issues": [],
+      "description": "Hai gói nghiệm thu kỹ thuật: thầu phụ/khối lượng và vật tư; tài chính không chặn tiến độ kỹ thuật.",
+      "exit_conditions": {
+        "text": "Nghiệm thu kỹ thuật đầu vào đã hoàn tất"
+      },
+      "fail_path": "rework",
+      "id": "c58ea988-6c03-4a9d-8a9f-2315a67cf419",
+      "name": "Nghiệm thu Đầu Vào",
+      "order_index": 1,
+      "permissions": [
+        "acceptance.view",
+        "acceptance.create",
+        "acceptance.approve",
+        "project_finance.view",
+        "project_finance.cost_create",
+        "project_finance.request_create"
+      ],
+      "project_id": "dad2862d-def4-4833-a1f8-c8b7e329bd54",
+      "required_permission": "acceptance.approve",
+      "responsible_role_ids": [
+        "QA/QC"
+      ],
+      "run_id": "20c79a7e-6f27-432a-bb7d-1c329adbd734",
+      "started_at": "2026-10-12T23:18:49Z",
+      "status": "in_progress",
+      "steps": [
+        {
+          "business_code": "incoming.subcontractor_checklist",
+          "checklist_required": true,
+          "description": "QS tổng hợp checklist và khối lượng thầu phụ; trạng thái nguồn được kiểm tra trước khi chốt.",
+          "document_required": false,
+          "domain_action_key": "source.subcontractor_reconciliation_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "61e9bf6c-33fb-4e62-ad98-5dc6d9cdba19",
+            "photo_required": false,
+            "required_permission": "acceptance.create"
+          },
+          "form_required": true,
+          "form_version_id": "61e9bf6c-33fb-4e62-ad98-5dc6d9cdba19",
+          "id": "cd3288fd-acd1-4965-b9dc-4d02edcc5a69",
+          "name": "[Synthetic] BM03 checklist thầu phụ có sẵn",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "dad2862d-def4-4833-a1f8-c8b7e329bd54",
+          "required_permission": "acceptance.create",
+          "required_role_ids": [
+            "QS"
+          ],
+          "required_workflow_form_version_id": "61e9bf6c-33fb-4e62-ad98-5dc6d9cdba19",
+          "reviewed_at": null,
+          "run_node_id": "c58ea988-6c03-4a9d-8a9f-2315a67cf419",
+          "status": "completed",
+          "step_type": "acceptance_check",
+          "submitted_at": "2026-10-12T23:27:13Z",
+          "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+          "surface_kind": "subcontractor_reconciliation",
+          "template_step_id": "2a197aab-4568-462a-95cf-b1dda95dd1c7",
+          "work_item_id": "0269cd8b-d6b4-41f5-8173-1dc4e08df8ee",
+          "work_item_role_ids": [
+            "QS"
+          ],
+          "work_item_status": "completed",
+          "work_item_title": "[Synthetic] BM03 checklist thầu phụ có sẵn",
+          "workflow_form_instance_id": "122f0acb-6a1d-4337-a737-814764dbfb9a",
+          "workflow_form_required": true,
+          "workflow_form_revision": 1,
+          "workflow_form_status": "submitted",
+          "workflow_form_submitted_at": "2026-10-12T23:19:36Z",
+          "workflow_form_template_code": "builtin_subcontractor_checklist",
+          "workflow_form_template_id": "995bb982-9148-42f7-a734-4b3dd1f64a1c",
+          "workflow_form_template_name": "Checklist thầu phụ",
+          "workflow_form_type": "checklist",
+          "workflow_form_version_id": "61e9bf6c-33fb-4e62-ad98-5dc6d9cdba19",
+          "workflow_form_version_no": 4,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "29009ff5-9c4e-435b-b826-0513ae4c0477",
+      "type": "incoming_acceptance"
+    }
+  ],
+  "project_id": "dad2862d-def4-4833-a1f8-c8b7e329bd54",
+  "project_name": "[Synthetic Development] BM03 checklist hợp lệ",
+  "started_at": "2026-10-12T23:18:49Z",
+  "status": "in_progress",
+  "template_definition_hash": "8cf3fe94332475bbc3e2dde1ed0aa4f566081acfa24f3b0af1a55003311e2bc6",
+  "template_id": "95c2c83a-0ec6-417d-a74b-935fd31a57cc",
+  "template_name": "[Synthetic Development] BM03 checklist hợp lệ"
+}

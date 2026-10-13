@@ -1,0 +1,17 @@
+{
+  "project_same": true,
+  "date_same": true,
+  "receipt_status": "submitted",
+  "receipt_work_item_id": "58969f9e-8a27-44b1-b2d9-7759442c61a5",
+  "report_work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1",
+  "work_items_different": true,
+  "received_items": [
+    {
+      "material_name": "[Synthetic] Gạch nhận trường BM02",
+      "quantity": "12.000",
+      "unit": "m2"
+    }
+  ],
+  "auto_arrivals": [],
+  "report_delivery_eligible": true
+}

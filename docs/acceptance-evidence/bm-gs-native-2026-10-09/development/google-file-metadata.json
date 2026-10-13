@@ -1,0 +1,98 @@
+{
+  "builtin": {
+    "status": "fulfilled",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "id": "1jBVLytRioWtM_6PUYkYhZ-hue6kA6XT8mw_054nlg6M",
+        "title": "BM03 — Development — File từ Xuất báo cáo — 2026-10-09",
+        "mime_type": "application/vnd.google-apps.spreadsheet",
+        "size": null,
+        "url": "https://docs.google.com/spreadsheets/d/1jBVLytRioWtM_6PUYkYhZ-hue6kA6XT8mw_054nlg6M/edit?usp=drivesdk",
+        "display_url": "https://docs.google.com/spreadsheets/d/1jBVLytRioWtM_6PUYkYhZ-hue6kA6XT8mw_054nlg6M/edit?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": null,
+        "modified_time": null,
+        "parent_ids": [
+          "1o4BfCqzdpE290QMPsfmK7CC1y2A35_Y6"
+        ],
+        "drive_id": null,
+        "current_user_can_share": null,
+        "has_augmented_permissions": null,
+        "shared": false,
+        "permissions": null,
+        "source_visibility_status": "not_shared"
+      },
+      "isError": false
+    }
+  },
+  "client": {
+    "status": "fulfilled",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "id": "1SOumXdGnhJ-YwOnrZrRK6-oCpJIsr1KGA6NKWw34JAY",
+        "title": "BM03 — Gói nghiệm thu client — Development — 2026-10-09",
+        "mime_type": "application/vnd.google-apps.spreadsheet",
+        "size": null,
+        "url": "https://docs.google.com/spreadsheets/d/1SOumXdGnhJ-YwOnrZrRK6-oCpJIsr1KGA6NKWw34JAY/edit?usp=drivesdk",
+        "display_url": "https://docs.google.com/spreadsheets/d/1SOumXdGnhJ-YwOnrZrRK6-oCpJIsr1KGA6NKWw34JAY/edit?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": null,
+        "modified_time": null,
+        "parent_ids": [
+          "1o4BfCqzdpE290QMPsfmK7CC1y2A35_Y6"
+        ],
+        "drive_id": null,
+        "current_user_can_share": null,
+        "has_augmented_permissions": null,
+        "shared": false,
+        "permissions": null,
+        "source_visibility_status": "not_shared"
+      },
+      "isError": false
+    }
+  },
+  "handover": {
+    "status": "fulfilled",
+    "value": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Action completed."
+        }
+      ],
+      "structuredContent": {
+        "id": "1UGRpqU7HyLOBxHhE6kurM8k08--__TX8WrwQNT0iIS0",
+        "title": "BM08 — Development — Bản đã lưu hạn xử lý — 2026-10-09",
+        "mime_type": "application/vnd.google-apps.spreadsheet",
+        "size": null,
+        "url": "https://docs.google.com/spreadsheets/d/1UGRpqU7HyLOBxHhE6kurM8k08--__TX8WrwQNT0iIS0/edit?usp=drivesdk",
+        "display_url": "https://docs.google.com/spreadsheets/d/1UGRpqU7HyLOBxHhE6kurM8k08--__TX8WrwQNT0iIS0/edit?usp=drivesdk",
+        "file_or_folder": "file",
+        "created_time": null,
+        "modified_time": null,
+        "parent_ids": [
+          "1o4BfCqzdpE290QMPsfmK7CC1y2A35_Y6"
+        ],
+        "drive_id": null,
+        "current_user_can_share": null,
+        "has_augmented_permissions": null,
+        "shared": false,
+        "permissions": null,
+        "source_visibility_status": "not_shared"
+      },
+      "isError": false
+    }
+  }
+}

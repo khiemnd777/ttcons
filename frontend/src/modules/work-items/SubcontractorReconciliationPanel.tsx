@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { Loader2, RefreshCw, Save, Send } from 'lucide-react';
 import clsx from 'clsx';
 import { EmptyState } from '../../components/EmptyState';
@@ -7,7 +8,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
-import { get, post, put } from '../../lib/api/client';
+import { api, ApiError, get } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import type { BOQItem, SubcontractorReconciliationItem, SubcontractorReconciliationResponse } from '../../lib/types/domain';
 import { syncWorkItemMutationTransition, workItemAutoStartedNotice } from './workItemMutationContext';
@@ -46,21 +47,42 @@ const quantityFormatter = new Intl.NumberFormat('vi-VN', { maximumFractionDigits
 export function SubcontractorReconciliationPanel({
   workItemId,
   projectId,
+  clientContext = false,
+  readOnly = false,
+  externalBusy = false,
+  revision,
+  onDirtyChange,
+  onBusyChange,
 }: {
   workItemId: string;
   projectId?: string;
+  clientContext?: boolean;
+  readOnly?: boolean;
+  externalBusy?: boolean;
+  revision?: number;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const location = useLocation();
   const [comment, setComment] = useState('');
   const [rows, setRows] = useState<RowDraft[]>([]);
   const [invalidKey, setInvalidKey] = useState('');
+  const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
+  const precondition = useRef<string>();
+  const baseline = useRef<SubcontractorReconciliationResponse>();
+  const [conflict, setConflict] = useState(false);
+  const [historyRevision, setHistoryRevision] = useState<number>();
   const panelRef = useRef<HTMLElement | null>(null);
+  const focusedAnchor = useRef<string>();
+  const panelAnchor = { ref: panelRef, id: revision === undefined ? 'subcontractor-reconciliation' : undefined, tabIndex: -1 };
   const navigateValidation = useValidationNavigation(panelRef);
 
   const reconciliation = useQuery({
-    queryKey: ['subcontractor-reconciliation', workItemId],
-    queryFn: () => get<SubcontractorReconciliationResponse>(`/work-items/${workItemId}/subcontractor-reconciliation`),
+    queryKey: ['subcontractor-reconciliation', workItemId, revision ?? 'current'],
+    queryFn: () => get<SubcontractorReconciliationResponse>(`/work-items/${workItemId}/subcontractor-reconciliation${revision === undefined ? '' : `?revision=${revision}`}`),
     enabled: Boolean(workItemId),
     retry: false,
   });
@@ -69,24 +91,61 @@ export function SubcontractorReconciliationPanel({
     const record = response?.reconciliation;
     setComment(record?.comment ?? '');
     setRows((record?.items ?? []).map(rowDraftFromItem));
+    precondition.current = response?.precondition;
+    baseline.current = response;
+    dirtyRef.current = false;
+    setDirty(false);
+    setConflict(false);
   }
 
   useEffect(() => {
-    resetFromResponse(reconciliation.data);
+    // Background invalidation must never overwrite an unsaved ledger draft.
+    if (!dirtyRef.current) resetFromResponse(reconciliation.data);
   }, [reconciliation.data]);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  function markDirty() { dirtyRef.current = true; setDirty(true); }
 
-  const record = reconciliation.data?.reconciliation;
+  const record = dirty ? baseline.current?.reconciliation : reconciliation.data?.reconciliation;
   const items = record?.items ?? [];
-  const boqItems = reconciliation.data?.boq_items ?? [];
+  const boqItems = revision === undefined ? (dirty ? baseline.current : reconciliation.data)?.boq_items ?? [] : [];
   const rowsByIndex = useMemo(() => new Map(rows.map((row) => [row.item_index, row])), [rows]);
-  const locked = record?.status === 'submitted';
+  const locked = readOnly || revision !== undefined || record?.status === 'submitted' || reconciliation.data?.reconciliation?.status === 'submitted' || reconciliation.data?.readonly === true || (clientContext && reconciliation.data?.capabilities?.can_write !== true);
+  useEffect(() => {
+    if (location.hash !== '#subcontractor-reconciliation') { focusedAnchor.current = undefined; return; }
+    if (revision !== undefined || !reconciliation.data?.available || reconciliation.isFetching || reconciliation.error || !record) return;
+    const anchor = `${workItemId}:${location.hash}`;
+    if (!panelRef.current || focusedAnchor.current === anchor) return;
+    focusedAnchor.current = anchor;
+    panelRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    panelRef.current.focus({ preventScroll: true });
+  }, [location.hash, workItemId, revision, reconciliation.data?.available, reconciliation.isFetching, reconciliation.error, record?.id]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['subcontractor-reconciliation', workItemId] });
     queryClient.invalidateQueries({ queryKey: ['work-item', workItemId] });
+    queryClient.invalidateQueries({ queryKey: ['work-item-form', workItemId] });
     queryClient.invalidateQueries({ queryKey: ['my-work-items'] });
     if (projectId) queryClient.invalidateQueries({ queryKey: ['project-operations', projectId] });
   };
+
+  async function writeReconciliation(submit: boolean) {
+    if (locked || conflict || externalBusy) return null;
+    const payload = buildPayload();
+    if (!payload) return null;
+    if (clientContext && !precondition.current) throw new Error('Tải lại dữ liệu đối soát trước khi lưu.');
+    return api<SubcontractorReconciliationResponse>(`/work-items/${workItemId}/subcontractor-reconciliation${submit ? '/submit' : ''}`, {
+      method: submit ? 'POST' : 'PUT',
+      headers: clientContext ? { 'If-Match': precondition.current! } : undefined,
+      body: JSON.stringify(payload),
+    });
+  }
+  function mutationError(error: unknown, title: string) {
+    if (clientContext && error instanceof ApiError && [409, 412, 428].includes(error.status)) {
+      setConflict(true);
+      toast.warn({ title: 'Dữ liệu đối soát đã thay đổi', description: 'Bản nháp đang nhập được giữ lại. Tải lại dữ liệu để đối chiếu trước khi thử lại.' });
+      invalidate();
+    } else toast.error(title, error);
+  }
 
   function buildPayload(): ReconciliationPayload | null {
     const invalid: string[] = [];
@@ -125,11 +184,7 @@ export function SubcontractorReconciliationPanel({
   }
 
   const saveDraft = useMutation({
-    mutationFn: async () => {
-      const payload = buildPayload();
-      if (!payload) return null;
-      return put<SubcontractorReconciliationResponse>(`/work-items/${workItemId}/subcontractor-reconciliation`, payload);
-    },
+    mutationFn: () => writeReconciliation(false),
     onSuccess: (updated) => {
       if (!updated) return;
       resetFromResponse(updated);
@@ -137,15 +192,11 @@ export function SubcontractorReconciliationPanel({
       syncWorkItemMutationTransition(queryClient, updated);
       toast.success(`Đã lưu nháp đối soát thầu phụ.${workItemAutoStartedNotice(updated)}`);
     },
-    onError: (error) => toast.error('Không lưu được đối soát thầu phụ', error),
+    onError: (error) => mutationError(error, 'Không lưu được đối soát thầu phụ'),
   });
 
   const submitReconciliation = useMutation({
-    mutationFn: async () => {
-      const payload = buildPayload();
-      if (!payload) return null;
-      return post<SubcontractorReconciliationResponse>(`/work-items/${workItemId}/subcontractor-reconciliation/submit`, payload);
-    },
+    mutationFn: () => writeReconciliation(true),
     onSuccess: (updated) => {
       if (!updated) return;
       resetFromResponse(updated);
@@ -153,17 +204,20 @@ export function SubcontractorReconciliationPanel({
       syncWorkItemMutationTransition(queryClient, updated);
       toast.success(`Đã gửi đối soát thầu phụ.${workItemAutoStartedNotice(updated)}`);
     },
-    onError: (error) => toast.error('Không gửi được đối soát thầu phụ', error),
+    onError: (error) => mutationError(error, 'Không gửi được đối soát thầu phụ'),
   });
-  const pending = reconciliation.isFetching || saveDraft.isPending || submitReconciliation.isPending;
+  const ownBusy = reconciliation.isFetching || saveDraft.isPending || submitReconciliation.isPending;
+  const pending = ownBusy || externalBusy;
+  useEffect(() => { onBusyChange?.(ownBusy); }, [ownBusy, onBusyChange]);
 
   function updateRow(itemIndex: number, patch: Partial<RowDraft>) {
+    markDirty();
     setRows((current) => current.map((row) => (row.item_index === itemIndex ? { ...row, ...patch } : row)));
   }
 
   if (reconciliation.isLoading) {
     return (
-      <section>
+      <section {...panelAnchor}>
         <h3 className="mb-2 text-sm font-semibold text-ink">Đối soát thầu phụ</h3>
         <div className="rounded-md border border-line bg-white p-4">
           <LoadingSpinner />
@@ -174,7 +228,7 @@ export function SubcontractorReconciliationPanel({
 
   if (reconciliation.error) {
     return (
-      <section>
+      <section {...panelAnchor}>
         <h3 className="mb-2 text-sm font-semibold text-ink">Đối soát thầu phụ</h3>
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -194,19 +248,33 @@ export function SubcontractorReconciliationPanel({
 
   if (!reconciliation.data?.available) {
     const reason = reconciliation.data?.reason ?? '';
-    if (!reason.toLowerCase().includes('submit') && !reason.toLowerCase().includes('gửi')) return null;
+    if (!clientContext && !reason.toLowerCase().includes('submit') && !reason.toLowerCase().includes('gửi')) return null;
     return (
-      <section>
+      <section {...panelAnchor}>
         <h3 className="mb-2 text-sm font-semibold text-ink">Đối soát thầu phụ</h3>
-        <EmptyState title={reason || 'Gửi checklist thầu phụ trước khi đối soát.'} />
+        <EmptyState title={reason || 'Chốt checklist thầu phụ trước khi đối soát.'} />
+        {clientContext ? <button type="button" className="mt-2 rounded-md border border-line px-3 py-2 text-sm font-semibold" onClick={() => reconciliation.refetch()}>Tải lại</button> : null}
+        {renderHistory()}
       </section>
     );
   }
 
-  if (!record) return null;
+  if (!record) return clientContext ? <section {...panelAnchor}><h3 className="text-sm font-semibold">Đối soát thầu phụ</h3><EmptyState title="Chưa có dữ liệu đối soát." /><button type="button" onClick={() => reconciliation.refetch()}>Tải lại</button>{renderHistory()}</section> : null;
+
+  function renderHistory() {
+    if (!clientContext || revision !== undefined || !reconciliation.data?.history?.length) return null;
+    return <div className="mt-3 rounded-md border border-line bg-white p-3">
+      <h4 className="text-sm font-semibold text-ink">Lịch sử đối soát</h4>
+      {reconciliation.data.history.map((entry) => <div key={entry.id} className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span>Phiên bản hồ sơ #{entry.form_revision_no} · <StatusBadge status={entry.status} /> {entry.updated_at ? dateText(entry.updated_at) : ''}</span>
+        <button type="button" className="rounded-md border border-line px-3 py-1 text-sm font-semibold" onClick={() => setHistoryRevision(historyRevision === entry.form_revision_no ? undefined : entry.form_revision_no)}>{historyRevision === entry.form_revision_no ? 'Đóng' : 'Xem'}</button>
+      </div>)}
+      {historyRevision !== undefined ? <div className="mt-3 border-t border-line pt-3"><SubcontractorReconciliationPanel key={historyRevision} workItemId={workItemId} clientContext readOnly revision={historyRevision} /></div> : null}
+    </div>;
+  }
 
   return (
-    <section ref={panelRef}>
+    <section {...panelAnchor}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold text-ink">Đối soát thầu phụ</h3>
@@ -214,10 +282,12 @@ export function SubcontractorReconciliationPanel({
             {[record.subcontractor_name, record.work_package, record.construction_area].filter(Boolean).join(' · ') || 'Checklist thầu phụ'}
           </p>
         </div>
-        <StatusBadge status={record.status} />
+        {clientContext && !record.id ? <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">Chưa lưu đối soát</span> : <StatusBadge status={record.status} />}
       </div>
 
       <div className="rounded-md border border-line bg-white p-3">
+        {conflict ? <div role="alert" className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Dữ liệu nguồn đã thay đổi. Bản nháp đang nhập được giữ lại; sao chép nội dung cần giữ trước khi tải lại.<button type="button" disabled={pending} className="mt-2 block rounded-md border border-amber-300 px-3 py-2 font-semibold" onClick={async () => { const result = await reconciliation.refetch(); if (result.data && !result.error) resetFromResponse(result.data); }}>Tải lại dữ liệu đối soát</button></div> : null}
+        {clientContext && locked && record.status !== 'submitted' ? <p className="mb-3 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm text-slate-600">Đối soát đang ở chế độ chỉ xem.</p> : null}
         <div className="grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-5">
           <SummaryChip label="Tổng" value={summaryCount(record.summary_json, 'total', items.length)} />
           <SummaryChip label="Chấp nhận" value={summaryCount(record.summary_json, 'accepted')} tone="emerald" />
@@ -226,21 +296,21 @@ export function SubcontractorReconciliationPanel({
           <SummaryChip label="Chờ minh chứng" value={summaryCount(record.summary_json, 'waiting_evidence')} tone="amber" />
         </div>
 
-        {locked ? (
+        {record.status === 'submitted' ? (
           <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
             Đã gửi bởi {identityReferenceText(record.submitted_by_name, record.submitted_by_account_deleted, 'người dùng')} {record.submitted_at ? `ngày ${dateText(record.submitted_at)}` : ''}.
           </div>
         ) : null}
 
         <div className="mt-3">
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="subcontractor-reconciliation-comment">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`subcontractor-reconciliation-comment-${revision ?? 'current'}`}>
             Ghi chú chung
           </label>
           <textarea
-            id="subcontractor-reconciliation-comment"
+            id={`subcontractor-reconciliation-comment-${revision ?? 'current'}`}
             className="mt-1 min-h-16 w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
             value={comment}
-            onChange={(event) => setComment(event.target.value)}
+            onChange={(event) => { markDirty(); setComment(event.target.value); }}
             disabled={locked || pending}
             placeholder="Ghi chú nội bộ khi lưu / gửi đối soát"
           />
@@ -251,11 +321,13 @@ export function SubcontractorReconciliationPanel({
             {items.map((item) => (
               <ReconciliationItemRow
                 key={item.item_index}
-                item={item}
+                item={revision === undefined ? item : { ...item, current_boq_work_item_name: undefined, current_boq_quantity: undefined, current_boq_unit: undefined }}
                 draft={rowsByIndex.get(item.item_index) ?? rowDraftFromItem(item)}
                 boqItems={boqItems}
+                historical={revision !== undefined}
+                fieldPrefix={`reconciliation-${revision ?? 'current'}`}
                 invalid={invalidKey === `items.${item.item_index}.confirmed_quantity`}
-                disabled={locked || pending}
+                disabled={locked || pending || conflict}
                 onChange={(patch) => {
                   updateRow(item.item_index, patch);
                   if (patch.confirmed_quantity !== undefined) setInvalidKey('');
@@ -275,7 +347,7 @@ export function SubcontractorReconciliationPanel({
           <div className="flex flex-wrap justify-end gap-2">
             <button
               className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={locked || pending || !items.length}
+              disabled={locked || pending || conflict || !items.length}
               onClick={() => saveDraft.mutate()}
             >
               {saveDraft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -283,7 +355,7 @@ export function SubcontractorReconciliationPanel({
             </button>
             <button
               className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={locked || pending || !items.length}
+              disabled={locked || pending || conflict || !items.length}
               onClick={() => submitReconciliation.mutate()}
             >
               {submitReconciliation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -292,6 +364,7 @@ export function SubcontractorReconciliationPanel({
           </div>
         </div>
       </div>
+      {renderHistory()}
     </section>
   );
 }
@@ -303,6 +376,8 @@ function ReconciliationItemRow({
   invalid,
   disabled,
   onChange,
+  historical = false,
+  fieldPrefix = 'reconciliation-current',
 }: {
   item: SubcontractorReconciliationItem;
   draft: RowDraft;
@@ -310,6 +385,8 @@ function ReconciliationItemRow({
   invalid: boolean;
   disabled: boolean;
   onChange: (patch: Partial<RowDraft>) => void;
+  historical?: boolean;
+  fieldPrefix?: string;
 }) {
   const selectedBOQExists = Boolean(draft.boq_item_id && boqItems.some((boq) => boq.id === draft.boq_item_id));
   const confirmed = parseQuantity(draft.confirmed_quantity);
@@ -330,11 +407,11 @@ function ReconciliationItemRow({
       </div>
 
       <div>
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`boq-${item.item_index}`}>
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`${fieldPrefix}-boq-${item.item_index}`}>
           BOQ
         </label>
         <select
-          id={`boq-${item.item_index}`}
+          id={`${fieldPrefix}-boq-${item.item_index}`}
           className="mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
           value={draft.boq_item_id}
           onChange={(event) => onChange({ boq_item_id: event.target.value })}
@@ -351,7 +428,7 @@ function ReconciliationItemRow({
           ))}
         </select>
         <p className="mt-1 text-xs text-slate-500">
-          {item.current_boq_work_item_name ?? item.boq_work_item_name ?? 'Chưa có BOQ hiện tại'}
+          {historical ? item.boq_work_item_name ?? 'Chưa gắn BOQ trong phiên bản này' : item.current_boq_work_item_name ?? item.boq_work_item_name ?? 'Chưa có BOQ hiện tại'}
         </p>
       </div>
 
@@ -375,11 +452,11 @@ function ReconciliationItemRow({
       </div>
 
       <div>
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`decision-${item.item_index}`}>
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor={`${fieldPrefix}-decision-${item.item_index}`}>
           Quyết định
         </label>
         <select
-          id={`decision-${item.item_index}`}
+          id={`${fieldPrefix}-decision-${item.item_index}`}
           className="mt-1 w-full rounded-md border border-line bg-white px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50"
           value={draft.decision}
           onChange={(event) => onChange({ decision: event.target.value })}

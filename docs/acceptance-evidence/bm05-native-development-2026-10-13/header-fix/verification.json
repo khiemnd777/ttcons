@@ -1,0 +1,47 @@
+{
+  "passed": true,
+  "assertions": {
+    "actual_browser_download_retained_byte_for_byte": true,
+    "original_pre_repair_file_preserved": true,
+    "only_added_merge_is_b5_k5": true,
+    "all_cell_values_equal_pre_repair": true,
+    "full_project_name_retained": true,
+    "row5_height_reduced_for_actual_fixture": true,
+    "all_risk_column_geometry_preserved": true,
+    "all_eleven_client_headers_preserved": true,
+    "saved_risk_values_dates_and_status_preserved": true,
+    "all_original_signature_placeholders_preserved": true,
+    "exact_native_form_pin_answers_status_and_revision_unchanged": true,
+    "native_private_google_conversion_confirmed": true,
+    "single_google_tab_matches_actual_download": true,
+    "all_165_google_cells_match_xlsx": true,
+    "no_google_effective_error_or_value_error": true,
+    "google_ui_confirms_b5_k5_and_full_name": true,
+    "all_2893_old_unique_rows_unchanged_and_retained": true,
+    "only_one_native_source_export_audit_added": true,
+    "database_consflow_migration_158_unchanged": true,
+    "all_149_storage_files_unchanged": true,
+    "all_979_current_source_hashes_match_built_manifest": true,
+    "only_approved_existing_renderer_changed": true,
+    "only_backend_recreated_with_changed_image": true,
+    "development_build_and_readiness_passed": true
+  },
+  "old_unique_rows_checked": 2893,
+  "changed_or_lost_rows": [],
+  "new_rows": [
+    [
+      "audit_logs",
+      "10a98635-a8b1-4b0d-bce9-40b0ad3e2099"
+    ]
+  ],
+  "source_files_checked": 979,
+  "existing_source_delta": [
+    "backend/internal/core/bm_gs_workbook.go"
+  ],
+  "bounded_google_cells_compared": 165,
+  "populated_google_cells": 33,
+  "google_errors": [],
+  "before_row5_height": 169.35000000000002,
+  "after_row5_height": 33.0,
+  "limits": "Development Admin, same native risk v4 draftR0 with one saved risk row, actual desktop download and unchanged private nativeGoogle. Merged-cell UI and100%layout screenshots; user review pending. Submitted/resolved/fullRev10/contextual/multirow/capacity/mobile/otherroles/Excel/printNOT_RUN. Source tests cover short/long frozen names and other-template geometry without runtime data mutation."
+}

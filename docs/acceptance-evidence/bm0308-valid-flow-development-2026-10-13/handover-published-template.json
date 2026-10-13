@@ -1,0 +1,182 @@
+{
+  "created_at": "2026-10-12T23:18:49Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "definition_hash": "97380f414445cfe65b93fcbe27877eb6da873b8b8ee6e6ce07d7a58f4f355e77",
+  "description": "[Synthetic] Isolated acceptance fixtures. Preserve official step guards. No whole Rev10 or accounting-closure acceptance claim.",
+  "edges": [
+    {
+      "condition_config": {},
+      "condition_type": "always",
+      "created_at": "2026-10-12T23:18:49Z",
+      "from_node_id": "8f026716-df61-48ca-813b-c0b1c83381bc",
+      "id": "a21a9651-839c-4939-9b5d-10a80e6b0e37",
+      "label": "Sau nghiệm thu cuối hợp lệ",
+      "priority": 1,
+      "template_id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+      "to_node_id": "9e460a01-4da9-4395-a4c3-12631f393f14"
+    }
+  ],
+  "engine_version": 2,
+  "id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+  "name": "[Synthetic Development] BM08 nghiệm thu cuối và bàn giao",
+  "nodes": [
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "business_code": "outgoing_acceptance",
+      "created_at": "2026-10-12T23:18:49Z",
+      "description": "Một gói nghiệm thu cuối và đối chiếu chủ đầu tư; tài chính được theo dõi ngoài critical path.",
+      "entry_conditions": {},
+      "exit_conditions": {
+        "text": "Nghiệm thu cuối và đối chiếu chủ đầu tư đã hoàn tất"
+      },
+      "fail_path": "rework",
+      "id": "8f026716-df61-48ca-813b-c0b1c83381bc",
+      "name": "Nghiệm thu Đầu Ra",
+      "order_index": 1,
+      "permissions": [
+        "acceptance.view",
+        "acceptance.create",
+        "acceptance.approve",
+        "project_finance.view",
+        "project_finance.request_create"
+      ],
+      "position_x": 0,
+      "position_y": 0,
+      "replanning_enabled": true,
+      "required_permission": "acceptance.approve",
+      "responsible_role_ids": [
+        "QA/QC"
+      ],
+      "rework_enabled": true,
+      "status": "active",
+      "steps": [
+        {
+          "business_code": "outgoing.final_package",
+          "checklist_required": true,
+          "created_at": "2026-10-12T23:18:49Z",
+          "description": "QA/QC chốt đối chiếu chủ đầu tư và hồ sơ nghiệm thu cuối đạt.",
+          "document_required": false,
+          "domain_action_key": "source.final_acceptance_package_ready",
+          "form_required": true,
+          "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+          "id": "0412c30d-dbf1-4c77-8e6a-2fcd53fcb1d5",
+          "name": "Chốt gói nghiệm thu cuối",
+          "node_id": "8f026716-df61-48ca-813b-c0b1c83381bc",
+          "order_index": 1,
+          "photo_required": false,
+          "required_permission": "acceptance.approve",
+          "required_role_ids": [
+            "QA/QC"
+          ],
+          "step_type": "acceptance_check",
+          "surface_kind": "owner_client_reconciliation"
+        }
+      ],
+      "template_id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+      "type": "acceptance",
+      "updated_at": "2026-10-12T23:18:49Z"
+    },
+    {
+      "approval_policy_json": {
+        "comment_required": true,
+        "mode": "any",
+        "quorum": 1,
+        "requester_cannot_approve": true,
+        "roles": [
+          "Kế toán",
+          "PM",
+          "Giám đốc"
+        ],
+        "signature_required": false
+      },
+      "approval_rule": "Kế toán và Giám đốc xác nhận hồ sơ quản trị",
+      "business_code": "handover_finance",
+      "created_at": "2026-10-12T23:18:49Z",
+      "description": "Bàn giao vật lý được hoàn tất độc lập; hồ sơ thương mại đủ điều kiện được bàn giao và Kế toán xác nhận tiếp nhận.",
+      "entry_conditions": {},
+      "exit_conditions": {
+        "accounting_handoff_included": true,
+        "handover_included": true,
+        "separate_gates": true,
+        "text": "Bàn giao vật lý và bàn giao hồ sơ kế toán đã hoàn tất"
+      },
+      "fail_path": "none",
+      "id": "9e460a01-4da9-4395-a4c3-12631f393f14",
+      "name": "Bàn giao công trình và hồ sơ kế toán",
+      "order_index": 2,
+      "permissions": [
+        "handover.view",
+        "handover.approve",
+        "accounting_handoff.view",
+        "accounting_handoff.acknowledge"
+      ],
+      "position_x": 0,
+      "position_y": 0,
+      "replanning_enabled": false,
+      "required_permission": "handover.view",
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "rework_enabled": false,
+      "status": "active",
+      "steps": [
+        {
+          "business_code": "closure.handover",
+          "checklist_required": false,
+          "created_at": "2026-10-12T23:18:49Z",
+          "description": "PM hoàn tất hồ sơ bàn giao sau khi chất lượng, tồn tại và vật tư dư đã đóng; tài chính không chặn bước này.",
+          "document_required": false,
+          "domain_action_key": "source.handover_completed",
+          "form_required": false,
+          "form_version_id": null,
+          "id": "82cbd73e-f763-4ff5-99c1-447c4931576b",
+          "name": "Hoàn tất bàn giao vật lý",
+          "node_id": "9e460a01-4da9-4395-a4c3-12631f393f14",
+          "order_index": 1,
+          "photo_required": false,
+          "required_permission": "handover.approve",
+          "required_role_ids": [
+            "PM"
+          ],
+          "step_type": "handover_check",
+          "surface_kind": "handover"
+        },
+        {
+          "business_code": "closure.finance",
+          "checklist_required": false,
+          "created_at": "2026-10-12T23:18:49Z",
+          "description": "Kế toán xác nhận đã tiếp nhận toàn bộ hồ sơ mua sắm và mốc thu đủ điều kiện; hạch toán, hóa đơn, thuế và thanh toán tiếp tục thực hiện trên MISA.",
+          "document_required": false,
+          "domain_action_key": "source.accounting_handoff_close_ready",
+          "form_required": false,
+          "form_version_id": null,
+          "id": "33bc22a4-aea7-40e1-b3f8-0117b5dc011f",
+          "name": "Xác nhận bàn giao hồ sơ kế toán",
+          "node_id": "9e460a01-4da9-4395-a4c3-12631f393f14",
+          "order_index": 2,
+          "photo_required": false,
+          "required_permission": "accounting_handoff.acknowledge",
+          "required_role_ids": [
+            "Kế toán"
+          ],
+          "step_type": "accounting_check",
+          "surface_kind": "finance"
+        }
+      ],
+      "template_id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+      "type": "financial_closure",
+      "updated_at": "2026-10-12T23:18:49Z"
+    }
+  ],
+  "project_type": null,
+  "published_at": "2026-10-12T23:18:49Z",
+  "published_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "report_config_json": {},
+  "revision_no": 1,
+  "source_template_id": null,
+  "status": "published",
+  "template_family_id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+  "updated_at": "2026-10-12T23:18:49Z",
+  "version": 1
+}

@@ -1,0 +1,158 @@
+[
+  {
+    "source": "client_site_measurement_record",
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 153.75,
+        "width": 137.75,
+        "x": 16,
+        "y": 337
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 183.75,
+        "width": 137.75,
+        "x": 46,
+        "y": 2005
+      }
+    ],
+    "path": "/private/tmp/consflow-native-browser-20261008/source-1-mobile390.jpg"
+  },
+  {
+    "source": "client_survey_work_package",
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 153.75,
+        "width": 137.75,
+        "x": 16,
+        "y": 357
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo rủi ro",
+        "right": 338.328125,
+        "width": 176.578125,
+        "x": 161.75,
+        "y": 357
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 183.75,
+        "width": 137.75,
+        "x": 46,
+        "y": 3542
+      }
+    ],
+    "path": "/private/tmp/consflow-native-browser-20261008/source-2-mobile390.jpg"
+  },
+  {
+    "source": "builtin_construction_daily_report",
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo ngày",
+        "right": 190.125,
+        "width": 174.125,
+        "x": 16,
+        "y": 295
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo rủi ro",
+        "right": 192.578125,
+        "width": 176.578125,
+        "x": 16,
+        "y": 341
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo hiện trường",
+        "right": 234.953125,
+        "width": 218.953125,
+        "x": 16,
+        "y": 387
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 183.75,
+        "width": 137.75,
+        "x": 46,
+        "y": 3063
+      }
+    ],
+    "path": "/private/tmp/consflow-native-browser-20261008/source-3-mobile390.jpg"
+  },
+  {
+    "source": "builtin_subcontractor_checklist",
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 153.75,
+        "width": 137.75,
+        "x": 16,
+        "y": 337
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 183.75,
+        "width": 137.75,
+        "x": 46,
+        "y": 2769
+      }
+    ],
+    "path": "/private/tmp/consflow-native-browser-20261008/source-4-mobile390.jpg"
+  },
+  {
+    "source": "client_subcontractor_acceptance_package",
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 153.75,
+        "width": 137.75,
+        "x": 16,
+        "y": 357
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 183.75,
+        "width": 137.75,
+        "x": 46,
+        "y": 2955
+      }
+    ],
+    "path": "/private/tmp/consflow-native-browser-20261008/source-5-mobile390.jpg"
+  },
+  {
+    "source": "client_site_risk_assessment",
+    "buttons": [
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 153.75,
+        "width": 137.75,
+        "x": 16,
+        "y": 295
+      },
+      {
+        "disabled": false,
+        "label": "Xuất báo cáo",
+        "right": 183.75,
+        "width": 137.75,
+        "x": 46,
+        "y": 1840
+      }
+    ],
+    "path": "/private/tmp/consflow-native-browser-20261008/source-6-mobile390.jpg"
+  }
+]

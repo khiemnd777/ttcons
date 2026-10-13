@@ -1,0 +1,40 @@
+[
+  {
+    "scenario": "project-desktop-card",
+    "day09": "09-10-2026\nnormal\n\n3 nhân sự / 1 đội · [Synthetic] Gạch đã dùng\n\nTIẾN ĐỘ BÁO CÁO\n\nChưa ghi tiến độ\n\nĐÃ LÀM · 1\n[Synthetic] Hoàn thiện ô tường mẫu\nĐANG LÀM · 0\n\nKhông có hạng mục dở dang\n\nSẼ LÀM · 1\n[Synthetic] Chỉnh sửa ô tường mẫu\nVẤN ĐỀ PHÁT SINH · 1\n[Synthetic] Lối thử còn vật liệu",
+    "day08": "08-10-2026\nNắng synthetic\n\n[Synthetic] Tổ thử A · 2 người · 4 giờ · Chưa ghi vật tư\n\nTIẾN ĐỘ BÁO CÁO\n\n0%\n\nĐÃ LÀM · 1\n[Synthetic] Chuẩn bị ô thử ngày 08\nĐANG LÀM · 0\n\nKhông có hạng mục dở dang\n\nSẼ LÀM · 0\n\nChưa ghi kế hoạch tiếp theo\n\nVẤN ĐỀ PHÁT SINH · 0\n\nKhông có vấn đề",
+    "missing_ok": true,
+    "zero_ok": true
+  },
+  {
+    "scenario": "project-desktop-detail09",
+    "missing_ok": true
+  },
+  {
+    "scenario": "project-desktop-detail08",
+    "zero_ok": true
+  },
+  {
+    "scenario": "project-mobile-390",
+    "missing_ok": true,
+    "zero_ok": true,
+    "geometry": {
+      "clientWidth": 390,
+      "documentWidth": 390,
+      "width": 390
+    }
+  },
+  {
+    "scenario": "project-mobile-detail09",
+    "missing_ok": true
+  },
+  {
+    "scenario": "project-mobile-detail08",
+    "zero_ok": true
+  },
+  {
+    "scenario": "global-desktop-card",
+    "missing_ok": true,
+    "zero_ok": true
+  }
+]

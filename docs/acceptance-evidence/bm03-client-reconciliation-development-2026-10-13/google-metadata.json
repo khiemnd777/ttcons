@@ -1,0 +1,34 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1C-y-vcgJyDxT1JOH7tjRlKNq7O9lKV2Su5lpyEygS9M",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1C-y-vcgJyDxT1JOH7tjRlKNq7O9lKV2Su5lpyEygS9M/edit",
+    "properties": {
+      "title": "BM03 — Gói client sau sửa đối soát — kiểm tra file tải 13-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 1562396462,
+          "title": "2026-10-13_01",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        }
+      }
+    ]
+  },
+  "isError": false
+}

@@ -1,0 +1,1136 @@
+{
+  "phase": "delivery2",
+  "file": "BM02-lan-gui-2-giu-nguyen.xlsx",
+  "title": "BM02 lần gửi 2 giữ nguyên sau sửa mapping — Development 12-10-2026",
+  "import": {
+    "success": true,
+    "converted": true,
+    "fileId": "1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI",
+    "title": "BM02 lần gửi 2 giữ nguyên sau sửa mapping — Development 12-10-2026",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "url": "https://docs.google.com/spreadsheets/d/1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI/edit?usp=drivesdk",
+    "spreadsheetId": "1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI",
+    "parentId": null,
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI"
+  },
+  "metadata": {
+    "spreadsheetId": "1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI/edit",
+    "properties": {
+      "title": "BM02 lần gửi 2 giữ nguyên sau sửa mapping — Development 12-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 1075317302,
+          "title": "2026-10-12_01",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        }
+      },
+      {
+        "properties": {
+          "sheetId": 319016405,
+          "title": "Hình ảnh",
+          "index": 1,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        }
+      }
+    ]
+  },
+  "cells": {
+    "spreadsheetId": "1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI/edit",
+    "properties": {
+      "title": "BM02 lần gửi 2 giữ nguyên sau sửa mapping — Development 12-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 1075317302,
+          "title": "2026-10-12_01",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                    "userEnteredValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-02)",
+                    "userEnteredValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-02)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-02)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "BÁO CÁO CÔNG VIỆC HẰNG NGÀY (DAILY REPORT)",
+                    "userEnteredValue": {
+                      "stringValue": "BÁO CÁO CÔNG VIỆC HẰNG NGÀY (DAILY REPORT)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "BÁO CÁO CÔNG VIỆC HẰNG NGÀY (DAILY REPORT)"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "Dự án:",
+                    "userEnteredValue": {
+                      "stringValue": "Dự án:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Dự án:"
+                    }
+                  },
+                  {
+                    "formattedValue": "[DEV-BM02-WORKFLOW-20261012] [Synthetic Development] BM02 phiếu quy trình và vật tư",
+                    "userEnteredValue": {
+                      "stringValue": "[DEV-BM02-WORKFLOW-20261012] [Synthetic Development] BM02 phiếu quy trình và vật tư"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[DEV-BM02-WORKFLOW-20261012] [Synthetic Development] BM02 phiếu quy trình và vật tư"
+                    }
+                  },
+                  {},
+                  {},
+                  {},
+                  {
+                    "formattedValue": "Ngày báo cáo:",
+                    "userEnteredValue": {
+                      "stringValue": "Ngày báo cáo:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ngày báo cáo:"
+                    }
+                  },
+                  {
+                    "formattedValue": "2026-10-12",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-12"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-12"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Thời tiết:",
+                    "userEnteredValue": {
+                      "stringValue": "Thời tiết:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Thời tiết:"
+                    }
+                  },
+                  {
+                    "formattedValue": "rain",
+                    "userEnteredValue": {
+                      "stringValue": "rain"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "rain"
+                    }
+                  },
+                  {},
+                  {},
+                  {},
+                  {
+                    "formattedValue": "Giám sát phụ trách:",
+                    "userEnteredValue": {
+                      "stringValue": "Giám sát phụ trách:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Giám sát phụ trách:"
+                    }
+                  },
+                  {
+                    "formattedValue": "Consflow Admin",
+                    "userEnteredValue": {
+                      "stringValue": "Consflow Admin"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Consflow Admin"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "I. DANH MỤC KIỂM TRA HẰNG NGÀY (CHECKLIST 12 TIÊU CHÍ)",
+                    "userEnteredValue": {
+                      "stringValue": "I. DANH MỤC KIỂM TRA HẰNG NGÀY (CHECKLIST 12 TIÊU CHÍ)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "I. DANH MỤC KIỂM TRA HẰNG NGÀY (CHECKLIST 12 TIÊU CHÍ)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "STT",
+                    "userEnteredValue": {
+                      "stringValue": "STT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "STT"
+                    }
+                  },
+                  {
+                    "formattedValue": "NỘI DUNG KIỂM TRA",
+                    "userEnteredValue": {
+                      "stringValue": "NỘI DUNG KIỂM TRA"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "NỘI DUNG KIỂM TRA"
+                    }
+                  },
+                  {
+                    "formattedValue": "TRẠNG THÁI",
+                    "userEnteredValue": {
+                      "stringValue": "TRẠNG THÁI"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "TRẠNG THÁI"
+                    }
+                  },
+                  {
+                    "formattedValue": "GHI CHÚ / ĐÁNH GIÁ HIỆN TRƯỜNG",
+                    "userEnteredValue": {
+                      "stringValue": "GHI CHÚ / ĐÁNH GIÁ HIỆN TRƯỜNG"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GHI CHÚ / ĐÁNH GIÁ HIỆN TRƯỜNG"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "1",
+                    "userEnteredValue": {
+                      "numberValue": 1
+                    },
+                    "effectiveValue": {
+                      "numberValue": 1
+                    }
+                  },
+                  {
+                    "formattedValue": "Tiến độ thi công so với kế hoạch",
+                    "userEnteredValue": {
+                      "stringValue": "Tiến độ thi công so với kế hoạch"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Tiến độ thi công so với kế hoạch"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận tiến độ trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận tiến độ trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận tiến độ trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "2",
+                    "userEnteredValue": {
+                      "numberValue": 2
+                    },
+                    "effectiveValue": {
+                      "numberValue": 2
+                    }
+                  },
+                  {
+                    "formattedValue": "Nhân lực thầu phụ / tổ đội",
+                    "userEnteredValue": {
+                      "stringValue": "Nhân lực thầu phụ / tổ đội"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Nhân lực thầu phụ / tổ đội"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Tổ workflow · Số người: 6 · Giờ làm việc: 7 · Ghi chú: [Synthetic] Phiếu Lần 2",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Tổ workflow · Số người: 6 · Giờ làm việc: 7 · Ghi chú: [Synthetic] Phiếu Lần 2"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Tổ workflow · Số người: 6 · Giờ làm việc: 7 · Ghi chú: [Synthetic] Phiếu Lần 2"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "3",
+                    "userEnteredValue": {
+                      "numberValue": 3
+                    },
+                    "effectiveValue": {
+                      "numberValue": 3
+                    }
+                  },
+                  {
+                    "formattedValue": "Vật tư / Thiết bị nhập trường",
+                    "userEnteredValue": {
+                      "stringValue": "Vật tư / Thiết bị nhập trường"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Vật tư / Thiết bị nhập trường"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "4",
+                    "userEnteredValue": {
+                      "numberValue": 4
+                    },
+                    "effectiveValue": {
+                      "numberValue": 4
+                    }
+                  },
+                  {
+                    "formattedValue": "Chất lượng thi công hiện trường",
+                    "userEnteredValue": {
+                      "stringValue": "Chất lượng thi công hiện trường"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chất lượng thi công hiện trường"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "5",
+                    "userEnteredValue": {
+                      "numberValue": 5
+                    },
+                    "effectiveValue": {
+                      "numberValue": 5
+                    }
+                  },
+                  {
+                    "formattedValue": "Khối lượng thực tế hoàn thành",
+                    "userEnteredValue": {
+                      "stringValue": "Khối lượng thực tế hoàn thành"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Khối lượng thực tế hoàn thành"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "6",
+                    "userEnteredValue": {
+                      "numberValue": 6
+                    },
+                    "effectiveValue": {
+                      "numberValue": 6
+                    }
+                  },
+                  {
+                    "formattedValue": "Phát sinh ngoài hợp đồng",
+                    "userEnteredValue": {
+                      "stringValue": "Phát sinh ngoài hợp đồng"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Phát sinh ngoài hợp đồng"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "7",
+                    "userEnteredValue": {
+                      "numberValue": 7
+                    },
+                    "effectiveValue": {
+                      "numberValue": 7
+                    }
+                  },
+                  {
+                    "formattedValue": "Hệ thống cơ điện / Xung đột MEP",
+                    "userEnteredValue": {
+                      "stringValue": "Hệ thống cơ điện / Xung đột MEP"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Hệ thống cơ điện / Xung đột MEP"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "8",
+                    "userEnteredValue": {
+                      "numberValue": 8
+                    },
+                    "effectiveValue": {
+                      "numberValue": 8
+                    }
+                  },
+                  {
+                    "formattedValue": "An toàn lao động & Vệ sinh công nghiệp",
+                    "userEnteredValue": {
+                      "stringValue": "An toàn lao động & Vệ sinh công nghiệp"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "An toàn lao động & Vệ sinh công nghiệp"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "9",
+                    "userEnteredValue": {
+                      "numberValue": 9
+                    },
+                    "effectiveValue": {
+                      "numberValue": 9
+                    }
+                  },
+                  {
+                    "formattedValue": "Nghiệm thu nội bộ / Lỗi tồn tại",
+                    "userEnteredValue": {
+                      "stringValue": "Nghiệm thu nội bộ / Lỗi tồn tại"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Nghiệm thu nội bộ / Lỗi tồn tại"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "10",
+                    "userEnteredValue": {
+                      "numberValue": 10
+                    },
+                    "effectiveValue": {
+                      "numberValue": 10
+                    }
+                  },
+                  {
+                    "formattedValue": "Vấn đề / Rủi ro hiện trường",
+                    "userEnteredValue": {
+                      "stringValue": "Vấn đề / Rủi ro hiện trường"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Vấn đề / Rủi ro hiện trường"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận rủi ro trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận rủi ro trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận rủi ro trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "11",
+                    "userEnteredValue": {
+                      "numberValue": 11
+                    },
+                    "effectiveValue": {
+                      "numberValue": 11
+                    }
+                  },
+                  {
+                    "formattedValue": "Hình ảnh hiện trường (BM-GS-07)",
+                    "userEnteredValue": {
+                      "stringValue": "Hình ảnh hiện trường (BM-GS-07)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Hình ảnh hiện trường (BM-GS-07)"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Ảnh 1 • Tên tệp: [Synthetic] BM02 quy trình Lần 2 · Chú thích: [Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2 · Vị trí: [Synthetic] Khu thử workflow BM02 · Giai đoạn ảnh: during",
+                    "userEnteredValue": {
+                      "stringValue": "Ảnh 1 • Tên tệp: [Synthetic] BM02 quy trình Lần 2 · Chú thích: [Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2 · Vị trí: [Synthetic] Khu thử workflow BM02 · Giai đoạn ảnh: during"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ảnh 1 • Tên tệp: [Synthetic] BM02 quy trình Lần 2 · Chú thích: [Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2 · Vị trí: [Synthetic] Khu thử workflow BM02 · Giai đoạn ảnh: during"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "12",
+                    "userEnteredValue": {
+                      "numberValue": 12
+                    },
+                    "effectiveValue": {
+                      "numberValue": 12
+                    }
+                  },
+                  {
+                    "formattedValue": "Danh sách công việc (BM-GS-06)",
+                    "userEnteredValue": {
+                      "stringValue": "Danh sách công việc (BM-GS-06)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Danh sách công việc (BM-GS-06)"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa đánh giá",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa đánh giá"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa đánh giá"
+                    }
+                  },
+                  {
+                    "formattedValue": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo.",
+                    "userEnteredValue": {
+                      "stringValue": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo."
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "II. NHÂN LỰC THẦU PHỤ & VẬT TƯ NHẬP CÔNG TRƯỜNG",
+                    "userEnteredValue": {
+                      "stringValue": "II. NHÂN LỰC THẦU PHỤ & VẬT TƯ NHẬP CÔNG TRƯỜNG"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "II. NHÂN LỰC THẦU PHỤ & VẬT TƯ NHẬP CÔNG TRƯỜNG"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "STT",
+                    "userEnteredValue": {
+                      "stringValue": "STT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "STT"
+                    }
+                  },
+                  {
+                    "formattedValue": "THẦU PHỤ / TỔ ĐỘI",
+                    "userEnteredValue": {
+                      "stringValue": "THẦU PHỤ / TỔ ĐỘI"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "THẦU PHỤ / TỔ ĐỘI"
+                    }
+                  },
+                  {
+                    "formattedValue": "SỐ CÔNG NHÂN",
+                    "userEnteredValue": {
+                      "stringValue": "SỐ CÔNG NHÂN"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "SỐ CÔNG NHÂN"
+                    }
+                  },
+                  {
+                    "formattedValue": "NGƯỜI ĐẠI DIỆN 24/7",
+                    "userEnteredValue": {
+                      "stringValue": "NGƯỜI ĐẠI DIỆN 24/7"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "NGƯỜI ĐẠI DIỆN 24/7"
+                    }
+                  },
+                  {
+                    "formattedValue": "VẬT TƯ / THIẾT BỊ NHẬP TRƯỜNG",
+                    "userEnteredValue": {
+                      "stringValue": "VẬT TƯ / THIẾT BỊ NHẬP TRƯỜNG"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "VẬT TƯ / THIẾT BỊ NHẬP TRƯỜNG"
+                    }
+                  },
+                  {
+                    "formattedValue": "QUY CÁCH / XUẤT XỨ",
+                    "userEnteredValue": {
+                      "stringValue": "QUY CÁCH / XUẤT XỨ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "QUY CÁCH / XUẤT XỨ"
+                    }
+                  },
+                  {
+                    "formattedValue": "SỐ LƯỢNG",
+                    "userEnteredValue": {
+                      "stringValue": "SỐ LƯỢNG"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "SỐ LƯỢNG"
+                    }
+                  },
+                  {
+                    "formattedValue": "GHI CHÚ",
+                    "userEnteredValue": {
+                      "stringValue": "GHI CHÚ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GHI CHÚ"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "1",
+                    "userEnteredValue": {
+                      "numberValue": 1
+                    },
+                    "effectiveValue": {
+                      "numberValue": 1
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Tổ workflow",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Tổ workflow"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Tổ workflow"
+                    }
+                  },
+                  {
+                    "formattedValue": "6",
+                    "userEnteredValue": {
+                      "numberValue": 6
+                    },
+                    "effectiveValue": {
+                      "numberValue": 6
+                    }
+                  },
+                  {},
+                  {},
+                  {},
+                  {},
+                  {
+                    "formattedValue": "[Synthetic] Phiếu Lần 2",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Phiếu Lần 2"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Phiếu Lần 2"
+                    }
+                  }
+                ]
+              },
+              {},
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "TỔNG CỘNG NHÂN LỰC HIỆN TRƯỜNG",
+                    "userEnteredValue": {
+                      "stringValue": "TỔNG CỘNG NHÂN LỰC HIỆN TRƯỜNG"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "TỔNG CỘNG NHÂN LỰC HIỆN TRƯỜNG"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "6",
+                    "userEnteredValue": {
+                      "formulaValue": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))"
+                    },
+                    "effectiveValue": {
+                      "numberValue": 6
+                    }
+                  }
+                ]
+              },
+              {},
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "Nội dung báo cáo đã lưu",
+                    "userEnteredValue": {
+                      "stringValue": "Nội dung báo cáo đã lưu"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Nội dung báo cáo đã lưu"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Công việc và khối lượng đã ghi nhận",
+                    "userEnteredValue": {
+                      "stringValue": "Công việc và khối lượng đã ghi nhận"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Công việc và khối lượng đã ghi nhận"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Tóm tắt nhân lực",
+                    "userEnteredValue": {
+                      "stringValue": "Tóm tắt nhân lực"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Tóm tắt nhân lực"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "6 nhân sự / 1 đội",
+                    "userEnteredValue": {
+                      "stringValue": "6 nhân sự / 1 đội"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "6 nhân sự / 1 đội"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Nhân lực đã ghi nhận",
+                    "userEnteredValue": {
+                      "stringValue": "Nhân lực đã ghi nhận"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Nhân lực đã ghi nhận"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Tổ workflow · Số người: 6 · Giờ làm việc: 7 · Ghi chú: [Synthetic] Phiếu Lần 2",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Tổ workflow · Số người: 6 · Giờ làm việc: 7 · Ghi chú: [Synthetic] Phiếu Lần 2"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Tổ workflow · Số người: 6 · Giờ làm việc: 7 · Ghi chú: [Synthetic] Phiếu Lần 2"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Ảnh đã liên kết với nguồn báo cáo",
+                    "userEnteredValue": {
+                      "stringValue": "Ảnh đã liên kết với nguồn báo cáo"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ảnh đã liên kết với nguồn báo cáo"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Ảnh 1 • Tên tệp: [Synthetic] BM02 quy trình Lần 2 · Chú thích: [Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2 · Vị trí: [Synthetic] Khu thử workflow BM02 · Giai đoạn ảnh: during",
+                    "userEnteredValue": {
+                      "stringValue": "Ảnh 1 • Tên tệp: [Synthetic] BM02 quy trình Lần 2 · Chú thích: [Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2 · Vị trí: [Synthetic] Khu thử workflow BM02 · Giai đoạn ảnh: during"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ảnh 1 • Tên tệp: [Synthetic] BM02 quy trình Lần 2 · Chú thích: [Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2 · Vị trí: [Synthetic] Khu thử workflow BM02 · Giai đoạn ảnh: during"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                    "userEnteredValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "ĐẠI DIỆN THẦU PHỤ (24/7)",
+                    "userEnteredValue": {
+                      "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                    "userEnteredValue": {
+                      "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "properties": {
+          "sheetId": 319016405,
+          "title": "Hình ảnh",
+          "index": 1,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] BM02 quy trình Lần 2 • b4281dc0-6c7f-48d0-8846-81845956d963\nBáo cáo 2bed89af-0988-4c6d-a4d5-23ee7fbc7f86 · lần gửi 2 • [Synthetic] Khu thử workflow BM02\nTrong thi công\n[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] BM02 quy trình Lần 2 • b4281dc0-6c7f-48d0-8846-81845956d963\nBáo cáo 2bed89af-0988-4c6d-a4d5-23ee7fbc7f86 · lần gửi 2 • [Synthetic] Khu thử workflow BM02\nTrong thi công\n[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] BM02 quy trình Lần 2 • b4281dc0-6c7f-48d0-8846-81845956d963\nBáo cáo 2bed89af-0988-4c6d-a4d5-23ee7fbc7f86 · lần gửi 2 • [Synthetic] Khu thử workflow BM02\nTrong thi công\n[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

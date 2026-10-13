@@ -1,0 +1,48 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1yJ1LsVr2D3VAcI0rvHzmvTckfYgVNL9TmVMd_YzGQig",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1yJ1LsVr2D3VAcI0rvHzmvTckfYgVNL9TmVMd_YzGQig/edit",
+    "properties": {
+      "title": "BM04 — Danh sách Cần xử lý — Nghiệm thu 13-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 1532828539,
+          "title": "2026-10-09_01",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        }
+      },
+      {
+        "properties": {
+          "sheetId": 1096122567,
+          "title": "Hình ảnh",
+          "index": 1,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        }
+      }
+    ]
+  },
+  "isError": false
+}

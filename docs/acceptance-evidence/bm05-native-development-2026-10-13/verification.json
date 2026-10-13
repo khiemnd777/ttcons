@@ -1,0 +1,55 @@
+{
+  "passed": true,
+  "assertions": {
+    "actual_native_button_download_retained_byte_for_byte": true,
+    "same_project_linked_form_work_item": true,
+    "exact_native_risk_template_and_version_four_pin": true,
+    "saved_draft_revision_zero_preserved": true,
+    "one_saved_risk_row_equals_all_eleven_output_cells": true,
+    "source_project_name_and_code_match": true,
+    "detected_and_due_dates_are_saved_dates": true,
+    "risk_severity_uses_correct_vietnamese_label": true,
+    "status_is_saved_risk_text_not_draft_or_work_item_state": true,
+    "all_eleven_original_client_headers_preserved": true,
+    "original_title_and_three_signature_placeholders_preserved": true,
+    "original_second_sample_row_cleared": true,
+    "one_sheet_eleven_columns_no_photo_column_or_appendix": true,
+    "native_google_conversion_confirmed": true,
+    "native_google_tab_identity_matches_download": true,
+    "all_165_bounded_google_cells_equal_xlsx": true,
+    "no_google_error_value_or_value_error": true,
+    "new_google_file_private_owner_only": true,
+    "all_old_business_workflow_construction_audit_rows_retained": true,
+    "only_one_native_source_export_audit_added": true,
+    "database_consflow_migration_158_unchanged": true,
+    "all_149_storage_files_unchanged": true,
+    "all_978_built_source_hashes_unchanged": true
+  },
+  "old_unique_rows_checked": 2892,
+  "changed_or_lost_rows": [],
+  "new_rows": [
+    [
+      "audit_logs",
+      "3f6c4cbc-5f2c-4328-8092-66248ff14350"
+    ]
+  ],
+  "bounded_google_cells_compared": 165,
+  "populated_google_cells": 33,
+  "google_errors": [],
+  "formula_count": 0,
+  "source_files_checked": 978,
+  "storage_files_checked": 149,
+  "layout_observation": {
+    "client_B_width": 12.0,
+    "client_row5_height": null,
+    "client_B5_wrap": null,
+    "client_row5_merges": [],
+    "output_B_width": 12.0,
+    "output_row5_height": 169.35000000000002,
+    "output_row5_merges": [],
+    "output_row8_height": 46.5,
+    "source_name": "[DEV-BM-REUSE-20261009] [Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06"
+  },
+  "acceptance_status": "DATA TECHNICALLY VERIFIED; visual issue: project B5 wraps into many lines, row5 height169.35pt; NOT UX ACCEPTED.",
+  "limits": "Development Admin, one saved native risk v4 draftR0, one risk row, no evidence. Actual desktop browser download and unchanged native Google import. Submitted/resolved/fullRev10/contextual sources/multirow/capacity/mobile/otherroles/Excel/print NOT_RUN. No application or workbook repair."
+}

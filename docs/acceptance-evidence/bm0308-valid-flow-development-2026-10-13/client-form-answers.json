@@ -1,0 +1,78 @@
+{
+  "reference_no": "UAT-BM03-CLIENT-20261013",
+  "check_date": "2026-10-13",
+  "subcontractor_name": "[Synthetic] Tổ chống thấm UAT",
+  "subcontractor_representative": "[Synthetic] Đại diện tổ thử",
+  "work_package": "flooring",
+  "construction_area": "[Synthetic] WC tầng 1 - Khu thử",
+  "checklist_items": [
+    {
+      "title": "[Synthetic] Bề mặt sàn trước chống thấm",
+      "standard_reference": "[Synthetic] Quy trình thử S-01",
+      "drawing_reference": "[Synthetic] KT-WC-02 RevA",
+      "technical_requirement": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử",
+      "claimed_quantity": 23,
+      "confirmed_quantity": 23,
+      "design_quantity": 25,
+      "actual_quantity": 24.8,
+      "unit": "m2",
+      "status": "done",
+      "owner_response": "accepted",
+      "quality_result": "pass",
+      "quality_note": "[Synthetic] Đạt yêu cầu bề mặt tại vùng thử",
+      "measurement_note": "[Synthetic] Đo theo sơ đồ ô thử"
+    },
+    {
+      "title": "[Synthetic] Thử nước chống thấm 24 giờ",
+      "standard_reference": "[Synthetic] Quy trình thử S-02",
+      "drawing_reference": "[Synthetic] KT-WC-03 RevB",
+      "technical_requirement": "Ngâm nước thử 50 mm trong 24 giờ; không rò",
+      "claimed_quantity": 20,
+      "confirmed_quantity": 20,
+      "design_quantity": 25,
+      "actual_quantity": 25,
+      "unit": "m2",
+      "status": "done",
+      "owner_response": "accepted",
+      "quality_result": "pass",
+      "quality_note": "[Synthetic] Không phát hiện rò trong mẫu kiểm tra"
+    },
+    {
+      "title": "[Synthetic] Độ dốc và lát gạch sàn",
+      "standard_reference": "[Synthetic] Mẫu duyệt MAT-03",
+      "drawing_reference": "[Synthetic] KT-WC-04 RevC",
+      "technical_requirement": "Độ dốc thử 1.5-2%; ron không quá 1 mm",
+      "claimed_quantity": 21,
+      "confirmed_quantity": 21,
+      "design_quantity": 25,
+      "actual_quantity": 24.6,
+      "unit": "m2",
+      "status": "done",
+      "owner_response": "accepted",
+      "quality_result": "pass",
+      "quality_note": "[Synthetic] Đạt yêu cầu đo tại mẫu thử"
+    }
+  ],
+  "overall_comment": "[Synthetic] Dữ liệu thử; không phải hồ sơ công trình hay biên bản pháp lý.",
+  "acceptance_conclusion": "accepted",
+  "quantity_items": [
+    {
+      "item": "[Synthetic] Bề mặt sàn trước chống thấm",
+      "claimed_quantity": 23,
+      "approved_quantity": 23,
+      "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+    },
+    {
+      "item": "[Synthetic] Thử nước chống thấm 24 giờ",
+      "claimed_quantity": 20,
+      "approved_quantity": 20,
+      "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+    },
+    {
+      "item": "[Synthetic] Độ dốc và lát gạch sàn",
+      "claimed_quantity": 21,
+      "approved_quantity": 21,
+      "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+    }
+  ]
+}

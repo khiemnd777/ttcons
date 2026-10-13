@@ -776,7 +776,7 @@ func TestConstructionVariationProposalStartsAtQSAndTracesAction(t *testing.T) {
 }
 
 func TestSubcontractorChecklistFormValidatesEvidenceAndQuantities(t *testing.T) {
-	db := openProjectOperationsTestDB(t)
+	db := openIsolatedCoreTestDB(t, "subcontractor_validation_", []string{"workflow_form_versions", "workflow_form_instances", "evidence_records"})
 	ctx := context.Background()
 	repo := NewRepository(db)
 	service := NewService(repo, "test-secret")
@@ -787,10 +787,19 @@ func TestSubcontractorChecklistFormValidatesEvidenceAndQuantities(t *testing.T) 
 		t.Fatal(err)
 	}
 	foundCatalog := false
+	var catalogDefaultVersionID string
 	for _, row := range rows {
-		if row["template_code"] == "builtin_subcontractor_checklist" {
+		if row["template_code"] != "builtin_subcontractor_checklist" {
+			continue
+		}
+		// Catalog versions are newest first. Automatic selection now uses the
+		// complete native assessment; legacy v1 remains explicitly selectable.
+		if boolValue(row["default_eligible"]) && catalogDefaultVersionID == "" {
+			catalogDefaultVersionID = cleanID(row["version_id"])
+		}
+		if number(row["version_no"]) == 1 {
 			foundCatalog = true
-			if row["form_type"] != "checklist" || number(row["version_no"]) != 1 {
+			if row["form_type"] != "checklist" {
 				t.Fatalf("unexpected subcontractor checklist catalog row: %#v", row)
 			}
 			if !containsString(stringSlice(row["required_field_keys"]), "checklist_items") {
@@ -810,8 +819,7 @@ func TestSubcontractorChecklistFormValidatesEvidenceAndQuantities(t *testing.T) 
 		WHERE t.code='builtin_subcontractor_checklist'
 		  AND t.status='active'
 		  AND v.status='published'
-		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
-		ORDER BY v.version_no DESC
+		  AND v.version_no=1
 		LIMIT 1
 	`).Scan(&formVersionID); err != nil {
 		t.Fatal(err)
@@ -820,8 +828,15 @@ func TestSubcontractorChecklistFormValidatesEvidenceAndQuantities(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if defaultFormVersionID != formVersionID {
-		t.Fatalf("default subcontractor checklist form version = %q, want %q", defaultFormVersionID, formVersionID)
+	var latestAssessmentVersionID string
+	if err := db.QueryRowContext(ctx, `SELECT v.id FROM workflow_form_versions v JOIN workflow_form_templates t ON t.id=v.template_id WHERE t.code='builtin_subcontractor_checklist' AND v.status='published' AND v.schema_json->>'native_subcontractor_assessment_revision'='1' ORDER BY v.version_no DESC LIMIT 1`).Scan(&latestAssessmentVersionID); err != nil {
+		t.Fatal(err)
+	}
+	if defaultFormVersionID != latestAssessmentVersionID || defaultFormVersionID == formVersionID {
+		t.Fatalf("default subcontractor assessment = %q, want latest assessment %q (legacy v1 %q)", defaultFormVersionID, latestAssessmentVersionID, formVersionID)
+	}
+	if catalogDefaultVersionID != defaultFormVersionID {
+		t.Fatalf("eligible catalog version = %q, want backend default %q", catalogDefaultVersionID, defaultFormVersionID)
 	}
 
 	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{

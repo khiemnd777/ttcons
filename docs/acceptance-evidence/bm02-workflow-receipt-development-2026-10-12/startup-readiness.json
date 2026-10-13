@@ -1,0 +1,66 @@
+{
+  "blockers": [],
+  "capabilities": {
+    "can_manage_project_manager": true,
+    "can_start_pipeline": true,
+    "can_update_project": true,
+    "is_startup_owner": true
+  },
+  "created_at": "2026-10-12T06:16:59Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "first_steps": [
+    {
+      "covered": true,
+      "eligible_users": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        },
+        {
+          "full_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+          "staff_id": "ac42059d-1adc-4a2f-9282-d13bf2bab4e6",
+          "user_id": "bc554766-1b43-425e-ab4a-295dd86060bd"
+        }
+      ],
+      "id": "1bb42b8c-9f6f-481a-bb41-82ecfe775282",
+      "name": "[Synthetic] Nghiệm thu vật tư nhập trường",
+      "required_permission": "",
+      "role_ids": [
+        "PM"
+      ]
+    }
+  ],
+  "owner_name": "Consflow Admin",
+  "owner_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "pm_name": "Consflow Admin",
+  "pm_staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+  "pm_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "project_code": "DEV-BM02-WORKFLOW-20261012",
+  "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+  "project_name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+  "ready_to_start": true,
+  "role_coverage": [
+    {
+      "covered": true,
+      "members": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        },
+        {
+          "full_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+          "staff_id": "ac42059d-1adc-4a2f-9282-d13bf2bab4e6",
+          "user_id": "bc554766-1b43-425e-ab4a-295dd86060bd"
+        }
+      ],
+      "node_count": 2,
+      "role_label": "PM",
+      "step_count": 2
+    }
+  ],
+  "template_id": "9ee7563a-e8ee-4648-b0ca-33815af10c5f",
+  "template_name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+  "template_status": "published"
+}

@@ -1,0 +1,59 @@
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook/short
+    bm_gs_risk_header_test.go:72: full project name retained; row5 height=33pt
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook/long
+    bm_gs_risk_header_test.go:72: full project name retained; row5 height=35.7pt
+--- PASS: TestBMGS05ProjectHeaderMergedWorkbook (0.03s)
+    --- PASS: TestBMGS05ProjectHeaderMergedWorkbook/short (0.01s)
+    --- PASS: TestBMGS05ProjectHeaderMergedWorkbook/long (0.01s)
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-04
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-05
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-06
+    bm_gs_risk_header_test.go:154: template merges changed beyond approved headers: got [A12:C12 A13:C13 A1:J1 A2:J2 A3:J3 D12:F12 D13:F13 G12:J12 G13:J13], want [A12:C12 A13:C13 A1:J1 A2:J2 A3:J3 B5:J5 D12:F12 D13:F13 G12:J12 G13:J13]
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-07
+    bm_gs_risk_header_test.go:154: template merges changed beyond approved headers: got [A13:C13 A14:C14 A1:G1 A2:G2 A3:G3 D13:G13 D14:G14], want [A13:C13 A14:C14 A1:G1 A2:G2 A3:G3 B5:G5 D13:G13 D14:G14]
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-08
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-02
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-01
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-03
+--- FAIL: TestBMGS05HeaderRepairPreservesOtherTemplateMerges (0.06s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-04 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-05 (0.01s)
+    --- FAIL: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-06 (0.01s)
+    --- FAIL: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-07 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-08 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-02 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-01 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-03 (0.01s)
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/current_short
+    bm_gs_risk_header_test.go:203: full identity retained; row5=35.7pt
+    bm_gs_risk_header_test.go:214: missing B5:J5 header merge
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/frozen_long
+    bm_gs_risk_header_test.go:201: header height=347.55pt, want <=60pt: <nil>
+    bm_gs_risk_header_test.go:203: full identity retained; row5=347.55pt
+    bm_gs_risk_header_test.go:214: missing B5:J5 header merge
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/historical_missing
+    bm_gs_risk_header_test.go:203: full identity retained; row5=33pt
+    bm_gs_risk_header_test.go:214: missing B5:J5 header merge
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/current_short
+    bm_gs_risk_header_test.go:203: full identity retained; row5=33pt
+    bm_gs_risk_header_test.go:214: missing B5:G5 header merge
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/frozen_long
+    bm_gs_risk_header_test.go:201: header height=184.20000000000002pt, want <=60pt: <nil>
+    bm_gs_risk_header_test.go:203: full identity retained; row5=184.20000000000002pt
+    bm_gs_risk_header_test.go:214: missing B5:G5 header merge
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/historical_missing
+    bm_gs_risk_header_test.go:203: full identity retained; row5=33pt
+    bm_gs_risk_header_test.go:214: missing B5:G5 header merge
+--- FAIL: TestBMGS06And07ProjectHeaderMergedWorkbook (0.06s)
+    --- FAIL: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/current_short (0.01s)
+    --- FAIL: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/frozen_long (0.01s)
+    --- FAIL: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/historical_missing (0.01s)
+    --- FAIL: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/current_short (0.01s)
+    --- FAIL: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/frozen_long (0.01s)
+    --- FAIL: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/historical_missing (0.01s)
+FAIL
+FAIL	consflow/backend/internal/core	0.905s
+FAIL

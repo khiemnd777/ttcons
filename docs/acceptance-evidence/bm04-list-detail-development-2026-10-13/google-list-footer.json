@@ -1,0 +1,111 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1yJ1LsVr2D3VAcI0rvHzmvTckfYgVNL9TmVMd_YzGQig",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1yJ1LsVr2D3VAcI0rvHzmvTckfYgVNL9TmVMd_YzGQig/edit",
+    "properties": {
+      "title": "BM04 — Danh sách Cần xử lý — Nghiệm thu 13-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 1532828539,
+          "title": "2026-10-09_01",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "startRow": 16,
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                    "userEnteredValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "ĐẠI DIỆN THẦU PHỤ (24/7)",
+                    "userEnteredValue": {
+                      "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                    "userEnteredValue": {
+                      "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "isError": false
+}

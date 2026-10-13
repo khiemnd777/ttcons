@@ -16,6 +16,12 @@ export type ConstructionCheckCreateInput = {
 };
 
 export type ConstructionActionCreateInput = {
+  fault_code?: string;
+  location?: string;
+  severity?: string;
+  responsible_unit?: string;
+  representative?: string;
+  contact?: string;
 	work_item_id: string;
 	source_daily_report_id?: string;
 	title: string;

@@ -1,0 +1,29 @@
+[
+  {
+    "accepted_quantity": "0",
+    "approval_request_id": null,
+    "budget_status": "within_budget",
+    "created_at": "2026-10-13T00:11:46Z",
+    "edit_version": 1,
+    "expected_delivery_date": null,
+    "id": "ab398fc0-0999-4a3d-b497-3957d53ab9b9",
+    "incoming_acceptance_id": null,
+    "incoming_acceptance_status": null,
+    "incoming_acceptance_work_item_id": null,
+    "item_count": 1,
+    "order_reference": null,
+    "ordered_at": null,
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "project_name": "[Synthetic] BM03 gói client Rev10 — nghiệm thu 13-10-2026",
+    "quantity_requested": "25.000",
+    "request_code": "PR-432115cb-1791850306-01",
+    "requested_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "status": "waiting_approval",
+    "stock_received_quantity": "0",
+    "supplier_name": "[Synthetic] supplier Development BM03",
+    "supplier_partner_id": "26cda344-e3f3-42c7-818c-167d2ea802c4",
+    "title": "Yêu cầu mua sinh từ BOQ - [Synthetic] supplier Development BM03",
+    "total_estimated_amount": "2250000.00",
+    "updated_at": "2026-10-13T00:11:46Z"
+  }
+]

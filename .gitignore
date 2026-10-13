@@ -34,3 +34,6 @@ backend/.gomodcache/
 
 # typescript
 *.tsbuildinfo
+
+# generated acceptance-script bytecode
+docs/acceptance-evidence/**/__pycache__/

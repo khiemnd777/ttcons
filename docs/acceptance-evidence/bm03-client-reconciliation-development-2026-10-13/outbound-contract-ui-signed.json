@@ -1,0 +1,116 @@
+{
+  "activated_at": null,
+  "activated_by": null,
+  "advance_percent": "0.00",
+  "approval_request_id": null,
+  "approved_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "contract_code": "BM03-REV10-OUTBOUND",
+  "contract_type": "main_client",
+  "counterparty_code": "BM03-REV10-CLIENT-20261013",
+  "counterparty_name": "[Synthetic] client Development BM03",
+  "counterparty_partner_id": "8995eb0d-3a3e-4aa4-b369-497b4a95fc68",
+  "counterparty_tax_code": null,
+  "created_at": "2026-10-13T00:13:22Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "currency": "VND",
+  "current_amount": "2250000.00",
+  "current_version_id": "6b70386a-43a9-4722-b5a0-df697f6bf46f",
+  "current_version_label": "UAT V1",
+  "current_version_no": 1,
+  "current_version_status": "signed",
+  "direction": "receivable",
+  "dispatches": [],
+  "effective_date": "2026-10-13T00:00:00Z",
+  "execution_readiness": {
+    "app_signed": true,
+    "contract_active": false,
+    "paper_dispatched": false,
+    "returned_scan_received": false
+  },
+  "expiry_date": null,
+  "id": "ba25628f-bf95-4034-b6c1-93fcb6b31e58",
+  "milestones": [],
+  "original_amount": "2250000.00",
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "retention_percent": "0.00",
+  "signed_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "signed_date": "2026-10-13T00:00:00Z",
+  "signing_forms": [
+    {
+      "current_revision": 1,
+      "id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "signatures": [
+        {
+          "id": "0a090008-b83a-4f6f-807d-41d22d4acb05",
+          "linked_contract_version_id": "6b70386a-43a9-4722-b5a0-df697f6bf46f",
+          "purpose": "approved_by",
+          "signed_at": "2026-10-13T00:16:26.417911+00:00",
+          "signer_name": "admin@thuthiemcons.com",
+          "signer_user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "status": "submitted",
+      "step_business_code": "outbound_contract.execution_package",
+      "submitted_at": "2026-10-13T00:15:24Z",
+      "title": "Hoàn tất gói hợp đồng chủ đầu tư",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb",
+      "work_item_title": "Hoàn tất gói hợp đồng chủ đầu tư"
+    }
+  ],
+  "status": "signed",
+  "title": "[Synthetic] outbound internal test contract",
+  "updated_at": "2026-10-13T00:16:26Z",
+  "variations": [],
+  "versions": [
+    {
+      "amount": "2250000.00",
+      "approved_at": "2026-10-13T00:13:46Z",
+      "approved_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "commercial_terms_json": {},
+      "contract_id": "ba25628f-bf95-4034-b6c1-93fcb6b31e58",
+      "created_at": "2026-10-13T00:13:22Z",
+      "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "definition_hash": "7bc468e3dea9732251383f118991ffc8406001c44d0fe79270cae1cbc90db2f5",
+      "document_id": null,
+      "id": "6b70386a-43a9-4722-b5a0-df697f6bf46f",
+      "payment_terms_json": {},
+      "planned_end_date": null,
+      "planned_start_date": null,
+      "review_comment": "[Synthetic] Canonical test version\n[Synthetic] Internal review\n[Synthetic] Internal test approval; no real legal agreement.",
+      "scope_summary": "[Synthetic] Internal test floor25m2; no legal contract or actual payment.",
+      "signature_comment": "[Synthetic] Internal Development UAT signature only; no actual client legal signature.",
+      "signed_at": "2026-10-13T00:16:26Z",
+      "signed_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "source_variation_id": null,
+      "status": "signed",
+      "submitted_at": "2026-10-13T00:13:39Z",
+      "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "updated_at": "2026-10-13T00:16:26Z",
+      "version_label": "UAT V1",
+      "version_no": 1
+    }
+  ],
+  "warranty_days": 0,
+  "workflow_signatures": [
+    {
+      "comment": "[Synthetic] Internal Development UAT signature only; no actual client legal signature.",
+      "contract_version_id": "6b70386a-43a9-4722-b5a0-df697f6bf46f",
+      "form_instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "link_id": "38d228fb-8b71-4e64-b0e9-31eca6dd1a99",
+      "linked_at": "2026-10-13T00:16:26Z",
+      "linked_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "payload_hash": "c1c8229c8fefd36994ef13c2357da9fa32014e420de7034c1eb4929411519fec",
+      "purpose": "approved_by",
+      "signed_at": "2026-10-13T00:16:26Z",
+      "signer_name": "admin@thuthiemcons.com",
+      "signer_roles_json": [
+        "Admin"
+      ],
+      "signer_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "visual_file_size": 5561,
+      "visual_mime_type": "image/png",
+      "workflow_form_signature_id": "0a090008-b83a-4f6f-807d-41d22d4acb05",
+      "workflow_form_title": "Hoàn tất gói hợp đồng chủ đầu tư"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "actor_id": "e506223b-421c-498c-808e-2a6058dbfdff",
+  "actor_role": "admin",
+  "database": "bmgs_native_browser_20261008",
+  "manual_daily_report_id": "f0458690-be7e-4638-9a36-fbde78248ec3",
+  "migration_max": 156,
+  "project_id": "4ce66435-2632-45fe-abef-309513530b1b",
+  "provenance": "New synthetic Work Items and Run Steps positioned in active construction context by explicit SQL. Form answers saved through canonical SaveWorkflowFormDraft; new manual daily report created through CreateDailyReport. Exports verified against saved sources. Protected original bytes copied to new unique opaque keys with checksum preserved. No full upstream workflow or real-site acceptance is claimed; pre-existing sources/pins/history were not changed.",
+  "sources": [
+    {
+      "form_code": "client_site_measurement_record",
+      "title": "UAT native — Đo hiện trạng sảnh",
+      "work_item_id": "66401f25-7231-4fb3-b06b-4622d42a9a51",
+      "form_id": "d954c785-be39-4847-b126-64e5ad07fe09",
+      "form_version_id": "8f6d71eb-bf98-45f2-b3f3-a34d448275e2",
+      "form_version_no": 4,
+      "photo_id": "c8487008-4944-4cc4-a912-bbb202b641d1",
+      "export_paths": [
+        "/workflow-form-instances/d954c785-be39-4847-b126-64e5ad07fe09/export.xlsx"
+      ]
+    },
+    {
+      "form_code": "client_survey_work_package",
+      "title": "UAT native — Khảo sát và rủi ro",
+      "work_item_id": "30f435bd-606c-4a80-91a7-45700b91539e",
+      "form_id": "75be3d6e-f868-493a-b589-8705f217e8b9",
+      "form_version_id": "a70b199b-843f-4a6c-a2e9-33db4c3188a0",
+      "form_version_no": 3,
+      "photo_id": "ff4637e7-e87e-4c65-aa91-fcb163e60bb0",
+      "export_paths": [
+        "/workflow-form-instances/75be3d6e-f868-493a-b589-8705f217e8b9/export.xlsx",
+        "/workflow-form-instances/75be3d6e-f868-493a-b589-8705f217e8b9/risks/export.xlsx"
+      ]
+    },
+    {
+      "form_code": "builtin_construction_daily_report",
+      "title": "UAT native — Báo cáo thi công đã lưu",
+      "work_item_id": "77281528-cd85-4fc8-9a93-02a2ba611df1",
+      "form_id": "a2fcafe6-2a14-453e-8934-cfd59b0fd07e",
+      "form_version_id": "6b046050-b4a3-40e1-99d1-0ff378ddc810",
+      "form_version_no": 5,
+      "photo_id": "f97c3752-7019-4a8f-98bf-edb4bb0481c1",
+      "export_paths": [
+        "/workflow-form-instances/a2fcafe6-2a14-453e-8934-cfd59b0fd07e/export.xlsx",
+        "/workflow-form-instances/a2fcafe6-2a14-453e-8934-cfd59b0fd07e/risks/export.xlsx",
+        "/workflow-form-instances/a2fcafe6-2a14-453e-8934-cfd59b0fd07e/next-plan/export.xlsx"
+      ]
+    },
+    {
+      "form_code": "builtin_subcontractor_checklist",
+      "title": "UAT native — Checklist thầu phụ",
+      "work_item_id": "6c3debd7-aa81-4df1-8b2f-7e3811cce511",
+      "form_id": "e05f3656-5904-407b-b351-b6de7ab84967",
+      "form_version_id": "7a24fc41-cda1-4ee8-812b-a8cb7b1e6ee2",
+      "form_version_no": 3,
+      "photo_id": "1a600c61-10f7-4b25-8de5-acdf8e7d914e",
+      "export_paths": [
+        "/workflow-form-instances/e05f3656-5904-407b-b351-b6de7ab84967/export.xlsx"
+      ]
+    },
+    {
+      "form_code": "client_subcontractor_acceptance_package",
+      "title": "UAT native — Gói nghiệm thu thầu phụ",
+      "work_item_id": "d820dbda-48e0-48c4-b20a-2bdbd3b05f9c",
+      "form_id": "3c358a29-1680-407e-8438-3eebad2c27d4",
+      "form_version_id": "69a63742-becf-48b8-a0c2-e96edc1c20e6",
+      "form_version_no": 2,
+      "photo_id": "588d3ecc-78d8-4048-b18b-ad282b36c6b1",
+      "export_paths": [
+        "/workflow-form-instances/3c358a29-1680-407e-8438-3eebad2c27d4/export.xlsx"
+      ]
+    },
+    {
+      "form_code": "client_site_risk_assessment",
+      "title": "UAT native — Đánh giá rủi ro",
+      "work_item_id": "bde2e39c-7da3-4f97-ac96-7e26b76c79a0",
+      "form_id": "2892baa9-0ae5-45bc-9eff-3254db5d8a70",
+      "form_version_id": "716fd9b6-3410-4a4e-b751-9aeb6e53cd45",
+      "form_version_no": 4,
+      "photo_id": "ecd3f4a4-f029-44ea-b73c-4105a287281a",
+      "export_paths": [
+        "/workflow-form-instances/2892baa9-0ae5-45bc-9eff-3254db5d8a70/export.xlsx"
+      ]
+    }
+  ]
+}

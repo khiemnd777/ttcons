@@ -1,0 +1,209 @@
+/Applications/Xcode.app/Contents/Developer/usr/bin/make --no-print-directory down
+docker compose --env-file /private/tmp/consflow-bm02-development-20261012.env down --remove-orphans
+ Container admin Stopping 
+ Container admin Stopped 
+ Container admin Removing 
+ Container admin Removed 
+ Container ttcons-backend-1 Stopping 
+ Container ttcons-backend-1 Stopped 
+ Container ttcons-backend-1 Removing 
+ Container ttcons-backend-1 Removed 
+ Container ttcons-redis-cache-1 Stopping 
+ Container ttcons-postgres-1 Stopping 
+ Container ttcons-redis-1 Stopping 
+ Container ttcons-redis-cache-1 Stopped 
+ Container ttcons-redis-cache-1 Removing 
+ Container ttcons-postgres-1 Stopped 
+ Container ttcons-postgres-1 Removing 
+ Container ttcons-redis-cache-1 Removed 
+ Container ttcons-redis-1 Stopped 
+ Container ttcons-redis-1 Removing 
+ Container ttcons-postgres-1 Removed 
+ Container ttcons-redis-1 Removed 
+ Network ttcons_default Removing 
+ Network ttcons_default Removed 
+/Applications/Xcode.app/Contents/Developer/usr/bin/make --no-print-directory build
+docker compose --env-file /private/tmp/consflow-bm02-development-20261012.env build
+ Image ttcons-backend Building 
+ Image ttcons-admin Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.00kB done
+#1 DONE 0.0s
+
+#2 [backend internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.45kB done
+#2 DONE 0.0s
+
+#3 [admin internal] load build definition from Dockerfile.dev
+#3 transferring dockerfile: 206B done
+#3 DONE 0.0s
+
+#4 [admin internal] load metadata for docker.io/library/node:22-alpine
+#4 DONE 1.7s
+
+#5 [backend] resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#5 DONE 1.7s
+
+#6 [admin internal] load .dockerignore
+#6 transferring context: 99B done
+#6 DONE 0.0s
+
+#7 [backend] docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#7 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e 0.0s done
+#7 CACHED
+
+#8 [admin 1/5] FROM docker.io/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+#8 resolve docker.io/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 0.0s done
+#8 DONE 0.0s
+
+#9 [admin internal] load build context
+#9 transferring context: 205.68kB 0.0s done
+#9 DONE 0.0s
+
+#10 [admin 2/5] WORKDIR /app
+#10 CACHED
+
+#11 [admin 3/5] COPY package.json package-lock.json* ./
+#11 CACHED
+
+#12 [admin 4/5] RUN npm install
+#12 CACHED
+
+#13 [admin 5/5] COPY . .
+#13 DONE 0.1s
+
+#14 [backend internal] load metadata for docker.io/library/alpine:3.20
+#14 ...
+
+#15 [admin] exporting to image
+#15 exporting layers 0.1s done
+#15 exporting manifest sha256:5a2c627bb7315145803266611886e9e90d5df9d8bb2483e79088ffefb3cd3b2e done
+#15 exporting config sha256:74b2d2a5e823f6a2589363576db05d605060f395c915daf80c9f381f0a5bec12 done
+#15 exporting attestation manifest sha256:e4da37ab6fde4d5daf8cd872c3eae9297bb2ab1f40b4616b8b57e705a9245642 done
+#15 exporting manifest list sha256:16eceb74d0405c21f737b865965707c1cf60d13701bf440f176baa6e39deba09 done
+#15 naming to docker.io/library/ttcons-admin:latest done
+#15 unpacking to docker.io/library/ttcons-admin:latest 0.0s done
+#15 DONE 0.2s
+
+#16 [admin] resolving provenance for metadata file
+#16 DONE 0.0s
+
+#17 [backend internal] load metadata for docker.io/library/golang:1.23-alpine
+#17 DONE 1.5s
+
+#14 [backend internal] load metadata for docker.io/library/alpine:3.20
+#14 DONE 1.5s
+
+#18 [backend internal] load .dockerignore
+#18 transferring context: 102B done
+#18 DONE 0.0s
+
+#19 [backend stage-1 1/8] FROM docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+#19 resolve docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc done
+#19 DONE 0.0s
+
+#20 [backend build  1/10] FROM docker.io/library/golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f
+#20 resolve docker.io/library/golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f done
+#20 DONE 0.0s
+
+#21 [backend internal] load build context
+#21 transferring context: 796.51kB 0.3s done
+#21 DONE 0.3s
+
+#22 [backend build  2/10] WORKDIR /src
+#22 CACHED
+
+#23 [backend build  4/10] COPY go.mod go.sum* ./
+#23 CACHED
+
+#24 [backend build  3/10] RUN apk add --no-cache git
+#24 CACHED
+
+#25 [backend build  5/10] RUN --mount=type=cache,target=/go/pkg/mod     go mod download
+#25 CACHED
+
+#26 [backend build  6/10] COPY . .
+#26 DONE 0.9s
+
+#27 [backend build  7/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow ./cmd/server
+#27 DONE 3.3s
+
+#28 [backend build  8/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-migrate ./cmd/migrate
+#28 DONE 0.4s
+
+#29 [backend build  9/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-storage-migrate ./cmd/storage-migrate
+#29 DONE 0.4s
+
+#30 [backend build 10/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-bootstrap-admin ./cmd/bootstrap-admin
+#30 DONE 0.4s
+
+#31 [backend stage-1 2/8] WORKDIR /app
+#31 CACHED
+
+#32 [backend stage-1 3/8] RUN addgroup -S -g 10001 appgroup     && adduser -S -D -H -u 10001 -G appgroup appuser
+#32 CACHED
+
+#33 [backend stage-1 4/8] COPY --from=build /bin/consflow /app/consflow
+#33 DONE 0.1s
+
+#34 [backend stage-1 5/8] COPY --from=build /bin/consflow-migrate /app/consflow-migrate
+#34 DONE 0.0s
+
+#35 [backend stage-1 6/8] COPY --from=build /bin/consflow-storage-migrate /app/consflow-storage-migrate
+#35 DONE 0.0s
+
+#36 [backend stage-1 7/8] COPY --from=build /bin/consflow-bootstrap-admin /app/consflow-bootstrap-admin
+#36 DONE 0.0s
+
+#37 [backend stage-1 8/8] COPY --from=build /src/migrations /app/migrations
+#37 DONE 0.0s
+
+#38 [backend] exporting to image
+#38 exporting layers
+#38 exporting layers 1.0s done
+#38 exporting manifest sha256:4c3fa67a5693c7c114aa0ac62ff5f52ade0074e93e1a47e9927fe382ea28c201 done
+#38 exporting config sha256:1f9ca8fbb449ef31677173b90a2e5a71e931e9bf681956b20fb2fa88ec22d344 done
+#38 exporting attestation manifest sha256:7035a8f5fa552b8b330ee5acf4ab63e41bd562089d6526a813ab987c7c6c1c27 done
+#38 exporting manifest list sha256:9619e6673a916665c45c3f6f561f03d30131bb2692a3a73b4acdf9388eab58c6 done
+#38 naming to docker.io/library/ttcons-backend:latest done
+#38 unpacking to docker.io/library/ttcons-backend:latest
+#38 unpacking to docker.io/library/ttcons-backend:latest 0.3s done
+#38 DONE 1.3s
+
+#39 [backend] resolving provenance for metadata file
+#39 DONE 0.0s
+ Image ttcons-admin Built 
+ Image ttcons-backend Built 
+/Applications/Xcode.app/Contents/Developer/usr/bin/make --no-print-directory run
+mkdir -p "/Users/khiemnguyen/Works/ttcons/ttcons/storage"
+docker compose --env-file /private/tmp/consflow-bm02-development-20261012.env up -d
+ Network ttcons_default Creating 
+ Network ttcons_default Creating 
+ Network ttcons_default Created 
+ Network ttcons_default Created 
+ Container ttcons-redis-1 Creating 
+ Container ttcons-postgres-1 Creating 
+ Container ttcons-redis-cache-1 Creating 
+ Container ttcons-postgres-1 Created 
+ Container ttcons-redis-1 Created 
+ Container ttcons-redis-cache-1 Created 
+ Container ttcons-backend-1 Creating 
+ Container ttcons-backend-1 Created 
+ Container admin Creating 
+ Container admin Created 
+ Container ttcons-redis-cache-1 Starting 
+ Container ttcons-redis-1 Starting 
+ Container ttcons-postgres-1 Starting 
+ Container ttcons-redis-cache-1 Started 
+ Container ttcons-redis-1 Started 
+ Container ttcons-postgres-1 Started 
+ Container ttcons-redis-cache-1 Waiting 
+ Container ttcons-postgres-1 Waiting 
+ Container ttcons-redis-1 Waiting 
+ Container ttcons-redis-1 Healthy 
+ Container ttcons-redis-cache-1 Healthy 
+ Container ttcons-postgres-1 Healthy 
+ Container ttcons-backend-1 Starting 
+ Container ttcons-backend-1 Started 
+ Container admin Starting 
+ Container admin Started 

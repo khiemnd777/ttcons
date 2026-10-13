@@ -1,0 +1,80 @@
+{
+  "list": {
+    "download_path": "/Users/khiemnguyen/Downloads/danh-sach-can-xu-ly-BM-GS-04 (3).xlsx",
+    "copy_path": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm04-list-detail-development-2026-10-13/BM04-list.xlsx",
+    "bytes": 14596,
+    "sha256": "4f9cbf89e65dd3de7e927a41eb23e771f6eec341cec4ac296214a83accd74f0b",
+    "tabs": [
+      "2026-10-09_01",
+      "Hình ảnh"
+    ],
+    "dimension": "A1:J16",
+    "headers": [
+      "STT",
+      "MÃ LỖI",
+      "VỊ TRÍ / HẠNG MỤC",
+      "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI",
+      "MỨC ĐỘ",
+      "ĐƠN VỊ PHỤ TRÁCH",
+      "ĐẠI DIỆN 24/7",
+      "THỜI HẠN",
+      "TRẠNG THÁI",
+      "GHI CHÚ"
+    ],
+    "row8": [
+      1,
+      null,
+      "[Synthetic] Khu B — ô kiểm tra 04",
+      "[Synthetic] Bề mặt ô thử còn xước",
+      null,
+      null,
+      "",
+      "2026-10-10T10:00:00Z",
+      "Mới",
+      ""
+    ],
+    "summary": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")",
+    "media": {
+      "xl/media/image1.png": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+    }
+  },
+  "detail": {
+    "download_path": "/Users/khiemnguyen/Downloads/BM-GS-04 (3).xlsx",
+    "copy_path": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm04-list-detail-development-2026-10-13/BM04-detail.xlsx",
+    "bytes": 14597,
+    "sha256": "34cf76a538c9181fcfbf6a0e096821a4bee07d03b79a95b0255ce397a3ad7b23",
+    "tabs": [
+      "2026-10-09_01",
+      "Hình ảnh"
+    ],
+    "dimension": "A1:J16",
+    "headers": [
+      "STT",
+      "MÃ LỖI",
+      "VỊ TRÍ / HẠNG MỤC",
+      "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI",
+      "MỨC ĐỘ",
+      "ĐƠN VỊ PHỤ TRÁCH",
+      "ĐẠI DIỆN 24/7",
+      "THỜI HẠN",
+      "TRẠNG THÁI",
+      "GHI CHÚ"
+    ],
+    "row8": [
+      1,
+      null,
+      "[Synthetic] Khu B — ô kiểm tra 04",
+      "[Synthetic] Bề mặt ô thử còn xước",
+      null,
+      null,
+      "",
+      "2026-10-10T10:00:00Z",
+      "Mới",
+      ""
+    ],
+    "summary": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")",
+    "media": {
+      "xl/media/image1.png": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+    }
+  }
+}

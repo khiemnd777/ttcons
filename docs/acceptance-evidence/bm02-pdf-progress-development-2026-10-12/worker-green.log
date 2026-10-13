@@ -1,0 +1,228 @@
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/missing
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/null
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/blank
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/zero
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/wrapped_zero
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/nonnumeric
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/hex_float
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/underscore
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/boolean
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/wrapped_nonnumeric
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/infinite
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/nan
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/positive
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/wrapped_positive
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/numeric_text
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/negative
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/above_range
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/missing
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/null
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/blank
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/zero
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/wrapped_zero
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/nonnumeric
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/hex_float
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/underscore
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/boolean
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/wrapped_nonnumeric
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/infinite
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/nan
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/positive
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/wrapped_positive
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/numeric_text
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/negative
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/above_range
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/missing
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/null
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/blank
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/zero
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/wrapped_zero
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/nonnumeric
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/hex_float
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/underscore
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/boolean
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/wrapped_nonnumeric
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/infinite
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/nan
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/positive
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/wrapped_positive
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/numeric_text
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/negative
+=== RUN   TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/above_range
+--- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook (0.46s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/missing (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/null (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/blank (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/zero (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/wrapped_zero (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/nonnumeric (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/hex_float (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/underscore (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/boolean (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/wrapped_nonnumeric (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/infinite (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/nan (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/positive (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/wrapped_positive (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/numeric_text (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/negative (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/daily_report/above_range (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/missing (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/null (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/blank (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/zero (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/wrapped_zero (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/nonnumeric (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/hex_float (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/underscore (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/boolean (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/wrapped_nonnumeric (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/infinite (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/nan (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/positive (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/wrapped_positive (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/numeric_text (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/negative (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/work_report/above_range (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/missing (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/null (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/blank (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/zero (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/wrapped_zero (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/nonnumeric (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/hex_float (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/underscore (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/boolean (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/wrapped_nonnumeric (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/infinite (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/nan (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/positive (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/wrapped_positive (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/numeric_text (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/negative (0.01s)
+    --- PASS: TestBMGSNativeDailyWorkflowProgressAuthorityWorkbook/workflow_form/above_range (0.01s)
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Bình_thường
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Nắng_nóng
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Mưa
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Gió_mạnh
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Hạn_chế_mặt_bằng
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Khác
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Nắng
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Mưa_nhẹ_tại_công_trường
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/unknown_code
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/__Custom_weather__
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Chưa_ghi_thời_tiết
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Chưa_ghi_thời_tiết#01
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Nắng_nóng#01
+=== RUN   TestConstructionWeatherPresentationExportsPreserveSource/Chưa_ghi_thời_tiết#02
+--- PASS: TestConstructionWeatherPresentationExportsPreserveSource (0.46s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Bình_thường (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Nắng_nóng (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Mưa (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Gió_mạnh (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Hạn_chế_mặt_bằng (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Khác (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Nắng (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Mưa_nhẹ_tại_công_trường (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/unknown_code (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/__Custom_weather__ (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Chưa_ghi_thời_tiết (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Chưa_ghi_thời_tiết#01 (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Nắng_nóng#01 (0.03s)
+    --- PASS: TestConstructionWeatherPresentationExportsPreserveSource/Chưa_ghi_thời_tiết#02 (0.03s)
+=== RUN   TestConstructionWeatherPresentationPinnedOptionsAndV20Parity
+--- PASS: TestConstructionWeatherPresentationPinnedOptionsAndV20Parity (0.00s)
+=== RUN   TestWorkReportPDFRecordedProgressAuthority
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_absent
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_omitted
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_header_conflict
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_zero
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_decimal
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_numeric_string
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_json_number
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/native_daily_form
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_legacy_wrapper
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_nested_wrapper
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_wrapper_boundary
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_wrapper_overflow
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_text
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_hex
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_bool
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_range
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_negative
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_blank
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_null_wrapper
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_maximum
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/manual_zero
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/manual_header
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/manual_numeric_string
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/manual_missing
+--- PASS: TestWorkReportPDFRecordedProgressAuthority (0.26s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_absent (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_omitted (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_header_conflict (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_zero (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_decimal (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_numeric_string (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_json_number (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/native_daily_form (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_legacy_wrapper (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_nested_wrapper (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_wrapper_boundary (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_wrapper_overflow (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_text (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_hex (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_bool (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_range (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_invalid_negative (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_blank (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_null_wrapper (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/workflow_maximum (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/manual_zero (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/manual_header (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/manual_numeric_string (0.01s)
+    --- PASS: TestWorkReportPDFRecordedProgressAuthority/manual_missing (0.01s)
+=== RUN   TestWorkReportPDFPageBoundaryKeepsLabelsWithContent
+=== RUN   TestWorkReportPDFPageBoundaryKeepsLabelsWithContent/section
+=== RUN   TestWorkReportPDFPageBoundaryKeepsLabelsWithContent/summary
+=== RUN   TestWorkReportPDFPageBoundaryKeepsLabelsWithContent/verification
+--- PASS: TestWorkReportPDFPageBoundaryKeepsLabelsWithContent (0.01s)
+    --- PASS: TestWorkReportPDFPageBoundaryKeepsLabelsWithContent/section (0.00s)
+    --- PASS: TestWorkReportPDFPageBoundaryKeepsLabelsWithContent/summary (0.00s)
+    --- PASS: TestWorkReportPDFPageBoundaryKeepsLabelsWithContent/verification (0.00s)
+=== RUN   TestWorkReportPDFDateFilename
+=== RUN   TestWorkReportPDFDateFilename/2026-08-25T00:00:00Z
+=== RUN   TestWorkReportPDFDateFilename/2026-08-25
+=== RUN   TestWorkReportPDFDateFilename/2026-08-25T00:00:00.123456Z
+=== RUN   TestWorkReportPDFDateFilename/2026-08-25T18:00:00Z
+=== RUN   TestWorkReportPDFDateFilename/2026-08-25T00:00:00+07:00
+=== RUN   TestWorkReportPDFDateFilename/#00
+=== RUN   TestWorkReportPDFDateFilename/2026-02-30
+=== RUN   TestWorkReportPDFDateFilename/../../invalid
+--- PASS: TestWorkReportPDFDateFilename (0.03s)
+    --- PASS: TestWorkReportPDFDateFilename/2026-08-25T00:00:00Z (0.00s)
+    --- PASS: TestWorkReportPDFDateFilename/2026-08-25 (0.00s)
+    --- PASS: TestWorkReportPDFDateFilename/2026-08-25T00:00:00.123456Z (0.00s)
+    --- PASS: TestWorkReportPDFDateFilename/2026-08-25T18:00:00Z (0.00s)
+    --- PASS: TestWorkReportPDFDateFilename/2026-08-25T00:00:00+07:00 (0.00s)
+    --- PASS: TestWorkReportPDFDateFilename/#00 (0.00s)
+    --- PASS: TestWorkReportPDFDateFilename/2026-02-30 (0.00s)
+    --- PASS: TestWorkReportPDFDateFilename/../../invalid (0.00s)
+=== RUN   TestWorkReportPDFFixtures
+=== RUN   TestWorkReportPDFFixtures/short
+=== RUN   TestWorkReportPDFFixtures/long
+=== RUN   TestWorkReportPDFFixtures/empty
+=== RUN   TestWorkReportPDFFixtures/overflow
+=== RUN   TestWorkReportPDFFixtures/columns
+=== RUN   TestWorkReportPDFFixtures/legacy
+--- PASS: TestWorkReportPDFFixtures (0.03s)
+    --- PASS: TestWorkReportPDFFixtures/short (0.00s)
+    --- PASS: TestWorkReportPDFFixtures/long (0.01s)
+    --- PASS: TestWorkReportPDFFixtures/empty (0.01s)
+    --- PASS: TestWorkReportPDFFixtures/overflow (0.01s)
+    --- PASS: TestWorkReportPDFFixtures/columns (0.01s)
+    --- PASS: TestWorkReportPDFFixtures/legacy (0.00s)
+PASS
+ok  	consflow/backend/internal/core	1.867s

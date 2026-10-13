@@ -16,9 +16,12 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
 import { SimpleForm } from '../_shared/SimpleForm';
+import { NativeExcelExportButton } from '../_shared/NativeExcelExportButton';
 import { HandoverChecklistSourceDialog } from './HandoverChecklistSourceDialog';
 import { HandoverCreateDialog } from './HandoverCreateDialog';
 import { HandoverWorkspace } from './HandoverWorkspace';
+import { HandoverAssessmentDialog, type HandoverAssessmentAction } from './HandoverAssessmentDialog';
+import { canAssessHandover, checklistAssessmentPayload, handoverAssessmentPayload } from './handoverAssessment';
 import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 import type { ChecklistItem, FinalAcceptanceOption, HandoverDetail, HandoverRow } from './handoverTypes';
 import {
@@ -30,6 +33,7 @@ import {
 
 type HandoverAction = { type: 'checklist'; item: ChecklistItem } | { type: 'source'; item: ChecklistItem } | { type: 'complete'; record: HandoverDetail } | null;
 
+
 export function HandoverPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -40,6 +44,7 @@ export function HandoverPage() {
   const [selectedID, setSelectedID] = useState('');
   const sourceLink = useRecordDeepLink({ kind: 'handover', projectId: id, onOpen: record => { setProjectId(record.project_id); setSelectedID(record.id); } });
   const [action, setAction] = useState<HandoverAction>(null);
+  const [assessmentAction, setAssessmentAction] = useState<HandoverAssessmentAction | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const revealedSource = useRef('');
   const queryClient = useQueryClient();
@@ -90,6 +95,19 @@ export function HandoverPage() {
     onSuccess: async () => { setAction(null); await invalidate(); toast.success('Đã xác minh checklist bàn giao'); },
     onError: (error) => toast.error('Không cập nhật được checklist', error),
   });
+  const assessment = useMutation({
+    mutationFn: ({ target, recordID, values }: { target: HandoverAssessmentAction; recordID: string; values: Record<string, unknown> }) => {
+      if (target.type === 'header-assessment') return put(`/handover/${recordID}/field-assessment`, handoverAssessmentPayload(values));
+      if (target.type === 'assessment') return put(`/handover-checklist-items/${target.item.id}/field-assessment`, checklistAssessmentPayload(values));
+      return post(`/handover/${recordID}/checklist-items`, { title: String(values.title ?? '').trim(), ...checklistAssessmentPayload(values) });
+    },
+    onSuccess: async (_row, variables) => { setAssessmentAction(null); await Promise.all([invalidate(), queryClient.invalidateQueries({ queryKey: ['handover-detail', variables.recordID] })]); toast.success('Đã lưu đánh giá bàn giao'); },
+    onError: (error) => toast.error('Không lưu được đánh giá bàn giao', error),
+  });
+  useEffect(() => { setAssessmentAction(null); }, [selectedID]);
+  const openAssessment = (target: HandoverAssessmentAction) => {
+    if (detail.data && canAssessHandover(detail.data.status, canVerify)) setAssessmentAction(target);
+  };
 
   const filteredRows = statusFilter === 'all' ? rows : rows.filter((row) => row.status === statusFilter);
   const statusOptions = useMemo<FilterOption[]>(() => [
@@ -139,11 +157,15 @@ export function HandoverPage() {
     {rows.length > 1 ? <label className="mb-4 block max-w-xl"><span className="text-xs font-semibold uppercase text-slate-500">Hồ sơ đang xem</span><select className="mt-1 w-full rounded-md border border-line bg-white px-3 py-2 text-sm" value={selectedID} onChange={(event) => openHandoverDetail(event.target.value)}>{rows.map((row) => <option key={row.id} value={row.id}>{row.handover_code} · {handoverStatusLabel(row.status)}</option>)}</select></label> : null}
 
     <section ref={workspaceRef} tabIndex={-1} aria-label="Chi tiết hồ sơ bàn giao" className="mb-6 scroll-mt-20 focus:outline-none">
+      {detail.data && !detail.isLoading && !detail.error ? <div className="mb-3"><NativeExcelExportButton path={`/handover/${encodeURIComponent(detail.data.id)}/export.xlsx`} filename="BM-GS-08.xlsx" /></div> : null}
       {handovers.isLoading || detail.isLoading ? <Loading /> : handovers.error || detail.error ? <ErrorState onRetry={() => { void handovers.refetch(); void detail.refetch(); }} /> : detail.data ? <HandoverWorkspace
         detail={detail.data}
         canVerify={canVerify}
         canApprove={canApprove}
-        pending={transition.isPending}
+        pending={transition.isPending || assessment.isPending}
+        onAssessment={(item) => openAssessment({ type: 'assessment', item })}
+        onHeaderAssessment={() => openAssessment({ type: 'header-assessment' })}
+        onAddItem={() => openAssessment({ type: 'add-item' })}
         onChecklist={(item) => setAction({ type: 'checklist', item })}
         onViewSource={(item) => setAction({ type: 'source', item })}
         onSubmit={() => transition.mutate({ endpoint: `/handover/${detail.data.id}/submit`, values: { comment: 'Gửi hồ sơ bàn giao' } })}
@@ -172,8 +194,23 @@ export function HandoverPage() {
       onClose={() => setAction(null)}
     />
 
+    <HandoverAssessmentDialog
+      action={detail.data && canAssessHandover(detail.data.status, canVerify) ? assessmentAction : null}
+      detail={detail.data ?? null}
+      pending={assessment.isPending}
+      onClose={() => setAssessmentAction(null)}
+      onSave={(values) => {
+        if (!assessmentAction || !detail.data || !canAssessHandover(detail.data.status, canVerify)) return Promise.reject(new Error('Hồ sơ không cho phép cập nhật đánh giá.'));
+        return assessment.mutateAsync({ target: assessmentAction, recordID: detail.data.id, values });
+      }}
+    />
+
     <Dialog open={action?.type === 'checklist'} title="Xác minh mục checklist" description={action?.type === 'checklist' ? action.item.title : undefined} onClose={() => setAction(null)} size="lg">
       {action?.type === 'checklist' && detail.data ? <SimpleForm submitLabel="Lưu xác minh" fields={[
+        { name: 'requirement', label: 'Yêu cầu bàn giao', type: 'textarea', defaultValue: action.item.requirement ?? '' },
+        { name: 'physical_result', label: 'Kết quả kiểm tra thực tế', type: 'select', defaultValue: action.item.physical_result ?? 'not_assessed', options: [{ value: 'not_assessed', label: 'Chưa đánh giá' }, { value: 'pass', label: 'Đạt' }, { value: 'fail', label: 'Không đạt' }] },
+        { name: 'defect', label: 'Tồn tại cần xử lý', type: 'textarea', defaultValue: action.item.defect ?? '' },
+        { name: 'due_date', label: 'Hạn xử lý tồn tại', type: 'date', defaultValue: action.item.due_date?.slice(0, 10) ?? '' },
         { name: 'status', label: 'Trạng thái', type: 'select', defaultValue: action.item.status === 'verified' ? 'verified' : 'pending', required: true, options: [{ value: 'pending', label: 'Chưa xác minh' }, { value: 'verified', label: 'Đã xác minh' }] },
         { name: 'evidence_id', label: 'Minh chứng đã chấp nhận', type: 'select', defaultValue: action.item.evidence_id ?? '', options: detail.data.evidence_options.map((item) => ({ value: item.id, label: `${item.name} · ${item.evidence_type}` })) },
         { name: 'document_id', label: 'Tài liệu hồ sơ', type: 'select', defaultValue: action.item.document_id ?? '', options: detail.data.document_options.map((item) => ({ value: item.id, label: `${item.name} · ${item.document_type || 'tài liệu'}` })) },

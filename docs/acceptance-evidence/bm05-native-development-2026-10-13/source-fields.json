@@ -1,0 +1,143 @@
+[
+  {
+    "id": "2a0cc4f6-0f54-46c3-9213-4456b5ece01a",
+    "form_version_id": "96f6a564-c6f4-4ef1-96a3-4dc45a3fe9b0",
+    "field_key": "risk_items",
+    "label": "Danh sách rủi ro",
+    "field_type": "structured_list",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 100,
+      "min_items": 1,
+      "item_fields": [
+        {
+          "key": "risk",
+          "type": "textarea",
+          "label": "Rủi ro",
+          "required": true,
+          "max_length": 1000,
+          "min_length": 3
+        },
+        {
+          "key": "category",
+          "type": "select",
+          "label": "Nhóm",
+          "options": [
+            {
+              "label": "Kết cấu",
+              "value": "structure"
+            },
+            {
+              "label": "MEP",
+              "value": "mep"
+            },
+            {
+              "label": "Mặt bằng",
+              "value": "access"
+            },
+            {
+              "label": "An toàn",
+              "value": "safety"
+            },
+            {
+              "label": "Tiến độ",
+              "value": "schedule"
+            },
+            {
+              "label": "Chi phí",
+              "value": "cost"
+            },
+            {
+              "label": "Khác",
+              "value": "other"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "severity",
+          "type": "select",
+          "label": "Mức độ",
+          "options": [
+            {
+              "label": "Thấp",
+              "value": "low"
+            },
+            {
+              "label": "Trung bình",
+              "value": "medium"
+            },
+            {
+              "label": "Cao",
+              "value": "high"
+            },
+            {
+              "label": "Nghiêm trọng",
+              "value": "critical"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "mitigation",
+          "type": "textarea",
+          "label": "Hướng xử lý",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "issue_code",
+          "type": "text",
+          "label": "Mã vấn đề hoặc rủi ro",
+          "required": false,
+          "max_length": 80
+        },
+        {
+          "key": "detected_date",
+          "type": "date",
+          "label": "Ngày phát hiện thực tế",
+          "required": false
+        },
+        {
+          "key": "cause",
+          "type": "textarea",
+          "label": "Nguyên nhân",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "impact",
+          "type": "textarea",
+          "label": "Ảnh hưởng",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "owner",
+          "type": "text",
+          "label": "Người phụ trách xử lý",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "key": "due_date",
+          "type": "date",
+          "label": "Thời hạn xử lý",
+          "required": false
+        },
+        {
+          "key": "status",
+          "type": "text",
+          "label": "Tình trạng ghi nhận",
+          "required": false,
+          "max_length": 80
+        }
+      ]
+    },
+    "help_text": null,
+    "order_index": 10,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  }
+]

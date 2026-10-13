@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { useUtilityDockLauncherHost } from './UtilityDockLauncherHost';
 import {
   AlertCircle,
   ArrowRight,
@@ -100,14 +101,12 @@ export function UtilityDock() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
   const [projectToReveal, setProjectToReveal] = useState('');
-  const [mobileLauncherHost, setMobileLauncherHost] = useState<HTMLElement | null>(null);
+  const launcherHost = useUtilityDockLauncherHost();
+  const mobileLauncherHost = launcherHost?.element ?? null;
+  const iconOnlyMobileLauncher = launcherHost?.presentation === 'icon';
   const projectStripRef = useRef<HTMLDivElement>(null);
   const routeProjectID = /^\/projects\/([^/]+)/.exec(location.pathname)?.[1] ?? '';
   const standardShell = !location.pathname.startsWith('/pipeline-builder') && !routeProjectID;
-
-  useEffect(() => {
-    setMobileLauncherHost(document.getElementById('utility-dock-mobile-launcher'));
-  }, [location.pathname]);
 
   const workSummary = useQuery({
     queryKey: ['my-work-navigation-summary', actorID],
@@ -270,9 +269,9 @@ export function UtilityDock() {
   const mobileLauncher = (
     <button
       type="button"
-      className={clsx('pointer-events-auto sm:hidden', mobileLauncherHost
+      className={clsx('pointer-events-auto sm:hidden', iconOnlyMobileLauncher
         ? 'relative grid h-10 w-10 place-items-center rounded-md border border-line bg-white text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
-        : 'inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-lg hover:border-blue-200 hover:text-blue-700')}
+        : clsx('inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-700', !mobileLauncherHost && 'shadow-lg'))}
       onClick={() => {
         if (pickerOpen || mobilePanel) {
           setPickerOpen(false);
@@ -286,7 +285,7 @@ export function UtilityDock() {
       aria-expanded={Boolean(pickerOpen || mobilePanel)}
     >
       <Sparkles className="h-4 w-4 text-blue-600" />
-      {mobileLauncherHost ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-center text-[10px] font-bold leading-4 text-white">{compactCount(workCount + discussionCount)}</span>
+      {iconOnlyMobileLauncher ? <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-center text-[10px] font-bold leading-4 text-white">{compactCount(workCount + discussionCount)}</span>
         : <>Tiện ích <CountBadge value={workCount + discussionCount} /></>}
     </button>
   );

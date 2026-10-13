@@ -1,0 +1,249 @@
+{
+  "scope": "Development weather presentation; existing synthetic BM02 fixture and immutable revisions",
+  "checks": {
+    "form_entire_baseline_preserved": true,
+    "report_entire_baseline_preserved": true,
+    "receipt_entire_baseline_preserved": true,
+    "database_entire_baseline_preserved": true,
+    "same_field_definition_11_fields": true,
+    "canonical_weather_codes_retained": true,
+    "no_false_resend_eligible_from_display_change": true,
+    "built_source967_unchanged": true,
+    "journal_actual_browser_bytes": true,
+    "journal_vietnamese_weather_B6": true,
+    "journal_no_stored_cell_errors": true,
+    "journal_progress_still_unknown": true,
+    "journal_accepted_material12_preserved": true,
+    "current_actual_browser_bytes": true,
+    "current_vietnamese_weather_B6": true,
+    "current_no_stored_cell_errors": true,
+    "current_progress_still_unknown": true,
+    "current_accepted_material12_preserved": true,
+    "form_actual_browser_bytes": true,
+    "form_vietnamese_weather_B6": true,
+    "form_no_stored_cell_errors": true,
+    "form_progress_still_unknown": true,
+    "form_accepted_material12_preserved": true,
+    "form_all_cells_styles_except_weather_equal": true,
+    "form_same_archive_parts": true,
+    "form_mime_declarations_unchanged": true,
+    "form_shared_strings_only_weather_changed": true,
+    "form_every_other_archive_part_equal": true,
+    "form_worksheet_geometry_values_formulas_except_weather_equal": true,
+    "delivery3_actual_browser_bytes": true,
+    "delivery3_vietnamese_weather_B6": true,
+    "delivery3_no_stored_cell_errors": true,
+    "delivery3_progress_still_unknown": true,
+    "delivery3_accepted_material12_preserved": true,
+    "delivery3_all_cells_styles_except_weather_equal": true,
+    "delivery3_same_archive_parts": true,
+    "delivery3_mime_declarations_unchanged": true,
+    "delivery3_shared_strings_only_weather_changed": true,
+    "delivery3_every_other_archive_part_equal": true,
+    "delivery3_worksheet_geometry_values_formulas_except_weather_equal": true,
+    "pdf3_actual_browser_bytes": true,
+    "pdf3_actual_pdf_vietnamese_weather": true,
+    "pdf1_actual_browser_bytes": true,
+    "pdf1_actual_pdf_vietnamese_weather": true,
+    "delivery1_actual_browser_bytes": true,
+    "delivery1_vietnamese_weather_B6": true,
+    "delivery1_no_stored_cell_errors": true,
+    "delivery1_progress_still_unknown": true,
+    "delivery1_all_cells_styles_except_weather_equal": true,
+    "delivery1_same_archive_parts": true,
+    "delivery1_mime_declarations_unchanged": true,
+    "delivery1_shared_strings_only_weather_changed": true,
+    "delivery1_every_other_archive_part_equal": true,
+    "delivery1_worksheet_geometry_values_formulas_except_weather_equal": true,
+    "delivery2_actual_browser_bytes": true,
+    "delivery2_vietnamese_weather_B6": true,
+    "delivery2_no_stored_cell_errors": true,
+    "delivery2_progress_still_unknown": true,
+    "delivery2_all_cells_styles_except_weather_equal": true,
+    "delivery2_same_archive_parts": true,
+    "delivery2_mime_declarations_unchanged": true,
+    "delivery2_shared_strings_only_weather_changed": true,
+    "delivery2_every_other_archive_part_equal": true,
+    "delivery2_worksheet_geometry_values_formulas_except_weather_equal": true,
+    "form_google_no_effective_error": true,
+    "form_google_all_bounded_cells_formulas_equal": true,
+    "form_google_crew_recalculates": true,
+    "delivery3_google_no_effective_error": true,
+    "delivery3_google_all_bounded_cells_formulas_equal": true,
+    "delivery3_google_crew_recalculates": true,
+    "delivery1_google_no_effective_error": true,
+    "delivery1_google_all_bounded_cells_formulas_equal": true,
+    "delivery1_google_crew_recalculates": true,
+    "delivery2_google_no_effective_error": true,
+    "delivery2_google_all_bounded_cells_formulas_equal": true,
+    "delivery2_google_crew_recalculates": true
+  },
+  "files": {
+    "journal": {
+      "file": "BM02-nhat-ky-tieng-Viet.xlsx",
+      "sha256": "27b2c14c3314faeed25c9fda9f4dce94c2c0ee83d6849d02d27b8f1c3b8b8aad",
+      "bytes": 28529,
+      "weather": "Mưa"
+    },
+    "current": {
+      "file": "BM02-bao-cao-hien-tai-tieng-Viet.xlsx",
+      "sha256": "46dd72c2d10c27bf2474abc23df90be8150d3f10ff71d7e69247d7af752e4c64",
+      "bytes": 28527,
+      "weather": "Mưa"
+    },
+    "form": {
+      "file": "BM02-phieu-da-chot-tieng-Viet.xlsx",
+      "sha256": "dd5c4dd43967b8a8fba733c8d3c5f65f32038bbb473c8c43717a5db3e57833ec",
+      "bytes": 28325,
+      "changed_cells_from_prior_acceptance": [
+        "2026-10-12_01!B6"
+      ],
+      "weather": "Mưa"
+    },
+    "delivery3": {
+      "file": "BM02-lan-gui-3-tieng-Viet.xlsx",
+      "sha256": "715db6c6eab1e40170ddb447dc7f3d900f84055643634843f1fb03d569d49a9b",
+      "bytes": 28529,
+      "changed_cells_from_prior_acceptance": [
+        "2026-10-12_01!B6"
+      ],
+      "weather": "Mưa"
+    },
+    "pdf3": {
+      "file": "BM02-lan-gui-3-tieng-Viet.pdf",
+      "sha256": "c9412bc07f6796189af84756f008c20652eeef5f973f904766f77791c077c144",
+      "bytes": 32991,
+      "weather": "Mưa",
+      "pages": 1,
+      "progress_limitation": "preexisting0% for missing workflow progress"
+    },
+    "pdf1": {
+      "file": "BM02-lan-gui-1-tieng-Viet.pdf",
+      "sha256": "8575faabfbdc076983cf6df57b86bf7c2d5b2f408f924a63dfc01d15900e03ef",
+      "bytes": 32672,
+      "weather": "Nắng nóng",
+      "pages": 1,
+      "progress_limitation": "preexisting0% for missing workflow progress"
+    },
+    "delivery1": {
+      "file": "BM02-lan-gui-1-tieng-Viet.xlsx",
+      "sha256": "74a71695e60bc8800cc78958f5408222df70b1098e62c6a5b249a91e8c4f32e8",
+      "bytes": 28533,
+      "changed_cells_from_prior_acceptance": [
+        "2026-10-12_01!B6"
+      ],
+      "weather": "Nắng nóng"
+    },
+    "delivery2": {
+      "file": "BM02-lan-gui-2-tieng-Viet.xlsx",
+      "sha256": "f3c233e8f3604da483f2f5f6ae86af7a7817b37908d1dd0165ca81371c71c24b",
+      "bytes": 28257,
+      "changed_cells_from_prior_acceptance": [
+        "2026-10-12_01!B6"
+      ],
+      "weather": "Mưa"
+    }
+  },
+  "google": [
+    {
+      "phase": "form",
+      "url": "https://docs.google.com/spreadsheets/d/1br9QZFpTK7v4AOmNTY8THTKqlqwLICQIWYvKeFg7Xro/edit",
+      "populated_cells": 98,
+      "errors": 0,
+      "crew_sum": 6,
+      "weather": "Mưa"
+    },
+    {
+      "phase": "delivery3",
+      "url": "https://docs.google.com/spreadsheets/d/1h7BIvfC5ien2x9e4qcRPJAwMEqYT9I9HiLN7dpvCY1Y/edit",
+      "populated_cells": 102,
+      "errors": 0,
+      "crew_sum": 6,
+      "weather": "Mưa"
+    },
+    {
+      "phase": "delivery1",
+      "url": "https://docs.google.com/spreadsheets/d/17bq9kvEavPMIVyiKXQsYI_r8IrsmaNpBbrSEeoKUTLk/edit",
+      "populated_cells": 96,
+      "errors": 0,
+      "crew_sum": 3,
+      "weather": "Nắng nóng"
+    },
+    {
+      "phase": "delivery2",
+      "url": "https://docs.google.com/spreadsheets/d/1QGyy5VfLG0xV-twrdldA-7D4Xk9dOXUA5heyfgjszxo/edit",
+      "populated_cells": 96,
+      "errors": 0,
+      "crew_sum": 6,
+      "weather": "Mưa"
+    }
+  ],
+  "source": {
+    "captured_at": "2026-10-12T08:19:36.037914+00:00",
+    "head": "75dc44707785d399ed2408959bf784928a544e96",
+    "file_count": 967,
+    "manifest_sha256": "661b896336d710b19183e2c6d9763b6d6848fbe1c0beae0c07cc8dfcfedfe317",
+    "changed_existing_files": [
+      "backend/internal/core/bm_gs_export_projection.go",
+      "backend/internal/core/work_report_pdf.go",
+      "frontend/src/modules/operations/ConstructionActionDialogs.tsx",
+      "frontend/src/modules/operations/ConstructionCheckDialogs.tsx",
+      "frontend/src/modules/operations/ConstructionReportDetailDialog.tsx",
+      "frontend/src/modules/operations/OperationsPage.tsx",
+      "frontend/src/modules/work-reports/WorkReportReviewDialog.tsx"
+    ],
+    "new_files": [
+      "backend/internal/core/construction_weather_presentation.go",
+      "backend/internal/core/construction_weather_presentation_test.go",
+      "frontend/src/modules/operations/constructionWeatherPresentation.ts",
+      "frontend/tests/constructionWeatherPresentation.test.ts"
+    ],
+    "missing_files": []
+  },
+  "database": {
+    "name": "consflow",
+    "migration_count": 157,
+    "projects": 6,
+    "forms": 21,
+    "business_tables_equal": 13
+  },
+  "images": {
+    "01-journal-mua.jpg": "21461f4cfcce69067bade29803f745aeb9ddd239c44e8aeeee6ad2ec0d2eb935",
+    "02-current-report-mua.jpg": "3b24e7299338c4fc1246c555010411a48468d5273691174693d4db6c02282817",
+    "03-form-export.jpg": "8c6fc17e0d3c23164ec62f430bb9dc01e1a95689b8d643490b53c56c5b947d21",
+    "04-pinned-form-weather.jpg": "96b061a1103979c74b757bc2e481b729daec3fc5b4db142fbb3990259b7fa296",
+    "05-delivery3-mua.jpg": "fd9fcd170828e9341af5c3cf3f13ec0b246e96b50c2e6d970105caf7c5425775",
+    "06-delivery1-nang-nong.jpg": "86ca9bd99a0a2109e149648607867a5da09425e536cf54a747e40c1ac4b4e91a",
+    "06a-delivery1-nang-nong-header.jpg": "df6a26d0f66582f2241c8d2486db194ef08f215ce1dffc24df01f0514d932ee0",
+    "06b-old1-weather-visible.jpg": "3235f1f3ea97a89e35c6e19fd65ae6ee2140e9c6ce3754457077e48ecbf8b5d8",
+    "07-delivery2-mua.jpg": "c6a2971f4898e47718add7b22da58a4e90aab196594aae13ad3388a08ea33c22",
+    "07a-delivery2-mua-header.jpg": "d0aff5ba8ca41eec22ffc95abcf0ecaa0df192c4153c67a4a6e25b98eb3c98a7",
+    "08-mobile-old1-nang-nong.jpg": "ba8034419e5102ee5b48475ebafe26152d00d600d82b488815714269c7d213b9",
+    "08b-mobile-weather-visible.jpg": "b7aec99e67ba7226a673b6d6b263e82883d16f7c62873bc97add5798cf8fb13a",
+    "09-current3-header.jpg": "d77c0fa118979358e53864f1288f4be5321075f136595ab86d053cf5fd717957",
+    "10-google-delivery3-main.jpg": "0de22c901a0b6bc7b6bd9f268a602c355ef07b00202fb0d58d78291aacc6567c",
+    "11-google-delivery3-material.jpg": "af308478db84fc308f5c1427fa815a13bacb60eb5ebc137c69c3b02d76c27d8e",
+    "12-google-delivery3-lower.jpg": "914dc38a347f79231821bc898b9db8c5c3c5d10bf0ee5860d42216ae732252d4",
+    "13-google-delivery3-photo.jpg": "86d4f7dfeca06747e1dcb5ec5cbc96096206d05c95d531b64cc69d5127f0ee42",
+    "14-google-form-main.jpg": "cb19d7217c47524347a6f73ac4e1984882573088c4f1b4ed77956d9e0c8e373e",
+    "15-google-form-material.jpg": "310ec9d355be1fa45ace9150926941f8421f29c4da1a3d4ef5ab122b3da8f0bb",
+    "16-google-form-lower.jpg": "24be7b93d64888a733d8e79ab2e86e3038666faf6ef71b23173c9c3d38945dab",
+    "17-google-form-photo.jpg": "2094be2192ae2c337244459152a12ea9263987908f8258c0ce98aeb42c96114e",
+    "18-google-old1-main.jpg": "294f694b13d166f6ce693d0938c50a21fff9cf40118c18b7b16222e524e72e92",
+    "19-google-old1-material.jpg": "654b765929880d077f771f5c9f3e910a75420f2d6d76e001393b31f98eaa9b7d",
+    "20-google-old1-lower.jpg": "6a6f3b1611758241114ea597c1e8b4800b447ba5b213c0c7ff64a8fe96c2b799",
+    "21-google-old1-photo.jpg": "d3f240af2b89d16deebb3cecc659a9580c61db4f2e21014d9f07f59ae8a2c54d",
+    "22-google-old2-main.jpg": "fd5e324995828c600c3d4ac2c0e1357bfc611f8d2ba143edb4018c5a2b7e4f11",
+    "23-google-old2-material.jpg": "577157d735b9142f4db47f3dc58aaf1e503ae03a0ce8db24aaaa277bebea55c5",
+    "24-google-old2-lower.jpg": "b9cae75923d5ab3bf99b696fed438892dc8a5e3c4f65b1b74fd3bc0d57f77e7a",
+    "25-google-old2-photo.jpg": "ec6d96ba1acd9c5465c8ea42e95ce2655ad988794ebf20450df10bf8e757f5f6",
+    "30-pdf1-nang-nong.png": "1952768be6e11669ffcaf9c1c0a526683bc2f9de86250db4e9dffd8754be314e",
+    "31-pdf3-mua.png": "76ed2e8ca751c86650a21f4047de4c58c0923ebe8016106c54fb0cd719f7e3c8"
+  },
+  "criteria": {
+    "weather_UI_XLSX_PDF": "TECHNICALLY VERIFIED; user review pending",
+    "stored_history_no_new_field": "PASS",
+    "prior_material_mapping_preserved": "PASS",
+    "PDF_progress": "separate preexisting0% issue, unapproved follow-up"
+  }
+}

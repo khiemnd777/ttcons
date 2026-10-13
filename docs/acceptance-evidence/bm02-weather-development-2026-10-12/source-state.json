@@ -1,0 +1,22 @@
+{
+  "captured_at": "2026-10-12T08:19:36.037914+00:00",
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "file_count": 967,
+  "manifest_sha256": "661b896336d710b19183e2c6d9763b6d6848fbe1c0beae0c07cc8dfcfedfe317",
+  "changed_existing_files": [
+    "backend/internal/core/bm_gs_export_projection.go",
+    "backend/internal/core/work_report_pdf.go",
+    "frontend/src/modules/operations/ConstructionActionDialogs.tsx",
+    "frontend/src/modules/operations/ConstructionCheckDialogs.tsx",
+    "frontend/src/modules/operations/ConstructionReportDetailDialog.tsx",
+    "frontend/src/modules/operations/OperationsPage.tsx",
+    "frontend/src/modules/work-reports/WorkReportReviewDialog.tsx"
+  ],
+  "new_files": [
+    "backend/internal/core/construction_weather_presentation.go",
+    "backend/internal/core/construction_weather_presentation_test.go",
+    "frontend/src/modules/operations/constructionWeatherPresentation.ts",
+    "frontend/tests/constructionWeatherPresentation.test.ts"
+  ],
+  "missing_files": []
+}

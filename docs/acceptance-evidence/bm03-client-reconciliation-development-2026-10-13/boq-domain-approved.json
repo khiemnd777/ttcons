@@ -1,0 +1,9 @@
+{
+  "action": "approve",
+  "from_status": "submitted",
+  "from_statuses": [
+    "submitted"
+  ],
+  "item_count": 1,
+  "to_status": "approved"
+}

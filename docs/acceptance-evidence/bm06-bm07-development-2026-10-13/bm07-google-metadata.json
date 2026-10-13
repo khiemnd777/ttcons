@@ -1,0 +1,34 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1aDiTayUB-5mA-yiFRsdZgcdfckP_Ctt3oh73PFrdkE0",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1aDiTayUB-5mA-yiFRsdZgcdfckP_Ctt3oh73PFrdkE0/edit",
+    "properties": {
+      "title": "BM07 — Sổ minh chứng 3 ảnh trong ô — Development 13-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 662639595,
+          "title": "BM-GS-07",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        }
+      }
+    ]
+  },
+  "isError": false
+}

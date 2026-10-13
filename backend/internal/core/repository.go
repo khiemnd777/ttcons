@@ -330,7 +330,7 @@ func safeTable(table string) string {
 		"boq_items", "supplier_quotations", "procurement_requests", "procurement_request_items", "contracts", "warehouses", "materials", "stock_movements",
 		"site_material_balances", "operation_daily_reports", "issues", "acceptance_records", "acceptance_checklist_items",
 		"construction_check_templates", "construction_checks", "construction_action_items", "construction_action_events",
-		"rework_requests", "replanning_requests", "handover_records", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
+		"rework_requests", "replanning_requests", "handover_records", "handover_checklist_items", "documents", "audit_logs", "system_settings", "staff", "roles", "permissions",
 		"role_permissions", "user_roles", "users", "work_items", "work_item_assignments", "work_item_activities",
 		"evidence_records", "workflow_form_templates", "workflow_form_versions", "workflow_form_fields",
 		"workflow_form_instances", "workflow_form_answers", "workflow_form_events", "workflow_form_signatures",

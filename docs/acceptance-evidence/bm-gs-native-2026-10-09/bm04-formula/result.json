@@ -1,0 +1,49 @@
+{
+  "status": "BOUNDED_SYNTHETIC_GOOGLE_ACCEPTANCE_PASS",
+  "checked_at_utc": "2026-10-09T03:15:07.403507+00:00",
+  "source_drift": [],
+  "downloads_unchanged": true,
+  "source_ids": {
+    "project": "4ce66435-2632-45fe-abef-309513530b1b",
+    "action": "07a961eb-0ad5-4ed4-b856-b2c7bcf6dad6"
+  },
+  "google": {
+    "list": {
+      "id": "1fSmgCgoDHF817aj1ufThkQAQJ9f06NByHIbfzutmcPw",
+      "sheet_id": 942974765,
+      "summary": {
+        "formattedValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1",
+        "userEnteredValue": {
+          "formulaValue": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")"
+        },
+        "effectiveValue": {
+          "stringValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1"
+        }
+      },
+      "visual_zoom": "100%",
+      "bounded_errors": 0,
+      "source_rows": 1,
+      "blank_fault_codes": 1,
+      "unchanged_photo_appendix_rendered": true
+    },
+    "detail": {
+      "id": "1CriW5NVIc0HBr2YFkJZBQ2ZFj9piiQeA_fW4v4stT6U",
+      "sheet_id": 1412500197,
+      "summary": {
+        "formattedValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1",
+        "userEnteredValue": {
+          "formulaValue": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")"
+        },
+        "effectiveValue": {
+          "stringValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1"
+        }
+      },
+      "visual_zoom": "100%",
+      "bounded_errors": 0,
+      "source_rows": 1,
+      "blank_fault_codes": 1,
+      "unchanged_photo_appendix_rendered": true
+    }
+  },
+  "remaining": "BM03/BM08 gaps, full other-template acceptance, Microsoft Excel/print and real-site acceptance outside this repair"
+}

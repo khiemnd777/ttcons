@@ -1,0 +1,158 @@
+{
+  "scope": "Development selected-revision PDF recorded progress; source/snapshot data preserved, existing export audit retained",
+  "checks": {
+    "database_entire_baseline_unchanged": true,
+    "form_entire_baseline_unchanged": true,
+    "report_entire_baseline_unchanged": true,
+    "receipt_entire_baseline_unchanged": true,
+    "manual-report_entire_baseline_unchanged": true,
+    "built_source_manifest_unchanged": true,
+    "workflow3_actual_browser_bytes": true,
+    "workflow3_expected_progress_text": true,
+    "workflow3_expected_weather_text": true,
+    "workflow3_no_false_zero_progress": true,
+    "workflow3_revision_number": true,
+    "workflow3_exact_revision_hash_in_pdf": true,
+    "workflow3_prior_pdf_text_only_missing_progress_label_changed": true,
+    "workflow1_actual_browser_bytes": true,
+    "workflow1_expected_progress_text": true,
+    "workflow1_expected_weather_text": true,
+    "workflow1_no_false_zero_progress": true,
+    "workflow1_revision_number": true,
+    "workflow1_exact_revision_hash_in_pdf": true,
+    "workflow1_prior_pdf_text_only_missing_progress_label_changed": true,
+    "manual2_actual_browser_bytes": true,
+    "manual2_expected_progress_text": true,
+    "manual2_expected_weather_text": true,
+    "manual2_revision_number": true,
+    "manual2_exact_revision_hash_in_pdf": true,
+    "manual1_actual_browser_bytes": true,
+    "manual1_expected_progress_text": true,
+    "manual1_expected_weather_text": true,
+    "manual1_revision_number": true,
+    "manual1_exact_revision_hash_in_pdf": true,
+    "workflow3_bm02_actual_browser_bytes": true,
+    "workflow3_bm02_all_values_styles_unchanged": true,
+    "workflow3_bm02_sheet_names_merges_unchanged": true,
+    "workflow3_bm02_embedded_media_unchanged": true,
+    "manual2_bm02_actual_browser_bytes": true,
+    "manual2_bm02_all_values_styles_unchanged": true,
+    "manual2_bm02_sheet_names_merges_unchanged": true,
+    "manual2_bm02_embedded_media_unchanged": true,
+    "workflow_absent_generated_test_pdf_text": true,
+    "workflow_zero_generated_test_pdf_text": true,
+    "workflow_decimal_generated_test_pdf_text": true,
+    "manual_zero_generated_test_pdf_text": true,
+    "workflow_wrapper_boundary_generated_test_pdf_text": true,
+    "workflow_wrapper_overflow_generated_test_pdf_text": true
+  },
+  "files": {
+    "workflow3": {
+      "file": "PDF-quy-trinh-lan-3.pdf",
+      "sha256": "0b9193bbf07d1dda0aae4db703e8720107dd5efb40bda466a1ee617536645ee8",
+      "bytes": 33105,
+      "pages": 1,
+      "expected_progress": "Chưa ghi tiến độ"
+    },
+    "workflow1": {
+      "file": "PDF-quy-trinh-lan-1.pdf",
+      "sha256": "7f34bef7144b09d6d8d9530f808244b1bb61e043a7bce2c01ceb595a5a7a64d5",
+      "bytes": 32780,
+      "pages": 1,
+      "expected_progress": "Chưa ghi tiến độ"
+    },
+    "manual2": {
+      "file": "PDF-thu-cong-lan-2-60.pdf",
+      "sha256": "660004d78f82d5d9e526e68c0947821814f32ce4118701447f57d7479463533e",
+      "bytes": 33490,
+      "pages": 1,
+      "expected_progress": "60%"
+    },
+    "manual1": {
+      "file": "PDF-thu-cong-lan-1-25.pdf",
+      "sha256": "b4fc32434ac1cda948ba52aeb434e6f7f67aafa94670b562adacc056215bf004",
+      "bytes": 33430,
+      "pages": 1,
+      "expected_progress": "25%"
+    }
+  },
+  "bm02_parity": {
+    "workflow3": {
+      "file": "BM02-quy-trinh-lan-3-doi-chieu.xlsx",
+      "progress_D10": "Chưa có ghi nhận tiến độ trong nguồn báo cáo.",
+      "weather_B6": "Mưa",
+      "quantity_G26": "12.000"
+    },
+    "manual2": {
+      "file": "BM02-thu-cong-lan-2-doi-chieu.xlsx",
+      "progress_D10": "60%",
+      "weather_B6": "[Synthetic] Mưa — Lần 2",
+      "quantity_G26": null
+    }
+  },
+  "test_pdf_scope": {
+    "workflow_absent": {
+      "file": "test-progress-workflow_absent.pdf",
+      "sha256": "dbf527f3122cf59034472e48f3397c2f5e1c961642ede7b7cb8fd9b803a525d2",
+      "label": "Chưa ghi tiến độ",
+      "scope": "generated pure-test PDF; not browser download or Development record"
+    },
+    "workflow_zero": {
+      "file": "test-progress-workflow_zero.pdf",
+      "sha256": "0f6eca01c19a36c08c7ce85b870e15a982ea5621e2f22de59b545d3aa349235f",
+      "label": "0%",
+      "scope": "generated pure-test PDF; not browser download or Development record"
+    },
+    "workflow_decimal": {
+      "file": "test-progress-workflow_decimal.pdf",
+      "sha256": "48314789da23228ff7a2cde8371e61f3947a49ec4a0da34a1bae5bc267a96663",
+      "label": "42.5%",
+      "scope": "generated pure-test PDF; not browser download or Development record"
+    },
+    "manual_zero": {
+      "file": "test-progress-manual_zero.pdf",
+      "sha256": "0f6eca01c19a36c08c7ce85b870e15a982ea5621e2f22de59b545d3aa349235f",
+      "label": "0%",
+      "scope": "generated pure-test PDF; not browser download or Development record"
+    },
+    "workflow_wrapper_boundary": {
+      "file": "test-progress-workflow_wrapper_boundary.pdf",
+      "sha256": "3b82c18156d70b997c0c79faa996647b1dfde7a043674c6ad65e4b696918f47f",
+      "label": "0%",
+      "scope": "generated pure-test PDF; not browser download or Development record"
+    },
+    "workflow_wrapper_overflow": {
+      "file": "test-progress-workflow_wrapper_overflow.pdf",
+      "sha256": "dbf527f3122cf59034472e48f3397c2f5e1c961642ede7b7cb8fd9b803a525d2",
+      "label": "Chưa ghi tiến độ",
+      "scope": "generated pure-test PDF; not browser download or Development record"
+    }
+  },
+  "images": {
+    "01-workflow-current-detail.jpg": "603701ad2c281f7f4294d486374a896340694159fb25624aecceea140123c9ce",
+    "02-workflow-pdf-buttons.jpg": "7db7387c8c04f0054c59ed4a6b9210ca0cb0ba96f2d9c2b2f0bca7ce907d1587",
+    "03-workflow-old1-detail.jpg": "f35db41456bf35efe46b1522586f78cac9f1f3ce2beab52cf2b1c71651dfe990",
+    "04-manual-current-60-detail.jpg": "95ece0a5dbb6f5da974082361e54cc4bdf77a9714132ca8a458361d9951099df",
+    "05-manual-pdf-buttons.jpg": "1c5f866f462dc8afc4015580eb823bf96414e275c413a350257ecc96f51fef6a",
+    "06-manual-old1-25-detail.jpg": "268642035eb74db21d9f163757c3080eaf970d5dfd59de3cf5fbcf60a1fd7bb2",
+    "10-render-manual1.png": "f8da6b398421b190a9483dae081e3e2413b0769f84dbdc0592a76aa82ece1845",
+    "10-render-manual2.png": "fc27946d6223122596807f93fb84a7e94a85ceb5a6b85f89d0beabfc57498170",
+    "10-render-test-decimal.png": "ad3a1e1082ad88bc4eba566cee2d2dab1d550ba03d68f58d213940f963c04af2",
+    "10-render-test-zero.png": "9b60503fb33cd7b726feb8e90272743fb396d49682cfb28fcd5b1c189a26b0d4",
+    "10-render-workflow1.png": "6fea9f070cff0240cde64aad4c77eb2e82073e050f2568d34afa544cbe79a5cc",
+    "10-render-workflow3.png": "d4ea7cf9a59eb6d97424f9bf93eab0cdfcaa2736cb1d754c609a952215b473a1"
+  },
+  "source": {
+    "captured_at": "2026-10-12T10:36:45.093278+00:00",
+    "head": "75dc44707785d399ed2408959bf784928a544e96",
+    "file_count": 968,
+    "manifest_sha256": "fb82303bd2a8a0ea4fc46f3424c082c18030f6a90d66a03bc54ea7b3095bd011",
+    "changed_existing_files": [
+      "backend/internal/core/bm_gs_export_projection.go",
+      "backend/internal/core/work_report_pdf.go"
+    ],
+    "new_files": [
+      "backend/internal/core/work_report_pdf_progress_test.go"
+    ]
+  }
+}

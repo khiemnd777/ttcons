@@ -1,0 +1,119 @@
+Browser tab: 334096846, Title: "BM02-FORM Development — Xuất báo cáo — 09-10-2026 - Google Sheets", URL: "https://docs.google.com/spreadsheets/d/13pejlEkLQZNC-cDsf5xmey4__PNxfCavd2t8w9P7bWk/edit?gid=819199416#gid=819199416".
+1 AXWebArea BM02-FORM Development — Xuất báo cáo — 09-10-2026 - Google Sheets, URL: docs.google.com/spreadsheets/d/13pejlEkLQZNC-cDsf5xmey4__PNxfCavd2t8w9P7bWk/edit?gid=819199416#gid=819199416
+	2 container
+		3 container Description: Menu bar, ID: docs-chrome
+			4 container docs-header
+				5 link Description: Sheets home, Value: docs.google.com/spreadsheets/u/0/?authuser=0&usp=sheets_web, ID: docs-branding-logo-link
+				6 container docs-titlebar-container
+					7 container BM02-FORM Development — Xuất báo cáo — 09-10-2026
+						8 container docs-title-widget
+							9 text BM02-FORM Development — Xuất báo cáo — 09-10-2026
+							10 text field (settable) Description: Rename, Value: BM02-FORM Development — Xuất báo cáo — 09-10-2026
+						11 checkbox Description: Star, Value: 0, ID: docs-star
+						12 button Description: Document status: Saved to Drive., ID: docs-save-indicator-badge
+							13 text Saved to Drive
+					14 container
+						15 button Description: Last edit was 10 minutes ago, ID: docs-revisions-appbarbutton
+						16 checkbox Description: Show all comments, Value: 0, ID: docs-docos-commentsbutton
+						17 container docs-titlebar-share-client-button
+							18 button Share. Private to only me. 
+								19 text Share
+							20 pop up button (collapsed) Description: Quick sharing actions, ID: scb-quick-actions-menu-button, Secondary Actions: Expand
+						21 link Upgrade
+							22 text Upgrade
+						23 pop up button (collapsed) Description: Google Account: Khiêm Nguyễn (khiemnd777@gmail.com), Secondary Actions: Expand
+			24 container docs-bars
+				25 container docs-menubars
+					26 menu bar docs-menubar
+						27 (collapsed) File, ID: docs-file-menu, Secondary Actions: Expand
+						28 (collapsed) Edit, ID: docs-edit-menu, Secondary Actions: Expand
+						29 (collapsed) View, ID: docs-view-menu, Secondary Actions: Expand
+						30 (collapsed) Insert, ID: docs-insert-menu, Secondary Actions: Expand
+						31 (collapsed) Format, ID: docs-format-menu, Secondary Actions: Expand
+						32 (collapsed) Data, ID: w183, Secondary Actions: Expand
+						33 (collapsed) Tools, ID: docs-tools-menu, Secondary Actions: Expand
+						34 (collapsed) Extensions, ID: docs-extensions-menu, Secondary Actions: Expand
+						35 (collapsed) Help, ID: docs-help-menu, Secondary Actions: Expand
+				36 container docs-toolbar-wrapper
+					37 container docs-primary-toolbars
+						38 toolbar Description: Search the menus (Option+/), ID: docs-omnibox-toolbar
+							39 container
+								40 combo box (settable) Menus
+						41 toolbar Description: Main, ID: docs-toolbar
+							42 button Description: Undo (⌘Z), ID: t-undo
+							43 button Description: Redo (⌘Y), ID: t-redo
+							44 button Description: Print (⌘P), ID: t-print
+							45 checkbox Description: Paint format, Value: 0, ID: t-paintformat
+							46 combo box (collapsed) Description: Zoom, ID: t-zoom, Secondary Actions: Expand
+								47 container
+									48 container Description: Zoom list. 100% selected., ID: :2h
+										49 text field (settable) Description: Zoom, Value: 100%
+							50 button Description: Format as currency, ID: t-num-fmt-currency
+								51 text $
+							52 button Description: Format as percent, ID: t-num-fmt-percent
+								53 text %
+							54 button Description: Decrease decimal places, ID: t-num-fmt-decimal-decrease
+							55 button Description: Increase decimal places, ID: t-num-fmt-decimal-increase
+							56 button (collapsed) Description: More formats, ID: t-num-fmt-other, Secondary Actions: Expand
+								57 text 123
+							58 list Description: Font, ID: docs-font-family
+								59 container
+									60 (selected) Value: Font list. Calibri selected., ID: :2r
+							61 button Description: Decrease font size (⌘+Shift+comma), ID: fontSizeDecrement
+							62 combo box (collapsed) Description: Font size, ID: fontSizeSelect, Secondary Actions: Expand
+								63 container Description: Font size list. 14 selected., ID: :2w
+									64 text field (settable) Description: Font size, Value: 14
+							65 button Description: Increase font size (⌘+Shift+period), ID: fontSizeIncrement
+							66 checkbox Description: Bold (⌘B), Value: 1, ID: t-bold
+							67 checkbox Description: Italic (⌘I), Value: 0, ID: t-italic
+							68 checkbox Description: Strikethrough (⌘+Shift+X), Value: 0, ID: t-strikethrough
+							69 pop up button (collapsed) Description: Text color, ID: t-text-color, Secondary Actions: Expand
+							70 pop up button (collapsed) Description: Fill color, ID: t-cell-color, Secondary Actions: Expand
+							71 pop up button (collapsed) Description: Borders, ID: t-border, Secondary Actions: Expand
+							72 checkbox Description: Merge cells, Value: 1, ID: t-merge-button
+							73 button (collapsed) Description: Select merge type, ID: t-merge-menu, Secondary Actions: Expand
+							74 pop up button (collapsed) Description: Horizontal align, ID: t-align, Secondary Actions: Expand
+							75 pop up button (collapsed) Description: Vertical align, ID: t-valign, Secondary Actions: Expand
+							76 pop up button (collapsed) Description: Text wrapping, ID: t-textwrap, Secondary Actions: Expand
+							77 pop up button (collapsed) Description: Text rotation, ID: t-text-rotation, Secondary Actions: Expand
+							78 button Description: Insert link (⌘K), ID: t-insert-link
+							79 button Description: Insert comment (⌘+Option+M), ID: t-insert-doco
+							80 button Description: Insert chart, ID: t-insert-chart
+							81 checkbox Description: Create a filter, Value: 0, ID: t-autofilter-toggle
+							82 pop up button (collapsed) Description: Filter views, ID: t-autofilter-menu, Secondary Actions: Expand
+							83 pop up button (collapsed) Description: Functions, ID: t-formula, Secondary Actions: Expand
+					84 toolbar Description: Mode and view, ID: docs-side-toolbar
+						85 button Description: Hide the menus (Ctrl+Shift+F), ID: viewModeButton
+			86 container Side panel
+			87 container docs-additional-bars
+				88 container formula-bar-name-box-wrapper
+					89 container Name box (⌘ + J)
+						90 text field (settable) Value: A1:H1, ID: t-name-box
+						91 pop up button (collapsed) Description: Name box menu button. Select one of the menu items to navigate to its corresponding named range., ID: t-name-box-dropdown, Secondary Actions: Expand
+					92 text entry area (settable) CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM
+
+						93 text CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM
+		94 container docs-editor
+			95 container 819199416-grid-container
+				96 container 819199416-static-overlay-container
+			97 container Sheet tab bar
+				98 toolbar
+					99 button Description: Add Sheet, ID: :e
+					100 pop up button (collapsed) Description: All Sheets, ID: :f, Secondary Actions: Expand
+				101 toolbar
+					102 pop up button (collapsed) 2026-10-09_01, ID: :z, Secondary Actions: Expand
+						103 container
+							104 text 2026-10-09_01
+					105 pop up button (collapsed) Hình ảnh, ID: :1g, Secondary Actions: Expand
+						106 container
+							107 text Hình ảnh
+		108 text entry area (settable) ID: waffle-rich-text-editor, Value: 
+
+
+		109 link Description: Turn on screen reader support, Value: docs.google.com/spreadsheets/d/13pejlEkLQZNC-cDsf5xmey4__PNxfCavd2t8w9P7bWk/edit?gid=819199416#, ID: docs-a11y-aria-enable
+		110 text entry area (settable)
+		111 text To enable screen reader support, press ⌘+Option+Z To learn about keyboard shortcuts, press ⌘slash
+		112 text Banner hidden
+
+The focused UI element is 108 text entry area (settable) ID: waffle-rich-text-editor, Value: 
+

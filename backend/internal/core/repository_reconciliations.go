@@ -17,6 +17,7 @@ func (r *Repository) GetSubcontractorReconciliation(ctx context.Context, workIte
 		LEFT JOIN users submitted ON submitted.id=scr.submitted_by
 		LEFT JOIN users updated ON updated.id=scr.updated_by
 		WHERE scr.work_item_id=$1
+		ORDER BY scr.created_at DESC,scr.id DESC LIMIT 1
 	`, workItemID)
 	if err != nil {
 		return nil, err
@@ -44,7 +45,7 @@ func (r *Repository) GetSubcontractorReconciliation(ctx context.Context, workIte
 	return reconciliation, nil
 }
 
-func (r *Repository) SaveSubcontractorReconciliation(ctx context.Context, item Record, form Record, comment string, items []Record, summary Record, submit bool, actorID, actorName string) error {
+func (r *Repository) SaveSubcontractorReconciliation(ctx context.Context, item Record, form Record, comment string, items []Record, summary Record, submit bool, actorID, actorName string, precondition ...string) error {
 	workItemID := cleanID(item["id"])
 	projectID := cleanID(item["project_id"])
 	instance, _ := form["instance"].(Record)
@@ -69,15 +70,34 @@ func (r *Repository) SaveSubcontractorReconciliation(ctx context.Context, item R
 		return err
 	}
 	defer tx.Rollback()
+	client := isClientSubcontractorChecklistForm(form)
+	if client {
+		instance, err = lockClientSubcontractorSource(ctx, tx, item, instance)
+		if err != nil {
+			return err
+		}
+	}
 
 	existingRows, err := queryTx(ctx, tx, `
 		SELECT *
 		FROM subcontractor_checklist_reconciliations
-		WHERE work_item_id=$1
+		WHERE work_item_id=$1 AND ($2=false OR (project_id=$3 AND form_instance_id=$4 AND form_revision_no=$5))
 		FOR UPDATE
-	`, workItemID)
+	`, workItemID, client, projectID, formInstanceID, formRevisionNo)
 	if err != nil {
 		return err
+	}
+	if client {
+		var ledger Record
+		if len(existingRows) > 0 {
+			ledger = existingRows[0]
+		}
+		if len(precondition) == 0 || precondition[0] == "" {
+			return StatusError{Status: 428, Code: "PRECONDITION_REQUIRED", Message: "Tải lại đối soát trước khi lưu"}
+		}
+		if precondition[0] != subcontractorReconciliationPrecondition(instance, ledger) {
+			return StatusError{Status: 412, Code: "PRECONDITION_FAILED", Message: "Đối soát đã thay đổi. Nội dung đang nhập vẫn được giữ; hãy tải lại trước khi lưu."}
+		}
 	}
 	reconciliationID := ""
 	if len(existingRows) > 0 {

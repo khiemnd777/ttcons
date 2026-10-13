@@ -1,0 +1,20 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "success": true,
+    "converted": true,
+    "fileId": "10LVtY38c6GjaDcD5TDWVtTZnRs8dO0PE-BQdlNXNDWA",
+    "title": "BM06 — Chi tiết Nhật ký — Development 13-10-2026",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "url": "https://docs.google.com/spreadsheets/d/10LVtY38c6GjaDcD5TDWVtTZnRs8dO0PE-BQdlNXNDWA/edit?usp=drivesdk",
+    "spreadsheetId": "10LVtY38c6GjaDcD5TDWVtTZnRs8dO0PE-BQdlNXNDWA",
+    "parentId": null,
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/10LVtY38c6GjaDcD5TDWVtTZnRs8dO0PE-BQdlNXNDWA"
+  },
+  "isError": false
+}

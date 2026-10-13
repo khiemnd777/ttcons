@@ -1,0 +1,21 @@
+RED evidence excerpt copied from the initial tool execution before the source fix.
+Command: python3 /private/tmp/consflow-bm02-receipt-test-runner.py test ./internal/core -run '^TestWorkReportPDFRecordedProgressAuthority$' -count=1 -v
+Environment: existing dedicated test database/cache runner; pure PDF regression wrote no database data.
+
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_absent
+    work_report_pdf_progress_test.go:57: PDF lacks progress label "Chưa ghi tiến độ"
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_header_conflict
+    work_report_pdf_progress_test.go:57: PDF lacks progress label "Chưa ghi tiến độ"
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_zero
+    work_report_pdf_progress_test.go:57: PDF lacks progress label "0%"
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_decimal
+    work_report_pdf_progress_test.go:57: PDF lacks progress label "42.5%"
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_numeric_string
+    work_report_pdf_progress_test.go:57: PDF lacks progress label "35%"
+=== RUN   TestWorkReportPDFRecordedProgressAuthority/workflow_legacy_wrapper
+    work_report_pdf_progress_test.go:57: PDF lacks progress label "0%"
+--- PASS: TestWorkReportPDFRecordedProgressAuthority/manual_zero (0.01s)
+--- PASS: TestWorkReportPDFRecordedProgressAuthority/manual_header (0.01s)
+FAIL
+FAIL	consflow/backend/internal/core	0.943s
+FAIL

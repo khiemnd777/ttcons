@@ -1,0 +1,20 @@
+# BM05 — Independent High audit, 2026-10-13
+
+**Finding P2 / NOT UX ACCEPTED:** B5 chỉ dùng cột B rộng12, không merge, nhưng renderer bật wrap và fit row5 thành169.35pt. Ảnh Google100% cho thấy mã/tên công trình xuống khoảng chín dòng trong một cột hẹp, trong khi C5:K5 đều trống. Điều này làm tên công trình khó đọc và header chiếm nhiều chiều cao không cần thiết. Data verifier PASS không đóng finding layout này.
+
+**Cause verified:** `backend/internal/core/bm_gs_workbook.go:177` ghi project vào B5; lines197–199 gọi `bmgsFitRowText`. Helper lines564–584 chỉ cộng chiều rộng merge nếu tồn tại; lines598–618 tính số dòng, bật wrap và đặt chiều cao. Original client B-width12, B5 không merge/wrap/explicit row5 height; output giữ width12, thêm wrap và169.35pt. Đối chiếu trực tiếp original workbook và output xác nhận `layout-observation.json`.
+
+**Proposal, chưa triển khai:** chỉ BM-GS-05 merge B5:K5 trước khi chạy fit hiện có, giữ A5 label và toàn bộ project code/name. C5:K5 của output hiện tại trống. Giữ11 risk columns, các ngày/trạng thái và chữ ký; không rút gọn dữ liệu, sửa Google, thay source/history hoặc đổi helper fit toàn cục. Sau approval cần test actual XLSX merge/row-height/data preservation và actual browser download→unchanged Google visual review. Hiện chưa có application/workbook repair.
+
+## Verified data scope
+
+- Mandatory central/backend/frontend/triage và Construction Operations/Workflow maps đã đọc; owners `service_native_bm_gs_owners.go`, `bm_gs_export_projection.go`, `bm_gs_workbook.go`, `workflowFormExcelEligibility.ts`, `WorkflowFormPanel.tsx`. First searches `BM-GS-05|client_site_risk_assessment|risk_items|status_is_captured_text`.
+- Development `consflow`/V158, retained source at HEAD `75dc44707785d399ed2408959bf784928a544e96` cộng dirty tree. 978 current hashes giữ nguyên và runtime evidence ghi readinessHTTP200. Retained frontend build Medium PASS/Vite4.42s, completion observed10:56:48ICT; reviewer không chạy build hoặc browser.
+- Exact form `dde65884-a1da-46ac-968d-6e1f83084185`, WI `0e59ca7e-d8d3-4ded-b28d-67253cfda970`, project `d2398f6e-83db-4171-a729-fc2e2e1557d2`. Native template active, version4 published `96f6a564-c6f4-4ef1-96a3-4dc45a3fe9b0` khớp WI evidence requirement và instance. Một saved risk row đạt pinned required/type/min/max/enum/date checks; form giữ draftR0/WI in_progress. Không gọi đây là submitted/resolved/full Rev10.
+- `verify()` import-only bằng bundled Python với `PYTHONDONTWRITEBYTECODE=1`: **23/23 assertions PASS**, không overwrite verification.json. Actual Downloads/copy byteequal10824bytes; SHA256 `f94f422ac80d1dfdcea6a7a40095a6f12979416328703dd43908b0b1cd10e45f`.
+- Client gốc TOC và BM05 snapshot khớp; output giữ11 headers, title, ba chỗ ký; đúng một risk row và sample row còn lại được xóa. Severity medium→Trung bình đúng pinned options. Detected09-10/deadline10-10 giữ nguồn; `Đang theo dõi synthetic` là captured risk text, không dùng form/WI status thay thế. Original BM05 không yêu cầu ảnh embedded; output không thêm photo columns/sheet.
+- Native Google readback A1:K15 có165cells/33populated khớp XLSX, zero errors/formulas; conversion/tab/private owner-only metadata đúng. Đây là import/value parity; không có formula recalculation scenario để chứng nhận.
+- 2892 unique old baseline rows không đổi/không mất; chỉ thêm audit `3f6c4cbc-5f2c-4328-8092-66248ff14350`, exact form/project/revision0/BM-GS-05/10824bytes.149 storage files, database/V158 và978 hashes giữ nguyên.
+- Reviewer xem `browser-source-desktop.jpg` và `google-main-100pct.jpg`; không rerun browser, SQL/API mutation, sửa source hoặc workbook/Google. Chỉ tạo review note này trong phạm vi được giao.
+
+**Remaining:** P2 B5 cần approval/repair/visual verification riêng. Submitted-source, resolved risk, full Rev10, contextual survey/daily sources, multirow/capacity, mobile, other roles, Microsoft Excel desktop và print NOT_RUN. Data TECHNICALLY VERIFIED; UX acceptance còn pending. Evidence-only audit không tạo application behavior/contract change; root sở hữu mapping/docs của proposal hoặc repair tiếp theo.

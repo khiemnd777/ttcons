@@ -1,0 +1,111 @@
+{
+  "assertions": {
+    "one_saved_open_uncoded_action": true,
+    "action_location_unset_linked_source_location_exists": true,
+    "no_existing_row_changed_or_lost": true,
+    "workspace_source_records_unchanged": true,
+    "no_source_change": true,
+    "migration_count_unchanged": true,
+    "list_actual_download_byte_equal": true,
+    "list_client_headers_preserved": true,
+    "list_location_matches_check": true,
+    "list_missing_code_stays_blank_numeric_stt_counts": true,
+    "list_status_matches_native_source": true,
+    "list_three_signature_placeholders_retained": true,
+    "list_google_summary_recalculated": true,
+    "detail_actual_download_byte_equal": true,
+    "detail_client_headers_preserved": true,
+    "detail_location_matches_check": true,
+    "detail_missing_code_stays_blank_numeric_stt_counts": true,
+    "detail_status_matches_native_source": true,
+    "detail_three_signature_placeholders_retained": true,
+    "detail_google_summary_recalculated": true,
+    "both_exports_have_identical_cells_and_formulas": true,
+    "same_embedded_source_photo_in_both_exports": true,
+    "google_all_read_values_and_formulas_match": true,
+    "google_no_effective_errors": true
+  },
+  "passed": true,
+  "old_unique_rows_checked": 2885,
+  "old_row_changes": [],
+  "old_rows_lost": [],
+  "new_rows": [
+    [
+      "audit_logs",
+      "050781fe-6fe2-4349-b03a-c52851331e68"
+    ],
+    [
+      "audit_logs",
+      "f22b3f9a-2534-4831-8608-f0df280ea9a8"
+    ]
+  ],
+  "source_files_checked": 976,
+  "source_drift": [],
+  "google_cells_checked": 760,
+  "google_populated_cells": 64,
+  "google_mismatches": [],
+  "google_errors": [],
+  "files": {
+    "list": {
+      "sha256": "4f9cbf89e65dd3de7e927a41eb23e771f6eec341cec4ac296214a83accd74f0b",
+      "media": {
+        "xl/media/image1.png": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    },
+    "detail": {
+      "sha256": "34cf76a538c9181fcfbf6a0e096821a4bee07d03b79a95b0255ce397a3ad7b23",
+      "media": {
+        "xl/media/image1.png": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    }
+  },
+  "ui_findings": [
+    {
+      "method": "Read-only cua_repl Playwright DOM getBoundingClientRect on the visible action row; no CSS or data mutation",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "table": {
+        "x": 362,
+        "y": 472.5,
+        "width": 876,
+        "height": 142,
+        "right": 1238
+      },
+      "actionCell": {
+        "x": 362,
+        "y": 509,
+        "width": 208.1328125,
+        "height": 105.5,
+        "right": 570.1328125
+      },
+      "actionGroup": {
+        "x": 374,
+        "y": 544,
+        "width": 184.1328125,
+        "height": 36,
+        "right": 558.1328125
+      },
+      "resolveButton": {
+        "x": 450,
+        "y": 544,
+        "width": 144.4765625,
+        "height": 36,
+        "right": 594.4765625
+      },
+      "titleButton": {
+        "x": 582.1328125,
+        "y": 521.5,
+        "width": 158.234375,
+        "height": 76,
+        "right": 740.3671875
+      },
+      "horizontalOverlapPixels": 12.34375,
+      "screenshot": "browser-list.jpg",
+      "finding": "P2: Gửi khắc phục overlaps the title in the Cần xử lý desktop action list",
+      "status": "Observed, not repaired; separate UI review/approval required"
+    }
+  ],
+  "scope": "Export technical checks PASS for Admin synthetic Development: one existing open action with no fault code and inherited linked-check location; actual list/detail downloads and native Google import. List UI P2 overlap at1280 unresolved; NOT UX ACCEPTED. Other lifecycle rows, ordinary roles, capacity, native Excel and print NOT_RUN."
+}

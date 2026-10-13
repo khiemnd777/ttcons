@@ -10,7 +10,7 @@ func (h *Handler) ProjectDailyReports(c *fiber.Ctx) error {
 	if err := h.requireProjectPermission(c, c.Params("id"), []string{"operation.view"}); err != nil {
 		return err
 	}
-	rows, err := h.service.ProjectDailyReports(c.Context(), c.Params("id"))
+	rows, err := h.service.ListNativeDailyReports(c.Context(), c.Params("id"), actorID(c), NativeDailyReportFilter{DateFrom: c.Query("date_from"), DateTo: c.Query("date_to")})
 	if err != nil {
 		return err
 	}

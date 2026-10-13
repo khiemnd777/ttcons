@@ -2,10 +2,11 @@ import { type MutableRefObject, type ReactNode, useRef } from 'react';
 import { Loader2, Plus, RotateCcw, Trash2, Upload } from 'lucide-react';
 import clsx from 'clsx';
 import './evidenceUploader.css';
-import { evidenceFileAccept, evidenceSupportedFileHint, type EvidenceFileClassification, type EvidenceUploadBusinessType } from './evidenceFileTypes';
+import { evidenceAcceptForKinds, evidenceSupportedFileHint, type EvidenceFileKind, type EvidenceFileClassification, type EvidenceUploadBusinessType } from './evidenceFileTypes';
 import { formatEvidenceFileSize } from './EvidenceRecordViewerDialog';
 import { evidenceUploadBatchLimit, evidenceUploadConcurrency, evidenceUploadOverallProgress } from '../work-items/evidenceUploadQueue';
 import type { EvidenceUploadStatus } from './evidenceUploadSession';
+import { captureDateTimeInput, captureDateTimeValue, type EvidenceCaptureMetadata } from './evidenceCaptureMetadata';
 
 export type EvidenceUploadRow = {
   id: string;
@@ -13,6 +14,7 @@ export type EvidenceUploadRow = {
   classification: EvidenceFileClassification | null;
   name: string;
   caption: string;
+  captureMetadata?: EvidenceCaptureMetadata;
   fileIssue: string;
   status: EvidenceUploadStatus;
   progress: number;
@@ -20,6 +22,7 @@ export type EvidenceUploadRow = {
 };
 
 type EvidenceUploaderProps = {
+  allowedFileKinds?: readonly EvidenceFileKind[];
   uploadRows: EvidenceUploadRow[];
   batchUploading: boolean;
   updateUploadRow: (id: string, update: (row: EvidenceUploadRow) => EvidenceUploadRow) => void;
@@ -44,7 +47,11 @@ type EvidenceUploaderProps = {
 
 // The WorkItem upload table is the single upload presentation owner. Adapters
 // control persistence timing; this component never submits its enclosing form.
-export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, onFileChange, addUploadRow, removeUploadRow, canRemoveRow, uploadEvidenceRows, retryUploadRow, onPreview, actions, maxFiles = evidenceUploadBatchLimit, addDisabled = false, requirementEvidenceType, fileInputRef: suppliedInputRef, fileInputRefs: suppliedInputRefs, extraColumn }: EvidenceUploaderProps) {
+export function EvidenceUploader({ allowedFileKinds, uploadRows, batchUploading, updateUploadRow, onFileChange, addUploadRow, removeUploadRow, canRemoveRow, uploadEvidenceRows, retryUploadRow, onPreview, actions, maxFiles = evidenceUploadBatchLimit, addDisabled = false, requirementEvidenceType, fileInputRef: suppliedInputRef, fileInputRefs: suppliedInputRefs, extraColumn }: EvidenceUploaderProps) {
+  const formatHints: Record<EvidenceFileKind, string> = { photo: 'PNG/JPG/JPEG/WebP/GIF', pdf: 'PDF', word: 'Word (DOC/DOCX)', excel: 'Excel (XLS/XLSX)' };
+  const supportedFileHint = allowedFileKinds
+    ? (Object.keys(formatHints) as EvidenceFileKind[]).filter((kind) => allowedFileKinds.includes(kind)).map((kind) => formatHints[kind]).join(', ')
+    : evidenceSupportedFileHint;
   const localInputRef = useRef<HTMLInputElement | null>(null);
   const localInputRefs = useRef(new Map<string, HTMLInputElement>());
   const fileInputRef = suppliedInputRef ?? localInputRef;
@@ -83,7 +90,7 @@ export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, 
                         aria-label={`Tệp ${index + 1}`}
                         name={row.id}
                         aria-invalid={Boolean(row.fileIssue || row.status === 'error')}
-                        accept={evidenceFileAccept}
+                        accept={evidenceAcceptForKinds(allowedFileKinds)}
                         disabled={batchUploading || row.status === 'success'}
                         className={clsx('block w-full rounded-md border bg-white px-2 py-1.5 text-sm file:mr-2 file:rounded-md file:border-0 file:bg-blue-50 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 disabled:bg-slate-100', row.fileIssue ? 'border-rose-400' : 'border-line')}
                         onChange={(event) => onFileChange(row.id, event.target.files?.[0] ?? null, event.currentTarget)}
@@ -146,6 +153,25 @@ export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, 
                       {row.file ? <ProgressBar progress={row.progress} tone={row.status === 'error' ? 'error' : row.status === 'success' ? 'success' : 'default'} label={`Tiến độ tệp ${index + 1}`} /> : null}
                     </div>
                   </div>
+                  {row.classification?.kind === 'photo' && row.captureMetadata ? <details className="mt-2 border-t border-line pt-2">
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-600">Thông tin ảnh hiện trường</summary>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="text-xs text-slate-600">Thời điểm chụp
+                        <input type="datetime-local" aria-label={`Thời điểm chụp ảnh ${index + 1}`} className="mt-1 w-full rounded-md border border-line px-2 py-1.5 text-sm" value={captureDateTimeInput(row.captureMetadata?.captured_at)} disabled={batchUploading || rowBusy || row.status === 'success'} onChange={(event) => updateUploadRow(row.id, (current) => ({ ...current, captureMetadata: { ...current.captureMetadata, captured_at: captureDateTimeValue(event.target.value) } }))} />
+                      </label>
+                      <label className="text-xs text-slate-600">Vị trí / hạng mục
+                        <input aria-label={`Vị trí ảnh ${index + 1}`} maxLength={200} className="mt-1 w-full rounded-md border border-line px-2 py-1.5 text-sm" value={row.captureMetadata?.location ?? ''} disabled={batchUploading || rowBusy || row.status === 'success'} onChange={(event) => updateUploadRow(row.id, (current) => ({ ...current, captureMetadata: { ...current.captureMetadata, location: event.target.value } }))} />
+                      </label>
+                      <label className="text-xs text-slate-600">Giai đoạn ghi nhận
+                        <select aria-label={`Giai đoạn ảnh ${index + 1}`} className="mt-1 w-full rounded-md border border-line px-2 py-1.5 text-sm" value={row.captureMetadata?.photo_phase ?? ''} disabled={batchUploading || rowBusy || row.status === 'success'} onChange={(event) => updateUploadRow(row.id, (current) => ({ ...current, captureMetadata: { ...current.captureMetadata, photo_phase: event.target.value as EvidenceCaptureMetadata['photo_phase'] } }))}>
+                          <option value="">Chưa ghi nhận</option><option value="before">Trước thi công</option><option value="during">Trong thi công</option><option value="after">Sau thi công</option><option value="defect">Phát hiện lỗi</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-slate-600">Ghi chú bàn giao
+                        <input aria-label={`Ghi chú bàn giao ảnh ${index + 1}`} maxLength={800} className="mt-1 w-full rounded-md border border-line px-2 py-1.5 text-sm" value={row.captureMetadata?.handover_note ?? ''} disabled={batchUploading || rowBusy || row.status === 'success'} onChange={(event) => updateUploadRow(row.id, (current) => ({ ...current, captureMetadata: { ...current.captureMetadata, handover_note: event.target.value } }))} />
+                      </label>
+                    </div>
+                  </details> : null}
                   {photoMismatch ? <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">{row.classification?.label} không hoàn tất điều kiện Hình ảnh. Hãy chọn thêm PNG, JPG, JPEG, WebP hoặc GIF.</p> : null}
                   {row.error ? <p className="mt-2 text-xs font-medium text-rose-700">{row.error}</p> : null}
                 </article>
@@ -160,7 +186,7 @@ export function EvidenceUploader({ uploadRows, batchUploading, updateUploadRow, 
                 {selectedRows.length ? <span className="font-semibold text-slate-700">Tổng tiến độ {overallProgress}%</span> : null}
               </div>
               {selectedRows.length ? <ProgressBar progress={overallProgress} label="Tổng tiến độ tải minh chứng" /> : null}
-              <p className="mt-1 text-[11px] text-slate-500">{evidenceSupportedFileHint}</p>
+              <p className="mt-1 text-[11px] text-slate-500">{supportedFileHint}</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               {actions}

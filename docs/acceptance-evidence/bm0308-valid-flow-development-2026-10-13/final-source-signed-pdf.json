@@ -1,0 +1,688 @@
+{
+  "answers": {
+    "check_date": "2026-10-13",
+    "checklist_items": [
+      {
+        "client_decision": "pass",
+        "comment": "[Synthetic] Quan sát và kiểm tra đạt trong fixture UAT",
+        "output_ref": "[Synthetic] OUT-01",
+        "status": "done",
+        "title": "[Synthetic] Hoàn thiện chống thấm và lát gạch"
+      }
+    ],
+    "client_representative": "[Synthetic] Đại diện CĐT thử",
+    "company_representative": "Consflow Admin",
+    "final_client_note": "[Synthetic] Chỉ nghiệm thu thử luồng hồ sơ trên Development; không có hiệu lực pháp lý.",
+    "handover_scope": "handover_item",
+    "scope_detail": "[Synthetic] Khu WC tầng 1 hoàn thiện thử"
+  },
+  "auto_advance_when_ready": false,
+  "available": true,
+  "capabilities": {
+    "can_add_confirmation": true,
+    "can_amend": true,
+    "can_delete_pdf": true,
+    "can_generate_pdf": true
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Xuất PDF biểu mẫu quy trình: chot-goi-nghiem-thu-cuoi-rev-1.pdf",
+      "created_at": "2026-10-12T23:20:43Z",
+      "event_type": "pdf_exported",
+      "from_status": "submitted",
+      "id": "89e385b7-c1f7-45a2-872f-97f627b5f068",
+      "instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "metadata_json": {
+        "checksum_sha256": "d5fd88ac7fcab0979ee05e0215f1d37d04458083f5ae1d03891a56ebc946a428",
+        "confirmation_selection": {
+          "seal_application_count": 0,
+          "seal_application_ids": [],
+          "signature_count": 1,
+          "signature_ids": [
+            "3d3b3d18-3b52-4c0a-abae-5618dbeddf72"
+          ]
+        },
+        "form_revision_no": 1,
+        "payload_hash": "d9f8a3e0b7c46249782ae47b51a4064883db31f1e9453e3bbf109d0ac388c98d",
+        "pdf_export_id": "0aa5d7a2-5eee-4dc1-a4e5-db79eade3671",
+        "workflow_form_instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730"
+      },
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "to_status": "submitted",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Dấu ký thử nội bộ UAT, không phải chữ ký khách hàng; không có hiệu lực pháp lý.",
+      "created_at": "2026-10-12T23:20:35Z",
+      "event_type": "signed",
+      "from_status": "submitted",
+      "id": "f9574029-4c5e-44c3-97b8-a5522700f668",
+      "instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "metadata_json": {
+        "form_revision_no": 1,
+        "payload_hash": "accf5b4cbb4d9ba5d1f952bd40858d4394f285f48395465b17484405276fd068",
+        "purpose": "internal_ack",
+        "signature_id": "3d3b3d18-3b52-4c0a-abae-5618dbeddf72",
+        "visual_checksum_sha256": "42705ff08650dcda72d331e24e4b8397e407f6072b82004ca266274ab5c5e18f",
+        "workflow_form_instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730"
+      },
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "to_status": "submitted",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-12T23:20:20Z",
+      "event_type": "submitted",
+      "from_status": "draft",
+      "id": "114c82e4-88a1-44e8-ac4d-74bd5809a0a7",
+      "instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "metadata_json": {
+        "form_type": "checklist",
+        "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+        "revision_no": 1
+      },
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "to_status": "submitted",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Chuẩn bị phiếu hợp lệ để chốt qua giao diện",
+      "created_at": "2026-10-12T23:19:20Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "8ac34dd1-bc4a-468c-b7c8-5aff541e75d9",
+      "instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "metadata_json": {
+        "form_type": "checklist",
+        "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+        "revision_no": 0
+      },
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "to_status": "draft",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:18:49Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "a91ceb55-ca0b-4284-a0bf-558c9f905b1d",
+      "instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "to_status": "draft",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "check_date",
+      "field_type": "date",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "48dad02d-56c9-47eb-8168-c3a2fedb7473",
+      "label": "Ngày kiểm tra",
+      "options_json": [],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {
+        "default_source": "current_date"
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "client_representative",
+      "field_type": "text",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "19446ad7-6c56-4e02-86f8-b152ed400143",
+      "label": "Đại diện chủ đầu tư",
+      "options_json": [],
+      "order_index": 20,
+      "required": true,
+      "validation_json": {
+        "max_length": 160,
+        "min_length": 2
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "company_representative",
+      "field_type": "text",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "88a6a415-61d8-4efa-8e75-7157be3481bc",
+      "label": "Đại diện công ty",
+      "options_json": [],
+      "order_index": 30,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "default_source": "actor_name",
+        "max_length": 160
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "handover_scope",
+      "field_type": "select",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "2e8a42c2-3e8e-4c61-8f83-be44e3c42da1",
+      "label": "Phạm vi kiểm tra",
+      "options_json": [
+        {
+          "label": "Khu vực / phòng",
+          "value": "area"
+        },
+        {
+          "label": "Gói thi công",
+          "value": "work_package"
+        },
+        {
+          "label": "Mốc nghiệm thu",
+          "value": "milestone"
+        },
+        {
+          "label": "Hạng mục bàn giao",
+          "value": "handover_item"
+        },
+        {
+          "label": "Đóng tồn tại",
+          "value": "defect_closure"
+        },
+        {
+          "label": "Khác",
+          "value": "other"
+        }
+      ],
+      "order_index": 40,
+      "required": true,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "scope_detail",
+      "field_type": "text",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "789514e0-1201-4fde-b91b-0215f3a91997",
+      "label": "Chi tiết phạm vi",
+      "options_json": [],
+      "order_index": 50,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 240
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "checklist_items",
+      "field_type": "structured_list",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": "Submit chỉ được phép khi mọi item ở trạng thái Done hoặc N/A. Chữ ký/PDF dùng flow workflow form sau khi submit.",
+      "id": "abb35ae6-7f4a-48ff-8037-32bbcc25bb2a",
+      "label": "Checklist items",
+      "options_json": [],
+      "order_index": 60,
+      "required": true,
+      "validation_json": {
+        "item_fields": [
+          {
+            "key": "title",
+            "label": "Hạng mục",
+            "max_length": 180,
+            "min_length": 3,
+            "required": true,
+            "type": "text"
+          },
+          {
+            "key": "output_ref",
+            "label": "Output / mã việc",
+            "max_length": 120,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "options": [
+              {
+                "label": "Done",
+                "value": "done"
+              },
+              {
+                "label": "N/A",
+                "value": "not_applicable"
+              },
+              {
+                "label": "Needs follow-up",
+                "value": "needs_follow_up"
+              },
+              {
+                "label": "Blocked",
+                "value": "blocked"
+              }
+            ],
+            "required": true,
+            "type": "select"
+          },
+          {
+            "key": "client_decision",
+            "label": "Quyết định CĐT",
+            "options": [
+              {
+                "label": "Đạt",
+                "value": "pass"
+              },
+              {
+                "label": "Đạt có điều kiện",
+                "value": "conditional_pass"
+              },
+              {
+                "label": "Không đạt",
+                "value": "fail"
+              },
+              {
+                "label": "N/A",
+                "value": "not_applicable"
+              }
+            ],
+            "required": true,
+            "type": "select"
+          },
+          {
+            "key": "evidence_id",
+            "label": "Evidence",
+            "required": false,
+            "type": "evidence_reference"
+          },
+          {
+            "key": "severity",
+            "label": "Severity",
+            "options": [
+              {
+                "label": "Low",
+                "value": "low"
+              },
+              {
+                "label": "Medium",
+                "value": "medium"
+              },
+              {
+                "label": "High",
+                "value": "high"
+              },
+              {
+                "label": "Critical",
+                "value": "critical"
+              }
+            ],
+            "required": false,
+            "type": "select"
+          },
+          {
+            "key": "required_action",
+            "label": "Yêu cầu bổ sung",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          },
+          {
+            "key": "due_date",
+            "label": "Due date",
+            "required": false,
+            "type": "date"
+          },
+          {
+            "key": "comment",
+            "label": "Comment",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          }
+        ],
+        "max_items": 250,
+        "min_items": 1,
+        "submit_clear_statuses": [
+          "done",
+          "not_applicable"
+        ]
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "final_client_note",
+      "field_type": "textarea",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "c91cb0a2-70c8-41d5-9448-8fd7b5aded6c",
+      "label": "Ghi chú cuối của chủ đầu tư",
+      "options_json": [],
+      "order_index": 70,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 2000
+      },
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {
+      "check_date": "2026-10-13",
+      "checklist_items": [
+        {
+          "client_decision": "pass",
+          "comment": "[Synthetic] Quan sát và kiểm tra đạt trong fixture UAT",
+          "output_ref": "[Synthetic] OUT-01",
+          "status": "done",
+          "title": "[Synthetic] Hoàn thiện chống thấm và lát gạch"
+        }
+      ],
+      "client_representative": "[Synthetic] Đại diện CĐT thử",
+      "company_representative": "Consflow Admin",
+      "final_client_note": "[Synthetic] Chỉ nghiệm thu thử luồng hồ sơ trên Development; không có hiệu lực pháp lý.",
+      "handover_scope": "handover_item",
+      "scope_detail": "[Synthetic] Khu WC tầng 1 hoàn thiện thử"
+    },
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:18:49Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 1,
+    "form_code": "builtin_owner_client_checklist",
+    "form_description": "Checklist đầu ra dành cho chủ đầu tư/client xác nhận hạng mục, evidence, quyết định và yêu cầu bổ sung.",
+    "form_name": "Checklist chủ đầu tư",
+    "form_template_id": "ae075c31-f6d3-4c37-a7a5-5b4ca4e78eb1",
+    "form_type": "checklist",
+    "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+    "form_version_no": 2,
+    "form_version_status": "published",
+    "id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+    "pipeline_run_id": "d56c563e-2adb-4c64-9b10-b1596c3af852",
+    "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "QA/QC"
+    ],
+    "run_node_id": "e8ab37d3-ecbf-455f-bec0-9c97c5c04a56",
+    "run_step_id": "41e635d6-c679-43e9-914f-ee41edc7e7fc",
+    "status": "submitted",
+    "submitted_at": "2026-10-12T23:20:20Z",
+    "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "template_step_id": "0412c30d-dbf1-4c77-8e6a-2fcd53fcb1d5",
+    "title": "Chốt gói nghiệm thu cuối",
+    "updated_at": "2026-10-12T23:20:20Z",
+    "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6",
+    "work_item_status": "in_progress",
+    "work_item_title": "Chốt gói nghiệm thu cuối"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [
+    {
+      "acceptance_reference_count": 0,
+      "can_delete": true,
+      "checksum_sha256": "d5fd88ac7fcab0979ee05e0215f1d37d04458083f5ae1d03891a56ebc946a428",
+      "created_at": "2026-10-12T23:20:43Z",
+      "deletion_status": "",
+      "file_name": "chot-goi-nghiem-thu-cuoi-rev-1.pdf",
+      "file_size": 41342,
+      "form_instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "form_revision_no": 1,
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "generated_at": "2026-10-12T23:20:43Z",
+      "generated_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "generated_by_name": "admin@thuthiemcons.com",
+      "id": "0aa5d7a2-5eee-4dc1-a4e5-db79eade3671",
+      "is_current_revision": true,
+      "metadata_json": {
+        "confirmation_selection": {
+          "seal_application_count": 0,
+          "seal_application_ids": [],
+          "signature_count": 1,
+          "signature_ids": [
+            "3d3b3d18-3b52-4c0a-abae-5618dbeddf72"
+          ]
+        },
+        "form_revision_no": 1,
+        "workflow_form_code": "builtin_owner_client_checklist",
+        "workflow_form_title": "Chốt gói nghiệm thu cuối",
+        "workflow_form_type": "checklist",
+        "workflow_form_version_no": 2
+      },
+      "mime_type": "application/pdf",
+      "payload_hash": "d9f8a3e0b7c46249782ae47b51a4064883db31f1e9453e3bbf109d0ac388c98d",
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "storage_key": "workflow-form-pdfs/94f3512a-6625-40a8-a2ce-e3bf67619c66/8cc65195-7bbb-4333-ab16-d8c5dd1c5730/ab40f87d-c6fa-44f0-b30a-8dd258e2df0a.pdf",
+      "storage_provider": "local",
+      "title": "Chốt gói nghiệm thu cuối",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    }
+  ],
+  "seal_applications": [],
+  "signatures": [
+    {
+      "comment": "[Synthetic] Dấu ký thử nội bộ UAT, không phải chữ ký khách hàng; không có hiệu lực pháp lý.",
+      "created_at": "2026-10-12T23:20:35Z",
+      "form_instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "form_revision_no": 1,
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "id": "3d3b3d18-3b52-4c0a-abae-5618dbeddf72",
+      "is_current_revision": true,
+      "payload_hash": "accf5b4cbb4d9ba5d1f952bd40858d4394f285f48395465b17484405276fd068",
+      "payload_json": {
+        "answers_snapshot": {
+          "check_date": "2026-10-13",
+          "checklist_items": [
+            {
+              "client_decision": "pass",
+              "comment": "[Synthetic] Quan sát và kiểm tra đạt trong fixture UAT",
+              "output_ref": "[Synthetic] OUT-01",
+              "status": "done",
+              "title": "[Synthetic] Hoàn thiện chống thấm và lát gạch"
+            }
+          ],
+          "client_representative": "[Synthetic] Đại diện CĐT thử",
+          "company_representative": "Consflow Admin",
+          "final_client_note": "[Synthetic] Chỉ nghiệm thu thử luồng hồ sơ trên Development; không có hiệu lực pháp lý.",
+          "handover_scope": "handover_item",
+          "scope_detail": "[Synthetic] Khu WC tầng 1 hoàn thiện thử"
+        },
+        "comment": "[Synthetic] Dấu ký thử nội bộ UAT, không phải chữ ký khách hàng; không có hiệu lực pháp lý.",
+        "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+        "purpose": "internal_ack",
+        "signer_name": "admin@thuthiemcons.com",
+        "signer_roles": [
+          "Admin"
+        ],
+        "signer_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "source": "workflow_form_signature",
+        "visual_signature": {
+          "checksum_sha256": "42705ff08650dcda72d331e24e4b8397e407f6072b82004ca266274ab5c5e18f",
+          "file_size": 5163,
+          "mime_type": "image/png",
+          "storage_key": "workflow-signatures/94f3512a-6625-40a8-a2ce-e3bf67619c66/8cc65195-7bbb-4333-ab16-d8c5dd1c5730/38aecab3-e4c8-44ce-a27f-b81b19d3a8e8.png",
+          "storage_provider": "local",
+          "strokes": [
+            {
+              "points": [
+                {
+                  "x": 0.18337730870712401,
+                  "y": 0.3284009546539379
+                },
+                {
+                  "x": 0.19525065963060687,
+                  "y": 0.3627684964200477
+                },
+                {
+                  "x": 0.20712401055408972,
+                  "y": 0.4009546539379475
+                },
+                {
+                  "x": 0.21767810026385223,
+                  "y": 0.4353221957040573
+                },
+                {
+                  "x": 0.22955145118733508,
+                  "y": 0.47350835322195706
+                },
+                {
+                  "x": 0.24142480211081793,
+                  "y": 0.5078758949880668
+                },
+                {
+                  "x": 0.2532981530343008,
+                  "y": 0.5422434367541766
+                },
+                {
+                  "x": 0.2638522427440633,
+                  "y": 0.5804295942720764
+                },
+                {
+                  "x": 0.2757255936675462,
+                  "y": 0.6147971360381862
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.2757255936675462,
+                  "y": 0.6147971360381862
+                },
+                {
+                  "x": 0.28891820580474936,
+                  "y": 0.5727923627684964
+                },
+                {
+                  "x": 0.3021108179419525,
+                  "y": 0.5346062052505967
+                },
+                {
+                  "x": 0.3153034300791557,
+                  "y": 0.49260143198090695
+                },
+                {
+                  "x": 0.32849604221635886,
+                  "y": 0.45441527446300717
+                },
+                {
+                  "x": 0.341688654353562,
+                  "y": 0.4124105011933174
+                },
+                {
+                  "x": 0.3548812664907652,
+                  "y": 0.3704057279236277
+                },
+                {
+                  "x": 0.36807387862796836,
+                  "y": 0.3322195704057279
+                },
+                {
+                  "x": 0.3812664907651715,
+                  "y": 0.2902147971360382
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.22295514511873352,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.2546174142480211,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.2862796833773087,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.316622691292876,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.3482849604221636,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.37994722955145116,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.41160949868073876,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.4419525065963061,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.4736147757255937,
+                  "y": 0.5957040572792363
+                }
+              ]
+            }
+          ]
+        },
+        "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6",
+        "workflow_form_code": "builtin_owner_client_checklist",
+        "workflow_form_instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+        "workflow_form_revision_no": 1,
+        "workflow_form_title": "Chốt gói nghiệm thu cuối",
+        "workflow_form_type": "checklist",
+        "workflow_form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896"
+      },
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "purpose": "internal_ack",
+      "signed_at": "2026-10-12T23:20:35Z",
+      "signer_name": "admin@thuthiemcons.com",
+      "signer_roles_json": [
+        "Admin"
+      ],
+      "signer_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "visual_checksum_sha256": "42705ff08650dcda72d331e24e4b8397e407f6072b82004ca266274ab5c5e18f",
+      "visual_file_size": 5163,
+      "visual_mime_type": "image/png",
+      "visual_storage_key": "workflow-signatures/94f3512a-6625-40a8-a2ce-e3bf67619c66/8cc65195-7bbb-4333-ab16-d8c5dd1c5730/38aecab3-e4c8-44ce-a27f-b81b19d3a8e8.png",
+      "visual_storage_provider": "local",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    }
+  ],
+  "template": {
+    "code": "builtin_owner_client_checklist",
+    "description": "Checklist đầu ra dành cho chủ đầu tư/client xác nhận hạng mục, evidence, quyết định và yêu cầu bổ sung.",
+    "form_type": "checklist",
+    "id": "ae075c31-f6d3-4c37-a7a5-5b4ca4e78eb1",
+    "name": "Checklist chủ đầu tư"
+  },
+  "version": {
+    "id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+    "status": "published",
+    "version_no": 2
+  }
+}

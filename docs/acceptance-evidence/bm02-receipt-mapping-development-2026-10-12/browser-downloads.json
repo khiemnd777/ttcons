@@ -1,0 +1,27 @@
+[
+  {
+    "phase": "delivery2-before",
+    "file": "BM02-lan-gui-2-truoc-sua-phieu.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-2 (2).xlsx"
+  },
+  {
+    "phase": "form3",
+    "file": "BM02-phieu-phien-ban-3.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/BM-GS-02 (6).xlsx"
+  },
+  {
+    "phase": "delivery3",
+    "file": "BM02-lan-gui-3.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-3.xlsx"
+  },
+  {
+    "phase": "delivery2",
+    "file": "BM02-lan-gui-2-giu-nguyen.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-2 (3).xlsx"
+  },
+  {
+    "phase": "delivery1",
+    "file": "BM02-lan-gui-1-giu-nguyen.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-1 (5).xlsx"
+  }
+]

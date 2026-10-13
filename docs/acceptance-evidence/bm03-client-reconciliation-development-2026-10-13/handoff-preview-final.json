@@ -1,0 +1,43 @@
+{
+  "available": true,
+  "can_activate": true,
+  "candidates": [
+    {
+      "assigned_user_id": "",
+      "criteria": [
+        {
+          "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc",
+          "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+          "evidence_required": true
+        }
+      ],
+      "evidence_required": true,
+      "location": "[Synthetic] Vùng thử Development",
+      "responsible_role": "Giám sát",
+      "scheduled_at": "2026-10-13T09:00:00+07:00",
+      "source_field_key": "inspection_items",
+      "source_form_code": "client_construction_handoff_plan",
+      "source_item_index": 0,
+      "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+    }
+  ],
+  "handoffs": [],
+  "participants": [
+    {
+      "email": "admin@thuthiemcons.com",
+      "full_name": "Consflow Admin",
+      "id": "f5250196-91bb-4df6-9666-b318a7036b42"
+    }
+  ],
+  "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+  "source_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+  "source_form_revision_no": 1,
+  "source_node_name": "Kế hoạch thi công",
+  "source_node_status": "in_progress",
+  "source_node_type": "construction_planning",
+  "source_run_node_id": "e42afc27-ca13-432d-9d93-b2f362a62f1c",
+  "suggested_title": "[Synthetic] Đợt kiểm tra ảnh thử",
+  "target_node_name": "Thi công",
+  "target_node_status": "pending",
+  "target_run_node_id": "80c03fbe-9105-4469-9b6e-b36129911b19"
+}

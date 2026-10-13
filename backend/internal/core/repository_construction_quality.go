@@ -432,7 +432,7 @@ func (r *Repository) CompleteConstructionCheck(ctx context.Context, checkID, res
 	return responseRow, nil
 }
 
-func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, workItemID, sourceDailyReportID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string) (Record, error) {
+func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, workItemID, sourceDailyReportID, title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName string, fieldContexts ...Record) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -441,6 +441,12 @@ func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, wo
 	action, err := createConstructionActionTx(ctx, tx, projectID, workItemID, sourceDailyReportID, "", title, description, priority, assignedUserID, dueAt, impactScope, evidenceID, actorID, actorName)
 	if err != nil {
 		return nil, err
+	}
+	if len(fieldContexts) > 0 {
+		action, err = saveConstructionActionFieldContextTx(ctx, tx, action, fieldContexts[0], actorID, actorName)
+		if err != nil {
+			return nil, err
+		}
 	}
 	transition, err := r.startWorkItemForDomainMutationTx(ctx, tx, projectID, linkedWorkItemMutationContext(workItemID), operationsWorkItemPolicy, "construction_action", cleanID(action["id"]), actorID, actorName)
 	if err != nil {
@@ -452,7 +458,7 @@ func (r *Repository) CreateConstructionAction(ctx context.Context, projectID, wo
 	return attachWorkItemTransition(action, transition), nil
 }
 
-func (r *Repository) UpdateConstructionAction(ctx context.Context, actionID, title, description, priority, assignedUserID, dueAt, actorID, actorName string) (Record, error) {
+func (r *Repository) UpdateConstructionAction(ctx context.Context, actionID, title, description, priority, assignedUserID, dueAt, actorID, actorName string, fieldContexts ...Record) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -473,6 +479,15 @@ func (r *Repository) UpdateConstructionAction(ctx context.Context, actionID, tit
 		return nil, validationError("Việc đồng bộ từ hồ sơ kỹ thuật chỉ được chỉnh sửa tại nguồn QA/QC")
 	}
 	projectID := cleanID(action["project_id"])
+	if len(fieldContexts) > 0 && len(fieldContexts[0]) > 0 {
+		allowed, e := r.withReadTransaction(tx).CanAccessProjectPermission(ctx, actorID, projectID, []string{"construction.action.edit"})
+		if e != nil {
+			return nil, e
+		}
+		if !allowed {
+			return nil, forbiddenError("Bạn không có quyền chỉnh sửa việc cần xử lý")
+		}
+	}
 	staffID, err := constructionProjectParticipantStaffIDTx(ctx, tx, projectID, assignedUserID)
 	if err != nil {
 		return nil, err
@@ -488,6 +503,13 @@ func (r *Repository) UpdateConstructionAction(ctx context.Context, actionID, tit
 	`, actionID, title, description, priority, assignedUserID, dueAt)
 	if err != nil {
 		return nil, err
+	}
+	if len(fieldContexts) > 0 {
+		updated, e := saveConstructionActionFieldContextTx(ctx, tx, rows[0], fieldContexts[0], actorID, actorName)
+		if e != nil {
+			return nil, e
+		}
+		rows[0] = updated
 	}
 	if issueID := cleanID(action["technical_issue_id"]); issueID != "" {
 		if _, err := tx.ExecContext(ctx, `UPDATE issues SET title=$2,description=NULLIF($3,''),severity=$4,assigned_to=$5,updated_at=now() WHERE id=$1`, issueID, title, description, severity, staffID); err != nil {
@@ -1504,6 +1526,7 @@ func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID stri
 		SELECT report.*,
 			project.code AS project_code,
 			project.name AS project_name,
+			project.address AS project_address,
 			author.full_name AS author_name,
 			work_item.title AS work_item_title,
 			delivery.id::text AS work_report_id,
@@ -1513,6 +1536,7 @@ func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID stri
 			delivery.current_revision_no AS delivery_revision_no,
 			delivery.review_comment AS delivery_review_comment,
 			delivery_revision.snapshot_sha256 AS delivery_snapshot_sha256,
+			delivery_revision.snapshot_json AS delivery_snapshot_json,
 			(
 				report.work_item_id IS NOT NULL
 				AND EXISTS (
@@ -1539,7 +1563,12 @@ func (r *Repository) ListProjectDailyReports(ctx context.Context, projectID stri
 		return nil, err
 	}
 	for _, row := range rows {
-		if err := annotateWorkReportDeliverySourceChanged(row); err != nil {
+		if cleanText(row["delivery_status"]) == "needs_changes" {
+			if err := freezeNativeWorkReportEvidence(ctx, r.querySource(), row, false); err != nil {
+				return nil, err
+			}
+		}
+		if err := annotateNativeWorkReportDeliverySourceChanged(ctx, r.querySource(), row); err != nil {
 			return nil, err
 		}
 	}
@@ -1653,6 +1682,7 @@ func (r *Repository) CreateDailyReport(ctx context.Context, body Record, deliver
 		"work_item_id":           workItemID,
 		"evidence_count":         len(stringSlice(report["photos"])),
 		"work_item_auto_started": autoStart,
+		"captured_rows":          constructionRiskPlanAuditRows(constructionReportRecord(report["structured_json"])),
 	}
 	if err := addAuditTx(
 		ctx,
@@ -1683,7 +1713,7 @@ func (r *Repository) CreateDailyReport(ctx context.Context, body Record, deliver
 	return report, nil
 }
 
-func (r *Repository) UpdateDailyReportWithDelivery(ctx context.Context, id string, body Record, delivery WorkReportDeliveryRequest, actorID, actorName string) (Record, error) {
+func (r *Repository) UpdateDailyReportWithDelivery(ctx context.Context, id string, body Record, delivery WorkReportDeliveryRequest, actorID, actorName string, omittedSections ...string) (Record, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -1693,12 +1723,56 @@ func (r *Repository) UpdateDailyReportWithDelivery(ctx context.Context, id strin
 	if err != nil {
 		return nil, err
 	}
+	if !boolValue(current["report_delivery_eligible"]) || cleanID(current["workflow_form_instance_id"]) != "" {
+		return nil, conflictError("Nguồn báo cáo không còn cho phép chỉnh sửa tại nhật ký")
+	}
+	allowed, accessErr := r.withReadTransaction(tx).CanAccessProjectPermission(ctx, actorID, cleanID(current["project_id"]), []string{"operation.report"})
+	if accessErr != nil {
+		return nil, accessErr
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền cập nhật báo cáo thi công")
+	}
 	status, err := workReportStatusForSourceTx(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
 	if status != "" && status != "needs_changes" {
 		return nil, validationError("Báo cáo chỉ được chỉnh sửa khi chưa gửi hoặc đang được yêu cầu bổ sung", Record{"report_id": id, "status": status})
+	}
+	if _, hasStructured := body["structured_json"]; hasStructured {
+		structured := constructionReportRecord(body["structured_json"])
+		mergeConstructionCapturedRows(structured, constructionReportRecord(current["structured_json"]))
+		oldCrews := map[string]Record{}
+		for _, row := range workflowAnswerRecordList(constructionReportRecord(current["structured_json"])["crew_items"]) {
+			if id := cleanID(row["row_id"]); id != "" {
+				oldCrews[id] = row
+			}
+		}
+		for _, row := range workflowAnswerRecordList(structured["crew_items"]) {
+			old := oldCrews[cleanID(row["row_id"])]
+			for _, key := range []string{"representative", "contact"} {
+				if _, provided := row[key]; !provided {
+					if value, exists := old[key]; exists {
+						row[key] = value
+					}
+				}
+			}
+		}
+	}
+	if len(omittedSections) > 0 {
+		structured := constructionReportRecord(body["structured_json"])
+		previous := constructionReportRecord(current["structured_json"])
+		for _, key := range omittedSections {
+			if !statusIn(key, "supervision_assessments", "material_arrival_items") {
+				return nil, validationError("Trường giữ nguyên của báo cáo không hợp lệ", nil)
+			}
+			delete(structured, key)
+			if value, exists := previous[key]; exists {
+				structured[key] = value
+			}
+		}
+		body["structured_json"] = structured
 	}
 	updated, err := updateRecord(ctx, tx, "operation_daily_reports", dailyReportColumns(), id, body)
 	if err != nil {
@@ -1708,6 +1782,8 @@ func (r *Repository) UpdateDailyReportWithDelivery(ctx context.Context, id strin
 		"progress_percent": updated["progress_percent"],
 		"work_item_id":     updated["work_item_id"],
 		"evidence_count":   len(constructionReportStringList(updated["photos"])),
+		"capture_before":   constructionRiskPlanAuditRows(constructionReportRecord(current["structured_json"])),
+		"capture_after":    constructionRiskPlanAuditRows(constructionReportRecord(updated["structured_json"])),
 	}); err != nil {
 		return nil, err
 	}

@@ -1,0 +1,246 @@
+{
+  "sha256": "f94f422ac80d1dfdcea6a7a40095a6f12979416328703dd43908b0b1cd10e45f",
+  "download_sha256": "f94f422ac80d1dfdcea6a7a40095a6f12979416328703dd43908b0b1cd10e45f",
+  "size": 10824,
+  "tabs": {
+    "BM-GS-05-dde65884_01": {
+      "maxRow": 13,
+      "maxCol": 11,
+      "cells": {
+        "A1": {
+          "value": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A2": {
+          "value": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-05)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A3": {
+          "value": "SỔ QUẢN LÝ VẤN ĐỀ, RỦI RO VÀ PHÁT SINH",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A5": {
+          "value": "Dự án:",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B5": {
+          "value": "[DEV-BM-REUSE-20261009] [Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A7": {
+          "value": "STT",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B7": {
+          "value": "MÃ SỰ VIỆC",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "C7": {
+          "value": "NGÀY PHÁT HIỆN",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "D7": {
+          "value": "MÔ TẢ VẤN ĐỀ / PHÁT SINH",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E7": {
+          "value": "NGUYÊN NHÂN",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "F7": {
+          "value": "ẢNH HƯỞNG",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "G7": {
+          "value": "MỨC ĐỘ RỦI RO",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "H7": {
+          "value": "ĐỀ XUẤT HƯỚNG XỬ LÝ",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "I7": {
+          "value": "NGƯỜI PHỤ TRÁCH",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "J7": {
+          "value": "THỜI HẠN",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "K7": {
+          "value": "TRẠNG THÁI",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A8": {
+          "value": 1,
+          "type": "n",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B8": {
+          "value": "SYN-RR-05",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "C8": {
+          "value": "2026-10-09",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "D8": {
+          "value": "[Synthetic] Lối tiếp cận bị giới hạn trong ô thử",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E8": {
+          "value": "[Synthetic] Vật liệu đặt sai khu thử",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "F8": {
+          "value": "[Synthetic] Chậm tiếp cận ô thử",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "G8": {
+          "value": "Trung bình",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "H8": {
+          "value": "[Synthetic] Bố trí lối tạm",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "I8": {
+          "value": "PM synthetic",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "J8": {
+          "value": "2026-10-10",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "K8": {
+          "value": "Đang theo dõi synthetic",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A12": {
+          "value": "GIÁM SÁT CÔNG TRÌNH",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "D12": {
+          "value": "PHÒNG QS / BỘ PHẬN LIÊN QUAN",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "G12": {
+          "value": "QUẢN LÝ DỰ ÁN (PM)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A13": {
+          "value": "(Ký & ghi rõ họ tên)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "D13": {
+          "value": "(Ký & ghi rõ họ tên)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "G13": {
+          "value": "(Ký & ghi rõ họ tên)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        }
+      },
+      "images": 0,
+      "merges": [
+        "D13:F13",
+        "A13:C13",
+        "A3:K3",
+        "G12:K12",
+        "A2:K2",
+        "D12:F12",
+        "G13:K13",
+        "A12:C12",
+        "A1:K1"
+      ],
+      "rows": {
+        "1": 28.0,
+        "2": 20.0,
+        "3": 26.0,
+        "5": 169.35000000000002,
+        "6": 15.75,
+        "7": 33.0,
+        "8": 46.5,
+        "9": 26.0,
+        "12": 20.0
+      },
+      "columns": {
+        "A": 8.0,
+        "B": 12.0,
+        "C": 14.0,
+        "D": 28.0,
+        "E": 22.0,
+        "G": 14.0,
+        "H": 28.0,
+        "I": 18.0,
+        "J": 14.0,
+        "K": 15.0
+      }
+    }
+  }
+}

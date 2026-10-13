@@ -1,3 +1,4 @@
+import { constructionReportWeatherLabel } from './constructionWeatherPresentation';
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +8,7 @@ import {
   CheckCircle2,
   ClipboardList,
   CloudSun,
+  Download,
   ExternalLink,
   FileText,
   Hammer,
@@ -20,6 +22,9 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
+import { downloadNativeReportExcel, nativeReportExcelPath } from '../_shared/bmgsExport';
+import { NativeExcelExportButton } from '../_shared/NativeExcelExportButton';
+import { useAuth } from '../../lib/auth/AuthContext';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -60,6 +65,17 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { hasPermission } = useAuth();
+  const [exporting, setExporting] = useState(false);
+  async function exportExcel() {
+    if (!record?.id || !hasPermission('operation.view') || exporting) return;
+    setExporting(true);
+    try {
+      await downloadNativeReportExcel(nativeReportExcelPath({ dailyReportId: String(record.id) }));
+      toast.success('Đã xuất Excel báo cáo đã lưu');
+    } catch (error) { toast.error('Không xuất được Excel báo cáo', error); }
+    finally { setExporting(false); }
+  }
   const [linkedDrafts, setLinkedDrafts] = useState<ReportLinkedDraft[]>([]);
   const report = useMemo(() => constructionReportViewModel(record ?? {}), [record]);
   const evidenceKey = report.evidenceIds.join(',');
@@ -220,26 +236,28 @@ export function ConstructionReportDetailDialog({ open, projectId, record, canMan
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-ink ring-1 ring-inset ring-blue-100"><CalendarDays className="h-4 w-4 text-blue-600" /> {dateText(report.reportDate)}</span>
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-sm text-slate-700 ring-1 ring-inset ring-blue-100"><CloudSun className="h-4 w-4 text-amber-500" /> {report.weather || 'Chưa ghi thời tiết'}</span>
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-sm text-slate-700 ring-1 ring-inset ring-blue-100"><CloudSun className="h-4 w-4 text-amber-500" /> {constructionReportWeatherLabel(record?.weather)}</span>
                 <span className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">{report.sourceKind === 'workflow' ? 'Báo cáo từ quy trình' : report.sourceKind === 'structured' ? 'Báo cáo hiện trường' : 'Báo cáo tóm tắt'}</span>
               </div>
               <p className="mt-3 text-sm text-slate-600">Nhịp thi công trong ngày được tách rõ thành kết quả, việc đang tiếp diễn, kế hoạch tiếp theo và blocker cần xử lý.</p>
             </div>
             <div>
-              <div className="mb-2 flex items-end justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ báo cáo</span><strong className="text-2xl text-blue-700">{report.progressPercent}%</strong></div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-label="Tiến độ báo cáo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={report.progressPercent}><div className="h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${report.progressPercent}%` }} /></div>
+              <div className="mb-2 flex items-end justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ báo cáo</span><strong className="text-2xl text-blue-700">{report.hasProgress ? `${report.progressPercent}%` : 'Chưa ghi tiến độ'}</strong></div>
+              {report.hasProgress ? <div className="h-2.5 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-label="Tiến độ báo cáo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={report.progressPercent}><div className="h-full rounded-full bg-blue-600 transition-[width]" style={{ width: `${report.progressPercent}%` }} /></div> : null}
             </div>
           </div>
         </section>
 
         <div className={canViewLinked ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]' : ''}>
           <div className="space-y-5">
+            {record?.id && hasPermission('operation.view') ? <button type="button" disabled={exporting} className="inline-flex items-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-60" onClick={() => void exportExcel()}><Download className="h-4 w-4" />{exporting ? 'Đang xuất…' : 'Xuất báo cáo ngày'}</button> : null}
             <section aria-labelledby="report-work-heading">
               <SectionHeading id="report-work-heading" icon={<Hammer className="h-4 w-4" />} title="Công việc trong ngày" description="Đọc từ trái sang phải để nắm kết quả và bước tiếp theo." />
-              <div className="mt-3 grid gap-3 md:grid-cols-2"><WorkGroup title="Đã làm" items={report.done} tone="green" empty="Chưa ghi hạng mục hoàn tất" /><WorkGroup title="Đang làm" items={report.current} tone="blue" empty="Không có hạng mục dở dang" /><WorkGroup title="Sẽ làm" items={report.next} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" /><WorkGroup title="Blocker cần xử lý" items={report.blockers} tone="red" empty="Không có blocker cần xử lý" /></div>
+              {record?.id && hasPermission('operation.view') ? <div className="mt-3 flex flex-wrap gap-2">{report.blockers.length ? <NativeExcelExportButton path={`/daily-reports/${encodeURIComponent(String(record.id))}/risks/export.xlsx`} filename="BM-GS-05.xlsx" label="Xuất báo cáo rủi ro" /> : null}{report.next.length ? <NativeExcelExportButton path={`/daily-reports/${encodeURIComponent(String(record.id))}/next-plan/export.xlsx`} filename="BM-GS-06.xlsx" label="Xuất báo cáo hiện trường" /> : null}</div> : null}
+              <div className="mt-3 grid gap-3 md:grid-cols-2"><WorkGroup title="Đã làm" items={report.done} tone="green" empty="Chưa ghi hạng mục hoàn tất" /><WorkGroup title="Đang làm" items={report.current} tone="blue" empty="Không có hạng mục dở dang" /><WorkGroup title="Sẽ làm" items={report.nextDetails} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" /><WorkGroup title="Blocker cần xử lý" items={report.blockerDetails} tone="red" empty="Không có blocker cần xử lý" /></div>
             </section>
 
-            <section aria-labelledby="report-resource-heading"><SectionHeading id="report-resource-heading" icon={<Users className="h-4 w-4" />} title="Nguồn lực sử dụng" description="Nhân công và vật tư đã ghi nhận trong ca thi công." /><div className="mt-3 grid gap-3 md:grid-cols-2"><ResourceCard icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" items={report.crew} empty="Chưa ghi nhân công hoặc tổ đội" /><ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" items={report.materials} empty="Chưa ghi vật tư sử dụng" /></div></section>
+            <section aria-labelledby="report-resource-heading"><SectionHeading id="report-resource-heading" icon={<Users className="h-4 w-4" />} title="Nguồn lực sử dụng" description="Nhân công và vật tư đã ghi nhận trong ca thi công." /><div className="mt-3 grid gap-3 md:grid-cols-2"><ResourceCard icon={<Users className="h-4 w-4" />} title="Nhân công / tổ đội" items={report.crew} empty="Chưa ghi nhân công hoặc tổ đội" /><ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" items={report.materials} empty="Chưa ghi vật tư sử dụng" />{report.materialArrivals.length ? <ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư nhập trường" items={report.materialArrivals} empty="" /> : null}{report.supervision.length ? <ResourceCard icon={<CheckCircle2 className="h-4 w-4" />} title="Nội dung giám sát" items={report.supervision} empty="" /> : null}</div></section>
 
             <section aria-labelledby="report-note-heading"><SectionHeading id="report-note-heading" icon={<FileText className="h-4 w-4" />} title="Ghi chú hiện trường" description="Thông tin bổ sung; không được tính là blocker nếu báo cáo không khai báo blocker có cấu trúc." /><div className="mt-3 rounded-lg border border-line bg-slate-50 p-4">{report.fieldNotes.length ? <ItemList items={report.fieldNotes} bulletClass="bg-slate-400" /> : <p className="text-sm italic text-slate-500">Không có ghi chú hiện trường.</p>}</div></section>
 

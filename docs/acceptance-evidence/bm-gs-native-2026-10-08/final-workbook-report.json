@@ -1,0 +1,287 @@
+{
+  "scope": "Read-only XLSX content/ZIP inspection of 23 browser-downloaded files; not native Excel, Google Sheets, visual layout, print acceptance, formula recalculation or upstream workflow acceptance.",
+  "download_count": 23,
+  "checked_pass": 246,
+  "checked_fail": 0,
+  "aggregate_bytes": 333259,
+  "picture_anchors": 20,
+  "embedded_media_parts": 19,
+  "outputs": [
+    {
+      "entry": "02-list-all",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-list-all.xlsx",
+      "size_bytes": 19486,
+      "sha256": "d38021aa6800ac3e39fc1d94cd993cb5ae50035886016e608c78dee9e768af15",
+      "sheet_names": [
+        "2026-10-08_01",
+        "2026-10-07_02",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 2
+    },
+    {
+      "entry": "02-detail-08",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-detail-08.xlsx",
+      "size_bytes": 16070,
+      "sha256": "4a00f275c456f25628a72fafa6fbc2c31cd940c11a9b65b12190e1096f2a58fa",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "06-detail-08",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/06-detail-08.xlsx",
+      "size_bytes": 14036,
+      "sha256": "d94c0c17cf9657bf0da2497aebdde9386f79ec7e7590ae3c7bcf9067289c445d",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "02-list-filter07",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-list-filter07.xlsx",
+      "size_bytes": 16066,
+      "sha256": "2f964f479a5a6f46267887af5167dc053f49634d6720b1d8207f26249aab3d5a",
+      "sheet_names": [
+        "2026-10-07_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "04-list",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/04-list.xlsx",
+      "size_bytes": 14507,
+      "sha256": "d42e2c9e42102d86dac94a2b7490e34a42be4d94adb8175aa652febd812c2c35",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "04-detail",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/04-detail.xlsx",
+      "size_bytes": 14506,
+      "sha256": "7ea1866b0938e0a16b84af05c94ea15a4549564a5c78f8745c5459d7dfca791f",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "02-detail-09",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-detail-09.xlsx",
+      "size_bytes": 16149,
+      "sha256": "dcacc627eab8afd7c982ce666f177ffa391c75ed57aa298cc437dba34baf456d",
+      "sheet_names": [
+        "2026-10-09_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "05-detail-09",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/05-detail-09.xlsx",
+      "size_bytes": 14295,
+      "sha256": "a8460a654f08627c7d91aa27ad6c2434eceea9bc0a0abd46228b8b0b43d73ab3",
+      "sheet_names": [
+        "2026-10-09_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "06-detail-09",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/06-detail-09.xlsx",
+      "size_bytes": 14197,
+      "sha256": "b69f53cfbfcd4eeab144878bfa9f9d73244bd6942491c43c1aa74e6b606e152a",
+      "sheet_names": [
+        "2026-10-09_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "08-handover",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/08-handover.xlsx",
+      "size_bytes": 14527,
+      "sha256": "b1b818d06681109b672346d76303d8e271fd33db9a42ff0c45fd0a6333560556",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "02-workreports-list",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-workreports-list.xlsx",
+      "size_bytes": 16077,
+      "sha256": "932e48f704b0735ebccbc2ce0764c8c180a3f31b7836b0ad4c83bc7a4278614f",
+      "sheet_names": [
+        "2026-10-07_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "02-workreport-revision1",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-workreport-revision1.xlsx",
+      "size_bytes": 16076,
+      "sha256": "c99f3b9dfb7f67592d46d21241d921730714577d2760ab2b2c44ea04edd489d4",
+      "sheet_names": [
+        "2026-10-07_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "01-measurement-form",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/01-measurement-form.xlsx",
+      "size_bytes": 11040,
+      "sha256": "30828995535c2d4057236dbcc846c6bcfd92ebb9e8d6d36581a918fbc46dddd2",
+      "sheet_names": [
+        "2026-10-08_01"
+      ],
+      "picture_anchor_count": 0
+    },
+    {
+      "entry": "07-evidence-register",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/07-evidence-register.xlsx",
+      "size_bytes": 14002,
+      "sha256": "f11c607c6e74cd401add6448c1ad59fb30f15af795fd5dbb3703ee90cc60c886",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "01-survey-form",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/01-survey-form.xlsx",
+      "size_bytes": 10961,
+      "sha256": "1d33d35353ef6ad123039cdd818282d3681a646d799d56ee6233d39e67246f1c",
+      "sheet_names": [
+        "2026-10-08_01"
+      ],
+      "picture_anchor_count": 0
+    },
+    {
+      "entry": "05-survey-context",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/05-survey-context.xlsx",
+      "size_bytes": 10793,
+      "sha256": "2ab48d411843730d0627d7f725a1a8ba4bef779f3b21012a82000c1cc76f4b3e",
+      "sheet_names": [
+        "2026-10-08_01"
+      ],
+      "picture_anchor_count": 0
+    },
+    {
+      "entry": "02-daily-workflow",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-daily-workflow.xlsx",
+      "size_bytes": 16069,
+      "sha256": "aa1b505664677961d4a53bd1ccba146f91847d979d55a7ddcb4a49ca3444e745",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "05-daily-workflow",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/05-daily-workflow.xlsx",
+      "size_bytes": 14195,
+      "sha256": "5ac9d7ab273587266327fbe110ce360419f3b7d8b1002d3c63ec515f217357d7",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "06-daily-workflow",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/06-daily-workflow.xlsx",
+      "size_bytes": 14228,
+      "sha256": "922b3c075774065d3113d3d24148b9cd6c51cef0ee3fda606f539a0a215652a5",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "02-daily-workflow-mobile390",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/02-daily-workflow-mobile390.xlsx",
+      "size_bytes": 16073,
+      "sha256": "e7df267c9ab3d91a4c9ca6816aaae68262c38334681eff527f6f94c8aac74c7e",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "03-subcontractor-checklist",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/03-subcontractor-checklist.xlsx",
+      "size_bytes": 14571,
+      "sha256": "220d22a34ce7139ca38b363eb17ba72f49403ffc18e5fbdbc19473fc31ab5467",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "03-subcontractor-package",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/03-subcontractor-package.xlsx",
+      "size_bytes": 14550,
+      "sha256": "e4358f874bc1d0df6a94e83eeb767be2c591af78bf95511e453ff5e67fb53770",
+      "sheet_names": [
+        "2026-10-08_01",
+        "Hình ảnh"
+      ],
+      "picture_anchor_count": 1
+    },
+    {
+      "entry": "05-risk-form",
+      "copied_path": "/private/tmp/consflow-native-browser-20261008/workbook-check/05-risk-form.xlsx",
+      "size_bytes": 10785,
+      "sha256": "de2cc27276c42f80f2ea59c6b8371d1fffe3cf79a09d3d981d720f296940a270",
+      "sheet_names": [
+        "BM-GS-05-2892baa9_01"
+      ],
+      "picture_anchor_count": 0
+    }
+  ],
+  "findings": [
+    {
+      "id": "BM04_TOTAL_COUNT",
+      "status": "FAIL_BY_INDEPENDENT_COUNT",
+      "entries": [
+        "04-list",
+        "04-detail"
+      ],
+      "cell": "A13",
+      "formula": "COUNTA(B8:B10)",
+      "observed": "B8:B10 blank; D8 contains one actual saved defect. Formula total is therefore 0 for one defect row.",
+      "independent_expected_defect_rows": 1,
+      "independent_formula_total": 0,
+      "engine_recalculation": "NOT_RUN"
+    }
+  ],
+  "observed_missing_photos": {
+    "entries": [
+      "01-measurement-form",
+      "01-survey-form",
+      "05-survey-context",
+      "05-risk-form"
+    ],
+    "picture_anchors": 0,
+    "note": "Observed no image appendices/media; fixture records link generic evidence before filtering to exact pinned form fields. Fixture has explicit evidence refs on completed/checklist rows for other forms. No live DB was read to assert other form links."
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "form_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+  "form_code": "client_construction_handoff_plan",
+  "cases": [
+    {
+      "case": "true",
+      "http_status": 400,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Biểu mẫu quy trình có dữ liệu không hợp lệ",
+        "details": {
+          "fields": {
+            "inspection_items": "Hạng mục giám sát dòng 1: Loại trường checkbox không được hỗ trợ"
+          },
+          "missing": []
+        }
+      }
+    },
+    {
+      "case": "omitted",
+      "http_status": 400,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Biểu mẫu quy trình có dữ liệu không hợp lệ",
+        "details": {
+          "fields": {
+            "inspection_items": "Hạng mục giám sát dòng 1: Loại trường checkbox không được hỗ trợ"
+          },
+          "missing": []
+        }
+      }
+    }
+  ],
+  "answers_unchanged": true
+}

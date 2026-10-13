@@ -138,6 +138,10 @@ func (s *Service) ExportStatistic(ctx context.Context, kind, format string, req 
 }
 
 func (s *Service) WorkReports(ctx context.Context, filter WorkReportFilter, actorID string) ([]Record, error) {
+	return s.workReports(ctx, filter, actorID, 0)
+}
+
+func (s *Service) workReports(ctx context.Context, filter WorkReportFilter, actorID string, exportLimit int) ([]Record, error) {
 	normalized, err := normalizeWorkReportFilter(filter)
 	if err != nil {
 		return nil, err
@@ -178,7 +182,7 @@ func (s *Service) WorkReports(ctx context.Context, filter WorkReportFilter, acto
 			return nil, forbiddenError("Bạn không có quyền xem báo cáo của công trình này", Record{"permissions": []string{"work_report.view"}})
 		}
 	}
-	return s.repo.WorkReports(ctx, actorID, normalized)
+	return s.repo.workReports(ctx, actorID, normalized, exportLimit)
 }
 
 func (s *Service) WorkReportSummary(ctx context.Context, filter WorkReportFilter, actorID string) (WorkReportSummary, error) {
@@ -308,6 +312,9 @@ func (s *Service) WorkReportDetail(ctx context.Context, sourceID, actorID string
 		if evidenceErr != nil {
 			return nil, evidenceErr
 		}
+		for index, live := range evidenceRecords {
+			evidenceRecords[index] = bmgsFrozenEvidence(snapshot, cleanID(live["id"]), live)
+		}
 		revision["evidence_ids"] = evidenceIDs
 		revision["evidence_records"] = evidenceRecords
 	}
@@ -384,7 +391,16 @@ func (s *Service) WorkReportEvidenceFile(ctx context.Context, reportID string, r
 	if len(evidenceRecords) != 1 {
 		return EvidenceFileResult{}, validationError("Không tìm thấy minh chứng trong bản báo cáo", Record{"evidence_id": evidenceID})
 	}
-	evidence := evidenceRecords[0]
+	live := evidenceRecords[0]
+	evidence := bmgsFrozenEvidence(snapshot, evidenceID, live)
+	// Legacy snapshots did not freeze locators. Preserve their protected native
+	// file access, while never importing current human labels into the revision.
+	if cleanText(evidence["storage_provider"]) == "" {
+		evidence["storage_provider"] = live["storage_provider"]
+	}
+	if cleanText(evidence["storage_key"]) == "" {
+		evidence["storage_key"] = live["storage_key"]
+	}
 	return s.storedFileResult(ctx, evidence, "storage_provider", "storage_key", "mime_type", evidenceDownloadName(evidence))
 }
 
@@ -488,7 +504,7 @@ func (s *Service) ReviewWorkReport(ctx context.Context, reportID, action string,
 }
 
 func (s *Service) ExportWorkReports(ctx context.Context, filter WorkReportFilter, format, actorID, actorName string) (tabularExportResult, error) {
-	rows, err := s.WorkReports(ctx, filter, actorID)
+	rows, err := s.workReports(ctx, filter, actorID, -1)
 	if err != nil {
 		return tabularExportResult{}, err
 	}

@@ -158,12 +158,22 @@ func (s *Service) normalizeConstructionDailyReport(ctx context.Context, projectI
 	}
 
 	completedItems := append(doneItems, currentItems...)
+	assessments, err := normalizeConstructionSupervisionAssessments(req.SupervisionAssessments)
+	if err != nil {
+		return nil, err
+	}
+	arrivals, err := normalizeConstructionMaterialArrivals(req.MaterialArrivalItems)
+	if err != nil {
+		return nil, err
+	}
 	structured := Record{
-		"completed_items":      completedItems,
-		"next_plan_items":      nextItems,
-		"blockers":             blockers,
-		"crew_items":           crewItems,
-		"material_usage_items": materialItems,
+		"completed_items":         completedItems,
+		"next_plan_items":         nextItems,
+		"blockers":                blockers,
+		"crew_items":              crewItems,
+		"material_usage_items":    materialItems,
+		"supervision_assessments": assessments,
+		"material_arrival_items":  arrivals,
 	}
 	if primaryEvidenceID != "" {
 		structured["site_photo_evidence_id"] = primaryEvidenceID
@@ -219,13 +229,22 @@ func (s *Service) UpdateDailyReport(ctx context.Context, reportID string, req Co
 	if err != nil {
 		return nil, err
 	}
+	// Resolve omitted sections from the current source under its transaction lock.
+	// An explicit empty list still means the user removed the section.
+	omittedSections := []string{}
+	if req.SupervisionAssessments == nil {
+		omittedSections = append(omittedSections, "supervision_assessments")
+	}
+	if req.MaterialArrivalItems == nil {
+		omittedSections = append(omittedSections, "material_arrival_items")
+	}
 	delivery, err := s.normalizeConstructionReportDelivery(ctx, cleanID(current["project_id"]), req.Delivery, actorID)
 	if err != nil {
 		return nil, err
 	}
 	delete(body, "project_id")
 	delete(body, "reported_by")
-	row, err := s.repo.UpdateDailyReportWithDelivery(ctx, reportID, body, delivery, actorID, actorName)
+	row, err := s.repo.UpdateDailyReportWithDelivery(ctx, reportID, body, delivery, actorID, actorName, omittedSections...)
 	if err != nil {
 		return nil, err
 	}
@@ -414,27 +433,62 @@ func normalizeConstructionReportWorkItems(items []ConstructionDailyReportWorkIte
 }
 
 func normalizeConstructionReportNextItems(items []ConstructionDailyReportWorkItemRequest) ([]Record, []string, error) {
-	rows, titles, err := normalizeConstructionReportWorkItems(items, "next_items", "", 120)
-	if err != nil {
-		return nil, nil, err
+	rows := make([]Record, 0, len(items))
+	titles := make([]string, 0, len(items))
+	seen := map[string]bool{}
+	for _, item := range items {
+		title, err := nativeCaptureText(item.Title, "next_items.title", 180)
+		if err != nil {
+			return nil, nil, err
+		}
+		row := Record{"title": title}
+		if err := normalizeConstructionNextCapture(row, item); err != nil {
+			return nil, nil, err
+		}
+		if title == "" {
+			if constructionRowHasCaptureFacts(row, constructionNextCaptureKeys) {
+				return nil, nil, validationError("Dòng kế hoạch cần tên công việc", Record{"field": "next_items.title"})
+			}
+			continue
+		}
+		rowID, err := constructionCaptureRowID(item.RowID, seen)
+		if err != nil {
+			return nil, nil, err
+		}
+		row["row_id"] = rowID
+		rows = append(rows, row)
+		titles = append(titles, title)
 	}
-	for _, row := range rows {
-		delete(row, "result")
+	if len(rows) > 120 {
+		return nil, nil, validationError("Báo cáo có quá nhiều hạng mục", Record{"field": "next_items", "max": 120})
 	}
 	return rows, titles, nil
 }
 
 func normalizeConstructionReportBlockers(items []ConstructionDailyReportBlockerRequest) ([]Record, error) {
 	rows := make([]Record, 0, len(items))
+	seen := map[string]bool{}
 	for _, item := range items {
 		content := strings.TrimSpace(item.Content)
-		if content == "" {
-			continue
-		}
 		if len([]rune(content)) > 1000 {
 			return nil, validationError("Nội dung blocker tối đa 1000 ký tự", Record{"blockers": content})
 		}
-		rows = append(rows, Record{"content": content})
+		row := Record{"content": content}
+		if err := normalizeConstructionBlockerCapture(row, item); err != nil {
+			return nil, err
+		}
+		if content == "" {
+			if constructionRowHasCaptureFacts(row, constructionBlockerCaptureKeys) {
+				return nil, validationError("Dòng rủi ro cần nội dung", Record{"field": "blockers.content"})
+			}
+			continue
+		}
+		rowID, err := constructionCaptureRowID(item.RowID, seen)
+		if err != nil {
+			return nil, err
+		}
+		row["row_id"] = rowID
+		rows = append(rows, row)
 	}
 	if len(rows) > 120 {
 		return nil, validationError("Báo cáo có quá nhiều blocker", Record{"blockers": len(rows), "max": 120})
@@ -444,16 +498,28 @@ func normalizeConstructionReportBlockers(items []ConstructionDailyReportBlockerR
 
 func normalizeConstructionReportCrew(items []ConstructionDailyReportCrewRequest) ([]Record, string, error) {
 	rows := make([]Record, 0, len(items))
+	seenIDs := map[string]bool{}
 	summaries := make([]string, 0, len(items))
 	for _, item := range items {
 		name := strings.TrimSpace(item.CrewName)
-		if name == "" && item.WorkerCount == 0 && item.WorkHours == 0 && strings.TrimSpace(item.Note) == "" {
+		if name == "" && item.WorkerCount == 0 && item.WorkHours == 0 && strings.TrimSpace(item.Note) == "" && item.Representative == nil && item.Contact == nil {
 			continue
 		}
 		if name == "" || item.WorkerCount < 1 || item.WorkHours < 0 {
 			return nil, "", validationError("Nhân công cần tên tổ đội, số người lớn hơn 0 và giờ công không âm", Record{"crew_name": name, "worker_count": item.WorkerCount, "work_hours": item.WorkHours})
 		}
-		row := Record{"crew_name": name, "worker_count": item.WorkerCount, "work_hours": item.WorkHours, "note": strings.TrimSpace(item.Note)}
+		rowID := cleanID(item.RowID)
+		if rowID == "" {
+			rowID = newID()
+		}
+		if !validActivityUUID(rowID) || seenIDs[rowID] {
+			return nil, "", validationError("Mã tổ đội không hợp lệ hoặc trùng", nil)
+		}
+		seenIDs[rowID] = true
+		row := Record{"row_id": rowID, "crew_name": name, "worker_count": item.WorkerCount, "work_hours": item.WorkHours, "note": strings.TrimSpace(item.Note)}
+		if err := normalizeConstructionCrewContact(row, item.Representative, item.Contact); err != nil {
+			return nil, "", err
+		}
 		rows = append(rows, row)
 		summary := fmt.Sprintf("%s · %d người", name, item.WorkerCount)
 		if item.WorkHours > 0 {
@@ -702,7 +768,11 @@ func (s *Service) CreateConstructionAction(ctx context.Context, projectID string
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.CreateConstructionAction(ctx, projectID, cleanID(req.WorkItemID), sourceDailyReportID, strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, impactScope, cleanID(req.EvidenceID), actorID, actorName)
+	fieldContext, err := normalizeConstructionActionFieldContext(req.FaultCode, req.Location, req.Severity, req.ResponsibleUnit, req.Representative, req.Contact)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreateConstructionAction(ctx, projectID, cleanID(req.WorkItemID), sourceDailyReportID, strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, impactScope, cleanID(req.EvidenceID), actorID, actorName, fieldContext)
 }
 
 func (s *Service) UpdateConstructionAction(ctx context.Context, actionID string, req ConstructionActionUpdateRequest, actorID, actorName string) (Record, error) {
@@ -718,7 +788,11 @@ func (s *Service) UpdateConstructionAction(ctx context.Context, actionID string,
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.UpdateConstructionAction(ctx, actionID, strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, actorID, actorName)
+	fieldContext, err := normalizeConstructionActionFieldContext(req.FaultCode, req.Location, req.Severity, req.ResponsibleUnit, req.Representative, req.Contact)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpdateConstructionAction(ctx, actionID, strings.TrimSpace(req.Title), strings.TrimSpace(req.Description), priority, cleanID(req.AssignedUserID), dueAt, actorID, actorName, fieldContext)
 }
 
 func (s *Service) SubmitConstructionActionResolution(ctx context.Context, actionID string, req ConstructionActionResolutionRequest, actorID, actorName string) (Record, error) {

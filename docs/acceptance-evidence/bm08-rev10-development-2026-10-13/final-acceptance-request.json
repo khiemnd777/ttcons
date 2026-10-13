@@ -1,0 +1,24 @@
+{
+  "work_item_id": "4fad1dc4-13b5-46b8-982b-f07ee3d875c1",
+  "form_instance_id": "0c091759-a7bf-43a7-8512-a8282f3eb64c",
+  "pdf_export_id": "36d4b513-6d6d-43e4-8c55-ea21ea8f4d5a",
+  "type": "final",
+  "title": "[Synthetic] Nghiệm thu cuối BM08 Rev10",
+  "acceptance_date": "2026-10-13",
+  "location": "[Synthetic] Vùng thử nội bộ Rev10",
+  "client_representative": "[Synthetic] Đại diện CĐT UAT",
+  "contractor_representative": "Consflow Admin",
+  "scope_summary": "[Synthetic] Bàn giao hồ sơ kiểm thử theo quy trình đầy đủ",
+  "notes": "[Synthetic] Nghiệm thu kỹ thuật luồng Development, không có hiệu lực pháp lý.",
+  "checklist": [
+    {
+      "item_index": 0,
+      "title": "[Synthetic] Hồ sơ vùng thử theo nguồn đã chốt",
+      "description": "[Synthetic] Có checklist đã chốt, xác nhận UAT và PDF bất biến của đúng nguồn.",
+      "decision": "pass",
+      "severity": "low",
+      "photo_required": false,
+      "note": "[Synthetic] Đã kiểm tra hồ sơ thử nội bộ"
+    }
+  ]
+}

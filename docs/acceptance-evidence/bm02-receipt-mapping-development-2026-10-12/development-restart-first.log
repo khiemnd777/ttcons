@@ -1,0 +1,32 @@
+/Applications/Xcode.app/Contents/Developer/usr/bin/make --no-print-directory down
+docker compose --env-file /private/tmp/consflow-bm02-development-20261012.env down --remove-orphans
+ Container admin Stopping 
+ Container admin Stopped 
+ Container admin Removing 
+ Container admin Removed 
+ Container ttcons-backend-1 Stopping 
+ Container ttcons-backend-1 Stopped 
+ Container ttcons-backend-1 Removing 
+ Container ttcons-backend-1 Removed 
+ Container ttcons-redis-cache-1 Stopping 
+ Container ttcons-redis-1 Stopping 
+ Container ttcons-postgres-1 Stopping 
+ Container ttcons-redis-cache-1 Stopped 
+ Container ttcons-redis-cache-1 Removing 
+ Container ttcons-redis-cache-1 Removed 
+ Container ttcons-redis-1 Stopped 
+ Container ttcons-redis-1 Removing 
+ Container ttcons-redis-1 Removed 
+ Container ttcons-postgres-1 Stopped 
+ Container ttcons-postgres-1 Removing 
+ Container ttcons-postgres-1 Removed 
+ Network ttcons_default Removing 
+ Network ttcons_default Removed 
+/Applications/Xcode.app/Contents/Developer/usr/bin/make --no-print-directory build
+docker compose --env-file /private/tmp/consflow-bm02-development-20261012.env build
+ Image ttcons-backend Building 
+ Image ttcons-admin Building 
+failed to update builder last activity time: open /Users/khiemnguyen/.docker/buildx/activity/.tmp-default1839143082: operation not permitted
+
+make[1]: *** [build] Error 1
+make: *** [restart] Error 2

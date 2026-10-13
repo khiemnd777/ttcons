@@ -1,0 +1,42 @@
+[
+  {
+    "phase": "journal",
+    "file": "BM02-nhat-ky-tieng-Viet.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (14).xlsx"
+  },
+  {
+    "phase": "current",
+    "file": "BM02-bao-cao-hien-tai-tieng-Viet.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (15).xlsx"
+  },
+  {
+    "phase": "form",
+    "file": "BM02-phieu-da-chot-tieng-Viet.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/BM-GS-02 (7).xlsx"
+  },
+  {
+    "phase": "delivery3",
+    "file": "BM02-lan-gui-3-tieng-Viet.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-3 (1).xlsx"
+  },
+  {
+    "phase": "pdf3",
+    "file": "BM02-lan-gui-3-tieng-Viet.pdf",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-thi-cong-12-10-2026-lan-3.pdf"
+  },
+  {
+    "phase": "pdf1",
+    "file": "BM02-lan-gui-1-tieng-Viet.pdf",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-thi-cong-12-10-2026-lan-1.pdf"
+  },
+  {
+    "phase": "delivery1",
+    "file": "BM02-lan-gui-1-tieng-Viet.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-1 (6).xlsx"
+  },
+  {
+    "phase": "delivery2",
+    "file": "BM02-lan-gui-2-tieng-Viet.xlsx",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-2 (4).xlsx"
+  }
+]

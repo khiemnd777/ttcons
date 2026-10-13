@@ -1,0 +1,70 @@
+{
+  "source_hashes": {
+    "backend/internal/core/bm_gs_workbook.go": "f2a4adce5cdf357a051128d53fc5de390d568d212f85311c23ae44b8415cbcc0",
+    "backend/internal/core/bm_gs_export_projection.go": "794f47da87ab5f047386c781f8770ea3e99cad1fd6d5f5fccf5dae4e3a1f3978",
+    "backend/internal/core/service_native_bm_gs_exports.go": "262ffb64ad2fee57dbcd7c5bd3f07ef2091d242ab94299f1ed56592e26c8de80",
+    "backend/internal/core/bm_gs_cell_images.go": "072b07fb0366eccfc1c2f12bf16f26840f82e4d13544983389ecec2273a55c0a",
+    "backend/internal/core/bm_gs_cell_images_test.go": "78b82891ffcba0147dab60ad559b78f1956c71764ffe2149effc9be3ccc290ee",
+    "backend/internal/core/bm_gs_native_projection_test.go": "8828f0772f451edad19019f70918bc0f2a4425eb36f7afb7a3de6891ab9e8b84",
+    "backend/internal/core/bm_gs_workbook_test.go": "53d7e6f24134c6f9348fd0d696c92eeb576915e49cfd8e09400f5b45026c2b3f"
+  },
+  "tests": {
+    "command": "BMGS_CELL_QA_DIR=/private/tmp/consflow-bm07-cell-20261008 GOPATH=/private/tmp/consflow-gopath GOMODCACHE=/private/tmp/consflow-gomod GOCACHE=/private/tmp/consflow-bmgs-go-cache go test ./internal/core -run ^TestBMGS -count=1",
+    "cwd": "/Users/khiemnguyen/Works/ttcons/ttcons/backend",
+    "exit_code": 0,
+    "observed": "ok consflow/backend/internal/core 1.641s"
+  },
+  "build": {
+    "command": "go build ./internal/core",
+    "same_env": true,
+    "exit_code": 0
+  },
+  "diff_check": {
+    "scoped_owner_files": true,
+    "exit_code": 0
+  },
+  "constraints": {
+    "database_checks": "NOT_RUN by this owner",
+    "browser": "Root owns; Google native conversion failed for native3, native2 and independent XlsxWriter2 controls",
+    "native_excel": "NOT_RUN",
+    "deps_changed": false,
+    "source_originals_modified": false
+  },
+  "artifacts": [
+    {
+      "path": "/private/tmp/consflow-bm07-cell-20261008/BM07-native-cell-51-images.xlsx",
+      "sha256": "939c1793fadf6a863dfd2202233664be6cbe16a505487c2c88e1cf82b4ac54f8",
+      "bytes": 30182
+    },
+    {
+      "path": "/private/tmp/consflow-bm07-cell-20261008/BM07-native-cell-landscape.xlsx",
+      "sha256": "e5a50d76c6f76e6667d77234b811092acd5e37c66b11d9966541bdfd05b48d50",
+      "bytes": 13185
+    },
+    {
+      "path": "/private/tmp/consflow-bm07-cell-20261008/BM07-native-cell-multiple.xlsx",
+      "sha256": "433e16a0ece7dcc4d198d4dd6c53b5d5280975bbef399b026e87f977f5c08f7f",
+      "bytes": 13995
+    },
+    {
+      "path": "/private/tmp/consflow-bm07-cell-20261008/BM07-native-cell-portrait.xlsx",
+      "sha256": "dc6c8e78cf4074326f71402a391a95cbd968a950d01740e01394053bba279752",
+      "bytes": 13196
+    },
+    {
+      "path": "/private/tmp/consflow-bm07-cell-20261008/BM07-native-cell-prototype-noText.xlsx",
+      "sha256": "088bbdfaa6a8404c0fac3785b579b783a7f215ae8b885b60afc72908a7c62a02",
+      "bytes": 8369
+    },
+    {
+      "path": "/private/tmp/consflow-bm07-cell-20261008/BM07-native-cell-prototype.xlsx",
+      "sha256": "a9a4ebd4e7d9b9fb298a25680c723f61a74ca5c2dfe6260cc5e88a39ae5020b2",
+      "bytes": 8865
+    }
+  ],
+  "frozen_at_utc": "2026-10-08T14:37:55.079836+00:00",
+  "final_delta": [
+    "Preserve original client F7 header exactly against embedded template",
+    "Combined four native sources, renamed worksheet rich cells and adjacent long text regression"
+  ]
+}

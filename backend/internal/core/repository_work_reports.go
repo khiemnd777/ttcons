@@ -17,6 +17,12 @@ func sha256Hex(value []byte) string {
 }
 
 func (r *Repository) WorkReports(ctx context.Context, actorID string, filter WorkReportFilter) ([]Record, error) {
+	return r.workReports(ctx, actorID, filter, 0)
+}
+
+// exportLimit is zero for the native list, positive for a bounded content export,
+// and -1 for the existing full-filter register export.
+func (r *Repository) workReports(ctx context.Context, actorID string, filter WorkReportFilter, exportLimit int) ([]Record, error) {
 	scopeSQL, scopeArgs, err := r.ProjectAccessFilter(ctx, actorID, "project", 1)
 	if err != nil {
 		return nil, err
@@ -97,7 +103,9 @@ func (r *Repository) WorkReports(ctx context.Context, actorID string, filter Wor
 		conditions = append(conditions, `lower(concat_ws(' ',project.code,project.name,author.full_name,recipient.full_name,source.weather,source.work_summary,source.issues_summary)) LIKE `+addArg(pattern))
 	}
 	pagination := ""
-	if filter.Scope == "supervision" {
+	if exportLimit > 0 {
+		pagination = " LIMIT " + addArg(exportLimit)
+	} else if exportLimit == 0 && filter.Scope == "supervision" {
 		pagination = " LIMIT " + addArg(filter.Limit) + " OFFSET " + addArg(filter.Offset)
 	}
 	return r.Query(ctx, fmt.Sprintf(`
@@ -270,13 +278,13 @@ func (r *Repository) WorkReportSummary(ctx context.Context, actorID string, filt
 
 func (r *Repository) WorkReportSource(ctx context.Context, sourceID string) (Record, error) {
 	row, err := r.QueryOne(ctx, `
-		SELECT source.*,source.id::text AS source_id,source.project_id::text AS project_id,
+		SELECT source.*,source.id::text AS source_id,source.project_id::text AS project_id,project.address AS project_address,
 			source.reported_by::text AS author_id,project.code AS project_code,project.name AS project_name,
 			author.full_name AS author_name,COALESCE(author.deleted_at IS NOT NULL, false) AS author_account_deleted,work_item.title AS work_item_title,
 			report.id::text AS work_report_id,report.is_supervisor_report,report.recipient_id::text AS recipient_id,
 			recipient.full_name AS recipient_name,COALESCE(recipient.deleted_at IS NOT NULL, false) AS recipient_account_deleted,report.status,report.current_revision_no,
 			report.submitted_at,report.reviewed_by::text AS reviewed_by,reviewer.full_name AS reviewed_by_name,COALESCE(reviewer.deleted_at IS NOT NULL, false) AS reviewed_by_account_deleted,
-			report.reviewed_at,report.review_comment,revision.snapshot_sha256 AS delivery_snapshot_sha256
+			report.reviewed_at,report.review_comment,revision.snapshot_sha256 AS delivery_snapshot_sha256,revision.snapshot_json AS delivery_snapshot_json
 		FROM operation_daily_reports source
 		JOIN projects project ON project.id=source.project_id
 		LEFT JOIN users author ON author.id=source.reported_by
@@ -290,7 +298,10 @@ func (r *Repository) WorkReportSource(ctx context.Context, sourceID string) (Rec
 	if err != nil {
 		return nil, err
 	}
-	if err := annotateWorkReportDeliverySourceChanged(row); err != nil {
+	if err := freezeNativeWorkReportEvidence(ctx, r.querySource(), row, false); err != nil {
+		return nil, err
+	}
+	if err := annotateNativeWorkReportDeliverySourceChanged(ctx, r.querySource(), row); err != nil {
 		return nil, err
 	}
 	return row, nil
@@ -455,7 +466,7 @@ func (r *Repository) SubmitWorkReport(ctx context.Context, sourceID, recipientID
 
 func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceID, recipientID, comment, actorID, actorName string) (Record, error) {
 	source, err := queryOneRecord(ctx, tx, `
-		SELECT source.*,project.code AS project_code,project.name AS project_name,author.full_name AS author_name,
+		SELECT source.*,project.code AS project_code,project.name AS project_name,project.address AS project_address,author.full_name AS author_name,
 			work_item.title AS work_item_title,`+supervisorUserSQL("source.reported_by", "source.project_id")+` AS is_supervisor_report
 		FROM operation_daily_reports source
 		JOIN projects project ON project.id=source.project_id AND project.status <> 'cancelled'
@@ -505,6 +516,9 @@ func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceI
 	if err := tx.QueryRowContext(ctx, `SELECT full_name FROM users WHERE id=$1::uuid`, recipientID).Scan(&recipientName); err != nil {
 		return nil, err
 	}
+	if err := freezeNativeWorkReportEvidence(ctx, tx, source, true); err != nil {
+		return nil, err
+	}
 	snapshot := workReportSnapshot(source)
 	rawSnapshot, err := json.Marshal(snapshot)
 	if err != nil {
@@ -523,11 +537,19 @@ func (r *Repository) submitWorkReportTx(ctx context.Context, tx *sql.Tx, sourceI
 			return nil, validationError("Báo cáo chỉ được gửi lại sau khi có yêu cầu bổ sung", Record{"status": existing["status"]})
 		}
 		reportID = cleanID(existing["id"])
-		var previousHash string
-		if err := tx.QueryRowContext(ctx, `SELECT snapshot_sha256 FROM work_report_revisions WHERE report_id=$1 AND revision_no=$2`, reportID, existing["current_revision_no"]).Scan(&previousHash); err != nil {
+		var previousJSON []byte
+		if err := tx.QueryRowContext(ctx, `SELECT snapshot_json FROM work_report_revisions WHERE report_id=$1 AND revision_no=$2`, reportID, existing["current_revision_no"]).Scan(&previousJSON); err != nil {
 			return nil, err
 		}
-		if previousHash == hash {
+		previous := Record{}
+		if err = json.Unmarshal(previousJSON, &previous); err != nil {
+			return nil, err
+		}
+		changed, err := workReportNativeSnapshotChanged(snapshot, previous)
+		if err != nil {
+			return nil, err
+		}
+		if !changed {
 			return nil, validationError("Báo cáo chưa có thay đổi sau yêu cầu bổ sung", Record{"reason": "unchanged_since_change_request"})
 		}
 		revisionNo = int(number(existing["current_revision_no"])) + 1
@@ -748,6 +770,7 @@ func workReportSnapshot(source Record) Record {
 		"project_id":                cleanID(source["project_id"]),
 		"project_code":              source["project_code"],
 		"project_name":              source["project_name"],
+		"address":                   source["project_address"],
 		"report_type":               "construction_daily",
 		"report_date":               source["report_date"],
 		"author_id":                 cleanID(source["reported_by"]),
@@ -764,17 +787,30 @@ func workReportSnapshot(source Record) Record {
 		"structured_json":           source["structured_json"],
 		"photos":                    source["photos"],
 		"primary_evidence_id":       cleanID(source["primary_evidence_id"]),
+		"bm_gs_evidence":            source["bm_gs_evidence"],
 	}
 }
 
 func annotateWorkReportDeliverySourceChanged(source Record) error {
-	status := strings.TrimSpace(fmt.Sprint(source["delivery_status"]))
+	status := cleanText(source["delivery_status"])
 	if status == "" {
-		status = strings.TrimSpace(fmt.Sprint(source["status"]))
+		status = cleanText(source["status"])
 	}
 	source["delivery_source_changed"] = false
 	if status == "needs_changes" {
-		rawSnapshot, err := json.Marshal(workReportSnapshot(source))
+		snapshot := workReportSnapshot(source)
+		previous := recordFromAny(source["delivery_snapshot_json"])
+		if len(previous) > 0 {
+			changed, err := workReportNativeSnapshotChanged(snapshot, previous)
+			if err != nil {
+				return err
+			}
+			source["delivery_source_changed"] = changed
+			delete(source, "delivery_snapshot_sha256")
+			delete(source, "delivery_snapshot_json")
+			return nil
+		}
+		rawSnapshot, err := json.Marshal(snapshot)
 		if err != nil {
 			return err
 		}
@@ -782,5 +818,45 @@ func annotateWorkReportDeliverySourceChanged(source Record) error {
 		source["delivery_source_changed"] = previousHash != "" && sha256Hex(rawSnapshot) != previousHash
 	}
 	delete(source, "delivery_snapshot_sha256")
+	delete(source, "delivery_snapshot_json")
 	return nil
+}
+
+// Compare native business facts without rewriting immutable old snapshots. The
+// retired supplemental editor fields cannot constitute a report correction.
+func workReportNativeSnapshotChanged(current, previous Record) (bool, error) {
+	current = bmgsCopy(current)
+	previous = bmgsCopy(previous)
+	keys := []string{"bm_gs_json", "bm_gs_version", "bm_gs_updated_by", "bm_gs_updated_at"}
+	for _, snapshot := range []Record{current, previous} {
+		for _, key := range keys {
+			delete(snapshot, key)
+		}
+		photos := workflowAnswerRecordList(snapshot["bm_gs_evidence"])
+		cloned := make([]Record, 0, len(photos))
+		for _, original := range photos {
+			photo := bmgsCopy(original)
+			for _, key := range keys {
+				delete(photo, key)
+			}
+			cloned = append(cloned, photo)
+		}
+		if len(photos) > 0 {
+			snapshot["bm_gs_evidence"] = cloned
+		}
+	}
+	for _, key := range []string{"bm_gs_evidence", "address"} {
+		if _, exists := previous[key]; !exists {
+			delete(current, key)
+		}
+	}
+	a, err := json.Marshal(current)
+	if err != nil {
+		return false, err
+	}
+	b, err := json.Marshal(previous)
+	if err != nil {
+		return false, err
+	}
+	return sha256Hex(a) != sha256Hex(b), nil
 }

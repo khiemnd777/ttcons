@@ -1,0 +1,11 @@
+{
+  "id": "48000000-0000-0000-0000-000000000001",
+  "code": "client_survey_work_package",
+  "name": "Gói khảo sát hiện trạng Rev8",
+  "description": "Một lần ghi nhận yêu cầu, phong cách, kích thước và rủi ro hiện trường.",
+  "form_type": "generic_submission",
+  "status": "active",
+  "created_by": null,
+  "created_at": "2026-08-18T02:28:00.329769+00:00",
+  "updated_at": "2026-08-18T02:28:00.329769+00:00"
+}

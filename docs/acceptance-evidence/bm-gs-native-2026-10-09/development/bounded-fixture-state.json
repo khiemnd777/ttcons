@@ -1,0 +1,16 @@
+{
+  "template_id": "0d709960-5201-4e57-9fb4-7ee4f37ae140",
+  "project_id": "e71b542f-2b5f-4ae5-bef5-75fb92acc206",
+  "run_id": "edfa4e2e-be51-4150-935a-f67259498351",
+  "scope": "bounded canonical draft/export fixture; full official upstream workflow excluded",
+  "work_items": [
+    {
+      "id": "c498b321-d7ad-4e67-92e3-eeaded709e55",
+      "title": "Checklist thầu phụ"
+    },
+    {
+      "id": "c9490997-49e1-493e-9a7c-5a0799b90547",
+      "title": "Gói nghiệm thu thầu phụ"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "list": {
+    "path": "/Users/khiemnguyen/Downloads/danh-sach-can-xu-ly-BM-GS-04 (1).xlsx",
+    "ui": "Thi công → Cần xử lý → danh sách",
+    "filter": {
+      "queue": "open",
+      "search": "Xử lý vị trí góc nền UAT"
+    },
+    "button": "Xuất báo cáo"
+  },
+  "detail": {
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-04 (1).xlsx",
+    "ui": "Chi tiết Xử lý vị trí góc nền UAT",
+    "button": "Xuất báo cáo"
+  },
+  "sourceURL": "http://127.0.0.1:15174/projects/4ce66435-2632-45fe-abef-309513530b1b/operations?tab=actions"
+}

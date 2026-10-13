@@ -1,0 +1,9 @@
+{
+  "action": "Click Hoàn tất inside the Hoàn tất bàn giao vật lý Work Item dialog",
+  "result": "REJECTED_BY_AUTOMATIC_APPROVAL_REVIEW",
+  "reason": "Completing the separate physical-handover Work Item and advancing workflow state was considered outside the explicit BM08 export/readiness acceptance scope.",
+  "handover_record_status": "handed_over",
+  "physical_work_item_status": "in_progress",
+  "workaround_attempted": false,
+  "remaining_step": "Explicit user approval for this separate Work Item transition if required. Export/date/Google acceptance proceeds independently."
+}

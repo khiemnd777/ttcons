@@ -1,0 +1,42 @@
+{
+  "captured_at": "2026-10-12T10:48:00.629970+00:00",
+  "health": {
+    "health": {
+      "http": 200,
+      "body": {
+        "success": true,
+        "data": {
+          "service": "consflow",
+          "status": "ok"
+        },
+        "message": "OK"
+      }
+    },
+    "ready": {
+      "http": 200,
+      "body": {
+        "success": true,
+        "data": {
+          "database": "ok",
+          "service": "consflow",
+          "status": "ready"
+        },
+        "message": "OK"
+      }
+    }
+  },
+  "containers": [
+    {
+      "name": "/ttcons-backend-1",
+      "image": "sha256:a669db43e6ede2571e57c3b7d818a89c2167b556ce4b2c15f0306048add2ebe0",
+      "created": "2026-10-12T10:37:11.99487251Z",
+      "started_at": "2026-10-12T10:37:18.922633346Z"
+    },
+    {
+      "name": "/admin",
+      "image": "sha256:2fc711645f527a8fea04477bca8578d9887aa652af799e577d34ee78d9964ed3",
+      "created": "2026-10-12T10:37:12.044409968Z",
+      "started_at": "2026-10-12T10:37:19.005808596Z"
+    }
+  ]
+}

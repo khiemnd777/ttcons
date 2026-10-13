@@ -1,0 +1,23 @@
+{
+  "verified_at_utc": "2026-10-08 16:04:14 UTC",
+  "status": "RENDER FAIL / NOT UX ACCEPTED",
+  "scenario": "Fresh actual download from EvidencePanel Xuất báo cáo, unchanged XLSX imported into a new native Google Sheet",
+  "source_head": "75dc44707785d399ed2408959bf784928a544e96",
+  "source_state": "Uncommitted shared main worktree; 100 source file hashes rechecked with zero drift from last tested state",
+  "source_fingerprint": "ce9532fc33e7efa85f47ed1e994ef0c4b994c093ed335050adcfb1d16b99f7fa",
+  "environment": "Task-owned localhost frontend15174/API18082; synthetic work item777ced83-58f0-4b0b-bf1d-a7b82202eceb; authenticated Codex IAB and Edge Google Sheets",
+  "database": "Retained task PostgreSQL16 DB bmgs_native_browser_20261008; V156 previously verified, not re-inspected in this read/render recheck",
+  "download_path": "/Users/khiemnguyen/Downloads/BM-GS-07 (2).xlsx",
+  "download_bytes": 87954,
+  "download_sha256": "19fa2ffc73ee9fa6cab36d4a4824b2a159ee99a37a5eb74f1c0ed3e766165896",
+  "same_bytes_as_previous_actual_export": true,
+  "google_sheet": "https://docs.google.com/spreadsheets/d/14G3ZmpmqqUgTIPNbZiat9rbicGT7YwqgWLCNndp_EyE/edit",
+  "google_sheet_id": 63176868,
+  "google_tab": "BM-GS-07",
+  "observed_errors": {"F8":"#VALUE!", "F9":"#VALUE!", "F10":"#VALUE!", "F11":"#VALUE!"},
+  "verification": ["Actual button download completed and button returned to ordinary state", "Read-only ZIP inspection confirms four local-image rich references and no drawings", "Fresh connector import confirmed native conversion and readback metadata", "Bounded F7:F11 CellData confirms effective VALUE errors in all four cells", "Authenticated browser100% screenshot confirms all four errors and no images"],
+  "screenshot": "google-four-errors.jpg",
+  "application_edits": "NONE",
+  "not_run": ["New build/tests: no application source change", "Microsoft Excel rendering", "Physical print", "Production/main environment checks"],
+  "limits": "Synthetic retained UAT only. A raw XLSX #VALUE sentinel alone is not the render verdict; actual native Google conversion and browser rendering are the failure evidence. The successful oneCellAnchor diagnostic from the previous turn remains a separate prototype and is not this UI download."
+}

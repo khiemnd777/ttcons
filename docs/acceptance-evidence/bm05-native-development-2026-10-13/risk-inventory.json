@@ -1,0 +1,17 @@
+[
+  {
+    "form_id": "dde65884-a1da-46ac-968d-6e1f83084185",
+    "work_item_id": "0e59ca7e-d8d3-4ded-b28d-67253cfda970",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "project_code": "DEV-BM-REUSE-20261009",
+    "project_name": "[Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06",
+    "work_item_title": "BM05 — Rủi ro synthetic",
+    "work_item_status": "in_progress",
+    "code": "client_site_risk_assessment",
+    "version": 4,
+    "version_id": "96f6a564-c6f4-4ef1-96a3-4dc45a3fe9b0",
+    "form_status": "draft",
+    "current_revision": 0,
+    "risk_rows": 1
+  }
+]

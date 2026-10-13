@@ -1,0 +1,20 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "success": true,
+    "converted": true,
+    "fileId": "1sOMXCGU2Yao9PawpNl23UOpvaPDUZ3YnY_LtAp5xyNU",
+    "title": "BM04 — Chi tiết Cần xử lý — Nghiệm thu 13-10-2026",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "url": "https://docs.google.com/spreadsheets/d/1sOMXCGU2Yao9PawpNl23UOpvaPDUZ3YnY_LtAp5xyNU/edit?usp=drivesdk",
+    "spreadsheetId": "1sOMXCGU2Yao9PawpNl23UOpvaPDUZ3YnY_LtAp5xyNU",
+    "parentId": null,
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1sOMXCGU2Yao9PawpNl23UOpvaPDUZ3YnY_LtAp5xyNU"
+  },
+  "isError": false
+}

@@ -1,0 +1,248 @@
+{
+  "scope": "Development BM02 project/date receipt mapping; existing canonical fixture and new form/delivery revision3",
+  "checks": {
+    "same_form_project_owner_submitted_revision3": true,
+    "same_report_delivery_revision3": true,
+    "old_delivery_entire_records_unchanged": true,
+    "all_earlier_form_events_unchanged": true,
+    "same_existing_field_definition": true,
+    "no_manual_arrivals_or_new_answer_keys": true,
+    "recipient_valid_requested_changes_revision2": true,
+    "receipt_unchanged_from_baseline": true,
+    "receipt_report_distinct_canonical_owners": true,
+    "form3_one_correct_delivered_receipt12": true,
+    "delivery3_exact_form_revision_arrivals": true,
+    "old_deliveries_not_backfilled": true,
+    "new_delivery_exact_existing_photo2": true,
+    "preserved_prior_projects": true,
+    "preserved_prior_work_items": true,
+    "preserved_prior_workflow_form_instances": true,
+    "preserved_prior_workflow_form_events": true,
+    "preserved_prior_operation_daily_reports": true,
+    "preserved_prior_work_report_revisions": true,
+    "preserved_prior_incoming_acceptance_records": true,
+    "preserved_prior_incoming_acceptance_items": true,
+    "database_migrations_and_record_counts": true,
+    "tested_built_source_manifest_unchanged": true,
+    "delivery2-before_original_browser_bytes": true,
+    "delivery2-before_two_sheets_no_stored_errors": true,
+    "delivery2-before_one_exact_original_photo": true,
+    "delivery2-before_old_receipt_missing_preserved": true,
+    "delivery2-before_no_invented_progress_assessment": true,
+    "form3_original_browser_bytes": true,
+    "form3_two_sheets_no_stored_errors": true,
+    "form3_one_exact_original_photo": true,
+    "form3_material_name_quantity12": true,
+    "form3_material_criterion_has_real_facts": true,
+    "form3_supplier_not_invented_origin": true,
+    "form3_no_invented_progress_assessment": true,
+    "delivery3_original_browser_bytes": true,
+    "delivery3_two_sheets_no_stored_errors": true,
+    "delivery3_one_exact_original_photo": true,
+    "delivery3_material_name_quantity12": true,
+    "delivery3_material_criterion_has_real_facts": true,
+    "delivery3_supplier_not_invented_origin": true,
+    "delivery3_no_invented_progress_assessment": true,
+    "delivery2_original_browser_bytes": true,
+    "delivery2_two_sheets_no_stored_errors": true,
+    "delivery2_one_exact_original_photo": true,
+    "delivery2_old_receipt_missing_preserved": true,
+    "delivery2_no_invented_progress_assessment": true,
+    "delivery1_original_browser_bytes": true,
+    "delivery1_two_sheets_no_stored_errors": true,
+    "delivery1_one_exact_original_photo": true,
+    "delivery1_old_receipt_missing_preserved": true,
+    "delivery1_no_invented_progress_assessment": true,
+    "delivery1_all_prior_parts_preserved_with_resolved_string_indices": true,
+    "delivery2_all_prior_parts_preserved_with_resolved_string_indices": true,
+    "delivery2_before_after_same_content_style_media": true,
+    "form3_delivery3_template_cells_match": true,
+    "form3_google_no_effective_errors": true,
+    "form3_google_all_bounded_cells_formulas_match": true,
+    "form3_google_crew_recalculated": true,
+    "delivery3_google_no_effective_errors": true,
+    "delivery3_google_all_bounded_cells_formulas_match": true,
+    "delivery3_google_crew_recalculated": true,
+    "delivery1_google_no_effective_errors": true,
+    "delivery1_google_all_bounded_cells_formulas_match": true,
+    "delivery1_google_crew_recalculated": true,
+    "delivery2_google_no_effective_errors": true,
+    "delivery2_google_all_bounded_cells_formulas_match": true,
+    "delivery2_google_crew_recalculated": true
+  },
+  "database": {
+    "name": "consflow",
+    "migration_count": 157,
+    "projects": 6,
+    "forms": 21,
+    "allowed_changed_ids": {
+      "work_items": [
+        "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+      ],
+      "workflow_form_instances": [
+        "a6edf273-25fb-4a49-aaa5-fdd525c4c4a2"
+      ],
+      "operation_daily_reports": [
+        "4c13526f-7fd6-4fc3-9526-18144148e687"
+      ]
+    }
+  },
+  "source_file_count": 963,
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "files": {
+    "delivery2-before": {
+      "file": "BM02-lan-gui-2-truoc-sua-phieu.xlsx",
+      "sha256": "7b0afe491f5e91e74a9632115f146b304b782ca3e6a8e736780b96ea290fadae",
+      "bytes": 28253,
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+          "pixel_sha256": "6604a8e3553bb39363cc9809cc80c226ecf2e202e626d6233b0c61dc99bf7ace",
+          "width": 900,
+          "height": 560
+        }
+      ],
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+      "crew": 6
+    },
+    "form3": {
+      "file": "BM02-phieu-phien-ban-3.xlsx",
+      "sha256": "82cf623362e61fa4bc32d75fc70e5aa2275ccb87bb3048e412d1288d918408d1",
+      "bytes": 28324,
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+          "pixel_sha256": "6604a8e3553bb39363cc9809cc80c226ecf2e202e626d6233b0c61dc99bf7ace",
+          "width": 900,
+          "height": 560
+        }
+      ],
+      "material_note": "[Synthetic] Gạch nhận trường BM02 · Khối lượng nhập: 12.000 · Đơn vị: m2 · Ghi chú: [Synthetic] Nhận thực tế 12 m2, chưa phải vật tư sử dụng",
+      "crew": 6
+    },
+    "delivery3": {
+      "file": "BM02-lan-gui-3.xlsx",
+      "sha256": "43b9134cdc2e995aeba75553e850fcb4cbfcf5248400c3281cc1885309c698f4",
+      "bytes": 28530,
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+          "pixel_sha256": "6604a8e3553bb39363cc9809cc80c226ecf2e202e626d6233b0c61dc99bf7ace",
+          "width": 900,
+          "height": 560
+        }
+      ],
+      "material_note": "[Synthetic] Gạch nhận trường BM02 · Khối lượng nhập: 12.000 · Đơn vị: m2 · Ghi chú: [Synthetic] Nhận thực tế 12 m2, chưa phải vật tư sử dụng",
+      "crew": 6
+    },
+    "delivery2": {
+      "file": "BM02-lan-gui-2-giu-nguyen.xlsx",
+      "sha256": "ca5d525b1741aa446e8d14f0a75aa30673a97996f7cd7c2993fef97243dd735e",
+      "bytes": 28256,
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+          "pixel_sha256": "6604a8e3553bb39363cc9809cc80c226ecf2e202e626d6233b0c61dc99bf7ace",
+          "width": 900,
+          "height": 560
+        }
+      ],
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+      "crew": 6
+    },
+    "delivery1": {
+      "file": "BM02-lan-gui-1-giu-nguyen.xlsx",
+      "sha256": "84798ac98e63a399fa768f52a8938a7487d586d8e546e72462c1f30abd91c722",
+      "bytes": 28527,
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "sha256": "06de76dd3433c3a7a8855d3328b72cba297d15f357ae971ae2afff050467bc5b",
+          "pixel_sha256": "8e4b45b49840ef6bb1582da97404c3decd4b6dc9a592e6bb9aa8f12cc5845bbf",
+          "width": 900,
+          "height": 560
+        }
+      ],
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+      "crew": 3
+    }
+  },
+  "old_archive_differences": {
+    "delivery1": [
+      "[Content_Types].xml",
+      "xl/sharedStrings.xml",
+      "xl/worksheets/sheet3.xml"
+    ],
+    "delivery2": [
+      "[Content_Types].xml",
+      "xl/sharedStrings.xml",
+      "xl/worksheets/sheet3.xml"
+    ]
+  },
+  "google": [
+    {
+      "phase": "form3",
+      "url": "https://docs.google.com/spreadsheets/d/1rMYbBNEvp8DDf2DV1LR2aJlPgW-v6UDVVbJW45gDTKs/edit",
+      "populated_cells_compared": 98,
+      "effective_error_count": 0,
+      "crew_sum": 6
+    },
+    {
+      "phase": "delivery3",
+      "url": "https://docs.google.com/spreadsheets/d/1RwfD8LklMgwjCUkhOGt6UKXLUb03BY4RdTbY2QnTtkk/edit",
+      "populated_cells_compared": 102,
+      "effective_error_count": 0,
+      "crew_sum": 6
+    },
+    {
+      "phase": "delivery1",
+      "url": "https://docs.google.com/spreadsheets/d/1StfFCHtXHX57clmzrQVIFuk1-yRLkobqlXCTzK5bR8E/edit",
+      "populated_cells_compared": 96,
+      "effective_error_count": 0,
+      "crew_sum": 3
+    },
+    {
+      "phase": "delivery2",
+      "url": "https://docs.google.com/spreadsheets/d/1dd_G_qeaDszNOPGwGNdGa3g9NeQcENCAN6cZ3R7OIbI/edit",
+      "populated_cells_compared": 96,
+      "effective_error_count": 0,
+      "crew_sum": 6
+    }
+  ],
+  "criteria": {
+    "automatic_legitimate_receipt_reuse": "PASS",
+    "frozen_form_delivery_and_old_history": "PASS",
+    "original_browser_file_google_cells": "PASS",
+    "user_visual_review": "PENDING"
+  },
+  "status": "TECHNICALLY VERIFIED within synthetic Development scope; user review pending",
+  "screenshots": {
+    "01-old-delivery2-before.jpg": "6ab1dc5b65b19a9a6e7fa1c5c355bb3dbef8e0f3fe66805f20583f3c70083d5e",
+    "02-form3-export.jpg": "f15cde8cb01e319ab5a0a7629dc9c13619a389486bf9facdc0268efb9454e984",
+    "03-resubmitted-delivery3.jpg": "7d86fe2cd47e4e5b31119d7984b78ef4c1f92420c9f4a24c46f7742b2fa45f71",
+    "04-delivery3-export.jpg": "34720228f421aa1b8d91cf34a93fe3e8dfea282c54fac87f7612503b185ae218",
+    "05-three-revisions.jpg": "66132967aeb3b179e04a1b56f6522d0ba089216e9c3e2b957b05710985c6e2bb",
+    "06-old-delivery2-after.jpg": "ea13cf22b457c0b309fc763a6edc818f585a704ee18ed0d264b5c94c95f44254",
+    "07-old-delivery1-after.jpg": "ba7fd4f5c972caee8d428b848dbd87bbe81586caa7692c3dce18acb15801fe5d",
+    "08-google-form3-main.jpg": "eda57f936f9fa730b849bd75b732afdf346378900b43808ccc66bd2b82c333fb",
+    "09-google-form3-material.jpg": "35b6f7f2d7dc933767cdec841fd957d3a8b562f060f1b07a3927e68db52bf1c2",
+    "10-google-form3-lower.jpg": "b87a57798453bd7fb8653a2495d2343efd7da594e3c3b26f18a6750849b8a860",
+    "11-google-form3-photo.jpg": "96c44bab8b5c3a0e6f5879cb3b50b2f0069f9b25d2372192638be1a776dd8fc4",
+    "12-google-delivery3-main.jpg": "4b7218d1c6ddfb779c8824a04e4e6ea2b5a61a86a834e50f6cd73f9dd91acaab",
+    "13-google-delivery3-material.jpg": "9a5c0d39bb3c70919abad6f1df1a873c4a3de7f2ebc5a1ea52301e479eaf36bd",
+    "14-google-delivery3-lower.jpg": "6e77caf33e67280165112bf5587978988eb7f034a830e6db342f3c6e5639f5ca",
+    "15-google-delivery3-photo.jpg": "4d7cd13bfe931f5324f1843eff2d1dfe529f9c1fa4887b63de91c4e35dc6c90a",
+    "16-google-old1-main.jpg": "96882691d983fdb8a61f2c99a20c66a5c554c128d055496d1cb4116f0297a869",
+    "17-google-old1-material.jpg": "caa4b2330455776a8e5508fbf4876b05536427821b496e71a4eb48e4dc89af25",
+    "18-google-old1-lower.jpg": "cb5d88d2e5a4b554021867eeec0478011f8b66904aab736b26578b3a060283b4",
+    "19-google-old1-photo.jpg": "f40d3fe244c95b5ee6c27e37e5d7988b2465938d91120dbb7958c2b2932ecd74",
+    "20-google-old2-main.jpg": "a564d7b93188b012e520a53bc4c50be4508da5ab501ed0f3f2d7dfd921dc1664",
+    "21-google-old2-material.jpg": "c78272c64a52b5da2a1a565b19943adea111d3d51f5506c352ab1f506be447d5",
+    "22-google-old2-lower.jpg": "11dc7ee8c50e42ebedb3cd3ddb1a1ff01dd1e9034b82f5ff7160fa52d7f2ae43",
+    "23-google-old2-photo.jpg": "d9d161f77e8c7bab5bd85cda41d7cfcf8c1eb1ba3db8f05d53279801df8db1de"
+  }
+}

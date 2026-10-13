@@ -1,0 +1,49 @@
+{
+  "recorded_at_utc": "2026-10-09T10:12:53.583628+00:00",
+  "scope": "bounded standard-development saved draft/export; full workflow and CreateHandoverUI excluded",
+  "checks": [
+    "builtin: no spreadsheet errors in entire bounded used range",
+    "builtin: reference, pinned package label, design/actual quantities, explicit fail and rework conclusion match",
+    "client: no spreadsheet errors in entire bounded used range",
+    "client: reference, explicit pass and accepted conclusion match",
+    "handover_final: no spreadsheet errors in entire bounded used range",
+    "handover: stage, explicit fail, date serial, not-eligible conclusion match; six unassessed results remain blank"
+  ],
+  "passed": true,
+  "google_ids": {
+    "builtin": "1jBVLytRioWtM_6PUYkYhZ-hue6kA6XT8mw_054nlg6M",
+    "client": "1SOumXdGnhJ-YwOnrZrRK6-oCpJIsr1KGA6NKWw34JAY",
+    "handover_final": "1UGRpqU7HyLOBxHhE6kurM8k08--__TX8WrwQNT0iIS0"
+  },
+  "private_google_native_conversion": true,
+  "google_content_edits": false,
+  "final_workbooks": [
+    {
+      "browser_download": "/Users/khiemnguyen/Downloads/BM-GS-03 (6).xlsx",
+      "retained_file": "bm03-builtin-actual.xlsx",
+      "sha256": "9971cd5c69586cc37f68e772c5c5d1a5164542a6bcede88129dc9b3e8113691e",
+      "bytes": 11230,
+      "status": "final",
+      "download_trigger": "existing Xuất báo cáo button",
+      "post_download_edits": false
+    },
+    {
+      "browser_download": "/Users/khiemnguyen/Downloads/BM-GS-03 (7).xlsx",
+      "retained_file": "bm03-client-package-actual.xlsx",
+      "sha256": "649980999bfea34b090f0df9924ba37d52a0dd6005a47f678d97e254f5b43fbf",
+      "bytes": 11192,
+      "status": "final",
+      "download_trigger": "existing Xuất báo cáo button",
+      "post_download_edits": false
+    },
+    {
+      "browser_download": "/Users/khiemnguyen/Downloads/BM-GS-08 (5).xlsx",
+      "retained_file": "bm08-final-actual.xlsx",
+      "sha256": "e681a17329e047b1a158af6fcdb9ac8f0098c9846e32e6240d26847f82f64f29",
+      "bytes": 11873,
+      "status": "final",
+      "download_trigger": "existing Xuất báo cáo button",
+      "post_download_edits": false
+    }
+  ]
+}

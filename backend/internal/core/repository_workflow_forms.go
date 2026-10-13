@@ -200,6 +200,32 @@ func (r *Repository) HasSubmittedWorkflowFormForWorkItem(ctx context.Context, wo
 	return len(rows) > 0 && number(rows[0]["total"]) > 0, nil
 }
 
+// Native forms remain explicit-only except the two complete BM03 assessment
+// contracts. A revision marker alone must not promote an incomplete definition.
+// Both catalog and automatic selection use this predicate (aliases t and v).
+const workflowFormDefaultEligibilitySQL = `(
+	COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
+	OR (
+		t.code IN ('builtin_subcontractor_checklist','client_subcontractor_acceptance_package')
+		AND COALESCE(v.schema_json->>'native_field_capture_revision','')='1'
+		AND COALESCE(v.schema_json->>'native_subcontractor_assessment_revision','')='1'
+		AND EXISTS (SELECT 1 FROM workflow_form_fields df WHERE df.form_version_id=v.id AND df.field_key='reference_no' AND df.field_type='text')
+		AND EXISTS (SELECT 1 FROM workflow_form_fields df WHERE df.form_version_id=v.id AND df.field_key='acceptance_conclusion' AND df.field_type='select'
+			AND df.options_json @> '[{"value":"accepted"},{"value":"rework_required"}]'::jsonb)
+		AND EXISTS (SELECT 1 FROM workflow_form_fields df WHERE df.form_version_id=v.id AND df.field_key='checklist_items' AND df.field_type='structured_list'
+			AND df.validation_json->'item_fields' @> '[
+				{"key":"standard_reference","type":"text"},
+				{"key":"drawing_reference","type":"text"},
+				{"key":"technical_requirement","type":"textarea"},
+				{"key":"design_quantity","type":"number"},
+				{"key":"actual_quantity","type":"number"},
+				{"key":"measurement_note","type":"textarea"},
+				{"key":"quality_result","type":"select","options":[{"value":"pass"},{"value":"fail"},{"value":"not_assessed"}]},
+				{"key":"quality_note","type":"textarea"}
+			]'::jsonb)
+	)
+)`
+
 func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) {
 	return r.Query(ctx, `
 		WITH latest_published AS (
@@ -208,7 +234,10 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 				template_id
 			FROM workflow_form_versions
 			WHERE status='published'
-			  AND COALESCE(schema_json->>'variant','')<>'operational_capture_v3'
+			  AND (COALESCE(schema_json->>'variant','')<>'operational_capture_v3'
+			       OR schema_json->>'native_capture_revision'='1'
+			       OR schema_json->>'native_field_capture_revision'='1'
+			       OR schema_json->>'native_risk_assignment_revision'='1')
 			ORDER BY template_id, version_no DESC, published_at DESC NULLS LAST, created_at DESC
 		),
 		step_usage AS (
@@ -229,6 +258,7 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 			v.status AS version_status,
 			v.published_at,
 			(v.id=lp.id) AS latest_published,
+			`+workflowFormDefaultEligibilitySQL+` AS default_eligible,
 			COALESCE(su.step_usage_count, 0) AS step_usage_count,
 			COUNT(f.id)::int AS field_count,
 			COALESCE(
@@ -253,7 +283,10 @@ func (r *Repository) WorkflowFormCatalog(ctx context.Context) ([]Record, error) 
 			) AS fields
 		FROM workflow_form_templates t
 		JOIN workflow_form_versions v ON v.template_id=t.id AND v.status='published'
-		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
+		  AND (COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
+		       OR v.schema_json->>'native_capture_revision'='1'
+		       OR v.schema_json->>'native_field_capture_revision'='1'
+		       OR v.schema_json->>'native_risk_assignment_revision'='1')
 		JOIN latest_published lp ON lp.template_id=t.id
 		LEFT JOIN workflow_form_fields f ON f.form_version_id=v.id
 		LEFT JOIN step_usage su ON su.form_version_id=v.id
@@ -895,7 +928,7 @@ func (r *Repository) DefaultWorkflowFormVersionID(ctx context.Context, stepType 
 		FROM workflow_form_templates t
 		JOIN workflow_form_versions v ON v.template_id=t.id
 		WHERE t.code=$1 AND t.status='active' AND v.status='published'
-		  AND COALESCE(v.schema_json->>'variant','')<>'operational_capture_v3'
+		  AND `+workflowFormDefaultEligibilitySQL+`
 		ORDER BY v.version_no DESC
 		LIMIT 1
 	`, code)
@@ -980,7 +1013,6 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 	if answers == nil {
 		answers = Record{}
 	}
-	rawSnapshot, _ := json.Marshal(answers)
 	eventType := "draft_saved"
 	toStatus := "draft"
 	if submit {
@@ -1008,6 +1040,12 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 		return nil, sql.ErrNoRows
 	}
 	instance := rows[0]
+	if cleanText(instance["form_code"]) == "builtin_construction_daily_report" {
+		if err := normalizeBMGSWorkflowCrewIDs(answers); err != nil {
+			return nil, err
+		}
+	}
+	rawSnapshot, _ := json.Marshal(answers)
 	fromStatus := fmt.Sprint(instance["status"])
 	if len(expectedAnswers) > 0 && expectedAnswers[0] != nil {
 		expected, err := json.Marshal(expectedAnswers[0])
@@ -1091,10 +1129,12 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 			return nil, err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `
+	var formEventID string
+	if err := tx.QueryRowContext(ctx, `
 		INSERT INTO workflow_form_events (instance_id, project_id, work_item_id, actor_id, event_type, from_status, to_status, comment, metadata_json)
 		VALUES ($1, $2, NULLIF($3,'')::uuid, NULLIF($4,'')::uuid, $5, $6, $7, NULLIF($8,''), $9::jsonb)
-	`, instanceID, projectID, workItemID, actorID, eventType, fromStatus, toStatus, comment, string(rawMetadata)); err != nil {
+		RETURNING id::text
+	`, instanceID, projectID, workItemID, actorID, eventType, fromStatus, toStatus, comment, string(rawMetadata)).Scan(&formEventID); err != nil {
 		return nil, err
 	}
 	if workItemID != "" {
@@ -1129,6 +1169,9 @@ func (r *Repository) SaveWorkflowForm(ctx context.Context, instanceID string, an
 				var err error
 				generatedWorkItemIDs, err = createDailyReportNextItemsTx(ctx, tx, instance, answers, actorID)
 				if err != nil {
+					return nil, err
+				}
+				if err := saveNativeWorkflowDailySourcesTx(ctx, tx, formEventID, instance, answers, revisionNo, actorID); err != nil {
 					return nil, err
 				}
 			}
@@ -1341,6 +1384,11 @@ func (r *Repository) AmendWorkflowForm(ctx context.Context, instanceID string, a
 		return nil, err
 	}
 	previousAnswers := recordFromAny(instance["answers_snapshot_json"])
+	if constructionDailyReport {
+		if err := normalizeBMGSWorkflowCrewIDs(answers); err != nil {
+			return nil, err
+		}
+	}
 	changes := workflowFormAnswerChanges(previousAnswers, answers, fields)
 	if len(changes) == 0 {
 		return nil, validationError("Hồ sơ chưa có nội dung thay đổi", Record{"reason": "no_changes"})
@@ -1423,6 +1471,11 @@ func (r *Repository) AmendWorkflowForm(ctx context.Context, instanceID string, a
 		"reason":                    reason,
 		"changed_fields":            changes,
 		"downstream_reprocessed":    false,
+	}
+	if facts, err := freezeNativeWorkflowDailySources(ctx, tx, instance, answers, nextRevision, actorID); err != nil {
+		return nil, err
+	} else if facts != nil {
+		metadata["native_daily_sources"] = facts
 	}
 	rawMetadata, _ := json.Marshal(metadata)
 	if _, err := tx.ExecContext(ctx, `

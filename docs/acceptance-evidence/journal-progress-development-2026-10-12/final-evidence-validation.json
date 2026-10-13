@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-12T02:46:53.668945+00:00",
+  "source_manifest_unchanged": true,
+  "source_file_count": 962,
+  "database_baseline_and_target_source_hashes_unchanged": true,
+  "database": {
+    "database": "consflow",
+    "migrations": 157,
+    "max_migration": 157,
+    "projects": 5,
+    "forms": 20,
+    "report_hashes": {
+      "bd131f5c-ccf0-4c3f-b862-7d2dfc551eb4": "93cd1b7c1527e885f52aa80b5dca83e8",
+      "ded0bb8b-39dd-4757-9cef-3c2f87692b1f": "98ae7b03e5eba105a6ad0e043d28707a"
+    },
+    "form_hash": "bc9b06284ff69f47e59e65e5956bc7eb"
+  },
+  "browser_scenarios": 7,
+  "browser_assertions_pass": true,
+  "screenshots": 8,
+  "limits": [
+    "positive-percentage browser fixture not exercised (real-component tests cover it)",
+    "Google Sheets not rerun (no export/backend change)",
+    "user UX acceptance pending"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "id": "100AyGBpby2WmD7GL3W7QF33heHGh9I1UhJBESz_jpWA",
+    "title": "BM06 — Phiếu đã chốt R2 — Development 13-10-2026",
+    "mime_type": "application/vnd.google-apps.spreadsheet",
+    "size": null,
+    "url": "https://docs.google.com/spreadsheets/d/100AyGBpby2WmD7GL3W7QF33heHGh9I1UhJBESz_jpWA/edit?usp=drivesdk",
+    "display_url": "https://docs.google.com/spreadsheets/d/100AyGBpby2WmD7GL3W7QF33heHGh9I1UhJBESz_jpWA/edit?usp=drivesdk",
+    "file_or_folder": "file",
+    "created_time": "2026-10-13T05:34:45.745Z",
+    "modified_time": null,
+    "parent_ids": null,
+    "drive_id": null,
+    "current_user_can_share": null,
+    "has_augmented_permissions": null,
+    "shared": false,
+    "permissions": [
+      {
+        "type": "user",
+        "role": "owner",
+        "emailAddress": null,
+        "domain": null,
+        "displayName": null,
+        "allowFileDiscovery": null
+      }
+    ],
+    "source_visibility_status": "permission_metadata_available"
+  },
+  "isError": false
+}

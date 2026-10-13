@@ -1,0 +1,811 @@
+package core
+
+import (
+	"bytes"
+	"crypto/sha256"
+	_ "embed"
+	"fmt"
+	"image"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
+)
+
+// Sanitized client workbook: structural text/styles only, with no example data.
+//
+//go:embed assets/bm_gs_templates.xlsx
+var bmgsTemplateWorkbook []byte
+
+type bmgsLayout struct {
+	start, slots, columns, last int
+	keys                        []string
+}
+
+var bmgsLayouts = map[string]bmgsLayout{
+	"BM-GS-01": {10, 5, 7, 18, []string{"location", "dimensions", "mep", "existing_condition", "assessment", "note"}},
+	"BM-GS-02": {25, 3, 8, 32, nil},
+	"BM-GS-03": {9, 3, 7, 16, []string{"title", "standard", "technical_requirement", "design_quantity", "actual_quantity", "result"}},
+	"BM-GS-04": {8, 3, 10, 16, []string{"fault_code", "location", "description", "severity", "partner", "representative", "due_at", "status", "note"}},
+	"BM-GS-05": {8, 2, 11, 13, []string{"risk_code", "detected_at", "description", "cause", "impact", "risk_level", "proposed_action", "owner", "due_at", "status"}},
+	"BM-GS-06": {8, 2, 10, 13, []string{"instruction_code", "title", "location", "partner", "representative", "issued_at", "due_at", "progress_percent", "status"}},
+	"BM-GS-07": {8, 3, 7, 14, []string{"location", "captured_at", "technical_content", "photo_phase", "filename", "handover_note"}},
+	"BM-GS-08": {8, 4, 6, 16, []string{"title", "requirement", "result", "defect", "due_at"}},
+}
+
+func generateBMGSWorkbook(data BMGSWorkbookData) ([]byte, error) {
+	grouped, err := nativeBMGSWorkbookSheets(data.TemplateCode, data.Sheets)
+	if err != nil {
+		return nil, err
+	}
+	data.Sheets = grouped
+	layout, ok := bmgsLayouts[data.TemplateCode]
+	if !ok {
+		return nil, fmt.Errorf("unsupported BM-GS template")
+	}
+	if len(data.Sheets) == 0 || len(data.Sheets) > 50 {
+		return nil, fmt.Errorf("workbook requires 1..50 independent source documents; narrow the source date/filter scope")
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(bmgsTemplateWorkbook))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	for _, defined := range f.GetDefinedName() {
+		if err = f.DeleteDefinedName(&defined); err != nil {
+			return nil, err
+		}
+	}
+	for _, name := range f.GetSheetList() {
+		if name != data.TemplateCode {
+			if err = f.DeleteSheet(name); err != nil {
+				return nil, err
+			}
+		}
+	}
+	// Copy the clean template before populating any source sheet.
+	names := []string{data.TemplateCode}
+	for i := 1; i < len(data.Sheets); i++ {
+		name := fmt.Sprintf("%s-%d", data.TemplateCode, i+1)
+		idx, e := f.NewSheet(name)
+		if e != nil {
+			return nil, e
+		}
+		if e = f.CopySheet(0, idx); e != nil {
+			return nil, e
+		}
+		names = append(names, name)
+	}
+	used := map[string]bool{}
+	cellImages := []bmgsCellImage{}
+	for i, s := range data.Sheets {
+		name := bmgsSheetName(s.Name, data.TemplateCode, i, used)
+		used[strings.ToLower(name)] = true
+		if err = f.SetSheetName(names[i], name); err != nil {
+			return nil, err
+		}
+		if err = bmgsPopulate(f, name, data, s, layout); err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		if data.TemplateCode == "BM-GS-07" {
+			bindings, e := bmgsBindCellImages(f, name, s.Rows, data.Images)
+			if e != nil {
+				return nil, e
+			}
+			cellImages = append(cellImages, bindings...)
+		}
+	}
+	if data.TemplateCode != "BM-GS-07" {
+		if err = bmgsAppendImages(f, data.Images); err != nil {
+			return nil, err
+		}
+	}
+	f.SetActiveSheet(0)
+	out, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+	if out.Len() > bmgsMaxWorkbookBytes {
+		return nil, fmt.Errorf("workbook exceeds %d MiB; narrow the source date/filter scope", bmgsMaxWorkbookBytes>>20)
+	}
+	if data.TemplateCode == "BM-GS-07" {
+		return bmgsWriteCellImages(out.Bytes(), cellImages)
+	}
+	return out.Bytes(), nil
+}
+
+func bmgsSheetName(proposed, code string, index int, used map[string]bool) string {
+	base := strings.TrimSpace(proposed)
+	if base == "" {
+		base = code
+	}
+	base = strings.Map(func(r rune) rune {
+		if strings.ContainsRune(":\\/?*[]", r) || r < 32 {
+			return '-'
+		}
+		return r
+	}, base)
+	base = strings.Trim(base, "'")
+	if base == "" {
+		base = code
+	}
+	r := []rune(base)
+	if len(r) > 25 {
+		base = string(r[:25])
+	}
+	name := base
+	for n := 2; used[strings.ToLower(name)] || name == "Hình ảnh"; n++ {
+		name = fmt.Sprintf("%s-%d", base, n)
+	}
+	return name
+}
+
+func bmgsPopulate(f *excelize.File, name string, d BMGSWorkbookData, s BMGSSheet, l bmgsLayout) error {
+	if d.TemplateCode == "BM-GS-07" {
+		if err := f.SetColWidth(name, "F", "F", 24); err != nil {
+			return err
+		}
+	}
+	set := func(cell string, v any) error {
+		if v == nil {
+			return nil
+		}
+		if t, ok := v.(time.Time); ok {
+			if t.IsZero() {
+				return nil
+			}
+		}
+		return f.SetCellValue(name, cell, v)
+	}
+	meta := s.Metadata
+	if meta == nil {
+		meta = Record{}
+	}
+	// Historical sheets own their frozen identity. A missing legacy snapshot field
+	// stays blank rather than acquiring the project's current name or address.
+	projectName := bmgsSheetProjectField(meta, "project_name", d.ProjectName)
+	projectCode := bmgsSheetProjectField(meta, "project_code", d.ProjectCode)
+	address := bmgsSheetProjectField(meta, "address", d.Address)
+	project := projectName
+	if projectCode != "" {
+		project = "[" + projectCode + "] " + project
+	}
+	values := map[string]any{"B5": project}
+	switch d.TemplateCode {
+	case "BM-GS-01":
+		values = map[string]any{"B5": projectName, "F5": projectCode, "B6": address, "F6": s.DateLabel, "B7": meta["survey_unit"], "F7": meta["client_representative"]}
+	case "BM-GS-02":
+		values["G5"] = s.DateLabel
+		values["B6"] = meta["weather"]
+		values["G6"] = meta["supervisor"]
+	case "BM-GS-03":
+		values = map[string]any{"B5": meta["reference_no"], "F5": s.DateLabel, "B6": meta["item_title"], "F6": meta["partner"]}
+	case "BM-GS-04":
+		values["H5"] = s.DateLabel
+	case "BM-GS-05":
+		// Fit the project identity across the empty header area, preserving risk column widths.
+		if err := f.MergeCell(name, "B5", "K5"); err != nil {
+			return err
+		}
+	case "BM-GS-06":
+		if err := f.MergeCell(name, "B5", "J5"); err != nil {
+			return err
+		}
+	case "BM-GS-07":
+		if err := f.MergeCell(name, "B5", "G5"); err != nil {
+			return err
+		}
+	case "BM-GS-08":
+		values["F5"] = meta["stage"]
+	}
+	for cell, v := range values {
+		if err := set(cell, v); err != nil {
+			return err
+		}
+	}
+	for row := 5; row <= 7; row++ {
+		if err := bmgsFitRowText(f, name, row, l.columns); err != nil {
+			return err
+		}
+	}
+	rows := s.Rows
+	if d.TemplateCode == "BM-GS-02" {
+		for i := 1; i <= 12; i++ {
+			if err := set(fmt.Sprintf("A%d", 9+i), i); err != nil {
+				return err
+			}
+		}
+		rows = append(append([]Record{}, s.CrewRows...), s.MaterialRows...)
+	}
+	if len(rows) > 5000 {
+		return fmt.Errorf("source exceeds 5000 rows")
+	}
+	extra := max(0, len(rows)-l.slots)
+	for n := 0; n < extra; n++ {
+		if err := f.DuplicateRowTo(name, l.start, l.start+l.slots+n); err != nil {
+			return err
+		}
+	}
+	for i, row := range rows {
+		rn := l.start + i
+		if err := set(fmt.Sprintf("A%d", rn), i+1); err != nil {
+			return err
+		}
+		if d.TemplateCode == "BM-GS-02" {
+			v := map[string]any{}
+			if i < len(s.CrewRows) {
+				v = map[string]any{"B": row["partner"], "C": row["worker_count"], "D": bmgsJoin(row["representative"], row["contact"]), "H": row["note"]}
+			} else {
+				v = map[string]any{"E": row["title"], "F": bmgsJoin(row["specification"], row["origin"]), "G": row["quantity"], "H": row["note"]}
+			}
+			for col, value := range v {
+				if err := set(fmt.Sprintf("%s%d", col, rn), value); err != nil {
+					return err
+				}
+			}
+			if i >= len(s.CrewRows) {
+				if err := bmgsQuantityStyle(f, name, fmt.Sprintf("G%d", rn), row["unit"]); err != nil {
+					return err
+				}
+			}
+			if err := bmgsFitRowText(f, name, rn, l.columns); err != nil {
+				return err
+			}
+			continue
+		}
+		for j, key := range l.keys {
+			cell, _ := excelize.CoordinatesToCellName(j+2, rn)
+			value := row[key]
+			if d.TemplateCode == "BM-GS-07" && key == "filename" {
+				value = ""
+			}
+			if key == "result" {
+				value = bmgsResultLabel(value)
+			}
+			if key == "status" {
+				if !boolValue(row["status_is_captured_text"]) {
+					value = bmgsStatusLabel(d.TemplateCode, row["source_kind"], value)
+				}
+			}
+			if key == "representative" {
+				value = bmgsJoin(value, row["contact"])
+			}
+			if key == "standard" {
+				value = bmgsJoin(value, row["drawing_revision"])
+			}
+			if key == "photo_phase" {
+				value = bmgsPhotoPhaseLabel(value)
+			}
+			if key == "severity" || key == "risk_level" {
+				value = bmgsEnum(value, map[string]string{"low": "Thấp", "medium": "Trung bình", "high": "Cao", "critical": "Nghiêm trọng"})
+			}
+			if d.TemplateCode == "BM-GS-08" && key == "due_at" {
+				if date, err := time.Parse("2006-01-02", bmgsBusinessDate(value)); err == nil {
+					value = date
+				}
+			}
+			if err := set(cell, value); err != nil {
+				return err
+			}
+			if d.TemplateCode == "BM-GS-08" && key == "due_at" && !bmgsBlank(value) {
+				if err := bmgsDateStyle(f, name, cell); err != nil {
+					return err
+				}
+			}
+			if key == "design_quantity" || key == "actual_quantity" {
+				var err error
+				if d.TemplateCode == "BM-GS-03" {
+					err = bmgsQuantityStyle(f, name, cell, row["unit"], value)
+				} else {
+					err = bmgsQuantityStyle(f, name, cell, row["unit"])
+				}
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if err := bmgsFitRowText(f, name, rn, l.columns); err != nil {
+			return err
+		}
+	}
+	sectionRows, err := bmgsAddSourceSections(f, name, l.last-1+extra, l.columns, s.SourceSections)
+	if err != nil {
+		return err
+	}
+	if d.TemplateCode == "BM-GS-02" {
+		for _, r := range s.CriteriaRows {
+			code := fmt.Sprint(r["code"])
+			rn := 0
+			for i, key := range []string{"progress", "workforce", "deliveries", "quality", "completed_quantity", "variation", "mep", "safety", "acceptance", "risk", "images", "instructions"} {
+				if code == key {
+					rn = 10 + i
+				}
+			}
+			if rn == 0 {
+				return fmt.Errorf("unknown daily criterion %q", code)
+			}
+			if err := set(fmt.Sprintf("C%d", rn), bmgsEnum(r["assessment"], map[string]string{"pass": "Đạt", "fail": "Không đạt", "not_applicable": "Không áp dụng", "not_assessed": "Chưa đánh giá"})); err != nil {
+				return err
+			}
+			if cleanText(r["assessment"]) == "not_assessed" {
+				cell := fmt.Sprintf("C%d", rn)
+				id, err := f.GetCellStyle(name, cell)
+				if err != nil {
+					return err
+				}
+				style, err := f.GetStyle(id)
+				if err != nil {
+					return err
+				}
+				// The client template's green assessment fill must not imply
+				// a positive decision when no assessment was recorded.
+				style.Fill = excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"F2F2F2"}}
+				id, err = f.NewStyle(style)
+				if err != nil {
+					return err
+				}
+				if err = f.SetCellStyle(name, cell, cell, id); err != nil {
+					return err
+				}
+			}
+			if err := set(fmt.Sprintf("D%d", rn), r["note"]); err != nil {
+				return err
+			}
+			if err := bmgsFitRowText(f, name, rn, l.columns); err != nil {
+				return err
+			}
+		}
+		if err := f.SetCellFormula(name, fmt.Sprintf("C%d", 28+extra), fmt.Sprintf(`IF(COUNT(C25:C%d)=0,"",SUM(C25:C%d))`, 27+extra, 27+extra)); err != nil {
+			return err
+		}
+	}
+	if d.TemplateCode == "BM-GS-04" {
+		if err := f.SetCellFormula(name, fmt.Sprintf("A%d", 13+extra), fmt.Sprintf(`"TỔNG HỢP: Tổng lỗi: "&COUNT(A8:A%d)&" | Đã khắc phục: "&COUNTIF(I8:I%d,"Đã khắc phục")&" | Đang xử lý: "&COUNTIFS(I8:I%d,"<>Đã khắc phục",I8:I%d,"<>")`, 10+extra, 10+extra, 10+extra, 10+extra)); err != nil {
+			return err
+		}
+	}
+	if d.TemplateCode == "BM-GS-03" || d.TemplateCode == "BM-GS-08" {
+		first, second := "accepted", "rework_required"
+		prefix, firstLabel, secondLabel := "KẾT LUẬN NGHIỆM THU: ", "ĐỒNG Ý NGHIỆM THU", "CẦN SỬA CHỮA TỒN TẠI"
+		if d.TemplateCode == "BM-GS-08" {
+			first, second = "eligible", "not_eligible"
+			prefix, firstLabel, secondLabel = "KẾT LUẬN BÀN GIAO: ", "ĐỦ ĐIỀU KIỆN BÀN GIAO", "CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)"
+		}
+		mark := func(key string) string {
+			if cleanText(meta["conclusion"]) == key {
+				return "[ X ] "
+			}
+			return "[   ] "
+		}
+		label := prefix + mark(first) + firstLabel + "  |  " + mark(second) + secondLabel
+		if err := set(fmt.Sprintf("A%d", 13+extra), label); err != nil {
+			return err
+		}
+		if err := bmgsFitRowText(f, name, 13+extra, l.columns); err != nil {
+			return err
+		}
+		// Both client decision labels must remain readable at the retained
+		// print scale. Keep room for wrapping even when the width estimate fits.
+		height, err := f.GetRowHeight(name, 13+extra)
+		if err != nil {
+			return err
+		}
+		if err := f.SetRowHeight(name, 13+extra, math.Max(height, 30)); err != nil {
+			return err
+		}
+	}
+	lastCol, _ := excelize.ColumnNumberToName(l.columns)
+	one, zero := 1, 0
+	// Retain the client's orientation, paper size and scaling from the copied
+	// template; only fit width changes to accommodate dynamic source rows.
+	if err := f.SetPageLayout(name, &excelize.PageLayoutOptions{FitToWidth: &one, FitToHeight: &zero}); err != nil {
+		return err
+	}
+	fit := true
+	if err := f.SetSheetProps(name, &excelize.SheetPropsOptions{FitToPage: &fit}); err != nil {
+		return err
+	}
+	if err := f.SetDefinedName(&excelize.DefinedName{Name: "_xlnm.Print_Area", Scope: name, RefersTo: "'" + strings.ReplaceAll(name, "'", "''") + "'!$A$1:$" + lastCol + fmt.Sprintf("$%d", l.last+extra+sectionRows+4)}); err != nil {
+		return err
+	}
+	header := l.start - 1
+	if d.TemplateCode == "BM-GS-02" {
+		header = 9
+	}
+	return f.SetDefinedName(&excelize.DefinedName{Name: "_xlnm.Print_Titles", Scope: name, RefersTo: "'" + strings.ReplaceAll(name, "'", "''") + fmt.Sprintf("'!$1:$%d", header)})
+}
+
+func bmgsDateStyle(f *excelize.File, name, cell string) error {
+	id, err := f.GetCellStyle(name, cell)
+	if err != nil {
+		return err
+	}
+	style, err := f.GetStyle(id)
+	if err != nil {
+		return err
+	}
+	format := "yyyy-mm-dd"
+	style.CustomNumFmt = &format
+	id, err = f.NewStyle(style)
+	if err != nil {
+		return err
+	}
+	return f.SetCellStyle(name, cell, cell, id)
+}
+
+func bmgsJoin(a, b any) string {
+	s := ""
+	if a != nil {
+		s = fmt.Sprint(a)
+	}
+	if b != nil && fmt.Sprint(b) != "" {
+		if s != "" {
+			s += " • "
+		}
+		s += fmt.Sprint(b)
+	}
+	return s
+}
+
+func bmgsSheetProjectField(meta Record, key, fallback string) string {
+	if value, ok := meta[key].(string); ok {
+		return value
+	}
+	if historical, _ := meta["historical"].(bool); historical {
+		return ""
+	}
+	return fallback
+}
+func bmgsEnum(v any, labels map[string]string) any {
+	if label, ok := labels[fmt.Sprint(v)]; ok {
+		return label
+	}
+	return v
+}
+
+func bmgsResultLabel(value any) any {
+	return bmgsEnum(value, map[string]string{"pass": "Đạt", "fail": "Không đạt", "conditional_pass": "Đạt có điều kiện", "pending": "Chưa đánh giá", "not_assessed": "Chưa đánh giá", "not_applicable": "Không áp dụng"})
+}
+
+func bmgsPhotoPhaseLabel(value any) any {
+	return bmgsEnum(value, map[string]string{"before": "Trước thi công", "during": "Trong thi công", "after": "Sau thi công", "defect": "Phát hiện lỗi"})
+}
+
+// Localize only the structured source identity composed by the export service.
+// Keep the exact source ID/revision and preserve arbitrary recorded labels.
+func bmgsImageSourceLabel(source string) string {
+	parts := strings.Fields(source)
+	if len(parts) != 4 || parts[2] != "lần" || !strings.HasPrefix(source, parts[0]+" ") {
+		return source
+	}
+	if _, err := uuid.Parse(parts[1]); err != nil {
+		return source
+	}
+	revision, err := strconv.Atoi(parts[3])
+	if err != nil || revision < 0 {
+		return source
+	}
+	label, ok := map[string]string{"survey": "Khảo sát hiện trạng", "daily_report": "Báo cáo hằng ngày", "work_report": "Báo cáo công việc", "workflow_form": "Phiếu nghiệp vụ", "subcontractor_checklist": "Checklist thầu phụ", "subcontractor_reconciliation": "Đối soát thầu phụ", "site_instruction": "Chỉ dẫn hiện trường", "acceptance": "Nghiệm thu nội bộ", "action": "Lỗi và tồn tại", "variation": "Phát sinh hợp đồng", "site_work": "Đầu việc hiện trường", "evidence": "Minh chứng", "handover": "Bàn giao"}[parts[0]]
+	if !ok {
+		return source
+	}
+	return label + source[len(parts[0]):]
+}
+
+// Status labels describe the source's recorded workflow. Approval states on a
+// variation or survey are not evidence that a field risk has been resolved.
+func bmgsStatusLabel(template string, kind, value any) any {
+	if template == "BM-GS-04" || template == "BM-GS-05" && kind == "action" {
+		return bmgsEnum(value, map[string]string{"open": "Mới", "waiting_confirmation": "Chờ xác nhận khắc phục", "done": "Đã khắc phục", "cancelled": "Đã hủy"})
+	}
+	if template == "BM-GS-05" && kind == "survey" {
+		return bmgsEnum(value, map[string]string{"draft": "Bản nháp biểu mẫu", "submitted": "Biểu mẫu đã gửi", "approved": "Biểu mẫu đã duyệt", "rejected": "Biểu mẫu bị từ chối", "cancelled": "Biểu mẫu đã hủy", "accepted": "Biểu mẫu đã chấp nhận", "signed": "Biểu mẫu đã ký", "reopened": "Biểu mẫu mở lại"})
+	}
+	if template == "BM-GS-05" && kind == "variation" {
+		label, ok := map[string]string{"draft": "Nháp", "submitted": "Đã gửi", "qs_review": "QS đang rà soát", "purchasing_sourcing": "Mua hàng đang lấy giá", "pending_approval": "Chờ Quản lý dự án/Giám đốc duyệt", "approved": "Đã duyệt", "rejected": "Từ chối", "incorporated": "Đã tạo phiên bản điều chỉnh", "procurement_created": "Đã tạo yêu cầu mua"}[fmt.Sprint(value)]
+		if ok {
+			return "Phát sinh hợp đồng: " + label
+		}
+		return value
+	}
+	// These labels match the Work Item presentation in lib/utils/status.ts.
+	if template == "BM-GS-06" {
+		return bmgsEnum(value, map[string]string{"draft": "Nháp", "submitted": "Đã gửi", "pending": "Chờ xử lý", "ready": "Sẵn sàng", "in_progress": "Đang xử lý", "waiting_review": "Chờ rà soát", "waiting_approval": "Chờ duyệt", "waiting_evidence": "Chờ minh chứng", "needs_changes": "Cần chỉnh sửa", "changes_requested": "Yêu cầu chỉnh sửa", "approved": "Đã duyệt", "rejected": "Từ chối", "blocked": "Bị chặn", "completed": "Hoàn tất", "done": "Đã xong", "cancelled": "Đã hủy", "overdue": "Quá hạn"})
+	}
+	return value
+}
+
+func bmgsQuantityStyle(f *excelize.File, name, cell string, rawUnit any, measuredValue ...any) error {
+	unit, ok := rawUnit.(string)
+	if !ok || unit == "" {
+		return nil
+	}
+	format := "0.######## \"" + strings.ReplaceAll(unit, "\"", "") + "\""
+	if len(measuredValue) > 0 {
+		if number, err := strconv.ParseFloat(fmt.Sprint(measuredValue[0]), 64); err == nil && !math.IsNaN(number) && !math.IsInf(number, 0) {
+			// Google Sheets renders a trailing dot for optional decimal formats
+			// on integer measurements. Fixed captured precision avoids that dot
+			// while keeping the cell numeric and preserving fractional quantities.
+			numberText := strconv.FormatFloat(number, 'f', -1, 64)
+			precision := ""
+			if dot := strings.IndexByte(numberText, '.'); dot >= 0 {
+				precision = "." + strings.Repeat("0", len(numberText)-dot-1)
+			}
+			format = "0" + precision + " \"" + strings.ReplaceAll(unit, "\"", "") + "\""
+		}
+	}
+	style, err := f.GetCellStyle(name, cell)
+	if err != nil {
+		return err
+	}
+	st, err := f.GetStyle(style)
+	if err != nil {
+		return err
+	}
+	st.CustomNumFmt = &format
+	id, err := f.NewStyle(st)
+	if err != nil {
+		return err
+	}
+	return f.SetCellStyle(name, cell, cell, id)
+}
+
+// Row heights are an estimated print safeguard; native Excel pagination still
+// requires manual acceptance. Never silently truncate text beyond Excel's limit.
+func bmgsFitRowText(f *excelize.File, name string, row, columns int) error {
+	height, err := f.GetRowHeight(name, row)
+	if err != nil {
+		return err
+	}
+	merges, err := f.GetMergeCells(name)
+	if err != nil {
+		return err
+	}
+	for col := 1; col <= columns; col++ {
+		cell, _ := excelize.CoordinatesToCellName(col, row)
+		value, err := f.GetCellValue(name, cell)
+		if err != nil {
+			return err
+		}
+		if value == "" {
+			continue
+		}
+		last := col
+		for _, m := range merges {
+			if m.GetStartAxis() == cell {
+				end, endrow, e := excelize.CellNameToCoordinates(m.GetEndAxis())
+				if e != nil {
+					return e
+				}
+				if endrow == row {
+					last = end
+				}
+				break
+			}
+		}
+		width := 0.0
+		for c := col; c <= last; c++ {
+			letter, _ := excelize.ColumnNumberToName(c)
+			w, e := f.GetColWidth(name, letter)
+			if e != nil {
+				return e
+			}
+			width += w
+		}
+		style, e := f.GetCellStyle(name, cell)
+		if e != nil {
+			return e
+		}
+		st, e := f.GetStyle(style)
+		if e != nil {
+			return e
+		}
+		size := 11.0
+		if st.Font != nil && st.Font.Size > 0 {
+			size = st.Font.Size
+		}
+		chars := max(1, int((width-2)*11/size/1.2))
+		lines := bmgsWrappedLines(value, chars)
+		needed := float64(lines)*(size*1.35) + 6
+		if needed > 409 {
+			return fmt.Errorf("%s text exceeds printable Excel row height; shorten this field", cell)
+		}
+		height = math.Max(height, needed)
+		if st.Alignment == nil {
+			st.Alignment = &excelize.Alignment{}
+		}
+		st.Alignment.WrapText = true
+		id, e := f.NewStyle(st)
+		if e != nil {
+			return e
+		}
+		if e = f.SetCellStyle(name, cell, cell, id); e != nil {
+			return e
+		}
+		col = last
+	}
+	return f.SetRowHeight(name, row, height)
+}
+
+func bmgsWrappedLines(text string, chars int) int {
+	lines := 0
+	for _, line := range strings.Split(text, "\n") {
+		lines += max(1, (utf8.RuneCountInString(line)+chars-1)/chars)
+	}
+	return lines
+}
+
+func bmgsAddSourceSections(f *excelize.File, name string, base, columns int, sections []BMGSSourceSection) (int, error) {
+	type line struct {
+		text   string
+		header bool
+	}
+	lines := []line{}
+	for _, section := range sections {
+		if len(section.Lines) == 0 {
+			continue
+		}
+		lines = append(lines, line{section.Title, true})
+		for _, text := range section.Lines {
+			runes := []rune(text)
+			for len(runes) > 500 {
+				cut := 500
+				for n := 499; n >= 250; n-- {
+					if runes[n] == ' ' || runes[n] == '\n' {
+						cut = n + 1
+						break
+					}
+				}
+				lines = append(lines, line{string(runes[:cut]), false})
+				runes = runes[cut:]
+			}
+			lines = append(lines, line{string(runes), false})
+		}
+	}
+	if len(lines) == 0 {
+		return 0, nil
+	}
+	if len(lines) > 10000 {
+		return 0, fmt.Errorf("native source content exceeds worksheet row budget")
+	}
+	if err := f.InsertRows(name, base, len(lines)); err != nil {
+		return 0, err
+	}
+	last, _ := excelize.ColumnNumberToName(columns)
+	for i, l := range lines {
+		row := base + i
+		start := fmt.Sprintf("A%d", row)
+		end := fmt.Sprintf("%s%d", last, row)
+		if err := f.MergeCell(name, start, end); err != nil {
+			return 0, err
+		}
+		style := &excelize.Style{Font: &excelize.Font{Family: "Calibri", Size: 11, Bold: l.header}, Alignment: &excelize.Alignment{WrapText: true, Vertical: "top"}}
+		if l.header {
+			style.Fill = excelize.Fill{Type: "pattern", Pattern: 1, Color: []string{"DCE6F1"}}
+		}
+		id, err := f.NewStyle(style)
+		if err != nil {
+			return 0, err
+		}
+		if err = f.SetCellStyle(name, start, end, id); err != nil {
+			return 0, err
+		}
+		if err = f.SetCellStr(name, start, l.text); err != nil {
+			return 0, err
+		}
+		if err = bmgsFitRowText(f, name, row, columns); err != nil {
+			return 0, err
+		}
+	}
+	return len(lines), nil
+}
+func imageConfig(raw []byte) (image.Config, string, error) {
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(raw))
+	if err != nil {
+		return cfg, format, fmt.Errorf("invalid optimized image: %w", err)
+	}
+	if format != "jpeg" && format != "png" {
+		return cfg, format, fmt.Errorf("unsupported optimized image")
+	}
+	return cfg, format, nil
+}
+
+func bmgsAppendImages(f *excelize.File, images []BMGSImage) error {
+	if len(images) > bmgsMaxImages {
+		return fmt.Errorf("image count exceeds %d", bmgsMaxImages)
+	}
+	if len(images) == 0 {
+		return nil
+	}
+	name := "Hình ảnh"
+	if _, err := f.NewSheet(name); err != nil {
+		return err
+	}
+	if err := f.SetColWidth(name, "A", "H", 12); err != nil {
+		return err
+	}
+	seen := map[string][32]byte{}
+	total, row := 0, 1
+	for _, im := range images {
+		hash := sha256.Sum256(im.Bytes)
+		key := im.EvidenceID
+		if im.SourceRevisionKey != "" {
+			key = im.SourceRevisionKey + ":" + key
+		}
+		if key == "" {
+			key = fmt.Sprintf("%x", hash)
+		}
+		if previous, ok := seen[key]; ok {
+			if previous != hash {
+				return fmt.Errorf("conflicting bytes for evidence %s", im.EvidenceID)
+			}
+			continue
+		}
+		seen[key] = hash
+		cfg, format, err := imageConfig(im.Bytes)
+		if err != nil {
+			return err
+		}
+		if cfg.Width != im.Width || cfg.Height != im.Height || im.Width > 1280 || im.Height > 1280 || len(im.Bytes) > bmgsMaxOutputImageBytes {
+			return fmt.Errorf("image must be preprocessed before rendering")
+		}
+		if im.MIMEType != "image/"+format {
+			return fmt.Errorf("optimized image MIME mismatch")
+		}
+		total += len(im.Bytes)
+		if total > bmgsMaxWorkbookImageBytes {
+			return fmt.Errorf("image appendix exceeds byte budget")
+		}
+		caption := bmgsJoin(im.Filename, im.EvidenceID) + "\n" + bmgsJoin(bmgsImageSourceLabel(im.SourceLabel), im.Location) + "\n" + bmgsJoin(im.CapturedAt, bmgsPhotoPhaseLabel(im.Phase)) + "\n" + im.Caption
+		if im.DerivativeNote != "" {
+			caption += "\n" + im.DerivativeNote
+		}
+		captionRows := max(3, int(math.Ceil((float64(bmgsWrappedLines(caption, 78))*14.85+6)/18)))
+		start := fmt.Sprintf("A%d", row)
+		end := fmt.Sprintf("H%d", row+captionRows-1)
+		if err = f.MergeCell(name, start, end); err != nil {
+			return err
+		}
+		if err = f.SetCellStr(name, start, caption); err != nil {
+			return err
+		}
+		style, e := f.NewStyle(&excelize.Style{Alignment: &excelize.Alignment{WrapText: true, Vertical: "top"}})
+		if e != nil {
+			return e
+		}
+		if e = f.SetCellStyle(name, start, end, style); e != nil {
+			return e
+		}
+		for r := row; r < row+captionRows+31; r++ {
+			if err = f.SetRowHeight(name, r, 18); err != nil {
+				return err
+			}
+		}
+		// Eight 12-character columns provide about 712 pixels. Leave space at
+		// the right print boundary instead of letting a picture cross column H.
+		scale := math.Min(1, math.Min(690/float64(im.Width), 680/float64(im.Height)))
+		ext := ".jpg"
+		if format == "png" {
+			ext = ".png"
+		}
+		if err = f.AddPictureFromBytes(name, fmt.Sprintf("A%d", row+captionRows), &excelize.Picture{Extension: ext, File: im.Bytes, Format: &excelize.GraphicOptions{ScaleX: scale, ScaleY: scale, LockAspectRatio: true, AltText: caption, Positioning: "oneCell"}}); err != nil {
+			return err
+		}
+		row += captionRows + 31
+	}
+	orientation := "portrait"
+	paper := 9
+	one, zero := 1, 0
+	if err := f.SetPageLayout(name, &excelize.PageLayoutOptions{Orientation: &orientation, Size: &paper, FitToWidth: &one, FitToHeight: &zero}); err != nil {
+		return err
+	}
+	fit := true
+	if err := f.SetSheetProps(name, &excelize.SheetPropsOptions{FitToPage: &fit}); err != nil {
+		return err
+	}
+	return f.SetDefinedName(&excelize.DefinedName{Name: "_xlnm.Print_Area", Scope: name, RefersTo: fmt.Sprintf("'Hình ảnh'!$A$1:$H$%d", max(1, row-1))})
+}

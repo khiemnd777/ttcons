@@ -1,5 +1,23 @@
 # Commercial Procurement Domain Map
 
+## Current Workflow Source For App Contract Signing — 2026-10-13
+
+- Existing ContractsPage signature selector and protected contract-version sign route accept exact legacy app_sign/internal-approval and canonical Rev10 execution_package/hardcopy-dispatch sources through one backend predicate. Submitted instance/current signature revision and project/Work Item/runtime pin bindings are authoritative; approved_by and signer==actor remain required with an approved contract version. No broad same-project form allowlist, history rewrite or permission change.
+- Existing dispatch returned-scan receipt and contract activation gates remain independently enforced. Synthetic Development signatures/documents are technical workflow evidence only and do not establish actual legal/client signatures. Tests source guard matrix + contract lifecycle; full workflow/browser proof remains separate.
+
+## Client Subcontractor Ledger Revisions — 2026-10-13
+
+- Existing client acceptance package checklist_items now shares canonical subcontractor reconciliation; independent quantity_items remains a dossier, not an implicit positional/title join. Claimed/confirmed/variance decisions never replace design/measured/quality BM03 facts.
+- Client ledgers are bound to project/Work Item/form/revision using existing columns (V158 constraints only). Submitted history is readonly; valid current amendments create separate ledgers. Required If-Match and locked source/Work Item/run prevent stale/concurrent writes, closed sources and another current source from being reused. Historic lookup reads persisted ledger/items without current form/BOQ enrichment. Builtin behavior stays legacy-compatible; no stock/finance mutation is introduced.
+- Existing form + SubcontractorReconciliationPanel is the operational owner. Client workflow readiness checks its own current submitted ledger. Samples bind exact source to avoid fan-out. Source tests and Development/browser/Google/UX status are distinct.
+
+## Native Subcontractor Quantities And Site Arrivals — 2026-10-08
+
+- Native subcontractor checklist/package is the BM03 candidate; current reconciliation remains a distinct source of claimed/confirmed commercial quantities. Accepted confirmed_quantity may default from claimed; neither becomes measured actual_quantity, and BOQ is not automatic design_quantity.
+- Standard/drawing/technical_requirement/design/actual capture is explicit in new native checklist form versions. Export preserves exact form revision and does not join current BOQ to historical item indices.
+- BM02 site arrivals are separate native report rows, not material usage or implicit stock receipts. No movement/balance/procurement mutation is added by capture/export.
+- Contract variations retain their commercial approval/state owner. The rejected generic variation-to-BM05 editor/export is removed from UI; native risk/blocker export does not imply commercial variation equivalence.
+- Existing contracts/reconciliation navigation is preserved. Sources: service_reconciliations/repository_reconciliations, native form revisions and projections; regression/acceptance evidence in current-states.
 ## Current Accounting Retirement Boundary — V150/V151
 
 - Internal obligation opening and retained-money release actions/routes/permissions/tracking tables are removed. Contract versions/signatures/dispatch/milestone eligibility/variations and commercial retention percentages/amounts remain project source information.

@@ -1,0 +1,19 @@
+{
+  "old_record_counts": {
+    "projects": 1,
+    "templates": 13,
+    "nodes": 162,
+    "steps": 507,
+    "runs": 0,
+    "forms": 0
+  },
+  "exact_json_equal": {
+    "projects": true,
+    "templates": true,
+    "nodes": true,
+    "steps": true,
+    "runs": true,
+    "forms": true
+  },
+  "all_retained_records_equal": true
+}

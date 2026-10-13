@@ -1,0 +1,436 @@
+[
+  {
+    "id": "c9cfa2eb-5d15-4b3f-8d78-83fbb153aa2f",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "owner_requirement",
+    "label": "Yêu cầu chính của chủ đầu tư",
+    "field_type": "textarea",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 5000,
+      "min_length": 3
+    },
+    "help_text": null,
+    "order_index": 10,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "6e1701f1-1792-4096-92cf-d8f6a1a5ca0c",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "requested_areas",
+    "label": "Khu vực / hạng mục cần khảo sát",
+    "field_type": "textarea",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 3000,
+      "min_length": 3
+    },
+    "help_text": null,
+    "order_index": 20,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "1d3b0c33-0987-479b-99a4-5afd75ac6412",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "target_deadline",
+    "label": "Deadline mong muốn",
+    "field_type": "date",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "capture_mode": "optional"
+    },
+    "help_text": null,
+    "order_index": 30,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "fa083073-b018-4d12-a5ae-6418042989f7",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "constraints",
+    "label": "Ràng buộc đặc biệt",
+    "field_type": "textarea",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 3000,
+      "capture_mode": "optional"
+    },
+    "help_text": "Ví dụ: giờ thi công, mặt bằng, ngân sách, pháp lý, vận hành hiện hữu.",
+    "order_index": 40,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "74eb0318-8812-42a1-a6b1-67323228f9fc",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "style_direction",
+    "label": "Phong cách mong muốn",
+    "field_type": "select",
+    "required": true,
+    "options_json": [
+      {
+        "label": "Hiện đại",
+        "value": "modern"
+      },
+      {
+        "label": "Tối giản",
+        "value": "minimal"
+      },
+      {
+        "label": "Cổ điển",
+        "value": "classic"
+      },
+      {
+        "label": "Industrial",
+        "value": "industrial"
+      },
+      {
+        "label": "Cao cấp",
+        "value": "luxury"
+      },
+      {
+        "label": "Khác",
+        "value": "other"
+      }
+    ],
+    "validation_json": {},
+    "help_text": null,
+    "order_index": 110,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "a8b0b9e3-7f50-4eea-abed-19a23d390027",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "reference_links",
+    "label": "Link / mô tả mẫu tham khảo",
+    "field_type": "textarea",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 3000,
+      "capture_mode": "optional"
+    },
+    "help_text": null,
+    "order_index": 120,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "0a6daed3-3fb8-41ea-bec4-f8ff4b76f1d9",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "material_preferences",
+    "label": "Vật liệu / màu sắc ưu tiên",
+    "field_type": "textarea",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 3000,
+      "capture_mode": "optional"
+    },
+    "help_text": null,
+    "order_index": 130,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "a770ead0-b78b-4d5f-9497-f7b19c2d3326",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "design_exclusions",
+    "label": "Điểm không mong muốn",
+    "field_type": "textarea",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 3000,
+      "capture_mode": "optional"
+    },
+    "help_text": null,
+    "order_index": 140,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "eca696c4-ba94-474e-b55a-aaea03c70a0f",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "measurement_date",
+    "label": "Ngày đo",
+    "field_type": "date",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "default_source": "current_date"
+    },
+    "help_text": null,
+    "order_index": 210,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "da5a94e6-2458-4f7f-8add-bf9bf052b335",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "measured_by",
+    "label": "Người đo",
+    "field_type": "text",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 120,
+      "min_length": 2
+    },
+    "help_text": null,
+    "order_index": 220,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "4fa90f67-c20f-48d7-8ba5-560e58644bf6",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "dimension_items",
+    "label": "Kích thước chính",
+    "field_type": "structured_list",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 100,
+      "min_items": 1,
+      "item_fields": [
+        {
+          "key": "area",
+          "type": "text",
+          "label": "Khu vực",
+          "required": true,
+          "max_length": 160,
+          "min_length": 2
+        },
+        {
+          "key": "dimension",
+          "type": "text",
+          "label": "Kích thước",
+          "required": true,
+          "max_length": 160,
+          "min_length": 1
+        },
+        {
+          "key": "unit",
+          "type": "text",
+          "label": "ĐVT",
+          "required": true,
+          "max_length": 20,
+          "min_length": 1
+        },
+        {
+          "key": "note",
+          "type": "textarea",
+          "label": "Ghi chú",
+          "required": false,
+          "max_length": 800
+        },
+        {
+          "key": "mep",
+          "type": "textarea",
+          "label": "Điểm giao kỹ thuật MEP",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "existing_condition",
+          "type": "textarea",
+          "label": "Kết cấu và hoàn thiện hiện hữu",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "assessment",
+          "type": "textarea",
+          "label": "Đánh giá và yêu cầu xử lý",
+          "required": false,
+          "max_length": 1000
+        }
+      ]
+    },
+    "help_text": "Ghi từng khu vực/phòng/hạng mục cần dùng cho BOQ hoặc thiết kế.",
+    "order_index": 230,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "b44b5552-e6db-418a-a5cc-e86871ba90f0",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "risk_items",
+    "label": "Danh sách rủi ro",
+    "field_type": "structured_list",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 100,
+      "min_items": 1,
+      "item_fields": [
+        {
+          "key": "risk",
+          "type": "textarea",
+          "label": "Rủi ro",
+          "required": true,
+          "max_length": 1000,
+          "min_length": 3
+        },
+        {
+          "key": "category",
+          "type": "select",
+          "label": "Nhóm",
+          "options": [
+            {
+              "label": "Kết cấu",
+              "value": "structure"
+            },
+            {
+              "label": "MEP",
+              "value": "mep"
+            },
+            {
+              "label": "Mặt bằng",
+              "value": "access"
+            },
+            {
+              "label": "An toàn",
+              "value": "safety"
+            },
+            {
+              "label": "Tiến độ",
+              "value": "schedule"
+            },
+            {
+              "label": "Chi phí",
+              "value": "cost"
+            },
+            {
+              "label": "Khác",
+              "value": "other"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "severity",
+          "type": "select",
+          "label": "Mức độ",
+          "options": [
+            {
+              "label": "Thấp",
+              "value": "low"
+            },
+            {
+              "label": "Trung bình",
+              "value": "medium"
+            },
+            {
+              "label": "Cao",
+              "value": "high"
+            },
+            {
+              "label": "Nghiêm trọng",
+              "value": "critical"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "mitigation",
+          "type": "textarea",
+          "label": "Hướng xử lý",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "issue_code",
+          "type": "text",
+          "label": "Mã vấn đề hoặc rủi ro",
+          "required": false,
+          "max_length": 80
+        },
+        {
+          "key": "detected_date",
+          "type": "date",
+          "label": "Ngày phát hiện thực tế",
+          "required": false
+        },
+        {
+          "key": "cause",
+          "type": "textarea",
+          "label": "Nguyên nhân",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "impact",
+          "type": "textarea",
+          "label": "Ảnh hưởng",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "owner",
+          "type": "text",
+          "label": "Người phụ trách xử lý",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "key": "due_date",
+          "type": "date",
+          "label": "Thời hạn xử lý",
+          "required": false
+        },
+        {
+          "key": "status",
+          "type": "text",
+          "label": "Tình trạng ghi nhận",
+          "required": false,
+          "max_length": 80
+        }
+      ]
+    },
+    "help_text": null,
+    "order_index": 310,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "5e9c385e-ff46-4f9c-8f4d-6e8393c6e54b",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "survey_unit",
+    "label": "Đơn vị khảo sát",
+    "field_type": "text",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 160
+    },
+    "help_text": null,
+    "order_index": 390,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  },
+  {
+    "id": "8a42878c-da5b-45ba-bc11-daeb6fbf44cc",
+    "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+    "field_key": "client_representative",
+    "label": "Đại diện khách hàng",
+    "field_type": "text",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 120
+    },
+    "help_text": null,
+    "order_index": 391,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.692502+00:00"
+  }
+]

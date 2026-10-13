@@ -1,0 +1,114 @@
+{
+  "spreadsheetId": "14G3ZmpmqqUgTIPNbZiat9rbicGT7YwqgWLCNndp_EyE",
+  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/14G3ZmpmqqUgTIPNbZiat9rbicGT7YwqgWLCNndp_EyE/edit",
+  "properties": {
+    "title": "BM07 — Kiểm chứng lại file tải từ Xuất báo cáo — 2026-10-08",
+    "locale": "en_US",
+    "timeZone": "America/Los_Angeles"
+  },
+  "sheets": [
+    {
+      "properties": {
+        "sheetId": 63176868,
+        "title": "BM-GS-07",
+        "index": 0,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      },
+      "data": [
+        {
+          "startRow": 6,
+          "startColumn": 5,
+          "rowData": [
+            {
+              "values": [
+                {
+                  "formattedValue": "TÊN FILE ÂNH THAM CHIẾU",
+                  "userEnteredValue": {
+                    "stringValue": "TÊN FILE ÂNH THAM CHIẾU"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "TÊN FILE ÂNH THAM CHIẾU"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "#VALUE!",
+                  "userEnteredValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  },
+                  "effectiveValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "#VALUE!",
+                  "userEnteredValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  },
+                  "effectiveValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "#VALUE!",
+                  "userEnteredValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  },
+                  "effectiveValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "#VALUE!",
+                  "userEnteredValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  },
+                  "effectiveValue": {
+                    "errorValue": {
+                      "type": "VALUE"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

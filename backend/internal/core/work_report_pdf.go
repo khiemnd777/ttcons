@@ -210,7 +210,7 @@ func (r workReportPDFRenderer) metaPair(leftLabel, leftValue, rightLabel, rightV
 func (r workReportPDFRenderer) summary(snapshot Record) {
 	pdf := r.pdf
 	pdf.SetFont(pipelinePDFFontFamily, "", 10.5)
-	weather := workReportPDFValue(snapshot["weather"])
+	weather := constructionReportWeatherLabel(snapshot["weather"])
 	weatherLines := pdf.SplitText(weather, 82)
 	// Reserve the normal summary together. Unusually long free text still uses
 	// the line paginator instead of overflowing a fixed-height panel.
@@ -225,9 +225,8 @@ func (r workReportPDFRenderer) summary(snapshot Record) {
 	pdf.CellFormat(91, 5, "TIẾN ĐỘ GHI NHẬN", "", 0, "L", false, 0, "")
 	pdf.CellFormat(85, 5, "THỜI TIẾT", "", 1, "L", false, 0, "")
 	valueY := pdf.GetY()
-	progress, valid := exportNumber(snapshot["progress_percent"])
-	valid = valid && !math.IsNaN(progress) && !math.IsInf(progress, 0) && progress >= 0 && progress <= 100
-	label := "Chưa ghi nhận"
+	progress, valid := nativeBMGSDailyRecordedProgress(snapshot)
+	label := "Chưa ghi tiến độ"
 	pdf.SetFont(pipelinePDFFontFamily, "B", 11)
 	if valid {
 		label = fmt.Sprintf("%g%%", progress)

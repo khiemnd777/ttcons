@@ -1,0 +1,342 @@
+{
+  "scope": "Development: submitted native workflow form, legitimate separate receipt owner and two delivery revisions",
+  "checked_at": "2026-10-12T06:36:09.166378+00:00",
+  "checks": {
+    "same_workflow_source_and_report_two_revisions": true,
+    "revision1_entire_record_unchanged": true,
+    "revision2_snapshot_distinct": true,
+    "revision1_photo_membership": true,
+    "revision2_photo_membership": true,
+    "recipient_requested_changes": true,
+    "author_submitted_both_revisions": true,
+    "form_remains_submitted_revision2": true,
+    "all_revision1_form_events_unchanged": true,
+    "canonical_form_amendment_event": true,
+    "only_existing_form_answer_keys": true,
+    "database_and_migration_state_unchanged": true,
+    "all_preexisting_projects_unchanged": true,
+    "all_preexisting_work_items_unchanged": true,
+    "all_preexisting_workflow_form_instances_unchanged": true,
+    "all_preexisting_workflow_form_events_unchanged": true,
+    "all_preexisting_operation_daily_reports_unchanged": true,
+    "all_preexisting_work_report_revisions_unchanged": true,
+    "all_preexisting_incoming_acceptance_records_unchanged": true,
+    "all_preexisting_incoming_acceptance_items_unchanged": true,
+    "application_source_manifest_unchanged": true,
+    "form1_copied_original_byte_equal": true,
+    "form1_two_expected_sheets": true,
+    "form1_no_excel_error_cells": true,
+    "form1_one_decodable_embedded_photo": true,
+    "form1_correct_original_photo_pixels": true,
+    "form1_quantity_notes": true,
+    "form1_crew": true,
+    "form1_missing_progress_is_not_zero": true,
+    "form1_no_invented_assessment": true,
+    "delivery1-before_copied_original_byte_equal": true,
+    "delivery1-before_two_expected_sheets": true,
+    "delivery1-before_no_excel_error_cells": true,
+    "delivery1-before_one_decodable_embedded_photo": true,
+    "delivery1-before_correct_original_photo_pixels": true,
+    "delivery1-before_quantity_notes": true,
+    "delivery1-before_crew": true,
+    "delivery1-before_missing_progress_is_not_zero": true,
+    "delivery1-before_no_invented_assessment": true,
+    "form2_copied_original_byte_equal": true,
+    "form2_two_expected_sheets": true,
+    "form2_no_excel_error_cells": true,
+    "form2_one_decodable_embedded_photo": true,
+    "form2_correct_original_photo_pixels": true,
+    "form2_quantity_notes": true,
+    "form2_crew": true,
+    "form2_missing_progress_is_not_zero": true,
+    "form2_no_invented_assessment": true,
+    "delivery2_copied_original_byte_equal": true,
+    "delivery2_two_expected_sheets": true,
+    "delivery2_no_excel_error_cells": true,
+    "delivery2_one_decodable_embedded_photo": true,
+    "delivery2_correct_original_photo_pixels": true,
+    "delivery2_quantity_notes": true,
+    "delivery2_crew": true,
+    "delivery2_missing_progress_is_not_zero": true,
+    "delivery2_no_invented_assessment": true,
+    "delivery1-after_copied_original_byte_equal": true,
+    "delivery1-after_two_expected_sheets": true,
+    "delivery1-after_no_excel_error_cells": true,
+    "delivery1-after_one_decodable_embedded_photo": true,
+    "delivery1-after_correct_original_photo_pixels": true,
+    "delivery1-after_quantity_notes": true,
+    "delivery1-after_crew": true,
+    "delivery1-after_missing_progress_is_not_zero": true,
+    "delivery1-after_no_invented_assessment": true,
+    "revision1_all_parts_equal_except_mime_declaration_order": true,
+    "revision1_mime_declarations_equal": true,
+    "revision1_form_delivery_original_template_cells_match": true,
+    "revision2_form_delivery_original_template_cells_match": true,
+    "recipient_protected_photo1_original_bytes": true,
+    "recipient_protected_photo2_original_bytes": true,
+    "form1_google_no_effective_error_values": true,
+    "form1_google_all_bounded_cells_formulas_match_original": true,
+    "form1_google_crew_formula_recalculated": true,
+    "form2_google_no_effective_error_values": true,
+    "form2_google_all_bounded_cells_formulas_match_original": true,
+    "form2_google_crew_formula_recalculated": true,
+    "delivery2_google_no_effective_error_values": true,
+    "delivery2_google_all_bounded_cells_formulas_match_original": true,
+    "delivery2_google_crew_formula_recalculated": true,
+    "delivery1-after_google_no_effective_error_values": true,
+    "delivery1-after_google_all_bounded_cells_formulas_match_original": true,
+    "delivery1-after_google_crew_formula_recalculated": true,
+    "valid_receipt_same_project_and_date_submitted": true,
+    "valid_receipt_delivered12_accepted12": true,
+    "canonical_distinct_receiving_reporting_owners": true,
+    "no_manual_arrival_rows_entered": true,
+    "failed_receipt_reuse_reproduced_in_both_frozen_revisions": true,
+    "failed_receipt_reuse_reproduced_in_all_five_actual_downloads": true
+  },
+  "criteria": {
+    "submitted_workflow_content_and_photo": "PASS",
+    "old_delivery_content_photo_immutable_after_form_amendment": "PASS",
+    "google_original_file_cells_formulas_images": "PASS",
+    "automatic_legitimate_material_receipt_reuse": "FAIL",
+    "user_visual_acceptance": "PENDING"
+  },
+  "snapshot_sha256": {
+    "revision1": "f9b3b922f8a5f4b08640d78298f2631dd13f3561def3f36bd1fd11cb9341563c",
+    "revision2": "070dd290323eefbd0b89fcaccca6efb33f855200aaf4ba5be23c9bd006e6b49a"
+  },
+  "database": {
+    "database": "consflow",
+    "migration_count": 157,
+    "projects": 6,
+    "forms": 21
+  },
+  "source_file_count": 962,
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "containers": [
+    {
+      "name": "ttcons-backend-1",
+      "image": "sha256:30537ea8444f792226d69074c8b2207a9d9805324a7f82e225e781df5e132949",
+      "created": "2026-10-12T02:41:09.885006096Z",
+      "started_at": "2026-10-12T02:41:16.57997221Z"
+    },
+    {
+      "name": "admin",
+      "image": "sha256:a5b9de8273c63be8d8a351451f1cdc5eb9f4942cf3c7cb19bdf06a6d5722ee28",
+      "created": "2026-10-12T02:41:09.938663179Z",
+      "started_at": "2026-10-12T02:41:16.649018668Z"
+    }
+  ],
+  "health": {
+    "health": {
+      "service": "consflow",
+      "status": "ok"
+    },
+    "ready": {
+      "database": "ok",
+      "service": "consflow",
+      "status": "ready"
+    }
+  },
+  "files": {
+    "form1": {
+      "file": "BM02-phieu-chot-lan-1.xlsx",
+      "sha256": "cfc40cbd0dce794815af02f771908980006d0c474449cf5c76d29daba7e0d03b",
+      "bytes": 28328,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "bytes": 16017,
+          "sha256": "06de76dd3433c3a7a8855d3328b72cba297d15f357ae971ae2afff050467bc5b",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "8e4b45b49840ef6bb1582da97404c3decd4b6dc9a592e6bb9aa8f12cc5845bbf"
+        }
+      ],
+      "quantity_note": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 1 — dùng ảnh đỏ",
+      "crew": 3,
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+    },
+    "delivery1-before": {
+      "file": "BM02-lan-gui-1-truoc.xlsx",
+      "sha256": "6ed76fbe477de26bde7faa671ecb17bf9dbcd95692b24268c35f8b1e626d16ac",
+      "bytes": 28529,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "bytes": 16017,
+          "sha256": "06de76dd3433c3a7a8855d3328b72cba297d15f357ae971ae2afff050467bc5b",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "8e4b45b49840ef6bb1582da97404c3decd4b6dc9a592e6bb9aa8f12cc5845bbf"
+        }
+      ],
+      "quantity_note": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 1 — dùng ảnh đỏ",
+      "crew": 3,
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+    },
+    "form2": {
+      "file": "BM02-phieu-chot-lan-2.xlsx",
+      "sha256": "73431a0111fd0ee4a470d06ed348abf035d17b18be9079c156b5d9cb15ad2e23",
+      "bytes": 28055,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "bytes": 15833,
+          "sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "6604a8e3553bb39363cc9809cc80c226ecf2e202e626d6233b0c61dc99bf7ace"
+        }
+      ],
+      "quantity_note": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh",
+      "crew": 6,
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+    },
+    "delivery2": {
+      "file": "BM02-lan-gui-2.xlsx",
+      "sha256": "68b47c4ef870d636eee37f45e07104694d45a273bf0e666856bdb299eb39d9b9",
+      "bytes": 28257,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "bytes": 15833,
+          "sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "6604a8e3553bb39363cc9809cc80c226ecf2e202e626d6233b0c61dc99bf7ace"
+        }
+      ],
+      "quantity_note": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 9 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh",
+      "crew": 6,
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+    },
+    "delivery1-after": {
+      "file": "BM02-lan-gui-1-sau.xlsx",
+      "sha256": "8647ab68b5336b83bc8dedfb2bdbdab1a9f2e7c3051ec89601407815a718c28a",
+      "bytes": 28530,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "part": "xl/media/image1.png",
+          "bytes": 16017,
+          "sha256": "06de76dd3433c3a7a8855d3328b72cba297d15f357ae971ae2afff050467bc5b",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "8e4b45b49840ef6bb1582da97404c3decd4b6dc9a592e6bb9aa8f12cc5845bbf"
+        }
+      ],
+      "quantity_note": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02 · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu thử BM02 · Tổ đội: [Synthetic] Tổ workflow · Ghi chú: [Synthetic] Nội dung phiếu quy trình Lần 1 — dùng ảnh đỏ",
+      "crew": 3,
+      "material_note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+    }
+  },
+  "revision1_archive_differences": [
+    "[Content_Types].xml"
+  ],
+  "protected_photos": [
+    {
+      "revision": 1,
+      "evidence_id": "68a802fd-8282-4eae-8cde-82de9e8d039e",
+      "sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144"
+    },
+    {
+      "revision": 2,
+      "evidence_id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+      "sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013"
+    }
+  ],
+  "google": [
+    {
+      "phase": "form1",
+      "url": "https://docs.google.com/spreadsheets/d/1s898qdoJ7pF2DZ0ujRoDtxZUR5s-AEm3KkZ5e3L3Z6k/edit",
+      "ranges": [
+        "'2026-10-12_01'!A1:H75",
+        "'Hình ảnh'!A1:H5"
+      ],
+      "populated_cells_compared": 92,
+      "effective_error_count": 0,
+      "crew_sum": 3
+    },
+    {
+      "phase": "form2",
+      "url": "https://docs.google.com/spreadsheets/d/1dnubHM-M_vTG5AaJddf8EBzHXb87q24Z9yaYnvkJd4U/edit",
+      "ranges": [
+        "'2026-10-12_01'!A1:H75",
+        "'Hình ảnh'!A1:H5"
+      ],
+      "populated_cells_compared": 92,
+      "effective_error_count": 0,
+      "crew_sum": 6
+    },
+    {
+      "phase": "delivery2",
+      "url": "https://docs.google.com/spreadsheets/d/1jOslmTKlC5N2JyQSOgGhtzOONELJDPLhSG-rqBEKeeA/edit",
+      "ranges": [
+        "'2026-10-12_01'!A1:H75",
+        "'Hình ảnh'!A1:H5"
+      ],
+      "populated_cells_compared": 96,
+      "effective_error_count": 0,
+      "crew_sum": 6
+    },
+    {
+      "phase": "delivery1-after",
+      "url": "https://docs.google.com/spreadsheets/d/1VR1VYxhu2ergtHsHNcewOaLX6pQ9EN2OAVLRtlEfjxU/edit",
+      "ranges": [
+        "'2026-10-12_01'!A1:H75",
+        "'Hình ảnh'!A1:H5"
+      ],
+      "populated_cells_compared": 96,
+      "effective_error_count": 0,
+      "crew_sum": 3
+    }
+  ],
+  "status": "BLOCKED: automatic material receipt reuse excludes canonical separate owner",
+  "screenshots": {
+    "01-form-submitted.jpg": "34029421a1e52cdf0c7fc67025f3d9f6d6248177d524fbfcc7cc1ba18e5141b0",
+    "02-receipt-work-item-completed.jpg": "a58c43fdc98817971e715be17efcdc25a9a3a6e599cb3aefccb780d4d59451c3",
+    "03-workflow-report-sent1.jpg": "126e58e16936c9232d04c2bb2316f5a755e41ff86a7e866df24f5bbdd2fa7723",
+    "04-delivery1-before.jpg": "e1cca82f3f3b10ff830e4b5aa7aa9495fd1c515bc30da84a023fb0907c5df2a1",
+    "05-valid-receipt-12m2.jpg": "f3c615fa48f39281fb3420ca9f2ac81b234ce7454d073dc51fe63fc7e415ac7b",
+    "06-recipient-request-changes.jpg": "e6d9c19856710200bbf2841ba40726f297601d56ded2e9492ea9c95ae7a1229f",
+    "07-form2-submitted.jpg": "e0708a917276253d356d8e333fcd2e411031bb9d7419e1a30b7bb9218b4301c1",
+    "08-workflow-report-resubmitted2.jpg": "73e10feccbf1de7bc6a8817a8d6f196fd39813c75746d39ec3cf35e5fdedf7a2",
+    "09-delivery2-current.jpg": "69e8f10ed6754bf78dbefccda8b9e1b206f4b2d40070a8459a073fe0747dc2c6",
+    "10-two-revisions.jpg": "e4810698649af1f67b2675dc0212474cb353b08ba3a53a48572eaad636a5203e",
+    "11-delivery1-after.jpg": "02d5cdf6dbf55764d9fa6170f2c45c5fe258a588d8e1005b4a7a351dbad259c5",
+    "12-google-form1-main.jpg": "38bc63fdbe4d2e4664231770464bf40527878c115fc773e3e07a37f30036675b",
+    "13-google-form1-photo.jpg": "9d1e9728cc64345d3776e4c6de6edd4b0f776b4c2fd1f1bc48778a31e2fe1732",
+    "14-google-form2-main.jpg": "896dd0ad913e357195c4737b84717525d97a6993e2f3b4d9224f14713eded77d",
+    "15-google-form2-lower.jpg": "eb12e2abeb7202bd5b5b94684135ed2c858441554461714cc069e0bc25ee294e",
+    "16-google-form2-photo.jpg": "fd9c844c162abecfc56ec857731e15531cd26744fb805a85d4c96e99a880ecce",
+    "17-google-delivery2-main.jpg": "638237617ef02e52bc4b9db989b450597b656293f2a5c24054208ecf932b22e6",
+    "18-google-delivery2-lower.jpg": "a6c88aac4967442895b8e037717da008c7e1012ab56aab2f2afcc61441e86eb6",
+    "19-google-delivery2-photo.jpg": "8dc6c80bae9c538e72e1e7d1fd9d523e1c13c59baf32f922104bf48e1f6e16f9",
+    "20-google-delivery1-after-main.jpg": "e8da0f5d12358d715f9ed4f9e7a055156136614535080db321e88158c5cf8c97",
+    "21-google-delivery1-after-lower.jpg": "cd8748bd4353f9e464bb5f2885c2fbd7839ed34f107c90d1e80bd3ee8642e148",
+    "22-google-delivery1-after-photo.jpg": "52f2c6b0ca6c0947989104dd261741a8a4650ecbf2115b07ee866b65bd0903aa",
+    "23-google-form1-middle.jpg": "a7c65b871d949b1cfd96c2d2a0ca7d804909fd56532e00564011bd99c6018e34",
+    "24-google-form1-lower.jpg": "80cd299815ca45aa8f4e8e7ce12bd16b33c366d0934ddd13092a98daf4944ea5",
+    "25-google-form2-footer.jpg": "46759da25ed7010f0e75b5a58c0627647c24f070769e1ef16a03ee2c36e94875",
+    "26-google-delivery2-footer.jpg": "97e5ade667de4de5f3690a65f613c5eb04c00aaf114c4bae822beca38f54aa50"
+  }
+}

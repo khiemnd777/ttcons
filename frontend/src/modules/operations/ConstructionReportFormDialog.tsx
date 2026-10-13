@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ClipboardCheck, Eye, FileText, Image as ImageIcon, Loader2, Package, Plus, RefreshCw, Send, Trash2, Users, Wrench } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
+import { emptyBlockerCapture, emptyNextPlan, emptyMaterialArrival, hasMaterialArrival, loadDailyCapture, serializeDailyCapture, serializeDailyWorkRows, supervisionCriteria, validateDailyCapture, validateDailyWorkRows, type BlockerCaptureDraft, type NextPlanDraft, type MaterialArrivalDraft, type SupervisionAssessment } from './constructionDailyCapture';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
@@ -26,9 +27,9 @@ import { useWorkReportRecipients } from './useWorkReportRecipients';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import './constructionReport.css';
 
-type CrewDraft = { crew_name: string; worker_count: string; work_hours: string; note: string };
+type CrewDraft = { row_id: string; crew_name: string; worker_count: string; work_hours: string; note: string; representative: string; contact: string };
 type MaterialDraft = { material_name: string; quantity: string; unit: string; note: string };
-type BlockerDraft = { id: string; content: string };
+type BlockerDraft = BlockerCaptureDraft & { id: string };
 type ReportEvidenceViewer = { source: 'stored'; record: EvidenceRecord };
 export type ConstructionDailyReportCreatePayload = {
   report_date: string;
@@ -37,10 +38,12 @@ export type ConstructionDailyReportCreatePayload = {
   work_item_id: string;
   done_items: Array<{ title: string }>;
   current_items: Array<{ title: string }>;
-  next_items: Array<{ title: string }>;
-  blockers: Array<{ content: string }>;
+  next_items: ReturnType<typeof serializeDailyWorkRows>['next_items'];
+  blockers: ReturnType<typeof serializeDailyWorkRows>['blockers'];
   field_notes: string;
-  crew_items: Array<{ crew_name: string; worker_count: number; work_hours: number; note: string }>;
+  crew_items: Array<{ row_id: string; crew_name: string; worker_count: number; work_hours: number; note: string; representative: string; contact: string }>;
+  supervision_assessments: SupervisionAssessment[];
+  material_arrival_items: ReturnType<typeof serializeDailyCapture>['material_arrival_items'];
   material_items: Array<{ material_name: string; quantity: number; unit: string; note: string }>;
   evidence_ids: string[];
   primary_evidence_id: string;
@@ -76,11 +79,13 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
   const [workItemId, setWorkItemId] = useState('');
   const [doneItems, setDoneItems] = useState<string[]>(['']);
   const [currentItems, setCurrentItems] = useState<string[]>(['']);
-  const [nextItems, setNextItems] = useState<string[]>(['']);
+  const [nextItems, setNextItems] = useState<NextPlanDraft[]>([emptyNextPlan()]);
   const [blockers, setBlockers] = useState<BlockerDraft[]>([emptyBlocker()]);
   const [fieldNotes, setFieldNotes] = useState('');
   const [crewItems, setCrewItems] = useState<CrewDraft[]>([emptyCrew()]);
   const [materialItems, setMaterialItems] = useState<MaterialDraft[]>([emptyMaterial()]);
+  const [assessments, setAssessments] = useState<SupervisionAssessment[]>(() => loadDailyCapture({}).assessments);
+  const [arrivals, setArrivals] = useState<MaterialArrivalDraft[]>([emptyMaterialArrival()]);
   const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>([]);
   const [primaryEvidenceId, setPrimaryEvidenceId] = useState('');
   const [manpowerSummary, setManpowerSummary] = useState('');
@@ -118,11 +123,13 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
     setWorkItemId(initial?.workItemId || '');
     setDoneItems(initial?.done ?? ['']);
     setCurrentItems(initial?.current ?? ['']);
-    setNextItems(initial?.next ?? ['']);
-    setBlockers((initial?.blockers?.length ? initial.blockers : ['']).map((content) => emptyBlocker(content)));
+    setNextItems(initial?.nextPlanItems.length ? initial.nextPlanItems : [emptyNextPlan()]);
+    setBlockers(initial?.blockerItems.length ? initial.blockerItems.map(row => ({ ...row, id: row.row_id })) : [emptyBlocker()]);
     setFieldNotes(initial?.fieldNotes ?? '');
     setCrewItems(initial?.crewItems.length ? initial.crewItems : [emptyCrew()]);
     setMaterialItems(initial?.materialItems.length ? initial.materialItems : [emptyMaterial()]);
+    setAssessments(initial?.supervisionAssessments ?? loadDailyCapture({}).assessments);
+    setArrivals(initial?.materialArrivalItems.length ? initial.materialArrivalItems : [emptyMaterialArrival()]);
     setSelectedEvidenceIds(initial?.evidenceIds ?? []);
     setPrimaryEvidenceId(initial?.primaryEvidenceId ?? '');
     setManpowerSummary(initial?.manpowerSummary ?? '');
@@ -220,6 +227,7 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
   }
 
   function setBlockerContent(id: string, content: string) {
+    setErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== `blocker_${id}_content`)));
     const previous = blockers.find((item) => item.id === id)?.content ?? '';
     setBlockers((current) => current.map((item) => item.id === id ? { ...item, content } : item));
     setLinkedDrafts((current) => current.map((draft) => draft.source_blocker_key === id && (draft.auto_title || draft.title === previous) ? { ...draft, title: content, source_label: content, auto_title: true } : draft));
@@ -262,6 +270,9 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const deliveryMode: 'draft' | 'submit' = mayDeliver && submitter?.value === 'submit' ? 'submit' : 'draft';
     const nextErrors = validateReport({ reportDate, weather, progressPercent, doneItems, crewItems, materialItems });
+    Object.assign(nextErrors, validateDailyWorkRows(nextItems, blockers));
+    const arrivalError = validateDailyCapture(arrivals);
+    if (arrivalError) nextErrors.material_arrival_items = arrivalError;
 	    if (!workItemId) nextErrors.work_item_id = 'Hạng mục thi công đang thực hiện';
 	    if (!hasPhotoEvidence) nextErrors.evidence_ids = 'Ít nhất một ảnh hiện trường';
     if (selectedEvidenceIds.length + uploads.length > 50) nextErrors.evidence_ids = 'Tối đa 50 ảnh/tệp cho mỗi báo cáo';
@@ -275,6 +286,7 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
       toast.warn({ title: 'Kiểm tra báo cáo', description: `Thiếu hoặc sai: ${[...Object.values(nextErrors), linkedSummary].filter(Boolean).join(', ')}` });
       navigateToValidation({ prepare: () => {
         if (nextErrors.done_items) setWorkGroup('done');
+        if (Object.keys(nextErrors).some(key => key.startsWith('next_'))) setWorkGroup('next');
       } });
       return;
     }
@@ -285,14 +297,17 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
       work_item_id: workItemId,
       done_items: textRows(doneItems, 'title'),
       current_items: textRows(currentItems, 'title'),
-      next_items: textRows(nextItems, 'title'),
-      blockers: textRows(blockers.map((item) => item.content), 'content'),
+      ...serializeDailyWorkRows(nextItems, blockers),
       field_notes: fieldNotes.trim(),
+      ...serializeDailyCapture(assessments, arrivals),
       crew_items: crewItems.filter(hasCrewValue).map((item) => ({
+        row_id: item.row_id,
         crew_name: item.crew_name.trim(),
         worker_count: Number(item.worker_count),
         work_hours: Number(item.work_hours || 0),
         note: item.note.trim(),
+        representative: item.representative.trim(),
+        contact: item.contact.trim(),
       })),
       material_items: materialItems.filter(hasMaterialValue).map((item) => ({
         material_name: item.material_name.trim(),
@@ -394,19 +409,19 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
             </div>
           </section>
 
-          <section data-validation-error={errors.done_items ? 'true' : undefined} className="min-w-0 scroll-mt-4 rounded-md">
+          <section data-validation-error={errors.done_items || Object.keys(errors).some(key => key.startsWith('next_')) ? 'true' : undefined} className="min-w-0 scroll-mt-4 rounded-md">
             <SectionTitle title="Công việc trong ngày" />
             <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg border border-line bg-slate-50 p-1" aria-label="Nhóm công việc">
               {([
                 ['done', 'Đã làm', doneItems],
                 ['current', 'Đang làm', currentItems],
-                ['next', 'Sẽ làm', nextItems],
+                ['next', 'Sẽ làm', nextItems.map(row => row.title)],
               ] as const).map(([key, label, values]) => <button key={key} type="button" aria-pressed={workGroup === key} className={clsx('min-w-0 rounded-md px-1 py-2 text-sm font-semibold', workGroup === key ? 'bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-line' : 'text-slate-500 hover:text-slate-700')} onClick={() => setWorkGroup(key)}>{label}{key === 'done' ? <span className="text-rose-600"> *</span> : null} <span className="text-xs">{values.filter((item) => item.trim()).length}</span></button>)}
             </div>
             <div className="mt-3">
               {workGroup === 'done' ? <TextListEditor title="Đã làm" required values={doneItems} onChange={(values) => { setDoneItems(values); setDirty(true); clearError('done_items'); }} tone="green" error={errors.done_items} addLabel="Thêm công việc" /> : null}
               {workGroup === 'current' ? <TextListEditor title="Đang làm" values={currentItems} onChange={(values) => { setCurrentItems(values); setDirty(true); }} tone="blue" addLabel="Thêm công việc" /> : null}
-              {workGroup === 'next' ? <TextListEditor title="Sẽ làm" values={nextItems} onChange={(values) => { setNextItems(values); setDirty(true); }} tone="slate" addLabel="Thêm kế hoạch" /> : null}
+              {workGroup === 'next' ? <NextPlanEditor rows={nextItems} errors={errors} onChange={rows => { setNextItems(rows); setDirty(true); setErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith('next_')))); }} /> : null}
             </div>
           </section>
 
@@ -421,13 +436,26 @@ export function ConstructionReportFormDialog({ open, projectId, projectName = ''
             </Field>
           </section>
 
-          <ReportDisclosure title="Vấn đề & xử lý" summary={blockers.filter((item) => item.content.trim()).length + ' vấn đề · ' + linkedDrafts.length + ' việc'} reveal={validationAttempt} forceOpen={showLinkedErrors || blockers.some((item) => Boolean(item.content.trim())) || linkedDrafts.length > 0}>
-            <BlockerEditor rows={blockers} drafts={linkedDrafts} canCreateCheck={mode === 'create' && canCreateCheck} canCreateAction={mode === 'create' && canCreateAction} disabled={!workspace || saving} onChange={setBlockerContent} onRelation={setBlockerRelation} onRemove={removeBlocker} onAdd={() => { setBlockers((current) => [...current, emptyBlocker()]); setDirty(true); }} />
+          <ReportDisclosure title="Vấn đề & xử lý" summary={blockers.filter((item) => item.content.trim()).length + ' vấn đề · ' + linkedDrafts.length + ' việc'} reveal={validationAttempt} forceOpen={showLinkedErrors || blockers.some((item) => Boolean(item.content.trim())) || linkedDrafts.length > 0 || Object.keys(errors).some(key => key.startsWith('blocker'))}>
+            <BlockerEditor rows={blockers} errors={errors} onDetails={(id, patch) => { setBlockers(current => current.map(row => row.id === id ? { ...row, ...patch } : row)); setDirty(true); setErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`blocker_${id}_`)))); }} drafts={linkedDrafts} canCreateCheck={mode === 'create' && canCreateCheck} canCreateAction={mode === 'create' && canCreateAction} disabled={!workspace || saving} onChange={setBlockerContent} onRelation={setBlockerRelation} onRemove={removeBlocker} onAdd={() => { setBlockers((current) => [...current, emptyBlocker()]); setDirty(true); }} />
             {mode === 'create' && (canCreateCheck || canCreateAction) ? <ConstructionReportLinkedComposer embedded mode="batch" drafts={linkedDrafts} onChange={(next) => { setLinkedDrafts(next); setDirty(true); }} workspace={workspace} sourceWorkItemId={workItemId} reportEvidence={selectedEvidence} reportEvidencePending={uploads.length > 0} primaryEvidenceId={primaryEvidenceId} canCreateCheck={canCreateCheck} canCreateAction={canCreateAction} showValidation={showLinkedErrors} /> : null}
           </ReportDisclosure>
 
+          <ReportDisclosure title="Nội dung giám sát" summary={`${assessments.filter(row => row.assessment !== 'not_assessed').length}/12 nội dung đã đánh giá`}>
+            <div className="space-y-3">{supervisionCriteria.map(([code, label]) => {
+              const row = assessments.find(item => item.code === code)!;
+              return <div key={code} className="grid min-w-0 gap-2 md:grid-cols-[1fr_180px_2fr]">
+                <label htmlFor={`assessment-${code}`} className="text-sm font-medium">{label}</label>
+                <select id={`assessment-${code}`} className={tableInputClass(false)} value={row.assessment} onChange={event => { setAssessments(current => current.map(item => item.code === code ? { ...item, assessment: event.target.value as SupervisionAssessment['assessment'] } : item)); setDirty(true); }}>
+                  <option value="not_assessed">Chưa đánh giá</option><option value="pass">Đạt</option><option value="fail">Không đạt</option><option value="not_applicable">Không áp dụng</option>
+                </select>
+                <input aria-label={`Ghi chú ${label}`} maxLength={1000} className={tableInputClass(false)} value={row.note ?? ''} placeholder="Ghi chú" onChange={event => { setAssessments(current => current.map(item => item.code === code ? { ...item, note: event.target.value } : item)); setDirty(true); }} />
+              </div>;
+            })}</div>
+          </ReportDisclosure>
           <div className="min-w-0 space-y-3">
             <CrewEditor rows={crewItems} onChange={(rows) => { setCrewItems(rows); setDirty(true); clearError('crew_items'); }} error={errors.crew_items} reveal={validationAttempt} />
+            <MaterialArrivalEditor rows={arrivals} onChange={rows => { setArrivals(rows); setDirty(true); clearError('material_arrival_items'); }} error={errors.material_arrival_items} reveal={validationAttempt} />
             <MaterialEditor rows={materialItems} onChange={(rows) => { setMaterialItems(rows); setDirty(true); clearError('material_items'); }} error={errors.material_items} reveal={validationAttempt} />
             {manpowerSummary || materialSummary ? <p className="text-xs leading-5 text-slate-600"><strong>Tóm tắt đã ghi:</strong>{manpowerSummary ? ' Nhân công: ' + manpowerSummary + '.' : ''}{materialSummary ? ' Vật tư: ' + materialSummary + '.' : ''}</p> : null}
           </div>
@@ -518,16 +546,36 @@ function ExistingEvidenceOption({ record, selected, primary, previewURL, preview
   );
 }
 
-function BlockerEditor({ rows, drafts, canCreateCheck, canCreateAction, disabled, onChange, onRelation, onRemove, onAdd }: { rows: BlockerDraft[]; drafts: ReportLinkedDraft[]; canCreateCheck: boolean; canCreateAction: boolean; disabled: boolean; onChange: (id: string, content: string) => void; onRelation: (row: BlockerDraft, kind: ReportLinkedDraft['kind'] | null) => void; onRemove: (id: string) => void; onAdd: () => void }) {
+function BlockerEditor({ rows, errors = {}, onDetails, drafts, canCreateCheck, canCreateAction, disabled, onChange, onRelation, onRemove, onAdd }: { rows: BlockerDraft[]; errors?: Record<string, string>; onDetails?: (id: string, patch: Partial<BlockerDraft>) => void; drafts: ReportLinkedDraft[]; canCreateCheck: boolean; canCreateAction: boolean; disabled: boolean; onChange: (id: string, content: string) => void; onRelation: (row: BlockerDraft, kind: ReportLinkedDraft['kind'] | null) => void; onRemove: (id: string) => void; onAdd: () => void }) {
   return <div className="mt-3 space-y-3">{rows.map((row, index) => {
     const linked = drafts.find((draft) => draft.source_blocker_key === row.id);
-    return <article key={row.id} className="rounded-lg border border-red-200 bg-red-50/30 p-3"><div className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(false), 'mt-0 min-h-16 flex-1 resize-y')} value={row.content} aria-label={`Vấn đề ${index + 1}`} placeholder={`Vấn đề ${index + 1}`} onChange={(event) => onChange(row.id, event.target.value)} /><button type="button" aria-label={`Xóa vấn đề ${index + 1}`} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600" onClick={() => onRemove(row.id)}><Trash2 className="h-4 w-4" /></button></div>{canCreateCheck || canCreateAction ? <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Bước tiếp theo</span><button type="button" className={clsx('rounded-md border px-2 py-1 text-[11px] font-semibold', !linked ? 'border-slate-300 bg-white text-slate-700' : 'border-transparent text-slate-500')} onClick={() => onRelation(row, null)}>Chỉ ghi nhận</button>{canCreateCheck ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'check' ? 'border-blue-500 bg-blue-600 text-white' : 'border-blue-200 bg-white text-blue-700')} onClick={() => onRelation(row, 'check')}><ClipboardCheck className="h-3 w-3" /> Tạo kiểm tra</button> : null}{canCreateAction ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'action' ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-300 bg-white text-amber-800')} onClick={() => onRelation(row, 'action')}><Wrench className="h-3 w-3" /> Giao xử lý</button> : null}</div> : null}</article>;
-  })}<button type="button" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={onAdd}><Plus className="h-3.5 w-3.5" /> Thêm vấn đề</button></div>;
+    return <article key={row.id} className="rounded-lg border border-red-200 bg-red-50/30 p-3"><div className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(Boolean(errors[`blocker_${row.row_id}_content`])), 'mt-0 min-h-16 flex-1 resize-y')} value={row.content} aria-invalid={Boolean(errors[`blocker_${row.row_id}_content`]) || undefined} aria-label={`Vấn đề ${index + 1}`} placeholder={`Vấn đề ${index + 1}`} onChange={(event) => onChange(row.id, event.target.value)} /><button type="button" aria-label={`Xóa vấn đề ${index + 1}`} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600" onClick={() => onRemove(row.id)}><Trash2 className="h-4 w-4" /></button></div>{errors[`blocker_${row.row_id}_content`] ? <p role="alert" className="text-xs text-rose-700">{errors[`blocker_${row.row_id}_content`]}</p> : null}
+      <DailyRowDetails kind="blocker" row={row} rowLabel={`Vấn đề ${index + 1}`} errors={errors} onChange={patch => onDetails?.(row.id, patch)} />
+      {canCreateCheck || canCreateAction ? <div className="mt-2 flex flex-wrap items-center gap-1.5"><span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Bước tiếp theo</span><button type="button" className={clsx('rounded-md border px-2 py-1 text-[11px] font-semibold', !linked ? 'border-slate-300 bg-white text-slate-700' : 'border-transparent text-slate-500')} onClick={() => onRelation(row, null)}>Chỉ ghi nhận</button>{canCreateCheck ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'check' ? 'border-blue-500 bg-blue-600 text-white' : 'border-blue-200 bg-white text-blue-700')} onClick={() => onRelation(row, 'check')}><ClipboardCheck className="h-3 w-3" /> Tạo kiểm tra</button> : null}{canCreateAction ? <button type="button" disabled={disabled} className={clsx('inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold disabled:opacity-40', linked?.kind === 'action' ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-300 bg-white text-amber-800')} onClick={() => onRelation(row, 'action')}><Wrench className="h-3 w-3" /> Giao xử lý</button> : null}</div> : null}</article>;
+  })}{errors.blockers ? <p role="alert" data-validation-error="true" className="text-xs text-rose-700">{errors.blockers}</p> : null}<button type="button" className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={onAdd}><Plus className="h-3.5 w-3.5" /> Thêm vấn đề</button></div>;
 }
 
 function TextListEditor({ title, required = false, values, onChange, tone, error, addLabel }: { title: string; required?: boolean; values: string[]; onChange: (values: string[]) => void; tone: 'green' | 'blue' | 'slate' | 'red'; error?: string; addLabel: string }) {
   const tones = { green: 'border-emerald-200 bg-emerald-50/30', blue: 'border-blue-200 bg-blue-50/30', slate: 'border-line bg-slate-50/40', red: 'border-red-200 bg-red-50/30' };
   return <article className={clsx('rounded-lg border p-4', tones[tone], error && 'ring-1 ring-rose-300')}><div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold text-ink">{title}{required ? <span className="ml-1 text-rose-600">*</span> : null}</h4><span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-line">{values.filter((item) => item.trim()).length}</span></div><div className="mt-3 space-y-2">{values.map((value, index) => <div key={index} className="flex items-start gap-2"><textarea rows={2} className={clsx(inputClass(Boolean(error)), 'mt-0 min-h-16 flex-1 resize-y')} value={value} aria-label={`${title} ${index + 1}`} placeholder={`${title} ${index + 1}`} onChange={(event) => onChange(values.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} /><button type="button" aria-label={`Xóa ${title} ${index + 1}`} disabled={values.length === 1} className="rounded-md p-2 text-slate-400 hover:bg-white hover:text-rose-600 disabled:opacity-30" onClick={() => onChange(values.filter((_item, itemIndex) => itemIndex !== index))}><Trash2 className="h-4 w-4" /></button></div>)}</div>{error ? <p className="mt-2 text-xs font-medium text-rose-700">{error}</p> : null}<button type="button" className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700" onClick={() => onChange([...values, ''])}><Plus className="h-3.5 w-3.5" /> {addLabel}</button></article>;
+}
+
+function NextPlanEditor({ rows, errors, onChange }: { rows: NextPlanDraft[]; errors: Record<string, string>; onChange: (rows: NextPlanDraft[]) => void }) {
+  return <article className="rounded-lg border border-line p-3"><h4 className="mb-3 text-sm font-semibold">Sẽ làm</h4><div className="space-y-3">{rows.map((row, index) => <div key={row.row_id} className="rounded-md border border-line p-3">
+    <div className="flex items-start gap-2"><textarea rows={2} maxLength={180} aria-label={`Sẽ làm ${index + 1}`} aria-invalid={Boolean(errors[`next_${row.row_id}_title`]) || undefined} className={inputClass(Boolean(errors[`next_${row.row_id}_title`]))} value={row.title} onChange={event => onChange(rows.map(item => item.row_id === row.row_id ? { ...item, title: event.target.value } : item))} /><button type="button" aria-label={`Xóa Sẽ làm ${index + 1}`} onClick={() => onChange(rows.filter(item => item.row_id !== row.row_id))} className="p-2 text-slate-400"><Trash2 className="h-4 w-4" /></button></div>
+    {errors[`next_${row.row_id}_title`] ? <p role="alert" className="text-xs text-rose-700">{errors[`next_${row.row_id}_title`]}</p> : null}
+    <DailyRowDetails kind="next" row={row} rowLabel={`Sẽ làm ${index + 1}`} errors={errors} onChange={patch => onChange(rows.map(item => item.row_id === row.row_id ? { ...item, ...patch } : item))} />
+  </div>)}</div>{errors.next_items ? <p role="alert" className="text-xs text-rose-700">{errors.next_items}</p> : null}<button type="button" onClick={() => onChange([...rows, emptyNextPlan()])} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700"><Plus className="h-3.5 w-3.5" /> Thêm kế hoạch</button></article>;
+}
+
+function DailyRowDetails({ kind, row, rowLabel, errors, onChange }: { kind: 'next' | 'blocker'; row: NextPlanDraft | BlockerCaptureDraft; rowLabel: string; errors: Record<string, string>; onChange: (patch: Record<string, string>) => void }) {
+  const fields: Array<[string, string, string, number]> = kind === 'next' ? [['instruction_code', 'Mã chỉ dẫn', 'text', 80], ['location', 'Vị trí', 'text', 200], ['subcontractor', 'Thầu phụ / tổ đội', 'text', 160], ['receiver', 'Người nhận', 'text', 120], ['contact', 'Liên hệ', 'text', 100], ['issued_date', 'Ngày giao', 'date', 10], ['due_date', 'Hạn thực hiện', 'date', 10], ['progress_percent', 'Tiến độ (%)', 'number', 10], ['state', 'Tình trạng đã ghi nhận', 'text', 80]] : [['risk_code', 'Mã rủi ro', 'text', 80], ['detected_at', 'Ngày phát hiện', 'date', 10], ['cause', 'Nguyên nhân', 'textarea', 1000], ['impact', 'Ảnh hưởng', 'textarea', 1000], ['severity', 'Mức độ rủi ro', 'select', 20], ['proposed_action', 'Biện pháp đề xuất', 'textarea', 1000], ['owner', 'Người phụ trách', 'text', 160], ['target_date', 'Hạn xử lý', 'date', 10], ['status', 'Tình trạng đã ghi nhận', 'text', 80]];
+  const prefix = `${kind}_${row.row_id}_`;
+  return <ReportDisclosure title={kind === 'next' ? 'Chi tiết kế hoạch' : 'Chi tiết vấn đề'} forceOpen={Object.keys(errors).some(key => key.startsWith(prefix))}><div className="grid min-w-0 gap-3 md:grid-cols-2">{fields.map(([key, label, type, max]) => {
+    const error = errors[prefix + key]; const value = (row as Record<string, string>)[key] ?? '';
+    const props = { 'aria-label': `${label} · ${rowLabel}`, 'aria-invalid': Boolean(error) || undefined, className: inputClass(Boolean(error)), value, onChange: (event: { target: { value: string } }) => onChange({ [key]: event.target.value }) };
+    return <Field key={key} label={label} error={error}>{type === 'select' ? <select {...props}><option value="">Chưa đánh giá</option><option value="low">Thấp</option><option value="medium">Trung bình</option><option value="high">Cao</option><option value="critical">Nghiêm trọng</option></select> : type === 'textarea' ? <textarea {...props} maxLength={max} rows={2} /> : <input {...props} type={type} maxLength={max} min={type === 'number' ? 0 : undefined} max={type === 'number' ? 100 : undefined} step={type === 'number' ? 'any' : undefined} />}</Field>;
+  })}</div></ReportDisclosure>;
 }
 
 function CrewEditor({ rows, onChange, error, reveal }: { rows: CrewDraft[]; onChange: (rows: CrewDraft[]) => void; error?: string; reveal: number }) {
@@ -543,6 +591,8 @@ function CrewEditor({ rows, onChange, error, reveal }: { rows: CrewDraft[]; onCh
               <th className="w-32 border-b border-line px-2 py-2">Số người <span className="text-rose-600">*</span></th>
               <th className="w-32 border-b border-line px-2 py-2">Giờ công</th>
               <th className="min-w-60 border-b border-line px-2 py-2">Ghi chú</th>
+              <th className="min-w-44 border-b border-line px-2 py-2">Đại diện</th>
+              <th className="min-w-44 border-b border-line px-2 py-2">Liên hệ 24/7</th>
             </tr>
           </thead>
           <tbody role="rowgroup" className="divide-y divide-line bg-white">
@@ -554,6 +604,8 @@ function CrewEditor({ rows, onChange, error, reveal }: { rows: CrewDraft[]; onCh
                 <td role="cell" data-label="Số người *" className="px-2 py-2 align-top"><input type="number" inputMode="numeric" min={1} className={tableInputClass(Boolean(error))} value={row.worker_count} placeholder="Số người" onChange={(event) => onChange(updateRow(rows, index, { worker_count: event.target.value }))} aria-label={`Số người dòng ${index + 1}`} /></td>
                 <td role="cell" data-label="Giờ công" className="px-2 py-2 align-top"><input type="number" inputMode="decimal" min={0} step="0.5" className={tableInputClass(Boolean(error))} value={row.work_hours} placeholder="Giờ công" onChange={(event) => onChange(updateRow(rows, index, { work_hours: event.target.value }))} aria-label={`Giờ công dòng ${index + 1}`} /></td>
                 <td role="cell" data-label="Ghi chú" className="px-2 py-2 align-top"><input className={tableInputClass(Boolean(error))} value={row.note} placeholder="Ghi chú" onChange={(event) => onChange(updateRow(rows, index, { note: event.target.value }))} aria-label={`Ghi chú nhân công dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="Đại diện" className="px-2 py-2 align-top"><input maxLength={120} className={tableInputClass(false)} value={row.representative ?? ''} onChange={event => onChange(updateRow(rows, index, { representative: event.target.value }))} aria-label={`Đại diện tổ đội dòng ${index + 1}`} /></td>
+                <td role="cell" data-label="Liên hệ 24/7" className="px-2 py-2 align-top"><input maxLength={100} className={tableInputClass(false)} value={row.contact ?? ''} onChange={event => onChange(updateRow(rows, index, { contact: event.target.value }))} aria-label={`Liên hệ tổ đội dòng ${index + 1}`} /></td>
               </tr>
             ))}
           </tbody>
@@ -561,6 +613,20 @@ function CrewEditor({ rows, onChange, error, reveal }: { rows: CrewDraft[]; onCh
       </div>
     </ResourceEditorFrame>
   );
+}
+
+function MaterialArrivalEditor({ rows, onChange, error, reveal }: { rows: MaterialArrivalDraft[]; onChange: (rows: MaterialArrivalDraft[]) => void; error?: string; reveal: number }) {
+  const fields = [['material_name', 'Tên vật tư', 160], ['specification', 'Quy cách', 300], ['origin', 'Xuất xứ', 200], ['quantity', 'Số lượng', 30], ['unit', 'Đơn vị', 30], ['note', 'Ghi chú', 800]] as const;
+  return <ResourceEditorFrame icon={<Package className="h-4 w-4" />} title="Vật tư nhập trường" count={rows.filter(hasMaterialArrival).length} error={error} reveal={reveal} onAdd={() => onChange([...rows, emptyMaterialArrival()])}>
+    <div className="space-y-3">{rows.map((row, index) => <div key={row.row_id} className="rounded-md border border-line p-3">
+      <div className="mb-2 flex items-center justify-between"><span className="text-xs font-semibold">Dòng {index + 1}</span><button type="button" aria-label={`Xóa vật tư nhập trường dòng ${index + 1}`} onClick={() => onChange(rows.filter(item => item.row_id !== row.row_id))}><Trash2 className="h-4 w-4 text-slate-400" /></button></div>
+      <div className="grid min-w-0 gap-2 md:grid-cols-3">{fields.map(([key, label, max]) => {
+        const unitInvalid = Boolean(error && key === 'unit' && row.quantity.trim() !== '' && !row.unit.trim());
+        const unitErrorId = `arrival-unit-error-${row.row_id}`;
+        return <label key={key} className="text-xs font-medium">{label}<input aria-label={`${label} nhập trường dòng ${index + 1}`} aria-invalid={unitInvalid || undefined} aria-describedby={unitInvalid ? unitErrorId : undefined} type={key === 'quantity' ? 'number' : 'text'} min={key === 'quantity' ? 0 : undefined} step={key === 'quantity' ? 'any' : undefined} maxLength={max} className={inputClass(Boolean(error))} value={row[key]} onChange={event => onChange(updateRow(rows, index, { [key]: event.target.value }))} />{unitInvalid ? <span id={unitErrorId} role="alert" className="mt-1 block text-rose-700">Nhập đơn vị khi có số lượng.</span> : null}</label>;
+      })}</div>
+    </div>)}</div>
+  </ResourceEditorFrame>;
 }
 
 function MaterialEditor({ rows, onChange, error, reveal }: { rows: MaterialDraft[]; onChange: (rows: MaterialDraft[]) => void; error?: string; reveal: number }) {
@@ -655,10 +721,10 @@ function updateRow<Row>(rows: Row[], index: number, patch: Partial<Row>) {
   return rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row);
 }
 
-function emptyCrew(): CrewDraft { return { crew_name: '', worker_count: '', work_hours: '', note: '' }; }
+function emptyCrew(): CrewDraft { return { row_id: crypto.randomUUID(), crew_name: '', worker_count: '', work_hours: '', note: '', representative: '', contact: '' }; }
 function emptyMaterial(): MaterialDraft { return { material_name: '', quantity: '', unit: '', note: '' }; }
-function emptyBlocker(content = ''): BlockerDraft { return { id: globalThis.crypto?.randomUUID?.() ?? `blocker-${Date.now()}-${Math.random().toString(36).slice(2)}`, content }; }
-function hasCrewValue(item: CrewDraft) { return Boolean(item.crew_name.trim() || item.worker_count || item.work_hours || item.note.trim()); }
+function emptyBlocker(content = ''): BlockerDraft { const row = emptyBlockerCapture(content); return { ...row, id: row.row_id }; }
+function hasCrewValue(item: CrewDraft) { return Boolean(item.crew_name.trim() || item.worker_count || item.work_hours || item.note.trim() || item.representative?.trim() || item.contact?.trim()); }
 function hasMaterialValue(item: MaterialDraft) { return Boolean(item.material_name.trim() || item.quantity || item.unit.trim() || item.note.trim()); }
 function todayText() { return new Date().toISOString().slice(0, 10); }
 function workItemRank(item: WorkItem) { return ['ready', 'in_progress', 'needs_changes', 'blocked'].includes(item.status) ? 0 : ['waiting_review', 'waiting_approval'].includes(item.status) ? 1 : 2; }

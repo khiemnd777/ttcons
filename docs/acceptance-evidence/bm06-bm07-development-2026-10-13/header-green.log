@@ -1,0 +1,48 @@
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook/short
+    bm_gs_risk_header_test.go:72: full project name retained; row5 height=33pt
+=== RUN   TestBMGS05ProjectHeaderMergedWorkbook/long
+    bm_gs_risk_header_test.go:72: full project name retained; row5 height=35.7pt
+--- PASS: TestBMGS05ProjectHeaderMergedWorkbook (0.02s)
+    --- PASS: TestBMGS05ProjectHeaderMergedWorkbook/short (0.01s)
+    --- PASS: TestBMGS05ProjectHeaderMergedWorkbook/long (0.01s)
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-01
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-03
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-04
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-05
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-06
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-07
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-08
+=== RUN   TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-02
+--- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges (0.05s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-01 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-03 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-04 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-05 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-06 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-07 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-08 (0.01s)
+    --- PASS: TestBMGS05HeaderRepairPreservesOtherTemplateMerges/BM-GS-02 (0.01s)
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/current_short
+    bm_gs_risk_header_test.go:203: full identity retained; row5=33pt
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/frozen_long
+    bm_gs_risk_header_test.go:203: full identity retained; row5=35.7pt
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/historical_missing
+    bm_gs_risk_header_test.go:203: full identity retained; row5=33pt
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/current_short
+    bm_gs_risk_header_test.go:203: full identity retained; row5=33pt
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/frozen_long
+    bm_gs_risk_header_test.go:203: full identity retained; row5=35.7pt
+=== RUN   TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/historical_missing
+    bm_gs_risk_header_test.go:203: full identity retained; row5=33pt
+--- PASS: TestBMGS06And07ProjectHeaderMergedWorkbook (0.10s)
+    --- PASS: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/current_short (0.01s)
+    --- PASS: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/frozen_long (0.01s)
+    --- PASS: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-06/historical_missing (0.01s)
+    --- PASS: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/current_short (0.03s)
+    --- PASS: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/frozen_long (0.03s)
+    --- PASS: TestBMGS06And07ProjectHeaderMergedWorkbook/BM-GS-07/historical_missing (0.02s)
+PASS
+ok  	consflow/backend/internal/core	0.971s

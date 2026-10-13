@@ -1,5 +1,11 @@
 # Project Planning Domain Map
 
+## Native Survey And Risk Exports — 2026-10-08
+
+- BM01 is exported in the exact supported dimensional survey form: client_survey_work_package or client_site_measurement_record. Intake questionnaires and survey minutes without dimension rows are not automatically measured surveys; their existing native output remains separate. Project Detail has no BM-GS chooser.
+- Native dimension_items retain area/dimension/unit/note; immutable new versions add MEP/existing_condition/assessment and survey representatives where missing. Existing facts are not re-entered in a reporting editor; pinned versions/history are unchanged.
+- BM05 reads native risk assessment or scoped survey risk_items/blockers with their actual meaning. New explicit risk dates/cause/impact/owner/status enrich native form rows; submitted form status does not prove resolved risks. No universal variation/action/survey ledger.
+- WorkflowFormPanel contextual exports use saved form ID and associated evidence. Unsaved changes disable export. Code owners: native form source export services, workflow form definitions/serializer, pure native projection and shared protected download button. See current-states for technical versus UX evidence.
 ## Startup / Member Role Catalog Cleanup — 2026-10-05
 
 - ProjectStartupWizard and ProjectMembersPanel share `ProjectMemberOptions`. Operational labels describe responsibilities; project role UUIDs grant permissions. Preserve this distinction and existing project.view/member.manage/pipeline.run eligibility rules.
@@ -77,6 +83,7 @@
 ## Compact Project Workspace Page Chrome
 
 - Mục đích chính: reserve vertical space for operational content without losing project or current-surface context. `ProjectWorkspaceLayout.tsx` is the single visible owner of project code/name, client, PM, status and the compact Developer Sample Data badge. Project-scoped business pages use the opt-in compact `PageHeader`; global counterparts retain standard density.
+- Below `sm`, the project sticky header adds one separate right-aligned row for the existing labelled Tiện ích button/count. It registers through shared UtilityDockLauncherHost context/ref lifecycle in AppShell; the same UtilityDock session and discussion drafts survive SPA standard/project navigation. Standard header stays icon-only, desktop/canvas presentation and focus-padding exclusion remain unchanged. No project/source/permission/API/history change. First searches UtilityDockLauncherHost/useUtilityDockLauncherHost/createPortal; lifecycle tests are controlled simulations, browser/draft evidence remains a separate gate.
 - `ProjectDetailPage.tsx` keeps an assistive-only page h1, combines the horizontally scrollable six-view switcher with the secondary `Mở kế hoạch` action, and does not repeat project identity. `ProjectDiscussionPage.tsx` owns the adjacent full `Trao đổi` route, retains an assistive-only heading and starts visible/loading content directly with the discussion workspace instead of repeating a local title/subtitle block. The primary lifecycle CTA remains solely in `Cần làm tiếp theo`; permissions, counts, loading/error/empty behavior and workflow transitions are unchanged.
 - Owners: `frontend/src/components/PageHeader.tsx`, `frontend/src/modules/projects/ProjectWorkspaceLayout.tsx`, `ProjectDetailPage.tsx`, `ProjectDiscussionPage.tsx`, and project-scoped callers under Planning, BOQ, Contracts, Procurement, Warehouse, Operations, Acceptance, Handover, Project Finance and Audit. Focused contracts: `frontend/tests/projectDetailTabs.test.ts`, `projectActivityTabs.test.ts`, `projectWorkspaceNavigation.test.ts`, `projectWorkspaceCompactHeader.test.ts`. First searches: `ProjectDiscussionPage|data-page-header-density|data-project-overview-toolbar|discussion_unread|density="compact"|SampleDataBadge`.
 

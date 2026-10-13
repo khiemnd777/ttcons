@@ -141,9 +141,9 @@ func TestWorkItemExecutionTargetUsesCanonicalBusinessWorkspace(t *testing.T) {
 			source:     Record{"route": "/projects/project-1/acceptance", "ready": false, "status": "blocked"},
 			kind:       "mixed",
 			workspace:  executionWorkspaceAcceptance,
-			route:      "/projects/project-1/acceptance?task=work-11",
+			route:      "/work-items/work-11#subcontractor-reconciliation",
 			completion: "domain_then_form",
-			action:     "Mở nghiệm thu",
+			action:     "Mở đối soát",
 		},
 		{
 			name: "Rev9 accounting handoff opens lean workspace",

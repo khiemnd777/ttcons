@@ -1,5 +1,6 @@
-import { ReactNode, type Ref } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState, type Ref } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ClipboardCheck, ExternalLink, FileCheck2, FileText, PackageCheck, ScrollText, ShieldCheck, Upload } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -376,6 +377,9 @@ function renderPrimaryPanel(
   }
   switch (kind) {
     case 'workflow_form':
+      if (item.workflow_form_template_code === 'client_subcontractor_acceptance_package') {
+        return <ClientSubcontractorFormSurface item={item} evidence={evidence} readOnly={readOnly} observerReadOnly={observerReadOnly} navigationRequest={navigationRequest} workflowFormActionRef={workflowFormActionRef} onWorkflowFormActionStateChange={onWorkflowFormActionStateChange} onDirtyChange={onDirtyChange} onBusyChange={onBusyChange} />;
+      }
       return (
         <WorkflowFormPanel
           workItemId={item.id}
@@ -419,6 +423,29 @@ function renderPrimaryPanel(
     default:
       return <GenericPrimaryPanel item={item} />;
   }
+}
+
+function ClientSubcontractorFormSurface({ item, evidence, readOnly, observerReadOnly, navigationRequest, workflowFormActionRef, onWorkflowFormActionStateChange, onDirtyChange, onBusyChange }: Parameters<typeof WorkItemPrimarySurface>[0]) {
+  const queryClient = useQueryClient();
+  const formIdentity = useRef<string>();
+  const flags = useRef({ formDirty: false, ledgerDirty: false, formBusy: false, ledgerBusy: false });
+  const [formBusy, setFormBusy] = useState(false);
+  const [ledgerBusy, setLedgerBusy] = useState(false);
+  const formDirtyChanged = useCallback((dirty: boolean) => { flags.current.formDirty = dirty; onDirtyChange?.(dirty || flags.current.ledgerDirty); }, [onDirtyChange]);
+  const ledgerDirtyChanged = useCallback((dirty: boolean) => { flags.current.ledgerDirty = dirty; onDirtyChange?.(dirty || flags.current.formDirty); }, [onDirtyChange]);
+  const formBusyChanged = useCallback((busy: boolean) => { flags.current.formBusy = busy; setFormBusy(busy); onBusyChange?.(busy || flags.current.ledgerBusy); }, [onBusyChange]);
+  const ledgerBusyChanged = useCallback((busy: boolean) => { flags.current.ledgerBusy = busy; setLedgerBusy(busy); onBusyChange?.(busy || flags.current.formBusy); }, [onBusyChange]);
+  const formActionStateChanged = useCallback((state: WorkflowFormActionState | null) => {
+    const identity = state ? `${state.currentRevision}:${state.status}` : '';
+    if (formIdentity.current !== undefined && formIdentity.current !== identity) void queryClient.invalidateQueries({ queryKey: ['subcontractor-reconciliation', item.id] });
+    formIdentity.current = identity;
+    onWorkflowFormActionStateChange?.(state);
+  }, [item.id, onWorkflowFormActionStateChange, queryClient]);
+  useEffect(() => () => { onDirtyChange?.(false); onBusyChange?.(false); }, [onDirtyChange, onBusyChange]);
+  return <>
+    <WorkflowFormPanel workItemId={item.id} projectId={item.project_id} evidence={evidence} workItemStatus={item.status} readOnly={readOnly || ledgerBusy} artifactReadOnly={observerReadOnly} navigationRequest={navigationRequest} externalActions actionRef={workflowFormActionRef} onActionStateChange={formActionStateChanged} onDirtyChange={formDirtyChanged} onBusyChange={formBusyChanged} />
+    <SubcontractorReconciliationPanel workItemId={item.id} projectId={item.project_id} clientContext readOnly={readOnly || observerReadOnly} externalBusy={formBusy} onDirtyChange={ledgerDirtyChanged} onBusyChange={ledgerBusyChanged} />
+  </>;
 }
 
 function ContractPrimaryPanel({ item }: { item: WorkItem }) {

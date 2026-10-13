@@ -993,9 +993,13 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 		t.Fatal(err)
 	}
 	foundCatalog := false
+	var catalogDefaultVersionID string
 	for _, row := range rows {
-		if row["template_code"] == "builtin_construction_daily_report" {
+		// Keep this compatibility regression pinned to the original default
+		// contract. Explicit native revisions have separate lifecycle coverage.
+		if row["template_code"] == "builtin_construction_daily_report" && boolValue(row["default_eligible"]) {
 			foundCatalog = true
+			catalogDefaultVersionID = cleanID(row["version_id"])
 			if row["form_type"] != "daily_report" || number(row["version_no"]) != 1 {
 				t.Fatalf("unexpected construction daily report catalog row: %#v", row)
 			}
@@ -1031,6 +1035,9 @@ func TestConstructionDailyReportFormValidatesEvidenceAndCreatesNextPlanWorkItems
 	}
 	if defaultFormVersionID != formVersionID {
 		t.Fatalf("default construction daily report form version = %q, want %q", defaultFormVersionID, formVersionID)
+	}
+	if catalogDefaultVersionID != defaultFormVersionID {
+		t.Fatalf("compatible catalog version = %q, want backend default %q", catalogDefaultVersionID, defaultFormVersionID)
 	}
 
 	evidence, err := service.AddWorkItemEvidence(ctx, fixture.itemID, WorkItemEvidenceRequest{

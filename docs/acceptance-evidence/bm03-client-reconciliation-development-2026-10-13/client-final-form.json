@@ -1,0 +1,836 @@
+{
+  "answers": {
+    "acceptance_conclusion": "accepted",
+    "check_date": "2026-10-13",
+    "checklist_items": [
+      {
+        "actual_quantity": 24.2,
+        "claimed_quantity": 24,
+        "confirmed_quantity": 24,
+        "design_quantity": 25,
+        "drawing_reference": "[Synthetic] KT-WC-02 RevA",
+        "evidence_id": "99d24495-827c-42b6-b575-dea587da6b52",
+        "measurement_note": "[Synthetic] Đo theo sơ đồ ô thử",
+        "owner_response": "accepted",
+        "quality_note": "[Synthetic] Đạt yêu cầu bề mặt tại vùng thử",
+        "quality_result": "pass",
+        "standard_reference": "[Synthetic] Quy trình thử S-01",
+        "status": "done",
+        "technical_requirement": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử",
+        "title": "[Synthetic] Bề mặt sàn trước chống thấm",
+        "unit": "m2"
+      },
+      {
+        "actual_quantity": 25,
+        "claimed_quantity": 20,
+        "confirmed_quantity": 20,
+        "design_quantity": 25,
+        "drawing_reference": "[Synthetic] KT-WC-03 RevB",
+        "owner_response": "accepted",
+        "quality_note": "[Synthetic] Không phát hiện rò trong mẫu kiểm tra",
+        "quality_result": "pass",
+        "standard_reference": "[Synthetic] Quy trình thử S-02",
+        "status": "done",
+        "technical_requirement": "Ngâm nước thử 50 mm trong 24 giờ; không rò",
+        "title": "[Synthetic] Thử nước chống thấm 24 giờ",
+        "unit": "m2"
+      },
+      {
+        "actual_quantity": 24.6,
+        "claimed_quantity": 21,
+        "confirmed_quantity": 21,
+        "design_quantity": 25,
+        "drawing_reference": "[Synthetic] KT-WC-04 RevC",
+        "owner_response": "accepted",
+        "quality_note": "[Synthetic] Đạt yêu cầu đo tại mẫu thử",
+        "quality_result": "pass",
+        "standard_reference": "[Synthetic] Mẫu duyệt MAT-03",
+        "status": "done",
+        "technical_requirement": "Độ dốc thử 1.5-2%; ron không quá 1 mm",
+        "title": "[Synthetic] Độ dốc và lát gạch sàn",
+        "unit": "m2"
+      }
+    ],
+    "construction_area": "[Synthetic] WC tầng 1 - Khu thử",
+    "overall_comment": "[Synthetic] Rev10 R1; dữ liệu thử nội bộ, không phải nghiệm thu công trình thật.",
+    "quantity_items": [
+      {
+        "approved_quantity": 23,
+        "claimed_quantity": 23,
+        "item": "[Synthetic] Bề mặt sàn trước chống thấm",
+        "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+      },
+      {
+        "approved_quantity": 20,
+        "claimed_quantity": 20,
+        "item": "[Synthetic] Thử nước chống thấm 24 giờ",
+        "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+      },
+      {
+        "approved_quantity": 21,
+        "claimed_quantity": 21,
+        "item": "[Synthetic] Độ dốc và lát gạch sàn",
+        "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+      }
+    ],
+    "reference_no": "UAT-BM03-REV10-20261013-R2",
+    "subcontractor_name": "[Synthetic] Tổ chống thấm UAT",
+    "subcontractor_representative": "[Synthetic] Đại diện tổ thử",
+    "work_package": "flooring"
+  },
+  "auto_advance_when_ready": false,
+  "available": true,
+  "capabilities": {
+    "can_add_confirmation": true,
+    "can_amend": true,
+    "can_delete_pdf": false,
+    "can_generate_pdf": true
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Nghiệm thu phiên bản R2 và giữ nguyên đối soát/ảnh/file R1.",
+      "created_at": "2026-10-13T00:34:56Z",
+      "event_type": "amended",
+      "from_status": "submitted",
+      "id": "f6bdcc58-ba92-4244-b99c-08056bb2442c",
+      "instance_id": "f5dbac7f-86f4-4b16-a0a1-80092e8592db",
+      "metadata_json": {
+        "changed_fields": [
+          {
+            "after": "UAT-BM03-REV10-20261013-R2",
+            "after_present": true,
+            "before": "UAT-BM03-REV10-20261013-R1",
+            "before_present": true,
+            "field_key": "reference_no",
+            "field_label": "Số biên bản",
+            "field_type": "text"
+          },
+          {
+            "after": [
+              {
+                "actual_quantity": 24.2,
+                "claimed_quantity": 24,
+                "confirmed_quantity": 24,
+                "design_quantity": 25,
+                "drawing_reference": "[Synthetic] KT-WC-02 RevA",
+                "evidence_id": "99d24495-827c-42b6-b575-dea587da6b52",
+                "measurement_note": "[Synthetic] Đo theo sơ đồ ô thử",
+                "owner_response": "accepted",
+                "quality_note": "[Synthetic] Đạt yêu cầu bề mặt tại vùng thử",
+                "quality_result": "pass",
+                "standard_reference": "[Synthetic] Quy trình thử S-01",
+                "status": "done",
+                "technical_requirement": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử",
+                "title": "[Synthetic] Bề mặt sàn trước chống thấm",
+                "unit": "m2"
+              },
+              {
+                "actual_quantity": 25,
+                "claimed_quantity": 20,
+                "confirmed_quantity": 20,
+                "design_quantity": 25,
+                "drawing_reference": "[Synthetic] KT-WC-03 RevB",
+                "owner_response": "accepted",
+                "quality_note": "[Synthetic] Không phát hiện rò trong mẫu kiểm tra",
+                "quality_result": "pass",
+                "standard_reference": "[Synthetic] Quy trình thử S-02",
+                "status": "done",
+                "technical_requirement": "Ngâm nước thử 50 mm trong 24 giờ; không rò",
+                "title": "[Synthetic] Thử nước chống thấm 24 giờ",
+                "unit": "m2"
+              },
+              {
+                "actual_quantity": 24.6,
+                "claimed_quantity": 21,
+                "confirmed_quantity": 21,
+                "design_quantity": 25,
+                "drawing_reference": "[Synthetic] KT-WC-04 RevC",
+                "owner_response": "accepted",
+                "quality_note": "[Synthetic] Đạt yêu cầu đo tại mẫu thử",
+                "quality_result": "pass",
+                "standard_reference": "[Synthetic] Mẫu duyệt MAT-03",
+                "status": "done",
+                "technical_requirement": "Độ dốc thử 1.5-2%; ron không quá 1 mm",
+                "title": "[Synthetic] Độ dốc và lát gạch sàn",
+                "unit": "m2"
+              }
+            ],
+            "after_present": true,
+            "before": [
+              {
+                "actual_quantity": 24.8,
+                "claimed_quantity": 23,
+                "confirmed_quantity": 23,
+                "design_quantity": 25,
+                "drawing_reference": "[Synthetic] KT-WC-02 RevA",
+                "evidence_id": "99d24495-827c-42b6-b575-dea587da6b52",
+                "measurement_note": "[Synthetic] Đo theo sơ đồ ô thử",
+                "owner_response": "accepted",
+                "quality_note": "[Synthetic] Đạt yêu cầu bề mặt tại vùng thử",
+                "quality_result": "pass",
+                "standard_reference": "[Synthetic] Quy trình thử S-01",
+                "status": "done",
+                "technical_requirement": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử",
+                "title": "[Synthetic] Bề mặt sàn trước chống thấm",
+                "unit": "m2"
+              },
+              {
+                "actual_quantity": 25,
+                "claimed_quantity": 20,
+                "confirmed_quantity": 20,
+                "design_quantity": 25,
+                "drawing_reference": "[Synthetic] KT-WC-03 RevB",
+                "owner_response": "accepted",
+                "quality_note": "[Synthetic] Không phát hiện rò trong mẫu kiểm tra",
+                "quality_result": "pass",
+                "standard_reference": "[Synthetic] Quy trình thử S-02",
+                "status": "done",
+                "technical_requirement": "Ngâm nước thử 50 mm trong 24 giờ; không rò",
+                "title": "[Synthetic] Thử nước chống thấm 24 giờ",
+                "unit": "m2"
+              },
+              {
+                "actual_quantity": 24.6,
+                "claimed_quantity": 21,
+                "confirmed_quantity": 21,
+                "design_quantity": 25,
+                "drawing_reference": "[Synthetic] KT-WC-04 RevC",
+                "owner_response": "accepted",
+                "quality_note": "[Synthetic] Đạt yêu cầu đo tại mẫu thử",
+                "quality_result": "pass",
+                "standard_reference": "[Synthetic] Mẫu duyệt MAT-03",
+                "status": "done",
+                "technical_requirement": "Độ dốc thử 1.5-2%; ron không quá 1 mm",
+                "title": "[Synthetic] Độ dốc và lát gạch sàn",
+                "unit": "m2"
+              }
+            ],
+            "before_present": true,
+            "field_key": "checklist_items",
+            "field_label": "Checklist items",
+            "field_type": "structured_list"
+          }
+        ],
+        "downstream_reprocessed": false,
+        "form_type": "checklist",
+        "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+        "from_revision": 1,
+        "reason": "[Synthetic] Nghiệm thu phiên bản R2 và giữ nguyên đối soát/ảnh/file R1.",
+        "to_revision": 2,
+        "workflow_form_instance_id": "f5dbac7f-86f4-4b16-a0a1-80092e8592db"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "submitted",
+      "work_item_id": "778be55c-f1aa-423a-b888-40807c11c2d5"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-13T00:33:20Z",
+      "event_type": "submitted",
+      "from_status": "draft",
+      "id": "4269d98b-9569-4645-9981-e87b69398c18",
+      "instance_id": "f5dbac7f-86f4-4b16-a0a1-80092e8592db",
+      "metadata_json": {
+        "form_type": "checklist",
+        "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+        "revision_no": 1
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "submitted",
+      "work_item_id": "778be55c-f1aa-423a-b888-40807c11c2d5"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Prepare R1 for actual UI Chốt hồ sơ.",
+      "created_at": "2026-10-13T00:32:42Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "010bb94c-0221-4c85-b37d-899e33ac5749",
+      "instance_id": "f5dbac7f-86f4-4b16-a0a1-80092e8592db",
+      "metadata_json": {
+        "form_type": "checklist",
+        "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "778be55c-f1aa-423a-b888-40807c11c2d5"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:56:15Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "3c247cd3-3b69-4a92-bfd8-f969f2b78820",
+      "instance_id": "f5dbac7f-86f4-4b16-a0a1-80092e8592db",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "778be55c-f1aa-423a-b888-40807c11c2d5"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "reference_no",
+      "field_type": "text",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "bb04dcc4-3e0f-4239-9def-0d89c8a169d9",
+      "label": "Số biên bản",
+      "options_json": [],
+      "order_index": 9,
+      "required": false,
+      "validation_json": {
+        "max_length": 160
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "check_date",
+      "field_type": "date",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "f9b55278-c01c-4e5d-8282-54f7be620f3d",
+      "label": "Ngày kiểm tra",
+      "options_json": [],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {
+        "default_source": "current_date"
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "subcontractor_name",
+      "field_type": "text",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "a6c8ce9b-b143-411f-91ba-d7c2e0ba97f9",
+      "label": "Đội / thầu phụ",
+      "options_json": [],
+      "order_index": 20,
+      "required": true,
+      "validation_json": {
+        "max_length": 160,
+        "min_length": 2
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "subcontractor_representative",
+      "field_type": "text",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "1e7d0ef6-3192-4ddd-91b7-f4bf0747f6b3",
+      "label": "Đại diện thầu phụ",
+      "options_json": [],
+      "order_index": 30,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 120
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "work_package",
+      "field_type": "select",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "2bef85f2-6888-4565-8399-31bb03cf0c7f",
+      "label": "Gói / phạm vi thi công",
+      "options_json": [
+        {
+          "label": "Tháo dỡ",
+          "value": "demolition"
+        },
+        {
+          "label": "Xây tô",
+          "value": "masonry"
+        },
+        {
+          "label": "Trần",
+          "value": "ceiling"
+        },
+        {
+          "label": "Sàn",
+          "value": "flooring"
+        },
+        {
+          "label": "Sơn",
+          "value": "painting"
+        },
+        {
+          "label": "MEP",
+          "value": "mep"
+        },
+        {
+          "label": "Mộc / nội thất",
+          "value": "carpentry"
+        },
+        {
+          "label": "Nhôm kính",
+          "value": "aluminum_glass"
+        },
+        {
+          "label": "Vệ sinh",
+          "value": "cleaning"
+        },
+        {
+          "label": "Khác",
+          "value": "other"
+        }
+      ],
+      "order_index": 40,
+      "required": true,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "construction_area",
+      "field_type": "text",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "1fe0e923-6692-43d9-b1fe-2c8aa1a33286",
+      "label": "Khu vực / tầng / phòng",
+      "options_json": [],
+      "order_index": 50,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 200
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "checklist_items",
+      "field_type": "structured_list",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": "Submit chỉ được phép khi mọi item ở trạng thái Done hoặc N/A. Evidence nếu chọn phải thuộc đúng work item.",
+      "id": "037307d1-101b-4654-a667-8c10f5c641cc",
+      "label": "Checklist items",
+      "options_json": [],
+      "order_index": 60,
+      "required": true,
+      "validation_json": {
+        "item_fields": [
+          {
+            "key": "title",
+            "label": "Hạng mục",
+            "max_length": 180,
+            "min_length": 3,
+            "required": true,
+            "type": "text"
+          },
+          {
+            "key": "boq_item_ref",
+            "label": "BOQ / mã việc",
+            "max_length": 120,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "claimed_quantity",
+            "label": "KL claim",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "confirmed_quantity",
+            "label": "KL xác nhận",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "unit",
+            "label": "ĐVT",
+            "max_length": 30,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "options": [
+              {
+                "label": "Done",
+                "value": "done"
+              },
+              {
+                "label": "N/A",
+                "value": "not_applicable"
+              },
+              {
+                "label": "Needs follow-up",
+                "value": "needs_follow_up"
+              },
+              {
+                "label": "Blocked",
+                "value": "blocked"
+              }
+            ],
+            "required": true,
+            "type": "select"
+          },
+          {
+            "key": "evidence_id",
+            "label": "Evidence",
+            "required": false,
+            "type": "evidence_reference"
+          },
+          {
+            "key": "owner_response",
+            "label": "Phản hồi",
+            "options": [
+              {
+                "label": "Chấp nhận",
+                "value": "accepted"
+              },
+              {
+                "label": "Điều chỉnh KL",
+                "value": "adjust_quantity"
+              },
+              {
+                "label": "Yêu cầu làm lại",
+                "value": "rework_required"
+              },
+              {
+                "label": "Chờ evidence",
+                "value": "waiting_evidence"
+              }
+            ],
+            "required": false,
+            "type": "select"
+          },
+          {
+            "key": "due_date",
+            "label": "Due date",
+            "required": false,
+            "type": "date"
+          },
+          {
+            "key": "comment",
+            "label": "Comment",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          },
+          {
+            "key": "standard_reference",
+            "label": "Tiêu chuẩn áp dụng",
+            "max_length": 300,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "drawing_reference",
+            "label": "Bản vẽ và revision",
+            "max_length": 300,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "technical_requirement",
+            "label": "Yêu cầu kỹ thuật",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          },
+          {
+            "key": "design_quantity",
+            "label": "Khối lượng thiết kế",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "actual_quantity",
+            "label": "Khối lượng thực tế đo",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "measurement_note",
+            "label": "Căn cứ và ghi chú đo",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          },
+          {
+            "key": "quality_result",
+            "label": "Kết quả",
+            "options": [
+              {
+                "label": "Đạt",
+                "value": "pass"
+              },
+              {
+                "label": "Không đạt",
+                "value": "fail"
+              },
+              {
+                "label": "Chưa đánh giá",
+                "value": "not_assessed"
+              }
+            ],
+            "required": false,
+            "type": "select"
+          },
+          {
+            "key": "quality_note",
+            "label": "Nhận xét nghiệm thu",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          }
+        ],
+        "max_items": 250,
+        "min_items": 1,
+        "submit_clear_statuses": [
+          "done",
+          "not_applicable"
+        ]
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "overall_comment",
+      "field_type": "textarea",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "25aba375-3621-4c06-ab2e-13251ac59b27",
+      "label": "Ghi chú tổng quan",
+      "options_json": [],
+      "order_index": 70,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 2000
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "quantity_items",
+      "field_type": "structured_list",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "71810774-1ef8-4da9-b9ea-0a0c82f788d0",
+      "label": "Khối lượng thầu phụ",
+      "options_json": [],
+      "order_index": 110,
+      "required": true,
+      "validation_json": {
+        "item_fields": [
+          {
+            "key": "item",
+            "label": "Hạng mục",
+            "max_length": 180,
+            "min_length": 2,
+            "required": true,
+            "type": "text"
+          },
+          {
+            "key": "claimed_quantity",
+            "label": "KL claim",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "approved_quantity",
+            "label": "KL duyệt",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "unit_price",
+            "label": "Đơn giá",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "note",
+            "label": "Ghi chú",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          }
+        ],
+        "max_items": 200,
+        "min_items": 1
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "acceptance_conclusion",
+      "field_type": "select",
+      "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+      "help_text": null,
+      "id": "db50fbfa-b116-4b8d-85bc-1601acc8b53b",
+      "label": "Kết luận nghiệm thu",
+      "options_json": [
+        {
+          "label": "Đồng ý nghiệm thu",
+          "value": "accepted"
+        },
+        {
+          "label": "Cần sửa chữa tồn tại",
+          "value": "rework_required"
+        }
+      ],
+      "order_index": 111,
+      "required": false,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {
+      "acceptance_conclusion": "accepted",
+      "check_date": "2026-10-13",
+      "checklist_items": [
+        {
+          "actual_quantity": 24.2,
+          "claimed_quantity": 24,
+          "confirmed_quantity": 24,
+          "design_quantity": 25,
+          "drawing_reference": "[Synthetic] KT-WC-02 RevA",
+          "evidence_id": "99d24495-827c-42b6-b575-dea587da6b52",
+          "measurement_note": "[Synthetic] Đo theo sơ đồ ô thử",
+          "owner_response": "accepted",
+          "quality_note": "[Synthetic] Đạt yêu cầu bề mặt tại vùng thử",
+          "quality_result": "pass",
+          "standard_reference": "[Synthetic] Quy trình thử S-01",
+          "status": "done",
+          "technical_requirement": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử",
+          "title": "[Synthetic] Bề mặt sàn trước chống thấm",
+          "unit": "m2"
+        },
+        {
+          "actual_quantity": 25,
+          "claimed_quantity": 20,
+          "confirmed_quantity": 20,
+          "design_quantity": 25,
+          "drawing_reference": "[Synthetic] KT-WC-03 RevB",
+          "owner_response": "accepted",
+          "quality_note": "[Synthetic] Không phát hiện rò trong mẫu kiểm tra",
+          "quality_result": "pass",
+          "standard_reference": "[Synthetic] Quy trình thử S-02",
+          "status": "done",
+          "technical_requirement": "Ngâm nước thử 50 mm trong 24 giờ; không rò",
+          "title": "[Synthetic] Thử nước chống thấm 24 giờ",
+          "unit": "m2"
+        },
+        {
+          "actual_quantity": 24.6,
+          "claimed_quantity": 21,
+          "confirmed_quantity": 21,
+          "design_quantity": 25,
+          "drawing_reference": "[Synthetic] KT-WC-04 RevC",
+          "owner_response": "accepted",
+          "quality_note": "[Synthetic] Đạt yêu cầu đo tại mẫu thử",
+          "quality_result": "pass",
+          "standard_reference": "[Synthetic] Mẫu duyệt MAT-03",
+          "status": "done",
+          "technical_requirement": "Độ dốc thử 1.5-2%; ron không quá 1 mm",
+          "title": "[Synthetic] Độ dốc và lát gạch sàn",
+          "unit": "m2"
+        }
+      ],
+      "construction_area": "[Synthetic] WC tầng 1 - Khu thử",
+      "overall_comment": "[Synthetic] Rev10 R1; dữ liệu thử nội bộ, không phải nghiệm thu công trình thật.",
+      "quantity_items": [
+        {
+          "approved_quantity": 23,
+          "claimed_quantity": 23,
+          "item": "[Synthetic] Bề mặt sàn trước chống thấm",
+          "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+        },
+        {
+          "approved_quantity": 20,
+          "claimed_quantity": 20,
+          "item": "[Synthetic] Thử nước chống thấm 24 giờ",
+          "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+        },
+        {
+          "approved_quantity": 21,
+          "claimed_quantity": 21,
+          "item": "[Synthetic] Độ dốc và lát gạch sàn",
+          "note": "[Synthetic] Khối lượng đối soát khác khối lượng đo thực tế"
+        }
+      ],
+      "reference_no": "UAT-BM03-REV10-20261013-R2",
+      "subcontractor_name": "[Synthetic] Tổ chống thấm UAT",
+      "subcontractor_representative": "[Synthetic] Đại diện tổ thử",
+      "work_package": "flooring"
+    },
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:56:15Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 2,
+    "form_code": "client_subcontractor_acceptance_package",
+    "form_description": "Một hồ sơ tổng hợp checklist và khối lượng nghiệm thu thầu phụ.",
+    "form_name": "Gói nghiệm thu thầu phụ Rev8",
+    "form_template_id": "48000000-0000-0000-0000-000000000004",
+    "form_type": "checklist",
+    "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+    "form_version_no": 3,
+    "form_version_status": "published",
+    "id": "f5dbac7f-86f4-4b16-a0a1-80092e8592db",
+    "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "QS"
+    ],
+    "run_node_id": "746724b1-60c1-418e-8710-3f41880eda1b",
+    "run_step_id": "3b3ab3ca-66ac-421a-b549-cad8428bbd68",
+    "status": "submitted",
+    "submitted_at": "2026-10-13T00:33:20Z",
+    "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "template_step_id": "606c3a96-8d5e-40cb-b972-c43f7dc2e16a",
+    "title": "Nghiệm thu gói thầu phụ và khối lượng",
+    "updated_at": "2026-10-13T00:34:56Z",
+    "work_item_id": "778be55c-f1aa-423a-b888-40807c11c2d5",
+    "work_item_status": "completed",
+    "work_item_title": "Nghiệm thu gói thầu phụ và khối lượng"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [],
+  "template": {
+    "code": "client_subcontractor_acceptance_package",
+    "description": "Một hồ sơ tổng hợp checklist và khối lượng nghiệm thu thầu phụ.",
+    "form_type": "checklist",
+    "id": "48000000-0000-0000-0000-000000000004",
+    "name": "Gói nghiệm thu thầu phụ Rev8"
+  },
+  "version": {
+    "id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+    "status": "published",
+    "version_no": 3
+  }
+}

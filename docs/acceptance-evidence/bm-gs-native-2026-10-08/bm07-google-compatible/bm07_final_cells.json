@@ -1,0 +1,456 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1vjzyxWF5ImPpx7Atjr03w2QaYH6RaCNREkJv6rEkjJk",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1vjzyxWF5ImPpx7Atjr03w2QaYH6RaCNREkJv6rEkjJk/edit",
+    "properties": {
+      "title": "BM07 — File tải trực tiếp từ Xuất báo cáo — Đã sửa tương thích 2026-10-08",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 349641001,
+          "title": "BM-GS-07",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                    "userEnteredValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-07)",
+                    "userEnteredValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-07)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-07)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "SỔ QUẢN LÝ HÌNH ẢNH HIỆN TRƯỜNG (IMAGE LOG)",
+                    "userEnteredValue": {
+                      "stringValue": "SỔ QUẢN LÝ HÌNH ẢNH HIỆN TRƯỜNG (IMAGE LOG)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "SỔ QUẢN LÝ HÌNH ẢNH HIỆN TRƯỜNG (IMAGE LOG)"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "Dự án:",
+                    "userEnteredValue": {
+                      "stringValue": "Dự án:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Dự án:"
+                    }
+                  },
+                  {
+                    "formattedValue": "[BMGS-UAT-20261008] UAT BM-GS — Công trình mẫu cô lập",
+                    "userEnteredValue": {
+                      "stringValue": "[BMGS-UAT-20261008] UAT BM-GS — Công trình mẫu cô lập"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[BMGS-UAT-20261008] UAT BM-GS — Công trình mẫu cô lập"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "STT",
+                    "userEnteredValue": {
+                      "stringValue": "STT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "STT"
+                    }
+                  },
+                  {
+                    "formattedValue": "VỊ TRÍ / HẠNG MỤC",
+                    "userEnteredValue": {
+                      "stringValue": "VỊ TRÍ / HẠNG MỤC"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "VỊ TRÍ / HẠNG MỤC"
+                    }
+                  },
+                  {
+                    "formattedValue": "THỜI ĐIỂM CHỤP",
+                    "userEnteredValue": {
+                      "stringValue": "THỜI ĐIỂM CHỤP"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "THỜI ĐIỂM CHỤP"
+                    }
+                  },
+                  {
+                    "formattedValue": "NỘI DUNG HÌNH ẢNH / BẰNG CHỨNG KĨ THUẬT",
+                    "userEnteredValue": {
+                      "stringValue": "NỘI DUNG HÌNH ẢNH / BẰNG CHỨNG KĨ THUẬT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "NỘI DUNG HÌNH ẢNH / BẰNG CHỨNG KĨ THUẬT"
+                    }
+                  },
+                  {
+                    "formattedValue": "GIAI ĐOẠN",
+                    "userEnteredValue": {
+                      "stringValue": "GIAI ĐOẠN"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GIAI ĐOẠN"
+                    }
+                  },
+                  {
+                    "formattedValue": "TÊN FILE ÂNH THAM CHIẾU",
+                    "userEnteredValue": {
+                      "stringValue": "TÊN FILE ÂNH THAM CHIẾU"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "TÊN FILE ÂNH THAM CHIẾU"
+                    }
+                  },
+                  {
+                    "formattedValue": "GHI CHÚ / BÀN GIAO",
+                    "userEnteredValue": {
+                      "stringValue": "GHI CHÚ / BÀN GIAO"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GHI CHÚ / BÀN GIAO"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "1",
+                    "userEnteredValue": {
+                      "numberValue": 1
+                    },
+                    "effectiveValue": {
+                      "numberValue": 1
+                    }
+                  },
+                  {
+                    "formattedValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh LANDSCAPE",
+                    "userEnteredValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh LANDSCAPE"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh LANDSCAPE"
+                    }
+                  },
+                  {
+                    "formattedValue": "2026-10-08T10:00:00+07:00",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-08T10:00:00+07:00"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-08T10:00:00+07:00"
+                    }
+                  },
+                  {
+                    "formattedValue": "Ảnh LANDSCAPE — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh.",
+                    "userEnteredValue": {
+                      "stringValue": "Ảnh LANDSCAPE — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ảnh LANDSCAPE — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    }
+                  },
+                  {
+                    "formattedValue": "Trong thi công",
+                    "userEnteredValue": {
+                      "stringValue": "Trong thi công"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Trong thi công"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc.",
+                    "userEnteredValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "2",
+                    "userEnteredValue": {
+                      "numberValue": 2
+                    },
+                    "effectiveValue": {
+                      "numberValue": 2
+                    }
+                  },
+                  {
+                    "formattedValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh PORTRAIT",
+                    "userEnteredValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh PORTRAIT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh PORTRAIT"
+                    }
+                  },
+                  {
+                    "formattedValue": "2026-10-08T10:01:00+07:00",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-08T10:01:00+07:00"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-08T10:01:00+07:00"
+                    }
+                  },
+                  {
+                    "formattedValue": "Ảnh PORTRAIT — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh.",
+                    "userEnteredValue": {
+                      "stringValue": "Ảnh PORTRAIT — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ảnh PORTRAIT — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    }
+                  },
+                  {
+                    "formattedValue": "Trong thi công",
+                    "userEnteredValue": {
+                      "stringValue": "Trong thi công"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Trong thi công"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc.",
+                    "userEnteredValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "3",
+                    "userEnteredValue": {
+                      "numberValue": 3
+                    },
+                    "effectiveValue": {
+                      "numberValue": 3
+                    }
+                  },
+                  {
+                    "formattedValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh SQUARE",
+                    "userEnteredValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh SQUARE"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh SQUARE"
+                    }
+                  },
+                  {
+                    "formattedValue": "2026-10-08T10:02:00+07:00",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-08T10:02:00+07:00"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-08T10:02:00+07:00"
+                    }
+                  },
+                  {
+                    "formattedValue": "Ảnh SQUARE — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh.",
+                    "userEnteredValue": {
+                      "stringValue": "Ảnh SQUARE — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ảnh SQUARE — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    }
+                  },
+                  {
+                    "formattedValue": "Trong thi công",
+                    "userEnteredValue": {
+                      "stringValue": "Trong thi công"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Trong thi công"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc.",
+                    "userEnteredValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "4",
+                    "userEnteredValue": {
+                      "numberValue": 4
+                    },
+                    "effectiveValue": {
+                      "numberValue": 4
+                    }
+                  },
+                  {
+                    "formattedValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh TALL",
+                    "userEnteredValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh TALL"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Sảnh tầng 1 giả lập — đoạn hành lang dài, vị trí ảnh TALL"
+                    }
+                  },
+                  {
+                    "formattedValue": "2026-10-08T10:03:00+07:00",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-08T10:03:00+07:00"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-08T10:03:00+07:00"
+                    }
+                  },
+                  {
+                    "formattedValue": "Ảnh TALL — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh.",
+                    "userEnteredValue": {
+                      "stringValue": "Ảnh TALL — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ảnh TALL — dữ liệu tổng hợp, không phải công trình thật. Dòng mô tả dài kiểm tra việc ảnh nằm trong ô không che nội dung vị trí và ghi chú liền kề. Mốc màu bốn góc và nhãn SYNTHETIC giúp nhận biết đầy đủ khung ảnh."
+                    }
+                  },
+                  {
+                    "formattedValue": "Trong thi công",
+                    "userEnteredValue": {
+                      "stringValue": "Trong thi công"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Trong thi công"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc.",
+                    "userEnteredValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ghi chú bàn giao tổng hợp nhiều dòng: đối chiếu ảnh với đúng Evidence ID; giữ nguyên tỷ lệ và toàn bộ dấu nhận biết bốn góc."
+                    }
+                  }
+                ]
+              },
+              {},
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                    "userEnteredValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "PHÒNG HỒ SƠ / BQLDA",
+                    "userEnteredValue": {
+                      "stringValue": "PHÒNG HỒ SƠ / BQLDA"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "PHÒNG HỒ SƠ / BQLDA"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "isError": false
+}

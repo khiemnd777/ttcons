@@ -1,0 +1,52 @@
+{
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "member_id": "a27c5d96-ee89-4257-b6e1-7ec9dd9d8e39",
+  "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+  "roles": [
+    "Bộ phận HĐ",
+    "Giám sát",
+    "Kế toán",
+    "Mua hàng",
+    "PM",
+    "QA/QC",
+    "QS",
+    "Thiết kế"
+  ],
+  "pm_set": true,
+  "run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+  "intake_boq_evidence": "62249b4d-2f84-49cd-a2cf-54be869e5b63",
+  "supplier_partner_id": "26cda344-e3f3-42c7-818c-167d2ea802c4",
+  "client_partner_id": "8995eb0d-3a3e-4aa4-b369-497b4a95fc68",
+  "boq_id": "51d8a750-1218-4574-94fa-6fe326d7a8fb",
+  "quotation_id": "6dd79a9a-3ad6-42c6-8d30-607da918c1ee",
+  "evidence_documents": {
+    "4c0160fd-336e-4f8a-8dd0-82f265805b41": "82e8443d-acc3-4918-9a8d-dd9d800fe00b",
+    "37d90fa3-abe5-4bbe-af17-34b1990730fb": "5753eb48-7c35-42d5-baf8-9c99ad3f4785",
+    "34282293-b45a-477c-b793-7c0035cc5aab": "aedca439-58c9-4ed5-935e-20817863ff44",
+    "1d6e55cc-ee66-4f62-9d02-6f51b5cf60c3": "1ee29293-eeb8-4a16-86fd-6fe670364ce6"
+  },
+  "outbound_contract_id": "ba25628f-bf95-4034-b6c1-93fcb6b31e58",
+  "outbound_contract_version_id": "6b70386a-43a9-4722-b5a0-df697f6bf46f",
+  "outbound_dispatch_id": "79ebb2bf-5bf9-47d7-ae16-6d073556eab4",
+  "outbound_scan_document_id": "e6747ac4-bb1a-4c4f-bf9b-a502451e29a0",
+  "procurement_request_id": "ab398fc0-0999-4a3d-b497-3957d53ab9b9",
+  "input_contract_id": "c1fce738-cb26-4600-ad07-e84272e61b00",
+  "input_contract_version_id": "60c1fd27-54ff-46c7-9ebe-7ec35f0ad30a",
+  "handoff_id": "fadd1e67-7634-455e-a357-f3a61fc52451",
+  "generated_check_id": "39f8482d-b279-453d-93c4-b5050c7ae968",
+  "generated_check_work_item_id": "531b42e1-3e29-4f56-b6e6-aec1e7bc1b52",
+  "inspection_photo_id": "84aad5ef-2ba2-4ead-880e-c28819c22b5e",
+  "client_photo_id": "99d24495-827c-42b6-b575-dea587da6b52",
+  "incoming_acceptance_id": "5d565737-3f3b-4523-a6a5-e62992148cf6",
+  "final_form_id": "0c091759-a7bf-43a7-8512-a8282f3eb64c",
+  "final_pdf_id": "36d4b513-6d6d-43e4-8c55-ea21ea8f4d5a",
+  "final_signature_id": "f7b1638b-4119-43dd-8c69-7465704aa49b",
+  "final_acceptance_id": "e6111f15-bbc2-4ff9-ab41-beda8337ac23",
+  "handover_id": "4fafa862-a292-408f-bd33-695d9c1e5b81",
+  "handover_documents": {
+    "as_built_documents": "bfb65188-601a-4603-85cf-665148a052a3",
+    "operation_manuals": "f1bb36b2-e21a-4a41-975c-78ee2b8dd7bb",
+    "warranty_documents": "e1de2081-5672-4960-bb26-19e5667b6171",
+    "signed_handover_minutes": "15c4a7f3-4b55-49db-8ace-afbefa354856"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "captured_at_utc": "2026-10-13T04:59:23.209282+00:00",
+  "build_exit_code": 0,
+  "update_exit_code": 0,
+  "source_files": 979,
+  "matches_built_source": true,
+  "only_backend_recreated": true,
+  "backend_image_changed": true,
+  "backend_started": "2026-10-13T04:58:17.775151297Z",
+  "backend_image": "sha256:f1aa879da541bb1636b7f8e9490f08a5a9b7374b012a9b1d70ea34c7e7254ee8",
+  "readiness_http": 200,
+  "frontend_http": 200,
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "compose_env_file": "/private/tmp/consflow-bm02-development-20261012.env"
+}

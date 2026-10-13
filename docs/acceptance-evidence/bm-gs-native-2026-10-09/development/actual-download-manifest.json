@@ -1,0 +1,38 @@
+[
+  {
+    "browser_download": "/Users/khiemnguyen/Downloads/BM-GS-03 (6).xlsx",
+    "retained_file": "bm03-builtin-actual.xlsx",
+    "sha256": "9971cd5c69586cc37f68e772c5c5d1a5164542a6bcede88129dc9b3e8113691e",
+    "bytes": 11230,
+    "status": "final",
+    "download_trigger": "existing Xuất báo cáo button",
+    "post_download_edits": false
+  },
+  {
+    "browser_download": "/Users/khiemnguyen/Downloads/BM-GS-03 (7).xlsx",
+    "retained_file": "bm03-client-package-actual.xlsx",
+    "sha256": "649980999bfea34b090f0df9924ba37d52a0dd6005a47f678d97e254f5b43fbf",
+    "bytes": 11192,
+    "status": "final",
+    "download_trigger": "existing Xuất báo cáo button",
+    "post_download_edits": false
+  },
+  {
+    "browser_download": "/Users/khiemnguyen/Downloads/BM-GS-08 (4).xlsx",
+    "retained_file": "bm08-actual.xlsx",
+    "sha256": "7963e955c963ed4770c0c379d48d847c2652e0c82d27f872c3a48e2d167f5a7a",
+    "bytes": 11823,
+    "status": "superseded missing deadline source",
+    "download_trigger": "existing Xuất báo cáo button",
+    "post_download_edits": false
+  },
+  {
+    "browser_download": "/Users/khiemnguyen/Downloads/BM-GS-08 (5).xlsx",
+    "retained_file": "bm08-final-actual.xlsx",
+    "sha256": "e681a17329e047b1a158af6fcdb9ac8f0098c9846e32e6240d26847f82f64f29",
+    "bytes": 11873,
+    "status": "final",
+    "download_trigger": "existing Xuất báo cáo button",
+    "post_download_edits": false
+  }
+]

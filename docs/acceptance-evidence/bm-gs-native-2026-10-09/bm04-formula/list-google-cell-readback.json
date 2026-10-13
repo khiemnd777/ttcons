@@ -1,0 +1,402 @@
+{
+  "spreadsheetId": "1fSmgCgoDHF817aj1ufThkQAQJ9f06NByHIbfzutmcPw",
+  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1fSmgCgoDHF817aj1ufThkQAQJ9f06NByHIbfzutmcPw/edit",
+  "properties": {
+    "title": "BM04 — Nghiệm thu tổng lỗi từ nút danh sách — 09-10-2026",
+    "locale": "en_US",
+    "timeZone": "America/Los_Angeles"
+  },
+  "sheets": [
+    {
+      "properties": {
+        "sheetId": 942974765,
+        "title": "2026-10-08_01",
+        "index": 0,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      },
+      "data": [
+        {
+          "rowData": [
+            {
+              "values": [
+                {
+                  "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                  "userEnteredValue": {
+                    "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-04)",
+                  "userEnteredValue": {
+                    "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-04)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-04)"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "DANH SÁCH LỖI VÀ TỒN TẠI HẠNG MỤC (PUNCH LIST)",
+                  "userEnteredValue": {
+                    "stringValue": "DANH SÁCH LỖI VÀ TỒN TẠI HẠNG MỤC (PUNCH LIST)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "DANH SÁCH LỖI VÀ TỒN TẠI HẠNG MỤC (PUNCH LIST)"
+                  }
+                }
+              ]
+            },
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "Dự án:",
+                  "userEnteredValue": {
+                    "stringValue": "Dự án:"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Dự án:"
+                  }
+                },
+                {
+                  "formattedValue": "[BMGS-UAT-20261008] UAT BM-GS — Công trình mẫu cô lập",
+                  "userEnteredValue": {
+                    "stringValue": "[BMGS-UAT-20261008] UAT BM-GS — Công trình mẫu cô lập"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "[BMGS-UAT-20261008] UAT BM-GS — Công trình mẫu cô lập"
+                  }
+                },
+                {},
+                {},
+                {},
+                {},
+                {
+                  "formattedValue": "Ngày cập nhật:",
+                  "userEnteredValue": {
+                    "stringValue": "Ngày cập nhật:"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ngày cập nhật:"
+                  }
+                },
+                {
+                  "formattedValue": "2026-10-08",
+                  "userEnteredValue": {
+                    "stringValue": "2026-10-08"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "2026-10-08"
+                  }
+                }
+              ]
+            },
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "STT",
+                  "userEnteredValue": {
+                    "stringValue": "STT"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "STT"
+                  }
+                },
+                {
+                  "formattedValue": "MÃ LỖI",
+                  "userEnteredValue": {
+                    "stringValue": "MÃ LỖI"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "MÃ LỖI"
+                  }
+                },
+                {
+                  "formattedValue": "VỊ TRÍ / HẠNG MỤC",
+                  "userEnteredValue": {
+                    "stringValue": "VỊ TRÍ / HẠNG MỤC"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "VỊ TRÍ / HẠNG MỤC"
+                  }
+                },
+                {
+                  "formattedValue": "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI",
+                  "userEnteredValue": {
+                    "stringValue": "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI"
+                  }
+                },
+                {
+                  "formattedValue": "MỨC ĐỘ",
+                  "userEnteredValue": {
+                    "stringValue": "MỨC ĐỘ"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "MỨC ĐỘ"
+                  }
+                },
+                {
+                  "formattedValue": "ĐƠN VỊ PHỤ TRÁCH",
+                  "userEnteredValue": {
+                    "stringValue": "ĐƠN VỊ PHỤ TRÁCH"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "ĐƠN VỊ PHỤ TRÁCH"
+                  }
+                },
+                {
+                  "formattedValue": "ĐẠI DIỆN 24/7",
+                  "userEnteredValue": {
+                    "stringValue": "ĐẠI DIỆN 24/7"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "ĐẠI DIỆN 24/7"
+                  }
+                },
+                {
+                  "formattedValue": "THỜI HẠN",
+                  "userEnteredValue": {
+                    "stringValue": "THỜI HẠN"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "THỜI HẠN"
+                  }
+                },
+                {
+                  "formattedValue": "TRẠNG THÁI",
+                  "userEnteredValue": {
+                    "stringValue": "TRẠNG THÁI"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "TRẠNG THÁI"
+                  }
+                },
+                {
+                  "formattedValue": "GHI CHÚ",
+                  "userEnteredValue": {
+                    "stringValue": "GHI CHÚ"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "GHI CHÚ"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "1",
+                  "userEnteredValue": {
+                    "numberValue": 1
+                  },
+                  "effectiveValue": {
+                    "numberValue": 1
+                  }
+                },
+                {},
+                {},
+                {
+                  "formattedValue": "Nội dung lỗi giả lập: kiểm tra góc nền trước hoàn thiện",
+                  "userEnteredValue": {
+                    "stringValue": "Nội dung lỗi giả lập: kiểm tra góc nền trước hoàn thiện"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Nội dung lỗi giả lập: kiểm tra góc nền trước hoàn thiện"
+                  }
+                },
+                {},
+                {},
+                {},
+                {
+                  "formattedValue": "2026-10-10T17:00:00+07:00",
+                  "userEnteredValue": {
+                    "stringValue": "2026-10-10T17:00:00+07:00"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "2026-10-10T17:00:00+07:00"
+                  }
+                },
+                {
+                  "formattedValue": "Mới",
+                  "userEnteredValue": {
+                    "stringValue": "Mới"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Mới"
+                  }
+                }
+              ]
+            },
+            {},
+            {},
+            {},
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1",
+                  "userEnteredValue": {
+                    "formulaValue": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1"
+                  }
+                }
+              ]
+            },
+            {},
+            {
+              "values": [
+                {
+                  "formattedValue": "Nội dung lỗi đã ghi nhận",
+                  "userEnteredValue": {
+                    "stringValue": "Nội dung lỗi đã ghi nhận"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Nội dung lỗi đã ghi nhận"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "Xử lý vị trí góc nền UAT",
+                  "userEnteredValue": {
+                    "stringValue": "Xử lý vị trí góc nền UAT"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Xử lý vị trí góc nền UAT"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                  "userEnteredValue": {
+                    "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                  }
+                },
+                {},
+                {},
+                {
+                  "formattedValue": "ĐẠI DIỆN THẦU PHỤ (24/7)",
+                  "userEnteredValue": {
+                    "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                  }
+                },
+                {},
+                {},
+                {
+                  "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                  "userEnteredValue": {
+                    "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                  }
+                }
+              ]
+            },
+            {
+              "values": [
+                {
+                  "formattedValue": "(Ký & ghi rõ họ tên)",
+                  "userEnteredValue": {
+                    "stringValue": "(Ký & ghi rõ họ tên)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "(Ký & ghi rõ họ tên)"
+                  }
+                },
+                {},
+                {},
+                {
+                  "formattedValue": "(Ký & ghi rõ họ tên)",
+                  "userEnteredValue": {
+                    "stringValue": "(Ký & ghi rõ họ tên)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "(Ký & ghi rõ họ tên)"
+                  }
+                },
+                {},
+                {},
+                {
+                  "formattedValue": "(Ký & ghi rõ họ tên)",
+                  "userEnteredValue": {
+                    "stringValue": "(Ký & ghi rõ họ tên)"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "(Ký & ghi rõ họ tên)"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "properties": {
+        "sheetId": 1336673957,
+        "title": "Hình ảnh",
+        "index": 1,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      },
+      "data": [
+        {
+          "rowData": [
+            {
+              "values": [
+                {
+                  "formattedValue": "Ảnh UAT trước thi công.png • 499ca547-9844-43a7-8c6f-ae0688ae6850\nLỗi và tồn tại · 07a961eb-0ad5-4ed4-b856-b2c7bcf6dad6\n\nẢnh lưới màu giả lập để kiểm tra bố cục và nén ảnh UAT",
+                  "userEnteredValue": {
+                    "stringValue": "Ảnh UAT trước thi công.png • 499ca547-9844-43a7-8c6f-ae0688ae6850\nLỗi và tồn tại · 07a961eb-0ad5-4ed4-b856-b2c7bcf6dad6\n\nẢnh lưới màu giả lập để kiểm tra bố cục và nén ảnh UAT"
+                  },
+                  "effectiveValue": {
+                    "stringValue": "Ảnh UAT trước thi công.png • 499ca547-9844-43a7-8c6f-ae0688ae6850\nLỗi và tồn tại · 07a961eb-0ad5-4ed4-b856-b2c7bcf6dad6\n\nẢnh lưới màu giả lập để kiểm tra bố cục và nén ảnh UAT"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "active": true,
+  "address": null,
+  "contact_name": null,
+  "created_at": "2026-10-13T00:11:27Z",
+  "email": null,
+  "id": "26cda344-e3f3-42c7-818c-167d2ea802c4",
+  "legal_name": null,
+  "name": "[Synthetic] supplier Development BM03",
+  "notes": "[Synthetic] Internal test counterparty; no real commercial party.",
+  "partner_code": "BM03-REV10-SUPPLIER-20261013",
+  "partner_types": [
+    "supplier"
+  ],
+  "payment_terms_days": 0,
+  "phone": null,
+  "tax_code": null,
+  "updated_at": "2026-10-13T00:11:27Z"
+}

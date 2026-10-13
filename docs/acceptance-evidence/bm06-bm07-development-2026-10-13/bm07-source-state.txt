@@ -1,0 +1,188 @@
+Browser tab: 3, Title: "Thủ Thiêm Workflow", URL: "http://127.0.0.1:5173/work-items/2c969a28-945f-4abe-bf9a-8d44c722699d".
+1 AXWebArea Thủ Thiêm Workflow, URL: 127.0.0.1:5173/work-items/2c969a28-945f-4abe-bf9a-8d44c722699d
+	2 container root
+		3 container
+			4 link Description: Về trang mặc định, Value: 127.0.0.1:5173/
+			5 container Điều hướng chính
+				6 text CÔNG VIỆC
+				7 link Description: Dashboard, Value: 127.0.0.1:5173/dashboard
+				8 link Description: Bàn làm việc Bàn làm việc: 15, Value: 127.0.0.1:5173/my-work
+				9 link Description: Tiến trình, Value: 127.0.0.1:5173/progress
+				10 link Description: Công trình, Value: 127.0.0.1:5173/projects
+				11 link Description: Mua sắm vật tư, Value: 127.0.0.1:5173/procurement
+				12 link Description: Báo cáo Báo cáo: 5, Value: 127.0.0.1:5173/reports
+				13 link Description: Thống kê, Value: 127.0.0.1:5173/statistics
+				14 link Description: Bàn giao kế toán, Value: 127.0.0.1:5173/accounting
+				15 text WORKFLOW
+				16 link Description: Trình thiết kế quy trình, Value: 127.0.0.1:5173/pipeline-builder
+				17 link Description: Biểu mẫu quy trình, Value: 127.0.0.1:5173/workflow-forms
+				18 text QUẢN TRỊ
+				19 link Description: Đối tác, Value: 127.0.0.1:5173/core-data
+				20 link Description: Kho vật tư, Value: 127.0.0.1:5173/warehouse
+				21 link Description: Nhân sự, Value: 127.0.0.1:5173/staff
+				22 link Description: Vai trò, Value: 127.0.0.1:5173/roles
+				23 link Description: Audit nghiệp vụ, Value: 127.0.0.1:5173/audit
+				24 link Description: Nhật ký sự kiện, Value: 127.0.0.1:5173/event-logs
+				25 link Description: Cấu hình, Value: 127.0.0.1:5173/settings
+			26 text POWERED BY
+			27 link Description: Mở KNASOFTWARE trong tab mới, Value: knasoftware.com/
+		28 container
+			29 text Bắt đầu từ việc ưu tiên, luôn rõ Công trình › Giai đoạn › Gói công việc
+			30 pop up button (collapsed) Description: Thông báo, 24 chưa đọc, Secondary Actions: Expand
+				31 image
+			32 button Mở hồ sơ cá nhân
+				33 text Consflow Admin
+				34 text Admin
+			35 button Đăng xuất
+				36 image
+				37 text Đăng xuất
+		48 container
+			49 container
+				50 text Node 1: [Synthetic] Thi công kiểm tra BM04  ·  Bước 1: [Synthetic] Kiểm tra bề mặt và xử lý lỗi
+			51 heading [Synthetic] Kiểm tra bề mặt và xử lý lỗi, Value: 3
+				52 text [Synthetic] Kiểm tra bề mặt và xử lý lỗi
+			53 text Đang xử lý DEV-BM04-REUSE-20261009 Bình thường
+			54 image
+			55 text PM
+			56 image
+			57 text - 3 / 0  minh chứng
+			58 button (collapsed) ĐIỀU KIỆN BẮT BUỘC Không có điều kiện đang chặn Xem chi tiết, Secondary Actions: Expand
+				59 image
+				60 text ĐIỀU KIỆN BẮT BUỘC
+				61 heading Không có điều kiện đang chặn, Value: 3
+					62 text Không có điều kiện đang chặn
+				63 text Xem chi tiết
+				64 image
+			65 container
+				66 text NỘI DUNG CHÍNH
+				67 heading QA/QC · ITP/RFI/NCR, Value: 3
+					68 text QA/QC · ITP/RFI/NCR
+				69 text Quản lý kế hoạch kiểm tra, inspection, không phù hợp/rework và occurrence QA/QC lặp.
+				70 image
+				71 text Công việc
+				72 image
+				73 text [Synthetic] Thi công kiểm tra BM04
+				74 heading Quality Workspace của công trình, Value: 3
+					75 text Quality Workspace của công trình
+				76 text Lập/activate ITP, tạo RFI theo hold point, xử lý NCR–rework–tái kiểm tra và theo dõi lịch QA/QC lặp. Hồ sơ form của bước vẫn được giữ trong tab hỗ trợ.
+				77 link Description: Mở QA/QC, Value: 127.0.0.1:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/quality
+			78 container
+				79 tab group Thông tin hỗ trợ
+					80 tab (selected, settable, boolean) Minh chứng 3 3 đang chờ, ID: work-item-support-tab-evidence, Value: 1
+Minh chứng
+3
+3 đang chờ
+					81 tab (selectable, settable, boolean) Trao đổi & lịch sử 8 Mới nhất 10:10 12-10-2026, ID: work-item-support-tab-activity, Value: 0
+Trao đổi & lịch sử
+8
+Mới nhất 10:10 12-10-2026
+				82 container Description: Minh chứng 3 3 đang chờ, ID: work-item-support-panel-evidence
+					83 container
+						84 text SỔ MINH CHỨNG
+						85 heading 3 hồ sơ minh chứng, Value: 3
+							86 text  hồ sơ minh chứng
+						87 text Ảnh 
+						88 text 3
+						89 text  · Tài liệu 
+						90 text 0
+						91 text  · Đang chờ 
+						92 text 3
+						93 button Xuất báo cáo
+							181 image
+							95 text Xuất báo cáo
+						96 button Tải minh chứng
+							97 image
+							98 text Tải minh chứng
+						99 image
+						100 text ẢNH
+						101 text 3
+						102 image
+						103 text TÀI LIỆU
+						104 text 0
+						105 image
+						106 text ĐÃ CHẤP NHẬN
+						107 text 0
+						108 image
+						109 text ĐANG CHỜ
+						110 text 3
+						111 image
+						112 text field (settable)
+						113 text LỌC MINH CHỨNG
+						114 container Lọc minh chứng
+							115 checkbox Tất cả 3, Value: 1
+								116 image
+								117 text Tất cả
+								118 text 3
+							119 checkbox Ảnh 3, Value: 0
+							120 checkbox Tài liệu 0, Value: 0
+							121 checkbox Đang chờ 3, Value: 0
+							122 checkbox Đã duyệt 0, Value: 0
+							123 checkbox Từ chối 0, Value: 0
+						124 text THAO TÁC
+						125 text MINH CHỨNG
+						126 text LOẠI
+						127 text PHẠM VI HIỂN THỊ
+						128 text TRẠNG THÁI
+						129 button Xem ảnh
+							130 image
+							131 text Xem ảnh
+						132 button Xem chi tiết hồ sơ [Synthetic] BM02 Lần 2
+							133 image [Synthetic] BM02 Lần 2
+							134 text [Synthetic] BM02 Lần 2
+							135 text Ảnh · Nội bộ · image/png · 15.3 KB
+						136 text Ảnh
+						137 text Nội bộ
+						138 text Đã gửi
+						139 button Xem ảnh
+							140 image
+							141 text Xem ảnh
+						142 button Xem chi tiết hồ sơ [Synthetic] BM02 Lần 1
+							143 image
+							144 text [Synthetic] BM02 Lần 1
+							145 text Ảnh · Nội bộ · image/png · 15.4 KB
+						146 text Ảnh
+						147 text Nội bộ
+						148 text Đã gửi
+						149 button Xem ảnh
+							150 image
+							151 text Xem ảnh
+						152 button Xem chi tiết hồ sơ [Synthetic] Gradient BM04/BM07
+							153 image [Synthetic] Gradient BM04/BM07
+							154 text [Synthetic] Gradient BM04/BM07
+							155 text Ảnh · Nội bộ · image/png · 5.9 KB
+						156 text Ảnh
+						157 text Nội bộ
+						158 text Đã gửi
+			159 text VIỆC CẦN LÀM
+			160 heading Hoàn tất, Value: 3
+				161 text Hoàn tất
+			162 button Hoàn tất, Help: Hoàn tất đầu việc khi đủ minh chứng bắt buộc.
+			163 button (collapsed) Thêm ghi chú / lý do, Secondary Actions: Expand
+			164 button (collapsed) Thao tác khác, Secondary Actions: Expand
+				165 text Thao tác khác
+				166 image
+			167 image
+			168 text TRẠNG THÁI
+			169 text Đang xử lý
+			170 image
+			171 text PHỤ TRÁCH
+			172 text PM
+			173 image
+			174 text HẠN XỬ LÝ
+			175 text -
+			176 image
+			177 text HOẠT ĐỘNG GẦN NHẤT
+			178 text Consflow Admin · 10:10 12-10-2026
+			179 link Description: Mở công trình, Value: 127.0.0.1:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd
+			180 button Đóng
+		39 container
+			40 button (collapsed) Description: Mở danh sách trao đổi, 0 tin mới, Secondary Actions: Expand
+				41 image
+				42 text Trao đổi
+				43 text 0
+			44 button (collapsed) Làm ngay 15, Secondary Actions: Expand
+				45 image
+				46 text Làm ngay
+				47 text 15
+
+The focused UI element is 1 AXWebArea Thủ Thiêm Workflow, URL: 127.0.0.1:5173/work-items/2c969a28-945f-4abe-bf9a-8d44c722699d

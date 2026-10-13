@@ -1,0 +1,651 @@
+{
+  "answers": {
+    "delivery_method": "hand_delivery",
+    "hardcopy_set": "[Synthetic] Internal Development test contract packet; no real client dispatch.",
+    "receiver": "[Synthetic] Internal UAT recipient"
+  },
+  "auto_advance_when_ready": false,
+  "available": true,
+  "capabilities": {
+    "can_add_confirmation": true,
+    "can_amend": true,
+    "can_delete_pdf": true,
+    "can_generate_pdf": true
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Internal Development UAT signature only; no actual client legal signature.",
+      "created_at": "2026-10-13T00:16:26Z",
+      "event_type": "signed",
+      "from_status": "submitted",
+      "id": "27ac0ee9-a93a-4148-9fd2-1d524c12c906",
+      "instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "metadata_json": {
+        "form_revision_no": 1,
+        "payload_hash": "c1c8229c8fefd36994ef13c2357da9fa32014e420de7034c1eb4929411519fec",
+        "purpose": "approved_by",
+        "signature_id": "0a090008-b83a-4f6f-807d-41d22d4acb05",
+        "visual_checksum_sha256": "3f138f1a1ca1a33780dfebce1451257e4579c52236ece3c8f37cd0f0a89af5e2",
+        "workflow_form_instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "submitted",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-13T00:15:24Z",
+      "event_type": "submitted",
+      "from_status": "draft",
+      "id": "f41b7526-9d63-4f20-a9b9-9e87553efb2c",
+      "instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+        "revision_no": 1
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "submitted",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-13T00:13:46Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "d35db4e0-581f-4125-934a-dc5ac7a4a581",
+      "instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-13T00:13:39Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "3abf028b-2700-4aa9-97ab-40d9a24fa931",
+      "instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:56:15Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "4a450bad-3e8e-465e-8f22-1b296a9958ee",
+      "instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "hardcopy_set",
+      "field_type": "textarea",
+      "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+      "help_text": null,
+      "id": "3dfb3d52-a641-4229-9b7b-4135cf9a497e",
+      "label": "Bộ hồ sơ bản cứng",
+      "options_json": [],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {
+        "max_length": 4000,
+        "min_length": 3
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "receiver",
+      "field_type": "text",
+      "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+      "help_text": null,
+      "id": "3d9f1593-9eb4-4919-8dbf-628d43f1caaa",
+      "label": "Người nhận",
+      "options_json": [],
+      "order_index": 20,
+      "required": true,
+      "validation_json": {
+        "max_length": 160,
+        "min_length": 2
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "delivery_method",
+      "field_type": "select",
+      "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+      "help_text": null,
+      "id": "01afeb2d-11ef-4f98-9143-80a0111e59cb",
+      "label": "Cách gửi",
+      "options_json": [
+        {
+          "label": "Giao trực tiếp",
+          "value": "hand_delivery"
+        },
+        {
+          "label": "Chuyển phát",
+          "value": "courier"
+        },
+        {
+          "label": "CĐT nhận tại văn phòng",
+          "value": "client_pickup"
+        },
+        {
+          "label": "Khác",
+          "value": "other"
+        }
+      ],
+      "order_index": 30,
+      "required": true,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {
+      "delivery_method": "hand_delivery",
+      "hardcopy_set": "[Synthetic] Internal Development test contract packet; no real client dispatch.",
+      "receiver": "[Synthetic] Internal UAT recipient"
+    },
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:56:15Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 1,
+    "form_code": "client_hardcopy_dispatch",
+    "form_description": "Ghi nhận bộ hồ sơ bản cứng, phương thức gửi, người nhận và minh chứng bàn giao.",
+    "form_name": "Gửi bản cứng hợp đồng / hồ sơ tạm ứng",
+    "form_template_id": "a979ef94-ada2-4ffb-bfd2-35769898d460",
+    "form_type": "generic_submission",
+    "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+    "form_version_no": 3,
+    "form_version_status": "published",
+    "id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+    "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "Bộ phận HĐ"
+    ],
+    "run_node_id": "e2c1f726-03bc-47cd-892e-6badfb4a6a01",
+    "run_step_id": "5013c2dc-802e-4ed1-95b8-9f8575b0d979",
+    "status": "submitted",
+    "submitted_at": "2026-10-13T00:15:24Z",
+    "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "template_step_id": "0a81bdb8-054d-4f76-980b-b223606cc526",
+    "title": "Hoàn tất gói hợp đồng chủ đầu tư",
+    "updated_at": "2026-10-13T00:15:24Z",
+    "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb",
+    "work_item_status": "in_progress",
+    "work_item_title": "Hoàn tất gói hợp đồng chủ đầu tư"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [
+    {
+      "comment": "[Synthetic] Internal Development UAT signature only; no actual client legal signature.",
+      "created_at": "2026-10-13T00:16:26Z",
+      "form_instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "form_revision_no": 1,
+      "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+      "id": "0a090008-b83a-4f6f-807d-41d22d4acb05",
+      "is_current_revision": true,
+      "payload_hash": "c1c8229c8fefd36994ef13c2357da9fa32014e420de7034c1eb4929411519fec",
+      "payload_json": {
+        "answers_snapshot": {
+          "delivery_method": "hand_delivery",
+          "hardcopy_set": "[Synthetic] Internal Development test contract packet; no real client dispatch.",
+          "receiver": "[Synthetic] Internal UAT recipient"
+        },
+        "comment": "[Synthetic] Internal Development UAT signature only; no actual client legal signature.",
+        "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+        "purpose": "approved_by",
+        "signer_name": "admin@thuthiemcons.com",
+        "signer_roles": [
+          "Admin"
+        ],
+        "signer_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "source": "workflow_form_signature",
+        "visual_signature": {
+          "checksum_sha256": "3f138f1a1ca1a33780dfebce1451257e4579c52236ece3c8f37cd0f0a89af5e2",
+          "file_size": 5561,
+          "mime_type": "image/png",
+          "storage_key": "workflow-signatures/432115cb-bd5b-4fae-9edc-74ce031eacf3/e88366dc-71bd-4356-bbac-ce890e18e6e2/c7257c90-b5ae-4f65-8ba9-e7d4115595a7.png",
+          "storage_provider": "local",
+          "strokes": [
+            {
+              "points": [
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.3665871121718377
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.3933174224343675
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.42386634844868737
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.4505966587112172
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.481145584725537
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.5078758949880668
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.5384248210023866
+                },
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.5651551312649165
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.20976253298153033,
+                  "y": 0.5651551312649165
+                },
+                {
+                  "x": 0.21503957783641162,
+                  "y": 0.5766109785202864
+                },
+                {
+                  "x": 0.22031662269129287,
+                  "y": 0.5842482100238664
+                },
+                {
+                  "x": 0.22427440633245382,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.22955145118733508,
+                  "y": 0.6033412887828162
+                },
+                {
+                  "x": 0.23482849604221637,
+                  "y": 0.6147971360381862
+                },
+                {
+                  "x": 0.24010554089709762,
+                  "y": 0.6224343675417661
+                },
+                {
+                  "x": 0.24406332453825857,
+                  "y": 0.633890214797136
+                },
+                {
+                  "x": 0.24934036939313983,
+                  "y": 0.641527446300716
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.24934036939313983,
+                  "y": 0.641527446300716
+                },
+                {
+                  "x": 0.2546174142480211,
+                  "y": 0.633890214797136
+                },
+                {
+                  "x": 0.2612137203166227,
+                  "y": 0.6224343675417661
+                },
+                {
+                  "x": 0.26649076517150394,
+                  "y": 0.6147971360381862
+                },
+                {
+                  "x": 0.27308707124010556,
+                  "y": 0.6033412887828162
+                },
+                {
+                  "x": 0.2783641160949868,
+                  "y": 0.5957040572792363
+                },
+                {
+                  "x": 0.2836411609498681,
+                  "y": 0.5842482100238664
+                },
+                {
+                  "x": 0.29023746701846964,
+                  "y": 0.5766109785202864
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.5651551312649165
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.5651551312649165
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.5384248210023866
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.5078758949880668
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.481145584725537
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.4505966587112172
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.42386634844868737
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.3933174224343675
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.3665871121718377
+                },
+                {
+                  "x": 0.2955145118733509,
+                  "y": 0.3360381861575179
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.3548812664907652,
+                  "y": 0.6033412887828162
+                },
+                {
+                  "x": 0.36015831134564646,
+                  "y": 0.5689737470167064
+                },
+                {
+                  "x": 0.3654353562005277,
+                  "y": 0.5384248210023866
+                },
+                {
+                  "x": 0.36939313984168864,
+                  "y": 0.5040572792362769
+                },
+                {
+                  "x": 0.37467018469656993,
+                  "y": 0.46968973747016707
+                },
+                {
+                  "x": 0.37994722955145116,
+                  "y": 0.4353221957040573
+                },
+                {
+                  "x": 0.38522427440633245,
+                  "y": 0.4047732696897375
+                },
+                {
+                  "x": 0.3891820580474934,
+                  "y": 0.3704057279236277
+                },
+                {
+                  "x": 0.3944591029023747,
+                  "y": 0.3360381861575179
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.3944591029023747,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.3997361477572559,
+                  "y": 0.3704057279236277
+                },
+                {
+                  "x": 0.4050131926121372,
+                  "y": 0.4047732696897375
+                },
+                {
+                  "x": 0.40897097625329815,
+                  "y": 0.4353221957040573
+                },
+                {
+                  "x": 0.41424802110817943,
+                  "y": 0.46968973747016707
+                },
+                {
+                  "x": 0.41952506596306066,
+                  "y": 0.5040572792362769
+                },
+                {
+                  "x": 0.42480211081794195,
+                  "y": 0.5384248210023866
+                },
+                {
+                  "x": 0.4287598944591029,
+                  "y": 0.5689737470167064
+                },
+                {
+                  "x": 0.4340369393139842,
+                  "y": 0.6033412887828162
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.37467018469656993,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.37994722955145116,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.38522427440633245,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.3891820580474934,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.3944591029023747,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.3997361477572559,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.4050131926121372,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.40897097625329815,
+                  "y": 0.48878281622911696
+                },
+                {
+                  "x": 0.41424802110817943,
+                  "y": 0.48878281622911696
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.4868073878627968,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.4973614775725594,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5079155672823219,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5184696569920845,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5303430079155673,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5408970976253298,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5514511873350924,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5620052770448549,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5725593667546174,
+                  "y": 0.3360381861575179
+                }
+              ]
+            },
+            {
+              "points": [
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.3360381861575179
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.3704057279236277
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.40859188544152747
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.44295942720763726
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.481145584725537
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.5155131264916468
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.5498806682577566
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.5880668257756563
+                },
+                {
+                  "x": 0.5263852242744064,
+                  "y": 0.6224343675417661
+                }
+              ]
+            }
+          ]
+        },
+        "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb",
+        "workflow_form_code": "client_hardcopy_dispatch",
+        "workflow_form_instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+        "workflow_form_revision_no": 1,
+        "workflow_form_title": "Hoàn tất gói hợp đồng chủ đầu tư",
+        "workflow_form_type": "generic_submission",
+        "workflow_form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "purpose": "approved_by",
+      "signed_at": "2026-10-13T00:16:26Z",
+      "signer_name": "admin@thuthiemcons.com",
+      "signer_roles_json": [
+        "Admin"
+      ],
+      "signer_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "visual_checksum_sha256": "3f138f1a1ca1a33780dfebce1451257e4579c52236ece3c8f37cd0f0a89af5e2",
+      "visual_file_size": 5561,
+      "visual_mime_type": "image/png",
+      "visual_storage_key": "workflow-signatures/432115cb-bd5b-4fae-9edc-74ce031eacf3/e88366dc-71bd-4356-bbac-ce890e18e6e2/c7257c90-b5ae-4f65-8ba9-e7d4115595a7.png",
+      "visual_storage_provider": "local",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb"
+    }
+  ],
+  "template": {
+    "code": "client_hardcopy_dispatch",
+    "description": "Ghi nhận bộ hồ sơ bản cứng, phương thức gửi, người nhận và minh chứng bàn giao.",
+    "form_type": "generic_submission",
+    "id": "a979ef94-ada2-4ffb-bfd2-35769898d460",
+    "name": "Gửi bản cứng hợp đồng / hồ sơ tạm ứng"
+  },
+  "version": {
+    "id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+    "status": "published",
+    "version_no": 3
+  }
+}

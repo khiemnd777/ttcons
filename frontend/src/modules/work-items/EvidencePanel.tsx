@@ -12,7 +12,9 @@ import {
   type EvidenceUploadBusinessType,
 } from '../_shared/evidenceFileTypes';
 import { EvidenceUploader, type EvidenceUploadRow } from '../_shared/EvidenceUploader';
+import { NativeExcelExportButton } from '../_shared/NativeExcelExportButton';
 import { EvidenceDraftViewerDialog } from '../_shared/EvidenceRecordViewerDialog';
+import { appendEvidenceCaptureMetadata } from '../_shared/evidenceCaptureMetadata';
 import { EvidenceGallery, formatEvidenceFileSize, isImageEvidence, type EvidenceReviewAction } from './EvidenceGallery';
 import {
   evidenceUploadBatchLimit,
@@ -140,6 +142,7 @@ export function EvidencePanel({
       ...row,
       file,
       classification,
+      captureMetadata: classification.kind === 'photo' ? {} : undefined,
       name: file.name,
       fileIssue: '',
       status: 'queued',
@@ -186,6 +189,7 @@ export function EvidencePanel({
       updateUploadRow(row.id, (current) => ({ ...current, status: 'uploading', progress: 0, error: '' }));
 
       const formData = new FormData();
+      if (row.classification.kind === 'photo') appendEvidenceCaptureMetadata(formData, row.captureMetadata);
       formData.append('file', row.file);
       formData.append('evidence_type', row.classification.evidenceType);
       formData.append('visibility', 'internal');
@@ -256,6 +260,7 @@ export function EvidencePanel({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sổ minh chứng</p>
           <h3 className="mt-0.5 text-sm font-semibold text-ink">{evidence.length} hồ sơ minh chứng</h3>
           <p className="mt-1 text-xs text-slate-500">Ảnh {stats.photos} · Tài liệu {stats.documents} · Đang chờ {stats.pending}</p>
+          {stats.photos > 0 ? <NativeExcelExportButton path={`/work-items/${encodeURIComponent(workItemId)}/photos/export.xlsx`} filename="BM-GS-07.xlsx" disabled={batchUploading} /> : null}
         </div>
         {!readOnly ? <button
           type="button"

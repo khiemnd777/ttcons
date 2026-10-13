@@ -1,0 +1,22 @@
+{
+  "work_item_id": "58969f9e-8a27-44b1-b2d9-7759442c61a5",
+  "source_type": "supplier",
+  "supplier_name": "[Synthetic] NCC thử BM02",
+  "delivery_reference": "[Synthetic] PHIEU-NHAN-BM02-20261012",
+  "received_at": "2026-10-12",
+  "result": "pass",
+  "comment": "[Synthetic] Vật tư đến hiện trường hợp lệ; kiểm chứng mapping BM02",
+  "items": [
+    {
+      "item_index": 0,
+      "material_name": "[Synthetic] Gạch nhận trường BM02",
+      "delivered_quantity": 12,
+      "accepted_quantity": 12,
+      "rejected_quantity": 0,
+      "unit": "m2",
+      "condition": "usable",
+      "decision": "accepted",
+      "comment": "[Synthetic] Nhận thực tế 12 m2, chưa phải vật tư sử dụng"
+    }
+  ]
+}

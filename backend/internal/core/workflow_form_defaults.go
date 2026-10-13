@@ -70,7 +70,9 @@ func applyConstructionHandoffEvidencePolicy(answers Record) Record {
 	normalizedItems := make([]Record, len(items))
 	changed := false
 	for index, item := range items {
-		if boolValue(item[clientConstructionEvidenceRequiredFieldKey]) {
+		value := item[clientConstructionEvidenceRequiredFieldKey]
+		checked, isBoolean := value.(bool)
+		if value != nil && (!isBoolean || checked) {
 			normalizedItems[index] = item
 			continue
 		}

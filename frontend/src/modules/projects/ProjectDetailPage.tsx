@@ -187,15 +187,7 @@ export function ProjectDetailPage() {
           activeTab={activeTab}
           onChange={setActiveTab}
           ariaLabel="Nội dung công trình"
-          actions={activeTab === 'workflow' ? undefined : (
-            <Link
-              to={`/projects/${id}/planning`}
-              className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-line px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-            >
-              <GitBranch className="h-4 w-4" />
-              Mở kế hoạch
-            </Link>
-          )}
+          actions={<ProjectDetailToolbarActions projectId={id} activeTab={activeTab} />}
         />
       </div>
 
@@ -1126,6 +1118,12 @@ function matchesWorkflowWorkFilter(item: WorkItem, filter: WorkflowWorkFilter) {
   if (filter === 'blocked') return item.status === 'blocked';
   if (filter === 'completed') return item.status === 'completed';
   return item.status === 'cancelled';
+}
+
+export function ProjectDetailToolbarActions({ projectId, activeTab }: { projectId: string; activeTab: ProjectDetailTab }) {
+  return <div className="flex flex-wrap gap-2">
+    {activeTab !== 'workflow' ? <Link to={`/projects/${projectId}/planning`} className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-line px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"><GitBranch className="h-4 w-4" />Mở kế hoạch</Link> : null}
+  </div>;
 }
 
 function ProjectAuditPanel({ projectId, initialRows }: { projectId: string; initialRows: ProjectOperationsRecord[] }) {

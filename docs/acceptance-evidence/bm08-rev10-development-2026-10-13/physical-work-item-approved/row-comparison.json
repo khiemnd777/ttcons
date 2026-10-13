@@ -1,0 +1,14 @@
+{
+  "rows_checked": 2515,
+  "changed": [
+    {
+      "table": "pipeline_run_steps",
+      "id": "bc19a69d-8fc4-4f42-b0ce-b63c1af5d1c7"
+    },
+    {
+      "table": "work_items",
+      "id": "73e77a9e-7abd-4f2c-b768-c62e3fd31627"
+    }
+  ],
+  "lost": []
+}

@@ -1,0 +1,279 @@
+[
+  {
+    "actionCell": {
+      "bottom": 614.5,
+      "height": 105.5,
+      "right": 606.4765625,
+      "width": 244.4765625,
+      "x": 362,
+      "y": 509
+    },
+    "actionGroup": {
+      "bottom": 580,
+      "classes": "flex w-max gap-2",
+      "height": 36,
+      "right": 594.4765625,
+      "width": 220.4765625,
+      "x": 374,
+      "y": 544
+    },
+    "buttons": [
+      {
+        "bottom": 577,
+        "height": 30,
+        "name": "Xem chi tiết",
+        "right": 404,
+        "width": 30,
+        "x": 374,
+        "y": 547
+      },
+      {
+        "bottom": 577,
+        "height": 30,
+        "name": "Chỉnh sửa",
+        "right": 442,
+        "width": 30,
+        "x": 412,
+        "y": 547
+      },
+      {
+        "bottom": 580,
+        "height": 36,
+        "name": "Gửi khắc phục",
+        "right": 594.4765625,
+        "width": 144.4765625,
+        "x": 450,
+        "y": 544
+      }
+    ],
+    "buttonsInsideActionCell": true,
+    "documentWidth": 1280,
+    "horizontalOverlapPixels": 0,
+    "tableScroll": {
+      "clientWidth": 876,
+      "overflowX": "auto",
+      "scrollWidth": 876
+    },
+    "titleButton": {
+      "bottom": 597.5,
+      "height": 76,
+      "right": 760.1953125,
+      "width": 141.71875,
+      "x": 618.4765625,
+      "y": 521.5
+    },
+    "titleGapPixels": 24,
+    "viewport": {
+      "height": 720,
+      "width": 1280
+    }
+  },
+  {
+    "actionCell": {
+      "bottom": 666.5,
+      "height": 157.5,
+      "right": 606.4765625,
+      "width": 244.4765625,
+      "x": 362,
+      "y": 509
+    },
+    "actionGroup": {
+      "bottom": 606,
+      "classes": "flex w-max gap-2",
+      "height": 36,
+      "right": 594.4765625,
+      "width": 220.4765625,
+      "x": 374,
+      "y": 570
+    },
+    "buttons": [
+      {
+        "bottom": 603,
+        "height": 30,
+        "name": "Xem chi tiết",
+        "right": 404,
+        "width": 30,
+        "x": 374,
+        "y": 573
+      },
+      {
+        "bottom": 603,
+        "height": 30,
+        "name": "Chỉnh sửa",
+        "right": 442,
+        "width": 30,
+        "x": 412,
+        "y": 573
+      },
+      {
+        "bottom": 606,
+        "height": 36,
+        "name": "Gửi khắc phục",
+        "right": 594.4765625,
+        "width": 144.4765625,
+        "x": 450,
+        "y": 570
+      }
+    ],
+    "buttonsInsideActionCell": true,
+    "documentWidth": 1024,
+    "horizontalOverlapPixels": 0,
+    "tableScroll": {
+      "clientWidth": 620,
+      "overflowX": "auto",
+      "scrollWidth": 757
+    },
+    "titleButton": {
+      "bottom": 649.5,
+      "height": 128,
+      "right": 706.2890625,
+      "width": 87.8125,
+      "x": 618.4765625,
+      "y": 521.5
+    },
+    "titleGapPixels": 24,
+    "viewport": {
+      "height": 768,
+      "width": 1024
+    },
+    "tableScrollObserved": {
+      "scrollLeft": 137.5,
+      "clientWidth": 620,
+      "scrollWidth": 757,
+      "documentWidth": 1024
+    }
+  },
+  {
+    "actionCell": {
+      "bottom": 550,
+      "height": 85.5,
+      "right": 606.4765625,
+      "width": 244.4765625,
+      "x": 362,
+      "y": 464.5
+    },
+    "actionGroup": {
+      "bottom": 525.5,
+      "classes": "flex w-max gap-2",
+      "height": 36,
+      "right": 594.4765625,
+      "width": 220.4765625,
+      "x": 374,
+      "y": 489.5
+    },
+    "buttons": [
+      {
+        "bottom": 522.5,
+        "height": 30,
+        "name": "Xem chi tiết",
+        "right": 404,
+        "width": 30,
+        "x": 374,
+        "y": 492.5
+      },
+      {
+        "bottom": 522.5,
+        "height": 30,
+        "name": "Chỉnh sửa",
+        "right": 442,
+        "width": 30,
+        "x": 412,
+        "y": 492.5
+      },
+      {
+        "bottom": 525.5,
+        "height": 36,
+        "name": "Gửi khắc phục",
+        "right": 594.4765625,
+        "width": 144.4765625,
+        "x": 450,
+        "y": 489.5
+      }
+    ],
+    "buttonsInsideActionCell": true,
+    "documentWidth": 1440,
+    "horizontalOverlapPixels": 0,
+    "tableScroll": {
+      "clientWidth": 1036,
+      "overflowX": "auto",
+      "scrollWidth": 1036
+    },
+    "titleButton": {
+      "bottom": 533,
+      "height": 56,
+      "right": 832.9453125,
+      "width": 214.46875,
+      "x": 618.4765625,
+      "y": 477
+    },
+    "titleGapPixels": 24,
+    "viewport": {
+      "height": 900,
+      "width": 1440
+    }
+  },
+  {
+    "bodyWidth": 390,
+    "buttons": [
+      {
+        "bottom": 575.5,
+        "name": "[Synthetic] Sửa bề mặt ô 04[Synthetic] Kiểm tra bề mặt ô 04",
+        "right": 257.8046875,
+        "width": 207.8046875,
+        "x": 50,
+        "y": 507.5
+      },
+      {
+        "bottom": 748.5,
+        "name": "Xem chi tiết",
+        "right": 80,
+        "width": 30,
+        "x": 50,
+        "y": 718.5
+      },
+      {
+        "bottom": 748.5,
+        "name": "Chỉnh sửa",
+        "right": 118,
+        "width": 30,
+        "x": 88,
+        "y": 718.5
+      },
+      {
+        "bottom": 751.5,
+        "name": "Gửi khắc phục",
+        "right": 340,
+        "width": 144.4765625,
+        "x": 195.5234375,
+        "y": 715.5
+      }
+    ],
+    "card": {
+      "bottom": 768.5,
+      "right": 357,
+      "width": 324,
+      "x": 33,
+      "y": 490.5
+    },
+    "desktopTableVisible": false,
+    "documentWidth": 390,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "existingUtilityOverlap": {
+      "observed": true,
+      "utilityRect": {
+        "x": 238.171875,
+        "y": 724,
+        "right": 382,
+        "bottom": 768,
+        "width": 143.828125,
+        "height": 44
+      },
+      "horizontalIntersectionPixels": 101.828125,
+      "verticalIntersectionPixels": 27.5,
+      "sourceScope": "mobile branch and utility owner unchanged"
+    }
+  }
+]

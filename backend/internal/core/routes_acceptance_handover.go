@@ -25,8 +25,11 @@ func registerAcceptanceHandoverRoutes(protected fiber.Router, h *Handler) {
 	protected.Get("/projects/:id/handover/options", h.HandoverOptions)
 	protected.Post("/projects/:id/handover", h.CreateHandover)
 	protected.Get("/handover/:id", h.GetHandover)
+	protected.Put("/handover/:id/field-assessment", h.UpdateHandoverFieldAssessment)
+	protected.Post("/handover/:id/checklist-items", h.CreateHandoverPhysicalItem)
 	protected.Post("/handover/:id/submit", h.SubmitHandover)
 	protected.Post("/handover/:id/check", h.CheckHandover)
 	protected.Post("/handover/:id/complete", h.CompleteHandover)
 	protected.Put("/handover-checklist-items/:id", h.UpdateHandoverChecklistItem)
+	protected.Put("/handover-checklist-items/:id/field-assessment", h.UpdateHandoverItemFieldAssessment)
 }

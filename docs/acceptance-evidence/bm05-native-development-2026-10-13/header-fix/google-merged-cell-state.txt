@@ -1,0 +1,38 @@
+Browser tab: 334097025, Title: "BM05 — Đã sửa vùng tên dự án — UAT 13-10-2026 - Google Sheets", URL: "https://docs.google.com/spreadsheets/d/1cA_IV__R9KFaDnb9hs6Gng28YUx6s6yuFZYBkJIU-RQ/edit?gid=936714466#gid=936714466".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 11, 16, 82, 89
++						104 checkbox Description: Star, Value: 0, ID: docs-star
++						105 button Description: Move, ID: docs-folder
++						106 button Description: Last edit was seconds ago, ID: docs-revisions-appbarbutton
++						107 pop up button (collapsed) Description: Join a call here or present this tab to the call, ID: docs-meet-in-editors-entrypointbutton, Secondary Actions: Expand
++								108 text Share
+~						18 link Upgrade
++							109 text Upgrade
++						110 container
++							111 button Try Gemini
+~								59 container Description: Font size list. 11 selected., ID: :2c
+~									60 text field (settable) Description: Font size, Value: 11
+~							62 checkbox Description: Bold (⌘B), Value: 0, ID: t-bold
++			112 container
++				113 container Side panel
++					114 tab group
++						115 tab (selectable, settable, boolean) Description: Calendar, Value: 0, ID: gsc-gab-6
++						116 tab (selectable, settable, boolean) Description: Keep, Value: 0, ID: gsc-gab-2
++						117 tab (selectable, settable, boolean) Description: Tasks, Value: 0, ID: gsc-gab-4
++						118 tab (selectable, settable, boolean) Description: Contacts, Value: 0, ID: gsc-gab-9
++						119 tab (selectable, settable, boolean) Description: Maps, Value: 0, ID: gsc-gab-8
++						120 tab (selectable, settable, boolean) Description: Get Add-ons, Value: 0, ID: qJTzr
++				121 button Hide side panel
+~						86 text field (settable) Value: B5:K5, ID: t-name-box
+~					88 text entry area (settable) [DEV-BM-REUSE-20261009] [Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06
+
++						122 text [DEV-BM-REUSE-20261009] [Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06
+~		101 text entry area (settable) ID: waffle-rich-text-editor, Value: 
+
+
+
++		123 text To enable screen reader support, press ⌘+Option+Z To learn about keyboard shortcuts, press ⌘slash
++		124 text Banner hidden
+The focused UI element is 101 text entry area (settable) ID: waffle-rich-text-editor, Value: 
+
+

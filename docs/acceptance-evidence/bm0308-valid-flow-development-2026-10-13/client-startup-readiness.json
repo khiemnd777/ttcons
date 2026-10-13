@@ -1,0 +1,69 @@
+{
+  "blockers": [],
+  "capabilities": {
+    "can_manage_project_manager": true,
+    "can_start_pipeline": true,
+    "can_update_project": true,
+    "is_startup_owner": true
+  },
+  "created_at": "2026-10-12T23:18:49Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "first_steps": [
+    {
+      "covered": true,
+      "eligible_users": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "id": "edaceeee-9a29-48eb-a416-32f028517f7a",
+      "name": "Nghiệm thu gói thầu phụ và khối lượng",
+      "required_permission": "acceptance.create",
+      "role_ids": [
+        "QS"
+      ]
+    }
+  ],
+  "owner_name": "Consflow Admin",
+  "owner_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "pm_name": "Consflow Admin",
+  "pm_staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+  "pm_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "project_code": "DEV-CLIENT-BM0308-20261013",
+  "project_id": "8ae7b7e1-2bcd-4633-a83a-b117eab65ead",
+  "project_name": "[Synthetic Development] BM03 gói client độc lập",
+  "ready_to_start": true,
+  "role_coverage": [
+    {
+      "covered": true,
+      "members": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "node_count": 1,
+      "role_label": "QA/QC",
+      "step_count": 0
+    },
+    {
+      "covered": true,
+      "members": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "node_count": 1,
+      "role_label": "QS",
+      "step_count": 1
+    }
+  ],
+  "template_id": "f9ba8f6b-c799-497e-a886-43a61cff9589",
+  "template_name": "[Synthetic Development] BM03 gói client độc lập",
+  "template_status": "published"
+}

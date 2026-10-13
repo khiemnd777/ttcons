@@ -1,7 +1,9 @@
+import { constructionReportWeatherLabel } from './constructionWeatherPresentation';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ClipboardCheck, Eye, GitPullRequestArrow, Plus, ScrollText } from 'lucide-react';
+import { AlertTriangle, ClipboardCheck, Download, Eye, GitPullRequestArrow, Plus, ScrollText } from 'lucide-react';
+import { downloadNativeReportExcel, nativeReportListExcelPath } from '../_shared/bmgsExport';
 import { get, post, postFormWithProgress, put } from '../../lib/api/client';
 import { PageHeader } from '../../components/PageHeader';
 import { useToast } from '../../components/ToastProvider';
@@ -24,6 +26,7 @@ import { createConstructionAction, createConstructionCheck, uploadConstructionEv
 import { optionalISO } from './constructionWorkspaceUtils';
 import { ConstructionWorkspacePanel, type ConstructionVariationSource, type ConstructionWorkspaceDialogRequest } from './ConstructionWorkspacePanel';
 import { ConstructionVariationProposalDialog } from './ConstructionVariationProposalDialog';
+import { useRecordDeepLink } from '../_shared/useRecordDeepLink';
 
 type OperationsTab = 'timeline' | 'checks' | 'actions';
 type OperationsDialog = {
@@ -42,6 +45,9 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const [dialog, setDialog] = useState<OperationsDialog | null>(null);
   const [workspaceDialogRequest, setWorkspaceDialogRequest] = useState<ConstructionWorkspaceDialogRequest | null>(null);
   const [variationSource, setVariationSource] = useState<ConstructionVariationSource | null>(null);
+  const [draftDates, setDraftDates] = useState({dateFrom: '', dateTo: ''});
+  const [dates, setDates] = useState(draftDates);
+  const [exporting, setExporting] = useState(false);
   const queryClient = useQueryClient();
   const toast = useToast();
   const { user, hasAnyPermission } = useAuth();
@@ -53,11 +59,36 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const canCreateAction = hasAnyPermission(['construction.action.create']);
   const canViewContracts = hasAnyPermission(['contract.view']);
   const canProposeVariation = hasAnyPermission(['contract.variation.propose']);
+  const reportSource = useRecordDeepLink({kind: 'daily_report', projectId: id || projectId, onOpen: record => { setProjectId(record.project_id); setDialog({type: 'report', mode: 'view', record}); changeTab('timeline'); }});
+  const actionSource = useRecordDeepLink({kind: 'action', projectId: id || projectId, onOpen: record => { setProjectId(record.project_id); openWorkspaceDialog({mode: 'actions', state: {type: 'view', action: record}}); }});
+  useEffect(() => { if (id) {setProjectId(id); setDialog(null); setWorkspaceDialogRequest(null);} }, [id]);
 
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => get<Record<string, any>[]>('/projects') });
   useEffect(() => { if (!projectId && projects.data?.[0]) setProjectId(projects.data[0].id); }, [projects.data, projectId]);
 
-  const reports = useQuery({ queryKey: ['daily-reports', projectId], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/daily-reports`), enabled: Boolean(projectId) && canViewOperations });
+  const reportQueryString = useMemo(() => {
+    const params = new URLSearchParams();
+    if (dates.dateFrom) params.set('date_from', dates.dateFrom);
+    if (dates.dateTo) params.set('date_to', dates.dateTo);
+    return params.toString();
+  }, [dates]);
+  const reports = useQuery({ queryKey: ['daily-reports', projectId, dates], queryFn: () => get<Record<string, any>[]>(`/projects/${projectId}/daily-reports${reportQueryString ? `?${reportQueryString}` : ''}`), enabled: Boolean(projectId) && canViewOperations });
+  function applyDates() {
+    if (draftDates.dateFrom && draftDates.dateTo && draftDates.dateFrom > draftDates.dateTo) {
+      toast.warn({title: 'Khoảng ngày chưa hợp lệ', description: 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.'});
+      return;
+    }
+    setDates({...draftDates});
+  }
+  async function exportReports() {
+    if (!projectId || !canViewOperations || exporting || reports.isFetching || reports.isError || !reports.data?.length) return;
+    setExporting(true);
+    try {
+      await downloadNativeReportExcel(nativeReportListExcelPath(`/projects/${encodeURIComponent(projectId)}/daily-reports`, reportQueryString));
+      toast.success('Đã xuất báo cáo Excel theo bộ lọc đang áp dụng');
+    } catch (error) { toast.error('Không xuất được báo cáo Excel', error); }
+    finally { setExporting(false); }
+  }
   const construction = useQuery({ queryKey: ['construction-workspace', projectId], queryFn: () => get<ConstructionWorkspace>(`/projects/${projectId}/construction-workspace`), enabled: Boolean(projectId) && canViewFieldWorkspace, retry: false });
   const variationContext = useQuery({ queryKey: ['construction-variation-context', projectId], queryFn: () => get<ConstructionVariationContext>(`/projects/${projectId}/construction-variation-context`), enabled: Boolean(projectId) && (canViewOperations || canViewContracts || canProposeVariation), retry: false });
   const timelineRows = useMemo(() => [...(reports.data ?? [])].sort((left, right) => String(right.report_date ?? '').localeCompare(String(left.report_date ?? ''))), [reports.data]);
@@ -254,10 +285,17 @@ export function OperationsPage({ global = false }: { global?: boolean }) {
   const canDeliverSelectedReport = canSubmitWorkReport && String(dialog?.record?.reported_by ?? '') === String(user?.id ?? '');
 
   return <>
+    {searchParams.get('record_type') === 'action' ? actionSource.feedback : reportSource.feedback}
     <PageHeader title="Thi công" description="Ghi nhật ký, kiểm tra chất lượng và xử lý việc phát sinh ngay tại công trường." actions={<>{!global ? <ProjectBackLink projectId={projectId} /> : null}{global ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div> : null}{canReport ? <button disabled={!projectId || !constructionActive} title={!constructionActive ? 'Chỉ lập báo cáo khi quy trình đang ở Node Thi công' : undefined} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => constructionActive && setOpenReport(true)}><Plus className="h-4 w-4" /> Báo cáo hôm nay</button> : null}</>} />
     {construction.data && !constructionActive ? <ConstructionRuntimeBanner workspace={construction.data} /> : null}
     <WorkspaceTabs className="mb-4" tabs={tabs} activeTab={activeTab} onChange={changeTab} ariaLabel="Không gian thi công" />
     {openVariations.length > 0 ? <ConstructionVariationStatus projectId={projectId} openCount={openVariations.length} urgentCount={openVariations.filter((variation) => variation.priority === 'urgent').length} canViewContracts={canViewContracts} /> : null}
+    {activeTab === 'timeline' && canViewOperations ? <section aria-label="Bộ lọc nhật ký" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-white p-3">
+      <label className="text-sm">Từ ngày<input type="date" className="mt-1 block rounded-md border border-line px-3 py-2" value={draftDates.dateFrom} onChange={event => setDraftDates(current => ({...current, dateFrom: event.target.value}))} /></label>
+      <label className="text-sm">Đến ngày<input type="date" aria-invalid={Boolean(draftDates.dateFrom && draftDates.dateTo && draftDates.dateFrom > draftDates.dateTo)} className="mt-1 block rounded-md border border-line px-3 py-2 aria-[invalid=true]:border-rose-500" value={draftDates.dateTo} onChange={event => setDraftDates(current => ({...current, dateTo: event.target.value}))} /></label>
+      <button type="button" className="rounded-md border border-line px-3 py-2 text-sm font-semibold" onClick={applyDates}>Áp dụng</button>
+      <button type="button" disabled={exporting || reports.isFetching || reports.isError || !reports.data?.length} className="inline-flex items-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => void exportReports()}><Download className="h-4 w-4" />{exporting ? 'Đang xuất…' : 'Xuất báo cáo'}</button>
+    </section> : null}
     {activeTab === 'timeline' && canViewOperations ? <DailyTimeline rows={timelineRows} workspace={canViewFieldWorkspace ? construction.data : undefined} loading={reports.isLoading} error={reports.error} createEnabled={constructionActive} onRetry={() => reports.refetch()} onCreate={() => constructionActive && setOpenReport(true)} onView={(record) => setDialog({ type: 'report', mode: 'view', record })} /> : null}
     {activeTab === 'checks' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="checks" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} /> : null}
     {activeTab === 'actions' && canViewFieldWorkspace ? <ConstructionWorkspacePanel projectId={projectId} mode="actions" dialogRequest={workspaceDialogRequest} onDialogRequestHandled={() => setWorkspaceDialogRequest(null)} onViewReport={canViewOperations ? openLinkedReport : undefined} variationContext={variationContext.data} variationContextLoading={variationContext.isLoading} variationContextError={variationContext.isError} canViewContracts={canViewContracts} onRetryVariationContext={() => { void variationContext.refetch(); }} onProposeVariation={canProposeVariation ? setVariationSource : undefined} /> : null}
@@ -332,7 +370,7 @@ function DailyTimeline({ rows, workspace, loading, error, createEnabled, onRetry
   if (loading) return <LoadingSpinner label="Đang tải nhật ký thi công..." />;
   if (error) return <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"><span>Không tải được nhật ký thi công.</span><button className="font-semibold underline" onClick={onRetry}>Thử lại</button></div>;
   if (!rows.length) return <div className="rounded-lg border border-line bg-white p-6"><EmptyState title="Chưa có báo cáo thi công" action={<button disabled={!createEnabled} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" onClick={onCreate}><Plus className="h-4 w-4" /> Báo cáo hôm nay</button>} /></div>;
-  return <div className="relative space-y-4 before:absolute before:bottom-6 before:left-[18px] before:top-6 before:w-px before:bg-blue-200">{rows.map((row) => { const groups = constructionReportViewModel(row); const linkedChecks = (workspace?.checks ?? []).filter((item) => item.source_daily_report_id === row.id); const linkedActions = (workspace?.actions ?? []).filter((item) => item.source_daily_report_id === row.id); return <article key={row.id} className="relative pl-10"><span className="absolute left-2 top-6 z-10 h-5 w-5 rounded-full border-4 border-blue-100 bg-blue-600" /><div className="overflow-hidden rounded-lg border border-line bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink">{dateText(row.report_date)}</h2><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{row.weather || 'Chưa ghi thời tiết'}</span>{linkedChecks.length ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{linkedChecks.length} kiểm tra</span> : null}{linkedActions.length ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{linkedActions.length} cần xử lý</span> : null}{linkedActions.some((item) => item.status === 'done') ? <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Đã khắc phục</span> : null}</div><p className="mt-1 text-xs text-slate-500">{row.manpower_summary || 'Chưa ghi nhân công'} · {row.material_usage_summary || 'Chưa ghi vật tư'}</p></div><div className="flex items-center gap-3"><div className="text-right"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ báo cáo</p><p className="text-lg font-semibold text-blue-700">{Number(row.progress_percent ?? 0)}%</p></div><button className="rounded-md border border-line p-2 text-slate-600 hover:bg-slate-100" onClick={() => onView(row)} aria-label="Xem báo cáo"><Eye className="h-4 w-4" /></button></div></div><div className="grid divide-y divide-line lg:grid-cols-4 lg:divide-x lg:divide-y-0"><TimelineColumn title="Đã làm" items={groups.done} tone="green" empty="Chưa ghi hạng mục hoàn tất" /><TimelineColumn title="Đang làm" items={groups.current} tone="blue" empty="Không có hạng mục dở dang" /><TimelineColumn title="Sẽ làm" items={groups.next} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" /><TimelineColumn title="Vấn đề phát sinh" items={groups.timelineProblems} tone="red" empty="Không có vấn đề" /></div></div></article>; })}</div>;
+  return <div className="relative space-y-4 before:absolute before:bottom-6 before:left-[18px] before:top-6 before:w-px before:bg-blue-200">{rows.map((row) => { const groups = constructionReportViewModel(row); const linkedChecks = (workspace?.checks ?? []).filter((item) => item.source_daily_report_id === row.id); const linkedActions = (workspace?.actions ?? []).filter((item) => item.source_daily_report_id === row.id); return <article key={row.id} className="relative pl-10"><span className="absolute left-2 top-6 z-10 h-5 w-5 rounded-full border-4 border-blue-100 bg-blue-600" /><div className="overflow-hidden rounded-lg border border-line bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-ink">{dateText(row.report_date)}</h2><span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{constructionReportWeatherLabel(row.weather)}</span>{linkedChecks.length ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{linkedChecks.length} kiểm tra</span> : null}{linkedActions.length ? <span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{linkedActions.length} cần xử lý</span> : null}{linkedActions.some((item) => item.status === 'done') ? <span className="rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Đã khắc phục</span> : null}</div><p className="mt-1 text-xs text-slate-500">{row.manpower_summary || 'Chưa ghi nhân công'} · {row.material_usage_summary || 'Chưa ghi vật tư'}</p></div><div className="flex items-center gap-3"><div className="text-right"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ báo cáo</p><p className="text-lg font-semibold text-blue-700">{groups.hasProgress ? `${groups.progressPercent}%` : 'Chưa ghi tiến độ'}</p></div><button className="rounded-md border border-line p-2 text-slate-600 hover:bg-slate-100" onClick={() => onView(row)} aria-label="Xem báo cáo"><Eye className="h-4 w-4" /></button></div></div><div className="grid divide-y divide-line lg:grid-cols-4 lg:divide-x lg:divide-y-0"><TimelineColumn title="Đã làm" items={groups.done} tone="green" empty="Chưa ghi hạng mục hoàn tất" /><TimelineColumn title="Đang làm" items={groups.current} tone="blue" empty="Không có hạng mục dở dang" /><TimelineColumn title="Sẽ làm" items={groups.next} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" /><TimelineColumn title="Vấn đề phát sinh" items={groups.timelineProblems} tone="red" empty="Không có vấn đề" /></div></div></article>; })}</div>;
 }
 
 function TimelineColumn({ title, items, tone, empty }: { title: string; items: string[]; tone: 'green' | 'blue' | 'slate' | 'red'; empty: string }) {

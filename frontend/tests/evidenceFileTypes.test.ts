@@ -5,6 +5,8 @@ import test from 'node:test';
 import {
   classifyEvidenceFile,
   evidenceFileAccept,
+  evidenceAcceptForKinds,
+  evidenceFileAllowed,
   evidenceFileKindLabel,
 } from '../src/modules/_shared/evidenceFileTypes.ts';
 
@@ -52,10 +54,15 @@ test('all work-item evidence upload surfaces derive the immutable business type 
   assert.match(workItemPanel, /const classification = classifyEvidenceFile\(file\)/);
   assert.match(workItemPanel, /formData\.append\('evidence_type', row\.classification\.evidenceType\)/);
   const uploader = await readFile(new URL('../src/modules/_shared/EvidenceUploader.tsx', import.meta.url), 'utf8');
-  assert.match(uploader, /accept=\{evidenceFileAccept\}/);
+  assert.match(uploader, /accept=\{evidenceAcceptForKinds\(allowedFileKinds\)\}/);
+  assert.equal(evidenceAcceptForKinds(), evidenceFileAccept, 'existing unrestricted consumers keep every supported format');
   assert.doesNotMatch(workItemPanel, /<option value="photo">/);
   assert.match(sharedCapture, /fileKind: classification\.kind/);
-  assert.match(sharedCapture, /accept=\{evidenceFileAccept\}/);
+  assert.match(sharedCapture, /accept=\{evidenceAcceptForKinds\(allowedFileKinds\)\}/);
+  assert.match(sharedCapture, /!evidenceFileAllowed\(file, allowedFileKinds\)/, 'selection validates the same semantic capability as the chooser');
+  assert.equal(evidenceFileAllowed({ name: 'document.pdf', type: 'application/pdf' }, ['photo']), false);
+  assert.equal(evidenceFileAllowed({ name: 'photo.jpg', type: 'image/jpeg' }, ['photo']), true);
+  assert.equal(evidenceFileAllowed({ name: 'document.pdf', type: 'application/pdf' }), true);
   assert.match(sharedCapture, /classification\?\.evidenceType \?\? draft\.evidenceType/);
   assert.match(constructionReport, /uploads\.some\(\(item\) => item\.evidenceType === 'photo'\)/);
 });

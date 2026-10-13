@@ -1,0 +1,30 @@
+{
+  "only_backend_recreated": true,
+  "backend_image_changed": true,
+  "backend": {
+    "service": "backend",
+    "id": "a7016c40cddde3474ae3a08a6d72a653afdfda33d3b69d36af37acf38f6e8f63",
+    "image": "sha256:09c379a9cb12d6e6d945221fa47b9b1a5389607a3a752d8ce5be844d4e1876ea",
+    "started_at": "2026-10-13T05:32:36.794835264Z",
+    "ports": {
+      "8080/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "8081"
+        }
+      ]
+    },
+    "compose_env_file": "/private/tmp/consflow-bm02-development-20261012.env",
+    "scope_env": {
+      "APP_ENV": "development",
+      "AUTO_MIGRATE": "true",
+      "PORT": "8080"
+    }
+  },
+  "build_exit_code": 0,
+  "update_exit_code": 0,
+  "verified_at_utc": "2026-10-13T05:33:09.914142+00:00",
+  "readiness_url": "http://127.0.0.1:8081/api/ready",
+  "readiness_http": 200,
+  "frontend_http": 200
+}

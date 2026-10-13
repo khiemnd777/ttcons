@@ -73,7 +73,7 @@ export function EvidenceRecordViewerDialog({
 }: EvidenceRecordViewerDialogProps) {
   const inlineMediaType = record ? inlineEvidenceMediaType(record) : undefined;
   const ownsPhotoPreview = previewUrl === undefined && previewLoading === undefined && previewError === undefined;
-  const protectedMediaType = record && isProtectedStorageProvider(record.storage_provider) && record.storage_key
+  const protectedMediaType = record && (protectedFilePath || (isProtectedStorageProvider(record.storage_provider) && record.storage_key))
     ? inlineMediaType ?? (ownsPhotoPreview ? evidenceMediaType(record) : undefined)
     : undefined;
   const protectedPreview = useProtectedEvidencePreview(record, protectedMediaType, protectedFilePath);
@@ -86,7 +86,7 @@ export function EvidenceRecordViewerDialog({
   const imageEvidence = detectedMediaType === 'photo';
   const inlinePdf = inlineMediaType === 'pdf';
   const inlineOffice = inlineMediaType === 'word' || inlineMediaType === 'spreadsheet';
-  const protectedFile = isProtectedStorageProvider(record.storage_provider) && Boolean(record.storage_key);
+  const protectedFile = Boolean(protectedFilePath) || (isProtectedStorageProvider(record.storage_provider) && Boolean(record.storage_key));
   const openableDocument = !imageEvidence && Boolean(onOpenFile) && (protectedFile || Boolean(record.file_url));
   const openActionLabel = inlinePdf ? 'Mở tab' : inlineOffice ? 'Mở tệp gốc' : 'Mở tệp';
   const mediaAction = protectedMediaType && protectedPreview.previewUrl ? (
@@ -394,7 +394,9 @@ export function formatEvidenceFileSize(value: number) {
 }
 
 export function useProtectedEvidencePreview(record: EvidenceRecord | null, mediaType?: EvidenceMediaType, protectedFilePath?: string) {
-  const eligible = Boolean(record?.id && record.storage_key && mediaType);
+  // Server-supplied revision paths identify authorized frozen files whose public
+  // metadata deliberately excludes the opaque storage key.
+  const eligible = Boolean(record?.id && (protectedFilePath || record.storage_key) && mediaType);
   const path = eligible ? protectedFilePath || `/evidence/${record!.id}/file` : undefined;
   return useProtectedFilePreview(path, mediaType, JSON.stringify([record?.id, record?.storage_key, record?.updated_at]));
 }

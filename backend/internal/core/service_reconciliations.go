@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func (s *Service) SubcontractorReconciliation(ctx context.Context, workItemID, actorID string) (Record, error) {
+func (s *Service) SubcontractorReconciliation(ctx context.Context, workItemID, actorID string, revision ...int) (Record, error) {
 	canView, err := s.repo.CanViewWorkItem(ctx, workItemID, actorID)
 	if err != nil {
 		return nil, err
@@ -21,6 +21,7 @@ func (s *Service) SubcontractorReconciliation(ctx context.Context, workItemID, a
 		return nil, err
 	}
 	form, err := s.repo.GetWorkflowFormForWorkItem(ctx, workItemID)
+	form = subcontractorReconciliationSourceForm(form)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Record{"available": false, "reason": "Đầu việc chưa có biểu mẫu quy trình"}, nil
 	}
@@ -31,7 +32,7 @@ func (s *Service) SubcontractorReconciliation(ctx context.Context, workItemID, a
 		return Record{"available": false, "reason": "Biểu mẫu quy trình không phải checklist thầu phụ", "form": form}, nil
 	}
 	instance, _ := form["instance"].(Record)
-	if fmt.Sprint(instance["status"]) != "submitted" {
+	if fmt.Sprint(instance["status"]) != "submitted" && !isClientSubcontractorChecklistForm(form) {
 		return Record{"available": false, "reason": "Gửi checklist thầu phụ trước khi đối soát", "form": form}, nil
 	}
 	projectID := cleanID(item["project_id"])
@@ -42,18 +43,37 @@ func (s *Service) SubcontractorReconciliation(ctx context.Context, workItemID, a
 	if !allowed {
 		return nil, forbiddenError("Bạn không có quyền xem đối soát thầu phụ", Record{"permissions": []string{"boq.view", "operation.report"}})
 	}
-	return s.subcontractorReconciliationResponse(ctx, item, form)
+	if len(revision) > 0 {
+		return s.subcontractorReconciliationHistoryResponse(ctx, item, form, revision[0])
+	}
+	result, err := s.subcontractorReconciliationResponse(ctx, item, form)
+	if err == nil && isClientSubcontractorChecklistForm(form) {
+		canAct, actionErr := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
+		if actionErr != nil {
+			return nil, actionErr
+		}
+		canReconcile, permissionErr := s.repo.CanAccessProjectPermission(ctx, actorID, projectID, []string{"boq.update", "operation.report"})
+		if permissionErr != nil {
+			return nil, permissionErr
+		}
+		canWrite := canAct && canReconcile && s.requireActivePipelineWorkItem(ctx, item) == nil && s.requireWorkItemPermission(ctx, item, actorID) == nil && clientReconciliationWorkItemWritable(item) && fmt.Sprint(instance["status"]) == "submitted"
+		ledger, _ := result["reconciliation"].(Record)
+		canWrite = canWrite && cleanOptionalText(ledger["status"]) != "submitted"
+		result["capabilities"] = Record{"can_write": canWrite}
+		result["readonly"] = !canWrite
+	}
+	return result, err
 }
 
-func (s *Service) SaveSubcontractorReconciliation(ctx context.Context, workItemID string, req SubcontractorReconciliationRequest, actorID, actorName string) (Record, error) {
-	return s.saveSubcontractorReconciliation(ctx, workItemID, req, false, actorID, actorName)
+func (s *Service) SaveSubcontractorReconciliation(ctx context.Context, workItemID string, req SubcontractorReconciliationRequest, actorID, actorName string, precondition ...string) (Record, error) {
+	return s.saveSubcontractorReconciliation(ctx, workItemID, req, false, actorID, actorName, precondition...)
 }
 
-func (s *Service) SubmitSubcontractorReconciliation(ctx context.Context, workItemID string, req SubcontractorReconciliationRequest, actorID, actorName string) (Record, error) {
-	return s.saveSubcontractorReconciliation(ctx, workItemID, req, true, actorID, actorName)
+func (s *Service) SubmitSubcontractorReconciliation(ctx context.Context, workItemID string, req SubcontractorReconciliationRequest, actorID, actorName string, precondition ...string) (Record, error) {
+	return s.saveSubcontractorReconciliation(ctx, workItemID, req, true, actorID, actorName, precondition...)
 }
 
-func (s *Service) saveSubcontractorReconciliation(ctx context.Context, workItemID string, req SubcontractorReconciliationRequest, submit bool, actorID, actorName string) (Record, error) {
+func (s *Service) saveSubcontractorReconciliation(ctx context.Context, workItemID string, req SubcontractorReconciliationRequest, submit bool, actorID, actorName string, precondition ...string) (Record, error) {
 	allowed, err := s.repo.CanActOnWorkItem(ctx, workItemID, actorID)
 	if err != nil {
 		return nil, err
@@ -80,11 +100,15 @@ func (s *Service) saveSubcontractorReconciliation(ctx context.Context, workItemI
 		return nil, forbiddenError("Bạn không có quyền đối soát checklist thầu phụ", Record{"permissions": []string{"boq.update", "operation.report"}})
 	}
 	form, err := s.repo.GetWorkflowFormForWorkItem(ctx, workItemID)
+	form = subcontractorReconciliationSourceForm(form)
 	if err != nil {
 		return nil, err
 	}
 	if !isSubcontractorChecklistForm(form) {
 		return nil, validationError("Biểu mẫu quy trình không phải checklist thầu phụ")
+	}
+	if isClientSubcontractorChecklistForm(form) && !clientReconciliationWorkItemWritable(item) {
+		return nil, conflictError("Đầu việc đã đóng, không thể sửa đối soát")
 	}
 	instance, _ := form["instance"].(Record)
 	if fmt.Sprint(instance["status"]) != "submitted" {
@@ -98,11 +122,14 @@ func (s *Service) saveSubcontractorReconciliation(ctx context.Context, workItemI
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.SaveSubcontractorReconciliation(ctx, item, form, strings.TrimSpace(req.Comment), normalizedItems, summary, submit, actorID, actorName); err != nil {
+	if err := s.repo.SaveSubcontractorReconciliation(ctx, item, form, strings.TrimSpace(req.Comment), normalizedItems, summary, submit, actorID, actorName, precondition...); err != nil {
 		return nil, err
 	}
 	result, err := s.subcontractorReconciliationResponse(ctx, item, form)
 	transition, _ := item["work_item_transition"].(Record)
+	if isClientSubcontractorChecklistForm(form) {
+		result, err = s.SubcontractorReconciliation(ctx, workItemID, actorID)
+	}
 	return attachWorkItemTransition(result, transition), err
 }
 
@@ -112,8 +139,17 @@ func (s *Service) subcontractorReconciliationResponse(ctx context.Context, item 
 	if err != nil {
 		return nil, err
 	}
-	reconciliation, err := s.repo.GetSubcontractorReconciliation(ctx, cleanID(item["id"]))
+	instance, _ := form["instance"].(Record)
+	var reconciliation Record
+	if isClientSubcontractorChecklistForm(form) {
+		reconciliation, err = s.repo.getSubcontractorReconciliationForSource(ctx, projectID, cleanID(item["id"]), cleanID(instance["id"]), int(number(instance["current_revision"])))
+	} else {
+		reconciliation, err = s.repo.GetSubcontractorReconciliation(ctx, cleanID(item["id"]))
+	}
 	if errors.Is(err, sql.ErrNoRows) {
+		if isClientSubcontractorChecklistForm(form) && fmt.Sprint(instance["status"]) != "submitted" {
+			return s.clientSubcontractorResponseMetadata(ctx, item, form, nil, Record{"available": false, "reason": "Gửi checklist thầu phụ trước khi đối soát", "form": form})
+		}
 		sourceItems, err := subcontractorChecklistSourceItems(form)
 		if err != nil {
 			return nil, err
@@ -141,14 +177,18 @@ func (s *Service) subcontractorReconciliationResponse(ctx context.Context, item 
 	} else if err != nil {
 		return nil, err
 	}
-	return Record{
+	result := Record{
 		"available":      true,
 		"work_item_id":   item["id"],
 		"project_id":     projectID,
 		"form":           form,
 		"reconciliation": reconciliation,
 		"boq_items":      boqItems,
-	}, nil
+	}
+	if isClientSubcontractorChecklistForm(form) {
+		return s.clientSubcontractorResponseMetadata(ctx, item, form, reconciliation, result)
+	}
+	return result, nil
 }
 
 func (s *Service) normalizeSubcontractorReconciliationRequest(ctx context.Context, item Record, form Record, boqItems []Record, req SubcontractorReconciliationRequest) ([]Record, Record, error) {
@@ -278,7 +318,7 @@ func (s *Service) normalizeSubcontractorReconciliationItem(ctx context.Context, 
 
 func isSubcontractorChecklistForm(form Record) bool {
 	template, _ := form["template"].(Record)
-	return fmt.Sprint(template["code"]) == "builtin_subcontractor_checklist"
+	return fmt.Sprint(template["code"]) == "builtin_subcontractor_checklist" || isClientSubcontractorChecklistForm(form)
 }
 
 func subcontractorChecklistSourceItems(form Record) ([]Record, error) {

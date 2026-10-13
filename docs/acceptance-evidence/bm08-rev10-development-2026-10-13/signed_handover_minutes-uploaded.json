@@ -1,0 +1,21 @@
+{
+  "checksum_sha256": "1f550680da9c2fe8f1993f2db69aa36ca689b12391f9b9746f2b99ea5ac7bdd0",
+  "created_at": "2026-10-13T02:19:29Z",
+  "document_type": "signed_handover_minutes",
+  "file_size": 2267,
+  "file_url": null,
+  "id": "15c4a7f3-4b55-49db-8ace-afbefa354856",
+  "mime_type": "application/pdf",
+  "name": "[Synthetic] BM08 Rev10 signed_handover_minutes",
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "release_status": "released",
+  "released_at": "2026-10-13T02:19:29Z",
+  "released_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "revision_no": 1,
+  "status": "active",
+  "storage_key": "project-documents/432115cb-bd5b-4fae-9edc-74ce031eacf3/project_intake/432115cb-bd5b-4fae-9edc-74ce031eacf3/4ddba9ca-6337-4585-8dde-863c758417a0.pdf",
+  "storage_provider": "local",
+  "target_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "target_type": "project_intake",
+  "uploaded_by": "f5250196-91bb-4df6-9666-b318a7036b42"
+}

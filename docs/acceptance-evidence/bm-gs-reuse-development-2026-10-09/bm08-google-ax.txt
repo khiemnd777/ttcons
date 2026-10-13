@@ -1,0 +1,513 @@
+Browser tab: 334096846, Title: "BM08 Development — nút Xuất báo cáo — 09-10-2026 - Google Sheets", URL: "https://docs.google.com/spreadsheets/d/1VYvxn1yrsSECV03Nj49bpuN83f_mjf4pFCU0Cndyleg/edit?gid=1114269901".
+1 AXWebArea BM08 Development — nút Xuất báo cáo — 09-10-2026 - Google Sheets, URL: docs.google.com/spreadsheets/d/1VYvxn1yrsSECV03Nj49bpuN83f_mjf4pFCU0Cndyleg/edit?gid=1114269901
+	2 container
+		3 container Description: Menu bar, ID: docs-chrome
+			4 container docs-header
+				5 link Description: Sheets home, Value: docs.google.com/spreadsheets/u/0/?authuser=0&usp=sheets_web, ID: docs-branding-logo-link
+				6 container docs-titlebar-container
+					7 container BM08 Development — nút Xuất báo cáo — 09-10-2026
+						8 container docs-title-widget
+							9 text BM08 Development — nút Xuất báo cáo — 09-10-2026
+					10 container
+						11 container docs-titlebar-share-client-button
+							12 button (disabled)   Share
+								13 text Share
+							14 button Description: Quick sharing actions, ID: scb-quick-actions-menu-button
+						15 pop up button (collapsed) Description: Google Account: Khiêm Nguyễn (khiemnd777@gmail.com), Secondary Actions: Expand
+			16 container docs-bars
+				17 container docs-menubars
+					18 menu bar docs-menubar
+						19 File, ID: docs-file-menu
+						20 Edit, ID: docs-edit-menu
+						21 View, ID: docs-view-menu
+						22 Insert, ID: docs-insert-menu
+						23 Format, ID: docs-format-menu
+						24 Data, ID: w183
+						25 Tools, ID: docs-tools-menu
+						26 Extensions, ID: docs-extensions-menu
+						27 Help, ID: docs-help-menu
+				28 container docs-toolbar-wrapper
+					29 container docs-primary-toolbars
+						30 container
+							31 text field (settable)
+						32 container Description: Main, ID: docs-toolbar
+							33 button (disabled) $, ID: t-num-fmt-currency
+								34 text $
+							35 button (disabled) %, ID: t-num-fmt-percent
+								36 text %
+							37 button (disabled) 123, ID: t-num-fmt-other
+								38 text 123
+					39 container Description: Mode and view, ID: docs-side-toolbar
+			40 container Side panel
+			41 container docs-additional-bars
+				42 image Loading...
+		43 container docs-editor
+			44 container 1114269901-grid-container
+				45 table
+					46 row
+						47 cell 1114269901C0
+							48 text A
+						49 cell 1114269901C1
+							50 text B
+						51 cell 1114269901C2
+							52 text C
+						53 cell 1114269901C3
+							54 text D
+						55 cell 1114269901C4
+							56 text E
+						57 cell 1114269901C5
+							58 text F
+						59 cell 1114269901C6
+							60 text G
+						61 cell 1114269901C7
+							62 text H
+						63 cell 1114269901C8
+							64 text I
+						65 cell 1114269901C9
+							66 text J
+						67 cell 1114269901C10
+							68 text K
+						69 cell 1114269901C11
+							70 text L
+						71 cell 1114269901C12
+							72 text M
+						73 cell 1114269901C13
+							74 text N
+						75 cell 1114269901C14
+							76 text O
+						77 cell 1114269901C15
+							78 text P
+						79 cell 1114269901C16
+							80 text Q
+						81 cell 1114269901C17
+							82 text R
+						83 cell 1114269901C18
+							84 text S
+						85 cell 1114269901C19
+							86 text T
+						87 cell 1114269901C20
+							88 text U
+						89 cell 1114269901C21
+							90 text V
+						91 cell 1114269901C22
+							92 text W
+						93 cell 1114269901C23
+							94 text X
+						95 cell 1114269901C24
+							96 text Y
+						97 cell 1114269901C25
+							98 text Z
+					99 row
+						100 cell 1114269901R0
+							101 text 1
+						102 cell
+							103 text CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM
+					104 row
+						105 cell 1114269901R1
+							106 text 2
+						107 cell
+							108 text THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-08)
+					109 row
+						110 cell 1114269901R2
+							111 text 3
+						112 cell
+							113 text DANH MỤC KIỂM TRA BÀN GIAO DỰ ÁN (HANDOVER CHECKLIST)
+					114 row
+						115 cell 1114269901R3
+							116 text 4
+					117 row
+						118 cell 1114269901R4
+							119 text 5
+						120 cell
+							121 text Dự án:
+						122 cell
+							123 text [DEV-BM0308-20261009] [Thử development] BM03 và BM08
+						124 cell
+							125 text Giai đoạn bàn giao:
+						126 cell
+							127 text Hoàn thiện tầng 1 — dữ liệu thử
+					128 row
+						129 cell 1114269901R5
+							130 text 6
+					131 row
+						132 cell 1114269901R6
+							133 text 7
+						134 cell
+							135 text STT
+						136 cell
+							137 text DANH MỤC HẠNG MỤC BÀN GIAO
+						138 cell
+							139 text YÊU CẦU HỒ SƠ & THỰC TẾ
+						140 cell
+							141 text ĐÁNH GIÁ (ĐẠT/KĐ)
+						142 cell
+							143 text TỒN TẠI CẦN XỬ LÝ (NẾU CÓ)
+						144 cell
+							145 text THỜI HẠN XỬ LÝ
+					146 row
+						147 cell 1114269901R7
+							148 text 8
+						149 cell
+							150 text 1
+						151 cell
+							152 text Biên bản nghiệm thu cuối đạt
+					153 row
+						154 cell 1114269901R8
+							155 text 9
+						156 cell
+							157 text 2
+						158 cell
+							159 text Bản vẽ và hồ sơ hoàn công
+					160 row
+						161 cell 1114269901R9
+							162 text 10
+						163 cell
+							164 text 3
+						165 cell
+							166 text Hướng dẫn vận hành/bảo trì
+					167 row
+						168 cell 1114269901R10
+							169 text 11
+						170 cell
+							171 text 4
+						172 cell
+							173 text Kho công trình và vật tư dư đã đóng
+					174 row
+						175 cell 1114269901R11
+							176 text 12
+						177 cell
+							178 text 5
+						179 cell
+							180 text Cam kết và hồ sơ bảo hành
+					181 row
+						182 cell 1114269901R12
+							183 text 13
+						184 cell
+							185 text 6
+						186 cell
+							187 text Biên bản bàn giao có xác nhận hai bên
+					188 row
+						189 cell 1114269901R13
+							190 text 14
+						191 cell
+							192 text 7
+						193 cell
+							194 text Sàn tầng 1 — kiểm tra bàn giao thử
+						195 cell
+							196 text Hoàn thiện mạch sàn và vệ sinh trước bàn giao
+						197 cell
+							198 text Không đạt
+						199 cell
+							200 text Mạch sàn cần chỉnh sửa — dữ liệu thử
+						201 cell
+							202 text 2026-10-11
+					203 row
+						204 cell 1114269901R14
+							205 text 15
+					206 row
+						207 cell 1114269901R15
+							208 text 16
+						209 cell
+							210 text KẾT LUẬN BÀN GIAO: [ ] ĐỦ ĐIỀU KIỆN BÀN GIAO | [ X ] CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)
+					211 row
+						212 cell 1114269901R16
+							213 text 17
+					214 row
+						215 cell 1114269901R17
+							216 text 18
+						217 cell
+							218 text Trạng thái hồ sơ nguồn (không thay thế đánh giá thực tế)
+					219 row
+						220 cell 1114269901R18
+							221 text 19
+						222 cell
+							223 text Biên bản nghiệm thu cuối đạt · Trạng thái hồ sơ: pending
+					224 row
+						225 cell 1114269901R19
+							226 text 20
+						227 cell
+							228 text Bản vẽ và hồ sơ hoàn công · Trạng thái hồ sơ: pending
+					229 row
+						230 cell 1114269901R20
+							231 text 21
+						232 cell
+							233 text Hướng dẫn vận hành/bảo trì · Trạng thái hồ sơ: pending
+					234 row
+						235 cell 1114269901R21
+							236 text 22
+						237 cell
+							238 text Kho công trình và vật tư dư đã đóng · Trạng thái hồ sơ: pending
+					239 row
+						240 cell 1114269901R22
+							241 text 23
+						242 cell
+							243 text Cam kết và hồ sơ bảo hành · Trạng thái hồ sơ: pending
+					244 row
+						245 cell 1114269901R23
+							246 text 24
+						247 cell
+							248 text Biên bản bàn giao có xác nhận hai bên · Trạng thái hồ sơ: pending
+					249 row
+						250 cell 1114269901R24
+							251 text 25
+						252 cell
+							253 text Sàn tầng 1 — kiểm tra bàn giao thử · Trạng thái hồ sơ: pending
+					254 row
+						255 cell 1114269901R25
+							256 text 26
+						257 cell
+							258 text Ghi chú hạng mục bàn giao nguồn (không thay thế đánh giá thực tế)
+					259 row
+						260 cell 1114269901R26
+							261 text 27
+						262 cell
+							263 text Sàn tầng 1 — kiểm tra bàn giao thử · Ghi chú nguồn: Ghi chú nguồn BM08: giữ lối đi thông thoáng khi kiểm tra lại — dữ liệu thử development.
+					264 row
+						265 cell 1114269901R27
+							266 text 28
+						267 cell
+							268 text Ghi chú bàn giao
+					269 row
+						270 cell 1114269901R28
+							271 text 29
+						272 cell
+							273 text Nguồn nháp tổng hợp để kiểm tra đánh giá và Xuất báo cáo; chưa có nghiệm thu cuối, không chứng nhận hoàn tất bàn giao.
+					274 row
+						275 cell 1114269901R29
+							276 text 30
+						277 cell
+							278 text GIÁM SÁT CÔNG TRÌNH
+						279 cell
+							280 text QUẢN LÝ DỰ ÁN (PM)
+						281 cell
+							282 text ĐẠI DIỆN THẦU PHỤ
+						283 cell
+							284 text ĐẠI DIỆN CĐT / KHÁCH HÀNG
+					285 row
+						286 cell 1114269901R30
+							287 text 31
+						288 cell
+							289 text (Ký & ghi rõ họ tên)
+						290 cell
+							291 text (Ký & ghi rõ họ tên)
+						292 cell
+							293 text (Ký & ghi rõ họ tên)
+						294 cell
+							295 text (Ký & ghi rõ họ tên)
+					296 row
+						297 cell 1114269901R31
+							298 text 32
+					299 row
+						300 cell 1114269901R32
+							301 text 33
+					302 row
+						303 cell 1114269901R33
+							304 text 34
+					305 row
+						306 cell 1114269901R34
+							307 text 35
+					308 row
+						309 cell 1114269901R35
+							310 text 36
+					311 row
+						312 cell 1114269901R36
+							313 text 37
+					314 row
+						315 cell 1114269901R37
+							316 text 38
+					317 row
+						318 cell 1114269901R38
+							319 text 39
+					320 row
+						321 cell 1114269901R39
+							322 text 40
+					323 row
+						324 cell 1114269901R40
+							325 text 41
+					326 row
+						327 cell 1114269901R41
+							328 text 42
+					329 row
+						330 cell 1114269901R42
+							331 text 43
+					332 row
+						333 cell 1114269901R43
+							334 text 44
+					335 row
+						336 cell 1114269901R44
+							337 text 45
+					338 row
+						339 cell 1114269901R45
+							340 text 46
+					341 row
+						342 cell 1114269901R46
+							343 text 47
+					344 row
+						345 cell 1114269901R47
+							346 text 48
+					347 row
+						348 cell 1114269901R48
+							349 text 49
+					350 row
+						351 cell 1114269901R49
+							352 text 50
+					353 row
+						354 cell 1114269901R50
+							355 text 51
+					356 row
+						357 cell 1114269901R51
+							358 text 52
+					359 row
+						360 cell 1114269901R52
+							361 text 53
+					362 row
+						363 cell 1114269901R53
+							364 text 54
+					365 row
+						366 cell 1114269901R54
+							367 text 55
+					368 row
+						369 cell 1114269901R55
+							370 text 56
+					371 row
+						372 cell 1114269901R56
+							373 text 57
+					374 row
+						375 cell 1114269901R57
+							376 text 58
+					377 row
+						378 cell 1114269901R58
+							379 text 59
+					380 row
+						381 cell 1114269901R59
+							382 text 60
+					383 row
+						384 cell 1114269901R60
+							385 text 61
+					386 row
+						387 cell 1114269901R61
+							388 text 62
+					389 row
+						390 cell 1114269901R62
+							391 text 63
+					392 row
+						393 cell 1114269901R63
+							394 text 64
+					395 row
+						396 cell 1114269901R64
+							397 text 65
+					398 row
+						399 cell 1114269901R65
+							400 text 66
+					401 row
+						402 cell 1114269901R66
+							403 text 67
+					404 row
+						405 cell 1114269901R67
+							406 text 68
+					407 row
+						408 cell 1114269901R68
+							409 text 69
+					410 row
+						411 cell 1114269901R69
+							412 text 70
+					413 row
+						414 cell 1114269901R70
+							415 text 71
+					416 row
+						417 cell 1114269901R71
+							418 text 72
+					419 row
+						420 cell 1114269901R72
+							421 text 73
+					422 row
+						423 cell 1114269901R73
+							424 text 74
+					425 row
+						426 cell 1114269901R74
+							427 text 75
+					428 row
+						429 cell 1114269901R75
+							430 text 76
+					431 row
+						432 cell 1114269901R76
+							433 text 77
+					434 row
+						435 cell 1114269901R77
+							436 text 78
+					437 row
+						438 cell 1114269901R78
+							439 text 79
+					440 row
+						441 cell 1114269901R79
+							442 text 80
+					443 row
+						444 cell 1114269901R80
+							445 text 81
+					446 row
+						447 cell 1114269901R81
+							448 text 82
+					449 row
+						450 cell 1114269901R82
+							451 text 83
+					452 row
+						453 cell 1114269901R83
+							454 text 84
+					455 row
+						456 cell 1114269901R84
+							457 text 85
+					458 row
+						459 cell 1114269901R85
+							460 text 86
+					461 row
+						462 cell 1114269901R86
+							463 text 87
+					464 row
+						465 cell 1114269901R87
+							466 text 88
+					467 row
+						468 cell 1114269901R88
+							469 text 89
+					470 row
+						471 cell 1114269901R89
+							472 text 90
+					473 row
+						474 cell 1114269901R90
+							475 text 91
+					476 row
+						477 cell 1114269901R91
+							478 text 92
+					479 row
+						480 cell 1114269901R92
+							481 text 93
+					482 row
+						483 cell 1114269901R93
+							484 text 94
+					485 row
+						486 cell 1114269901R94
+							487 text 95
+					488 row
+						489 cell 1114269901R95
+							490 text 96
+					491 row
+						492 cell 1114269901R96
+							493 text 97
+					494 row
+						495 cell 1114269901R97
+							496 text 98
+					497 row
+						498 cell 1114269901R98
+							499 text 99
+					500 row
+						501 cell 1114269901R99
+							502 text 100
+			503 container Sheet tab bar
+				504 container
+					505 container Add Sheet
+					506 container All Sheets
+					507 container Canvas menu
+				508 container
+					509 container
+						510 text 2026-10-12_01
+
+The focused UI element is 1 AXWebArea BM08 Development — nút Xuất báo cáo — 09-10-2026 - Google Sheets, URL: docs.google.com/spreadsheets/d/1VYvxn1yrsSECV03Nj49bpuN83f_mjf4pFCU0Cndyleg/edit?gid=1114269901

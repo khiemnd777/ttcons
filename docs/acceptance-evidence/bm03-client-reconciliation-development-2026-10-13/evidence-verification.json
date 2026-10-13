@@ -1,0 +1,15 @@
+{
+  "historical_rows_checked": 2299,
+  "historical_row_changes": [],
+  "historical_files_checked": 133,
+  "historical_file_changes": [],
+  "migration_count": 158,
+  "download_byte_equal": true,
+  "source_cells_unchanged": true,
+  "google_cells_checked": 210,
+  "google_populated_cells": 60,
+  "google_mismatches": [],
+  "google_effective_errors": [],
+  "scope": "Retained original baseline and bounded closed-client export/readonly proof; current full Rev10 positive acceptance is checked separately by verify-rev10.",
+  "bounded_checks_passed": true
+}

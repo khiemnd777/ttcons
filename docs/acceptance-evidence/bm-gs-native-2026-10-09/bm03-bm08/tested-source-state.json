@@ -1,0 +1,461 @@
+{
+  "verified_at_utc": "2026-10-09T04:01:06.153405+00:00",
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "source_state": "uncommitted main, BM03/BM08 frozen implementation",
+  "file_count": 113,
+  "files": [
+    {
+      "path": "backend/go.mod",
+      "sha256": "13acd4fa685a026a9fc602d58cbd4867ae69963729264c5972c15c8893d68c34"
+    },
+    {
+      "path": "backend/go.sum",
+      "sha256": "a786cc297addfbbbf83cb79b404edc8b47f86d786c629c7bd1a1c16ac3f2143e"
+    },
+    {
+      "path": "backend/internal/core/assets/bm_gs_templates.xlsx",
+      "sha256": "9a86d281cba1d01979dd7962b9b370175ab93adfb49105a0fa21cc3bba61e351"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_acceptance_renderer_test.go",
+      "sha256": "e0833fb41e2a0f337aa7b12db0062cf359c1a216fca5178346f611acf1ca3aba"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_cell_images.go",
+      "sha256": "f787ee2822d7b311d340239484349e8a7f32f9b611df097c17ebb2f163e1966a"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_cell_images_test.go",
+      "sha256": "1768726523d6b33fa1ab5c11c574e1bccc20a10356b70bafdf6a70eb88acfc97"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_crew_identity.go",
+      "sha256": "3ff7e4b4ab44eb7b0d03c66e12df0823652958de4b6e7741aed44b145509c6fa"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_export_projection.go",
+      "sha256": "7f50c384631a94c7e6c1a3ba014accfb93c21cde950d9136d77f4af995c73e2a"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_images.go",
+      "sha256": "ae5d2cc9918d15f7db80159778b2168002e915dceaf8a53870af41cb6db3d9da"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_native_projection_test.go",
+      "sha256": "21f696d85777ac19843de2718392921426dd6b176042c77e07c52cd274beaf94"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_workbook.go",
+      "sha256": "818620ef4eaeae642539c5dcad8d1ffb4a1426b11cc381c4c2a5ed8ecf27a455"
+    },
+    {
+      "path": "backend/internal/core/bm_gs_workbook_test.go",
+      "sha256": "c14ce3d12d6c63792a6727ba96012100fe58cd0f8439918a9a0a7f228fb42614"
+    },
+    {
+      "path": "backend/internal/core/commercial_procurement_integration_test.go",
+      "sha256": "ff47016c6b456dfebad36867c3971ed8cbaf27d790fc07830d392b79ac8ec708"
+    },
+    {
+      "path": "backend/internal/core/construction_action_field_context.go",
+      "sha256": "b40f24385355315d883b57f097c22bd2be32adf335c510c31d120e4af36b8c96"
+    },
+    {
+      "path": "backend/internal/core/construction_report_capture.go",
+      "sha256": "dd760c5f332e4860b5dd58ac028de88a9ed43978bd919f9eac023d7768bf0f52"
+    },
+    {
+      "path": "backend/internal/core/handlers_construction.go",
+      "sha256": "e49a7a3919d6095652982a0660a4e834b82cb24a1e9baa2bf7bb669615535de8"
+    },
+    {
+      "path": "backend/internal/core/handlers_handover_field_assessment.go",
+      "sha256": "cdc09d84fe3fa0f82df18b9d02c0b331d4af0b6c99445d32075b345181b7ac1c"
+    },
+    {
+      "path": "backend/internal/core/handlers_native_bm_gs_exports.go",
+      "sha256": "170b405bb995a7838f4bfa63d63875966abee29bffc5d084fcf1cd5713e93eda"
+    },
+    {
+      "path": "backend/internal/core/handlers_native_bm_gs_owners.go",
+      "sha256": "d0c54a61ddc5fcbddad67760ea9bfffde2ec03f8858f1841667abf6be6a4e17f"
+    },
+    {
+      "path": "backend/internal/core/native_bm_gs_export_helpers.go",
+      "sha256": "25b95b9dc5745304b7f2d351f9701b42710c8e20f52115f208c3b3c73f9f4d9f"
+    },
+    {
+      "path": "backend/internal/core/native_bm_gs_exports_test.go",
+      "sha256": "9720bf523e8beda0248af4d147cb60ed1c08af5fe2590ab138d3fb3ec4d91bab"
+    },
+    {
+      "path": "backend/internal/core/native_capture_catalog_test.go",
+      "sha256": "faffaf8f1edc3f109ab8c2c32df8dabdf25c0d0cb1c2ee1071ffae1ee25a5944"
+    },
+    {
+      "path": "backend/internal/core/native_capture_test.go",
+      "sha256": "b99898cfa968d22e3f981987572809632361c13df1b81277d2d2989b13d3ab5a"
+    },
+    {
+      "path": "backend/internal/core/native_crew_identity_test.go",
+      "sha256": "15a6ad0c4a8ae0f2fdc74c0ab926f9e24542f967176da23e0bbaf19eb82f33fe"
+    },
+    {
+      "path": "backend/internal/core/native_daily_form_export_test.go",
+      "sha256": "ea89494d8526cc0d89c0a20fb1937fcfbbc537e07235d64499e27a94c508a426"
+    },
+    {
+      "path": "backend/internal/core/native_daily_risk_plan_test.go",
+      "sha256": "301521c1c323d303e432b259f93ad0c697842e0e1461bda17548fb3e3276a61d"
+    },
+    {
+      "path": "backend/internal/core/native_handover_assessment_test.go",
+      "sha256": "4ec22af8970c7dcdc5cb00421c1b4e5794f74210fb4152073a3302a9c354a290"
+    },
+    {
+      "path": "backend/internal/core/native_subcontractor_assessment_test.go",
+      "sha256": "5f6f5aeb7f3278434c3a5e6b9a399ec1ef97fcc7573cc2a18b6992505482e135"
+    },
+    {
+      "path": "backend/internal/core/native_work_report_evidence.go",
+      "sha256": "7ffc253b6dbb03c1eed1a8ede464f665175e419451eaf8974140a1481364dd9a"
+    },
+    {
+      "path": "backend/internal/core/project_operations_integration_test.go",
+      "sha256": "e4642b3770ec9890e8e679e1c1a671c670d69095ba14442bea720798f8d4e596"
+    },
+    {
+      "path": "backend/internal/core/quality_acceptance_handover_integration_test.go",
+      "sha256": "8a1e98d97c8c1213bf5da084df0bb7e8f8369085934676f1cf22a2fc34139e46"
+    },
+    {
+      "path": "backend/internal/core/repository_construction_quality.go",
+      "sha256": "3afa748b70df7c4f92ec7cb0f8587ebabfe4606eeadfbef86b3939d58671cf55"
+    },
+    {
+      "path": "backend/internal/core/repository_handover.go",
+      "sha256": "47317d4d0ff1a973688f04d4de67dac4b2d277ccf7c9eb1d595790b013167c7a"
+    },
+    {
+      "path": "backend/internal/core/repository_handover_field_assessment.go",
+      "sha256": "76ee756fef7f2efce6cf4d2ac74f9d693279b2ab673cb7ce5c62f74b383a1093"
+    },
+    {
+      "path": "backend/internal/core/repository_native_bm_gs_exports.go",
+      "sha256": "8922627f0cd3d9a58859501792343c730d75f40b376d359062384e142264fac7"
+    },
+    {
+      "path": "backend/internal/core/repository_work_reports.go",
+      "sha256": "96c458d92b5381e50b7d7f65ea4b64d973d5fd5ae64af56ce44a19727178ebd9"
+    },
+    {
+      "path": "backend/internal/core/repository_workflow_forms.go",
+      "sha256": "2ab3e3006862de524fd9dcef7fbb650df21f47e090079137d16e2cbfa5f086e8"
+    },
+    {
+      "path": "backend/internal/core/routes.go",
+      "sha256": "68fe9cffeb761114d8f8a5e0975526639af53b5519ecd081bebc4effcd42f9ce"
+    },
+    {
+      "path": "backend/internal/core/routes_acceptance_handover.go",
+      "sha256": "e60db89c35a029ec644c198717eabec604fd2e6853c5d29c2597cfa48669fa31"
+    },
+    {
+      "path": "backend/internal/core/routes_bm_gs_exports.go",
+      "sha256": "458ddea07b862917296898b762db0609f6833f97fdedb4b90bac21c939bd7b27"
+    },
+    {
+      "path": "backend/internal/core/service_construction.go",
+      "sha256": "0034f9b94c1fc0b13e2289bb3ec9a0f0a865c8e435b41143f69ba46c22c07e34"
+    },
+    {
+      "path": "backend/internal/core/service_evidence.go",
+      "sha256": "909540826521278127cd5e204d51f51119bfbc93ef8be12360b9f522fcff594e"
+    },
+    {
+      "path": "backend/internal/core/service_handover.go",
+      "sha256": "d0985f26ca16d345815bc6f57318c4547c77ca1d67e9e96a2f99ee465482df75"
+    },
+    {
+      "path": "backend/internal/core/service_handover_field_assessment.go",
+      "sha256": "8ee6be0de0e04a971091b1bd3a5e0c6301663990cad44d77c23191ce326dd71b"
+    },
+    {
+      "path": "backend/internal/core/service_native_bm_gs_exports.go",
+      "sha256": "262ffb64ad2fee57dbcd7c5bd3f07ef2091d242ab94299f1ed56592e26c8de80"
+    },
+    {
+      "path": "backend/internal/core/service_native_bm_gs_owners.go",
+      "sha256": "b2b7f1a9ffbe7f93de9999f3cca1d86456a21fb7dac0d2128e61d5c83e165e8b"
+    },
+    {
+      "path": "backend/internal/core/service_work_reports.go",
+      "sha256": "3c5576a10f42412daae4c4bdfc9df0c0a4a0deed4cc125e74b34e06f5337c6ec"
+    },
+    {
+      "path": "backend/internal/core/service_workflow_form_validation.go",
+      "sha256": "65273b2fe89c7b2dc8b0f17bf537a34422d8169aeed6793b2dff598b4a541a7f"
+    },
+    {
+      "path": "backend/internal/core/types_bm_gs.go",
+      "sha256": "7f88584539ebfc69a031d690dfdab8eea8621b73b9deeb6dae0da40440d491c1"
+    },
+    {
+      "path": "backend/internal/core/types_bm_gs_exports.go",
+      "sha256": "71b2dfd12e3199a4424c652f849dd743cb93a3b26caca379c62020bacea6eb8b"
+    },
+    {
+      "path": "backend/internal/core/types_construction.go",
+      "sha256": "f79ff77ce107bc6c80721fa9e4dc00471100e2fed83033a193733bc23610b208"
+    },
+    {
+      "path": "backend/internal/core/types_finance.go",
+      "sha256": "13e3cc48e92dab4fdf1a47dd0c48d3f865e086d749f356a4259b96e5610cb43c"
+    },
+    {
+      "path": "backend/internal/shared/middleware/ratelimit.go",
+      "sha256": "7401eb08509589f992fbe9920ec599143f8fd65229a65c29d90bb3a9f8138681"
+    },
+    {
+      "path": "backend/internal/shared/middleware/ratelimit_test.go",
+      "sha256": "2b48268a8f96cbd553dfd96c9586f62bd13bae641107c48161c23d93b25ad00e"
+    },
+    {
+      "path": "backend/internal/shared/storage/migration_db_test.go",
+      "sha256": "df712d316f8259df98771e83f90ff3219aa29110e235d1707f45d1b510817a88"
+    },
+    {
+      "path": "backend/migrations/V152__bm_gs_source_fields.sql",
+      "sha256": "59c0c50b262638a0d59188923ccff9c89bc35e6dff3bd1051be8a668017c018a"
+    },
+    {
+      "path": "backend/migrations/V153__native_daily_report_capture_revision.sql",
+      "sha256": "fb37e6e429f5cefa0555e0b5c352591531e36b54826aa3c1051a9c49c674f577"
+    },
+    {
+      "path": "backend/migrations/V154__native_field_capture_gaps.sql",
+      "sha256": "d6710cba91f6fde7f03d26a9ad559e8b41e893adc56a068db731b9ffe4418578"
+    },
+    {
+      "path": "backend/migrations/V155__native_risk_and_field_assignment_capture.sql",
+      "sha256": "6cefb2ff41d9d754ac41a7728dbfba23e4a1e3ff4478265ea0de4d69de1476af"
+    },
+    {
+      "path": "backend/migrations/V156__native_daily_blocker_capture_revision.sql",
+      "sha256": "94c186a16a8c528e9e5dee19c6c7a94a6ae3687ee46351f890b6489c26914a28"
+    },
+    {
+      "path": "backend/migrations/V157__native_subcontractor_and_handover_assessment.sql",
+      "sha256": "a8f419ef4293b6c8814aebdd50004ebe6fad6f19b627e181eb8d0437ff187284"
+    },
+    {
+      "path": "frontend/src/lib/api/client.ts",
+      "sha256": "955fdcf5d9a538822375b7fec1e179c3bb2fbcb3f012a3b4b6716d64a5269cba"
+    },
+    {
+      "path": "frontend/src/lib/types/domain/constructionQuality.ts",
+      "sha256": "9ab82c895f6c999f3b865e8c663ad970148a3435f8da0c7793c299b5cf3fb3e7"
+    },
+    {
+      "path": "frontend/src/lib/types/domain/projectsWorkflowDefinitions.ts",
+      "sha256": "d95cb82865d87c2e85e44f6a5a136cfc27ae90748803e060f9a7f8f0b3fc2b28"
+    },
+    {
+      "path": "frontend/src/modules/_shared/EvidenceCapture.tsx",
+      "sha256": "58252fad1aebc621d67a642163fe659b003d015e4ef7057e6c1dbb209333c08d"
+    },
+    {
+      "path": "frontend/src/modules/_shared/EvidenceRecordViewerDialog.tsx",
+      "sha256": "cd2493bacdbadf0b0d9664db37668773e3503d21ec487a451d5ac8d84e82f05b"
+    },
+    {
+      "path": "frontend/src/modules/_shared/EvidenceUploader.tsx",
+      "sha256": "cf0ad4f062a5c5ee54c7e313f79a29736f38523df3b5ae0f2101a7c65e1507ed"
+    },
+    {
+      "path": "frontend/src/modules/_shared/NativeExcelExportButton.tsx",
+      "sha256": "91a8a88759a0d1a2debc6579494e18fa7ea69f091ca240494bf5c56a9a449b8a"
+    },
+    {
+      "path": "frontend/src/modules/_shared/bmgsExport.ts",
+      "sha256": "86a54d851429aae082fdfd0c8d75d7578f074023b46224cb1f647d208fa8d553"
+    },
+    {
+      "path": "frontend/src/modules/_shared/bmgsSourceNavigation.ts",
+      "sha256": "c97ca542debe5b85af296b9a7f03e3bedc53822cebec3f3811b7844d72dc908a"
+    },
+    {
+      "path": "frontend/src/modules/_shared/evidenceCaptureMetadata.ts",
+      "sha256": "c26217500bab9b551fa8e0a8e34beb52364a60ec29f4546a6fa083e689a704d8"
+    },
+    {
+      "path": "frontend/src/modules/_shared/evidenceFileTypes.ts",
+      "sha256": "26d4bb37a7588b9d02aa56eaffb7f4f4437f91bd666d836781258eb807b4c1ff"
+    },
+    {
+      "path": "frontend/src/modules/_shared/recordNavigation.ts",
+      "sha256": "2f378976beb0f81d2e6515692fcae2ba031a546563380a48bd64535fa1eea42a"
+    },
+    {
+      "path": "frontend/src/modules/_shared/useRecordDeepLink.tsx",
+      "sha256": "6f55f0d44817ea31a5ab7809282d5eb8229eec64ba953733b82e2a81f1745e81"
+    },
+    {
+      "path": "frontend/src/modules/contracts/ContractsPage.tsx",
+      "sha256": "91331d546320496f62e15defd6f003f48815badd55e1a38f1b2878eaa6c07e0b"
+    },
+    {
+      "path": "frontend/src/modules/handover/HandoverAssessmentDialog.tsx",
+      "sha256": "8b4748ea9ede11c6d868e189063e556b264a7efb5f900ecfb0cd8879310b879d"
+    },
+    {
+      "path": "frontend/src/modules/handover/HandoverCreateDialog.tsx",
+      "sha256": "91ba2d9e509668a8e5957330d9e15a24023a00499dca9c4b38993efd244ad676"
+    },
+    {
+      "path": "frontend/src/modules/handover/HandoverPage.tsx",
+      "sha256": "43be5c6b7b8078acfb0417b3e40771deb41375fdcc3b7119ff9726d2393b7183"
+    },
+    {
+      "path": "frontend/src/modules/handover/HandoverWorkspace.tsx",
+      "sha256": "3bb2b67d971fba84ad2ac6b37803493e41b3d0699726f6277cc423ecde1c6207"
+    },
+    {
+      "path": "frontend/src/modules/handover/handoverAssessment.ts",
+      "sha256": "612661b90a06634b134f462e0c50104be964195f819a685da70a62bb4f7f9479"
+    },
+    {
+      "path": "frontend/src/modules/handover/handoverTypes.ts",
+      "sha256": "872642e806e2a2251b5a11308ac55d686f5263d3ae4eb8d1d38b602f708ff9b5"
+    },
+    {
+      "path": "frontend/src/modules/operations/ConstructionActionDialogs.tsx",
+      "sha256": "7407fc1d371d68646e362ec1edc676b001d15186ca5331be424f3b2910699a8a"
+    },
+    {
+      "path": "frontend/src/modules/operations/ConstructionReportDetailDialog.tsx",
+      "sha256": "849ef6de8ba6b4b426dfc08f39a5ed2d3855042d188269fce435e5fedb2afe84"
+    },
+    {
+      "path": "frontend/src/modules/operations/ConstructionReportFormDialog.tsx",
+      "sha256": "21e280060b5d749f8a930156c544148ee5ba52d8ae5eb899e7b83c183595b13b"
+    },
+    {
+      "path": "frontend/src/modules/operations/ConstructionWorkspaceLists.tsx",
+      "sha256": "84e4b3713e48544fd68c54847c9e25e223839482254ed425dbb7c61d0b4c6557"
+    },
+    {
+      "path": "frontend/src/modules/operations/ConstructionWorkspacePanel.tsx",
+      "sha256": "f787a7da5f877db68258ec82cfd5baa9b8f30691d5fade698fd5cb62a726ccc6"
+    },
+    {
+      "path": "frontend/src/modules/operations/OperationsPage.tsx",
+      "sha256": "ede5952f760d2d9890b9b9fe8c672578d818b80d01705f52485133f5f41e06f2"
+    },
+    {
+      "path": "frontend/src/modules/operations/constructionDailyCapture.ts",
+      "sha256": "acf1b7c71a051e7e239e3d9354e526f81437d08ed6e3821635a1072cbf5b7595"
+    },
+    {
+      "path": "frontend/src/modules/operations/constructionReportViewModel.ts",
+      "sha256": "9983209a156be9bbf90bffcd68116880be4ff5c759b955c433345185a3697bb1"
+    },
+    {
+      "path": "frontend/src/modules/operations/constructionWorkspaceApi.ts",
+      "sha256": "e76b9110e45cba70077236c79b2746c59b53ce3e95b184bf5219994b0cdaa7c0"
+    },
+    {
+      "path": "frontend/src/modules/pipeline-builder/pipelineBuilderDomain.ts",
+      "sha256": "9ee059fa016bdce7157366e606f70c9e79dbe207649bdea46a2affe6470f7977"
+    },
+    {
+      "path": "frontend/src/modules/projects/ProjectDetailPage.tsx",
+      "sha256": "85e49ca0140d8a5f3592dff3d0d6e80e29dccedf9b26663291b689f4242c3481"
+    },
+    {
+      "path": "frontend/src/modules/work-items/EvidencePanel.tsx",
+      "sha256": "906858f6f3468cb72baaad4d88d3a59c6c0c35693d6743298d2dc7c621aace19"
+    },
+    {
+      "path": "frontend/src/modules/work-items/WorkflowFormPanel.tsx",
+      "sha256": "0fa9937b62f2fba4912080804cd84360207f89dac2dea51c7373eb5bbed12e92"
+    },
+    {
+      "path": "frontend/src/modules/work-items/workflowFormExcelEligibility.ts",
+      "sha256": "ff92b2c75299977276a56abb974fd2cdbee58b94e31ef6fbeec499ad80bf1d36"
+    },
+    {
+      "path": "frontend/src/modules/work-reports/WorkReportReviewDialog.tsx",
+      "sha256": "9bf9b08dcd223fecfe75f2ec302d48eb59aa8d1b29fa0dadb446e781bd5001b1"
+    },
+    {
+      "path": "frontend/src/modules/work-reports/WorkReportsPage.tsx",
+      "sha256": "2f5e92575cd82db63b21dc84638e2f40177cf00f085d01dcddebc9aa4b678885"
+    },
+    {
+      "path": "frontend/tests/bmgsExport.test.ts",
+      "sha256": "c2512c2c12e35197b47bbce4ef5660209245c1a6863ded88cf0d8db84b705c46"
+    },
+    {
+      "path": "frontend/tests/bmgsExportLifecycle.test.ts",
+      "sha256": "c35aef9f718a2af8a4076bc612e4d2b197d9073fe526a8af4153efccf76cdfd4"
+    },
+    {
+      "path": "frontend/tests/bmgsRevisionNavigation.test.ts",
+      "sha256": "a0ca393a43418405caa73b7f6af2e78d7f13c8e80737ce0c13c1901c2ff977be"
+    },
+    {
+      "path": "frontend/tests/bmgsSourceNavigation.test.ts",
+      "sha256": "0dc5eb4a7032494c5401e6b3be71e38b15929c78d2c38e48e8d103cfe9d48db2"
+    },
+    {
+      "path": "frontend/tests/constructionDailyCapture.test.ts",
+      "sha256": "f89cc23fd461772e0e8684932f8ef593c47c0a551d7dab1be0924b417d5d989e"
+    },
+    {
+      "path": "frontend/tests/constructionDailyCaptureLifecycle.test.ts",
+      "sha256": "e4cba39df26ac110c1e2c2bd12cf507f7c58be23f5220008966872b576df6904"
+    },
+    {
+      "path": "frontend/tests/constructionReportMobile.test.ts",
+      "sha256": "b10feb62858401404d491b7239368b5aa8a05e87d0ebec027b0d97a15b94fc05"
+    },
+    {
+      "path": "frontend/tests/evidenceFileTypes.test.ts",
+      "sha256": "495a2bd4d0a1cf4b138bcf7de6ffcd844683e0bae279d6984246e1bfbb7b6371"
+    },
+    {
+      "path": "frontend/tests/evidenceLifecycle.test.ts",
+      "sha256": "37649fb55ac4f748b055fe3fc3ff884e17da578090ada2b8d23f4a00874e50b5"
+    },
+    {
+      "path": "frontend/tests/handoverAssessment.test.ts",
+      "sha256": "8d3ae0497571c38e4dafdce166e766ec10d071365c4965f01a394a312bd4fb27"
+    },
+    {
+      "path": "frontend/tests/nativeConstructionActionExport.test.ts",
+      "sha256": "b769c169a4edae1b81b314ab41277c09ab08333aacd6798e995f719ed4508b0b"
+    },
+    {
+      "path": "frontend/tests/nativeEvidenceCaptureMetadata.test.ts",
+      "sha256": "d0135ee22bdd3cb70ea874e97d02642c7c14ab50972ae00fa0120a1053645504"
+    },
+    {
+      "path": "frontend/tests/pipelineFormDefaults.test.ts",
+      "sha256": "31da83672b89051d152d24d5a234de5c7564779250705a24b2503432830a5f88"
+    },
+    {
+      "path": "frontend/tests/projectDetailTabs.test.ts",
+      "sha256": "ea5bc76567f401189e5c25a13b17228259ad62dbe0ad797af9792270e83b18a0"
+    },
+    {
+      "path": "frontend/tests/workflowFormExcelEligibility.test.ts",
+      "sha256": "bcb236c07954a38c2cd56f0748f245dfd03fc647020c0f5ffd2a23601ff7fef6"
+    },
+    {
+      "path": "frontend/tests/workflowFormNativeExportLifecycle.test.ts",
+      "sha256": "174a999835fe219ff5bc9940c1f6ef60adab420fe2fa3dbc58a4a29a81c5286d"
+    }
+  ],
+  "combined_fingerprint": "00888489761ab49895ca2aaf8848bd4a7a9d75912b41ffe3e74f787439b83dd0"
+}

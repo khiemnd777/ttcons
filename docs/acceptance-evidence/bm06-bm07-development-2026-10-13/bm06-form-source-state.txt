@@ -1,0 +1,559 @@
+Browser tab: 3, Title: "Thủ Thiêm Workflow", URL: "http://127.0.0.1:5173/work-items/4717be95-6d19-4c5e-972a-32fa825a0d8d".
+1 AXWebArea Thủ Thiêm Workflow, URL: 127.0.0.1:5173/work-items/4717be95-6d19-4c5e-972a-32fa825a0d8d
+	2 container root
+		3 container
+			4 link Description: Về trang mặc định, Value: 127.0.0.1:5173/
+			5 container Điều hướng chính
+				6 text CÔNG VIỆC
+				7 link Description: Dashboard, Value: 127.0.0.1:5173/dashboard
+				8 link Description: Bàn làm việc Bàn làm việc: 15, Value: 127.0.0.1:5173/my-work
+				9 link Description: Tiến trình, Value: 127.0.0.1:5173/progress
+				10 link Description: Công trình, Value: 127.0.0.1:5173/projects
+				11 link Description: Mua sắm vật tư, Value: 127.0.0.1:5173/procurement
+				12 link Description: Báo cáo Báo cáo: 5, Value: 127.0.0.1:5173/reports
+				13 link Description: Thống kê, Value: 127.0.0.1:5173/statistics
+				14 link Description: Bàn giao kế toán, Value: 127.0.0.1:5173/accounting
+				15 text WORKFLOW
+				16 link Description: Trình thiết kế quy trình, Value: 127.0.0.1:5173/pipeline-builder
+				17 link Description: Biểu mẫu quy trình, Value: 127.0.0.1:5173/workflow-forms
+				18 text QUẢN TRỊ
+				19 link Description: Đối tác, Value: 127.0.0.1:5173/core-data
+				20 link Description: Kho vật tư, Value: 127.0.0.1:5173/warehouse
+				21 link Description: Nhân sự, Value: 127.0.0.1:5173/staff
+				22 link Description: Vai trò, Value: 127.0.0.1:5173/roles
+				23 link Description: Audit nghiệp vụ, Value: 127.0.0.1:5173/audit
+				24 link Description: Nhật ký sự kiện, Value: 127.0.0.1:5173/event-logs
+				25 link Description: Cấu hình, Value: 127.0.0.1:5173/settings
+			26 text POWERED BY
+			27 link Description: Mở KNASOFTWARE trong tab mới, Value: knasoftware.com/
+		28 container
+			29 text Bắt đầu từ việc ưu tiên, luôn rõ Công trình › Giai đoạn › Gói công việc
+			30 pop up button (collapsed) Description: Thông báo, 24 chưa đọc, Secondary Actions: Expand
+				31 image
+			32 button Mở hồ sơ cá nhân
+				33 text Consflow Admin
+				34 text Admin
+			35 button Đăng xuất
+				36 image
+				37 text Đăng xuất
+		48 container
+			49 container
+				50 text Node 1: [Synthetic] Thi công kiểm thử nguồn  ·  Bước 2: BM02 — Báo cáo ngày synthetic
+			51 heading BM02 — Báo cáo ngày synthetic, Value: 3
+				52 text BM02 — Báo cáo ngày synthetic
+			53 text Đang xử lý DEV-BM-REUSE-20261009 Bình thường
+			54 image
+			55 text PM
+			56 image
+			57 text - 2 / 0  minh chứng Daily report thi công v5  ·  Đã chốt
+			58 button (collapsed) ĐIỀU KIỆN BẮT BUỘC Không có điều kiện đang chặn Xem chi tiết, Secondary Actions: Expand
+				59 image
+				60 text ĐIỀU KIỆN BẮT BUỘC
+				61 heading Không có điều kiện đang chặn, Value: 3
+					62 text Không có điều kiện đang chặn
+				63 text Xem chi tiết
+				64 image
+			65 container
+				66 button Xuất báo cáo ngày
+					67 image
+					68 text Xuất báo cáo ngày
+				69 button Xuất báo cáo rủi ro
+					70 image
+					71 text Xuất báo cáo rủi ro
+				72 button Xuất báo cáo hiện trường
+					208 image
+					74 text Xuất báo cáo hiện trường
+				75 container
+					76 heading BM02 — Báo cáo ngày synthetic, Value: 3
+						77 text BM02 — Báo cáo ngày synthetic
+					78 text Đã chốt Hồ sơ nghiệp vụ v 5  ·  Chốt lúc 23:15 09-10-2026
+				79 content list Trình tự xử lý hồ sơ
+					209 container
+						210 button (expanded) NỘI DUNG CẦN XỬ LÝ Thông tin nghiệp vụ Đã chốt 7 chính · 4 bổ sung, Secondary Actions: Collapse
+							211 text NỘI DUNG CẦN XỬ LÝ
+							212 heading Thông tin nghiệp vụ, Value: 4
+								213 text Thông tin nghiệp vụ
+							214 text Đã chốt
+							215 text 7
+							216 text  chính
+							217 text  · 4 bổ sung
+							218 image
+						219 text Ngày report
+						220 text *
+						221 date field (disabled, settable) 2026-10-09
+						222 text Người report
+						223 text *
+						224 text field (disabled) PM synthetic
+						225 text Phạm vi thi công
+						226 text *
+						227 pop up button (disabled, collapsed, settable) Value: Xây tô / phần thô, Secondary Actions: Expand
+							228 menu
+								229 (disabled) Chọn
+								230 (disabled) Chuẩn bị mặt bằng
+								231 (disabled) Xây tô / phần thô
+								232 (disabled) Trần
+								233 (disabled) Sàn
+								234 (disabled) Sơn
+								235 (disabled) MEP
+								236 (disabled) Mộc / nội thất
+								237 (disabled) Nhôm kính
+								238 (disabled) Chuẩn bị bàn giao
+								239 (disabled) Khác
+						240 text Thời tiết / điều kiện thi công
+						241 text *
+						242 pop up button (disabled, collapsed, settable) Value: Bình thường, Secondary Actions: Expand
+							243 menu
+								244 (disabled) Chọn
+								245 (disabled) Bình thường
+								246 (disabled) Nắng nóng
+								247 (disabled) Mưa
+								248 (disabled) Gió mạnh
+								249 (disabled) Hạn chế mặt bằng
+								250 (disabled) Khác
+						251 text Đã làm
+						252 text *
+						253 container Đã làm: bảng có thể cuộn ngang
+							254 table Đã làm
+								255 text Đã làm
+								256 row
+									257 cell
+										258 text #
+									259 cell
+										260 text Hạng mục *
+									261 cell
+										262 text Khu vực
+									263 cell
+										264 text Tổ / đội
+									265 cell
+										266 text KL thực tế
+									267 cell
+										268 text ĐVT
+									269 cell
+										270 text Vật tư dùng
+									271 cell
+										272 text Kết quả *
+									273 cell
+										274 text Ảnh / evidence
+									275 cell
+										276 text Ghi chú
+								277 row
+									278 cell
+										279 text 1
+									280 cell
+										281 text Hạng mục *
+										282 text [Synthetic] Hoàn thiện ô tường mẫu
+									283 cell
+										284 text Khu vực
+										285 text [Synthetic] Khu A
+									286 cell
+										287 text Tổ / đội
+										288 text —
+									289 cell
+										290 text KL thực tế
+										291 text 2
+									292 cell
+										293 text ĐVT
+										294 text m2
+									295 cell
+										296 text Vật tư dùng
+										297 text —
+									298 cell
+										299 text Kết quả *
+										300 text Done
+									301 cell
+										302 text Ảnh / evidence
+										303 text [Synthetic] Gradient BM04/BM07 · Ảnh · submitted
+									304 cell
+										305 text Ghi chú
+										306 text [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu
+						307 text Kéo ngang để xem các cột còn lại
+						308 text Ghi theo từng hạng mục đã làm trong ngày. Evidence nếu chọn phải thuộc đúng work item.
+						309 text Đánh giá giám sát trong ngày
+						310 text Chưa có dòng nào
+						311 text Chỉ ghi nội dung đã quan sát. Không bắt buộc đủ 12 nội dung; không thay thế quyết định nghiệm thu.
+						312 text Vật tư và thiết bị đến hiện trường
+						313 text Chưa có dòng nào
+						314 text Ghi nhận hàng đến hiện trường, tách biệt vật tư sử dụng. Không tạo phiếu kho.
+						315 button (expanded) Thông tin bổ sungKhông bắt buộc · 4 mục, Secondary Actions: Collapse
+							316 text Thông tin bổ sung
+							317 text Không bắt buộc · 
+							318 text 4
+							319 text  mục
+							322 image
+						323 container
+							324 text Nhân công / tổ đội
+							325 container Nhân công / tổ đội: bảng có thể cuộn ngang
+								326 table Nhân công / tổ đội
+									327 text Nhân công / tổ đội
+									328 row
+										329 cell
+											330 text #
+										331 cell
+											332 text Tổ / đội *
+										333 cell
+											334 text Trade
+										335 cell
+											336 text Số người *
+										337 cell
+											338 text Giờ công
+										339 cell
+											340 text Ghi chú
+										341 cell
+											342 text Đại diện tổ đội (24/7)
+										343 cell
+											344 text Liên hệ đại diện
+									345 row
+										346 cell
+											347 text 1
+										348 cell
+											349 text Tổ / đội *
+											350 text [Synthetic] Tổ thử A
+										351 cell
+											352 text Trade
+											353 text —
+										354 cell
+											355 text Số người *
+											356 text 3
+										357 cell
+											358 text Giờ công
+											359 text 8
+										360 cell
+											361 text Ghi chú
+											362 text —
+										363 cell
+											364 text Đại diện tổ đội (24/7)
+											365 text Đại diện synthetic
+										366 cell
+											367 text Liên hệ đại diện
+											368 text demo-only
+							369 text Kéo ngang để xem các cột còn lại
+						370 container
+							371 text Vật tư sử dụng
+							372 container Vật tư sử dụng: bảng có thể cuộn ngang
+								373 table Vật tư sử dụng
+									374 text Vật tư sử dụng
+									375 row
+										376 cell
+											377 text #
+										378 cell
+											379 text Vật tư *
+										380 cell
+											381 text Mã vật tư
+										382 cell
+											383 text Số lượng *
+										384 cell
+											385 text ĐVT *
+										386 cell
+											387 text Nguồn *
+										388 cell
+											389 text Ghi chú *
+									390 row
+										391 cell
+											392 text 1
+										393 cell
+											394 text Vật tư *
+											395 text [Synthetic] Gạch đã dùng
+										396 cell
+											397 text Mã vật tư
+											398 text —
+										399 cell
+											400 text Số lượng *
+											401 text 2
+										402 cell
+											403 text ĐVT *
+											404 text viên
+										405 cell
+											406 text Nguồn *
+											407 text Khác
+										408 cell
+											409 text Ghi chú *
+											410 text —
+							411 text Kéo ngang để xem các cột còn lại
+							412 text Chỉ ghi nhận báo cáo; không tự tạo stock movement.
+						413 container
+							414 text Sẽ làm
+							415 container Sẽ làm: bảng có thể cuộn ngang
+								416 table Sẽ làm
+									417 text Sẽ làm
+									418 row
+										419 cell
+											420 text #
+										421 cell
+											422 text Việc cần làm *
+										423 cell
+											424 text Owner role *
+										425 cell
+											426 text Owner
+										427 cell
+											428 text Due date *
+										429 cell
+											430 text Priority *
+										431 cell
+											432 text Ghi chú
+										433 cell
+											434 text Mã giao việc
+										435 cell
+											436 text Vị trí và hạng mục
+										437 cell
+											438 text Thầu phụ hoặc tổ đội nhận việc
+										439 cell
+											440 text Đại diện nhận việc (24/7)
+										441 cell
+											442 text Liên hệ đại diện
+										443 cell
+											444 text Ngày giao việc thực tế
+										445 cell
+											446 text Tiến độ công việc ghi nhận (%)
+										447 cell
+											448 text Tình trạng công việc ghi nhận
+									449 row
+										450 cell
+											451 text 1
+										452 cell
+											453 text Việc cần làm *
+											454 text [Synthetic] Chỉnh sửa ô tường mẫu
+										455 cell
+											456 text Owner role *
+											457 text PM
+										458 cell
+											459 text Owner
+											460 text —
+										461 cell
+											462 text Due date *
+											463 text 2026-10-10
+										464 cell
+											465 text Priority *
+											466 text Normal
+										467 cell
+											468 text Ghi chú
+											469 text —
+										470 cell
+											471 text Mã giao việc
+											472 text SYN-GV-06
+										473 cell
+											474 text Vị trí và hạng mục
+											475 text [Synthetic] Khu A — ô tường
+										476 cell
+											477 text Thầu phụ hoặc tổ đội nhận việc
+											478 text —
+										479 cell
+											480 text Đại diện nhận việc (24/7)
+											481 text Đại diện synthetic
+										482 cell
+											483 text Liên hệ đại diện
+											484 text demo-only
+										485 cell
+											486 text Ngày giao việc thực tế
+											487 text —
+										488 cell
+											489 text Tiến độ công việc ghi nhận (%)
+											490 text 0
+										491 cell
+											492 text Tình trạng công việc ghi nhận
+											493 text —
+							494 text Kéo ngang để xem các cột còn lại
+							495 text Submit sẽ tạo work item theo từng việc cần làm.
+						496 container
+							497 text Blocker / Risk
+							498 container Blocker / Risk: bảng có thể cuộn ngang
+								499 table Blocker / Risk
+									500 text Blocker / Risk
+									501 row
+										502 cell
+											503 text #
+										504 cell
+											505 text Nội dung *
+										506 cell
+											507 text Impact *
+										508 cell
+											509 text Owner role
+										510 cell
+											511 text Target date
+										512 cell
+											513 text Severity *
+										514 cell
+											515 text Mã vấn đề hoặc rủi ro
+										516 cell
+											517 text Ngày phát hiện thực tế
+										518 cell
+											519 text Nguyên nhân
+										520 cell
+											521 text Hướng xử lý đề xuất
+										522 cell
+											523 text Người phụ trách xử lý
+										524 cell
+											525 text Tình trạng ghi nhận
+									526 row
+										527 cell
+											528 text 1
+										529 cell
+											530 text Nội dung *
+											531 text [Synthetic] Lối thử còn vật liệu
+										532 cell
+											533 text Impact *
+											534 text Mặt bằng
+										535 cell
+											536 text Owner role
+											537 text —
+										538 cell
+											539 text Target date
+											540 text 2026-10-10
+										541 cell
+											542 text Severity *
+											543 text Medium
+										544 cell
+											545 text Mã vấn đề hoặc rủi ro
+											546 text SYN-RR-02
+										547 cell
+											548 text Ngày phát hiện thực tế
+											549 text —
+										550 cell
+											551 text Nguyên nhân
+											552 text [Synthetic] Sắp xếp ô thử
+										553 cell
+											554 text Hướng xử lý đề xuất
+											555 text —
+										556 cell
+											557 text Người phụ trách xử lý
+											558 text PM synthetic
+										559 cell
+											560 text Tình trạng ghi nhận
+											561 text Đang theo dõi synthetic
+							562 text Kéo ngang để xem các cột còn lại
+						321 text Chốt lúc 23:15 09-10-2026
+					89 container
+						90 button (expanded) TÀI LIỆU NGHIỆP VỤ Xác nhận hồ sơ và PDF, Secondary Actions: Collapse
+							91 text TÀI LIỆU NGHIỆP VỤ
+							92 heading Xác nhận hồ sơ và PDF, Value: 4
+								93 text Xác nhận hồ sơ và PDF
+							94 image
+						95 heading Xác nhận hồ sơ, Value: 4
+							96 text Xác nhận hồ sơ
+						97 text Xác nhận được nhóm theo mục đích. Khi một mục đích có đủ hai loại, chọn chữ ký, con dấu hoặc cả hai để đưa vào PDF.
+						98 text CHỮ KÝ CÁ NHÂN · 0
+						99 text Chưa có chữ ký cá nhân.
+						100 text Chọn chữ ký cá nhân hoặc con dấu công ty.
+						101 button Thêm xác nhận
+							102 image
+							103 text Thêm xác nhận
+						104 heading Tệp PDF, Value: 4
+							105 text Tệp PDF
+						106 container
+							107 text PDF mới sẽ gồm  0  chữ ký ·  0  con dấu theo lựa chọn phía trên.
+						108 button Tạo PDF
+							109 image
+							110 text Tạo PDF
+						111 text Chưa tạo PDF cho hồ sơ này.
+			112 container
+				113 tab group Thông tin hỗ trợ
+					114 tab (selected, settable, boolean) Minh chứng 2 2 đang chờ, ID: work-item-support-tab-evidence, Value: 1
+Minh chứng
+2
+2 đang chờ
+					115 tab (selectable, settable, boolean) Trao đổi & lịch sử 12 Mới nhất 23:51 09-10-2026, ID: work-item-support-tab-activity, Value: 0
+Trao đổi & lịch sử
+12
+Mới nhất 23:51 09-10-2026
+				116 container Description: Minh chứng 2 2 đang chờ, ID: work-item-support-panel-evidence
+					117 container
+						118 text SỔ MINH CHỨNG
+						119 heading 2 hồ sơ minh chứng, Value: 3
+							120 text 2  hồ sơ minh chứng
+						121 text Ảnh 
+						122 text 2
+						123 text  · Tài liệu 
+						124 text 0
+						125 text  · Đang chờ 
+						126 text 2
+						127 button Xuất báo cáo
+							128 image
+							129 text Xuất báo cáo
+						130 button Tải minh chứng
+							131 image
+							132 text Tải minh chứng
+						133 image
+						134 text ẢNH
+						135 text 2
+						136 image
+						137 text TÀI LIỆU
+						138 text 0
+						139 image
+						140 text ĐÃ CHẤP NHẬN
+						141 text 0
+						142 image
+						143 text ĐANG CHỜ
+						144 text 2
+						145 image
+						146 text field (settable)
+						147 text LỌC MINH CHỨNG
+						148 container Lọc minh chứng
+							149 checkbox Tất cả 2, Value: 1
+								150 image
+								151 text Tất cả
+								152 text 2
+							153 checkbox Ảnh 2, Value: 0
+							154 checkbox Tài liệu 0, Value: 0
+							155 checkbox Đang chờ 2, Value: 0
+							156 checkbox Đã duyệt 0, Value: 0
+							157 checkbox Từ chối 0, Value: 0
+						158 text THAO TÁC
+						159 text MINH CHỨNG
+						160 text LOẠI
+						161 text PHẠM VI HIỂN THỊ
+						162 text TRẠNG THÁI
+						163 button Xem ảnh
+							164 image
+							165 text Xem ảnh
+						166 button Xem chi tiết hồ sơ [Synthetic] Gradient BM04/BM07
+							167 image [Synthetic] Gradient BM04/BM07
+							168 text [Synthetic] Gradient BM04/BM07
+							169 text Ảnh · Nội bộ · image/png · 5.9 KB
+						170 text Ảnh
+						171 text Nội bộ
+						172 text Đã gửi
+						173 button Xem ảnh
+							174 image
+							175 text Xem ảnh
+						176 button Xem chi tiết hồ sơ [Synthetic] Ảnh màu thử biểu mẫu
+							177 image [Synthetic] Ảnh màu thử biểu mẫu
+							178 text [Synthetic] Ảnh màu thử biểu mẫu
+							179 text Ảnh · Nội bộ · image/png · 68 B
+						180 text Ảnh
+						181 text Nội bộ
+						182 text Đã gửi
+			183 text VIỆC CẦN LÀM
+			184 heading Hồ sơ đã chốt · Có thể chỉnh sửa, Value: 3
+				185 text Hồ sơ đã chốt · Có thể chỉnh sửa
+			186 button Hoàn tất, Help: Hoàn tất đầu việc khi đủ minh chứng bắt buộc.
+			187 button (collapsed) Thêm ghi chú / lý do, Secondary Actions: Expand
+			188 button (collapsed) Thao tác khác, Secondary Actions: Expand
+				189 text Thao tác khác
+				190 image
+			191 image
+			192 text TRẠNG THÁI
+			193 text Đang xử lý
+			194 image
+			195 text PHỤ TRÁCH
+			196 text PM
+			197 image
+			198 text HẠN XỬ LÝ
+			199 text -
+			200 image
+			201 text HOẠT ĐỘNG GẦN NHẤT
+			202 text Consflow Admin · 23:51 09-10-2026
+			203 button Chỉnh sửa
+				204 image
+				205 text Chỉnh sửa
+			206 link Description: Mở công trình, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2
+			207 button Đóng
+		39 container
+			40 button (collapsed) Description: Mở danh sách trao đổi, 0 tin mới, Secondary Actions: Expand
+				41 image
+				42 text Trao đổi
+				43 text 0
+			44 button (collapsed) Làm ngay 15, Secondary Actions: Expand
+				45 image
+				46 text Làm ngay
+				47 text 15
+
+The focused UI element is 315 button (expanded) Thông tin bổ sungKhông bắt buộc · 4 mục, Secondary Actions: Collapse

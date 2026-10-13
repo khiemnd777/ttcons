@@ -1,3 +1,4 @@
+import { constructionReportWeatherLabel } from '../operations/constructionWeatherPresentation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dateTimeText as formatDateTime } from '../../lib/utils/format';
@@ -25,6 +26,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, post } from '../../lib/api/client';
+import { downloadNativeReportExcel, nativeReportExcelPath } from '../_shared/bmgsExport';
 import type { EvidenceRecord, WorkReportDetail, WorkReportEvent, WorkReportRevision, WorkReportStatus } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
@@ -39,6 +41,7 @@ type WorkReportReviewDialogProps = {
   detail: WorkReportDetail | null;
   loading: boolean;
   error: unknown;
+  initialRevisionNo?: number | null;
   userID: string;
   canReview: boolean;
   canManage: boolean;
@@ -53,6 +56,7 @@ export function WorkReportReviewDialog({
   detail,
   loading,
   error,
+  initialRevisionNo,
   userID,
   canReview,
   canManage,
@@ -64,7 +68,7 @@ export function WorkReportReviewDialog({
   const navigate = useNavigate();
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<ReviewTab>('content');
-  const [selectedRevisionNo, setSelectedRevisionNo] = useState(0);
+  const [selectedRevisionNo, setSelectedRevisionNo] = useState(initialRevisionNo ?? 0);
   const [reviewComment, setReviewComment] = useState('');
   const [busyAction, setBusyAction] = useState('');
   const [reviewCommentInvalid, setReviewCommentInvalid] = useState(false);
@@ -73,14 +77,15 @@ export function WorkReportReviewDialog({
   const currentRevisionNo = Number(detail?.current_revision_no ?? 0);
   const revisions = useMemo(() => detail?.revisions ?? [], [detail?.revisions]);
   const selectedRevision = useMemo(
-    () => revisions.find((revision) => Number(revision.revision_no) === selectedRevisionNo) ?? revisions.find((revision) => Number(revision.revision_no) === currentRevisionNo) ?? null,
+    () => selectedRevisionNo > 0 ? revisions.find((revision) => Number(revision.revision_no) === selectedRevisionNo) ?? null : revisions.find((revision) => Number(revision.revision_no) === currentRevisionNo) ?? null,
     [currentRevisionNo, revisions, selectedRevisionNo],
   );
+  const revisionUnavailable = initialRevisionNo === null || Boolean(detail && !loading && selectedRevisionNo > 0 && !selectedRevision);
   const selectedSnapshot = selectedRevision?.snapshot_json ?? detail ?? {};
   const view = useMemo(() => constructionReportViewModel(selectedSnapshot), [selectedSnapshot]);
   const selectedEvidence = selectedRevision?.evidence_records ?? [];
   const isCurrentRevision = !selectedRevision || Number(selectedRevision.revision_no) === currentRevisionNo;
-  const reviewCapabilities = workReportReviewCapabilities({ current: isCurrentRevision, ready: Boolean(detail) && !loading && !error, status: detail?.status, capabilities: detail?.capabilities, canReview, canManage, recipientID: detail?.recipient_id, userID });
+  const reviewCapabilities = workReportReviewCapabilities({ current: isCurrentRevision, ready: Boolean(detail) && !loading && !error && !revisionUnavailable, status: detail?.status, capabilities: detail?.capabilities, canReview, canManage, recipientID: detail?.recipient_id, userID });
   const mayReview = reviewCapabilities.acknowledge || reviewCapabilities.requestChanges;
 
   const evidenceFilePath = useCallback((record: EvidenceRecord) => {
@@ -91,10 +96,10 @@ export function WorkReportReviewDialog({
   useEffect(() => {
     if (!open) return;
     setActiveTab('content');
-    setSelectedRevisionNo(Number(detail?.current_revision_no ?? 0));
+    setSelectedRevisionNo(initialRevisionNo ?? Number(detail?.current_revision_no ?? 0));
     setReviewComment('');
     setReviewCommentInvalid(false);
-  }, [detail?.source_id, open]);
+  }, [detail?.source_id, open, initialRevisionNo]);
 
   useEffect(() => {
     if (!open || !detail) return;
@@ -140,12 +145,22 @@ export function WorkReportReviewDialog({
     setActiveTab('content');
   }
 
+  async function exportExcel() {
+    if (!canExport || !detail?.work_report_id || !selectedRevision || loading || error || revisionUnavailable || busyAction) return;
+    setBusyAction('excel');
+    try {
+      await downloadNativeReportExcel(nativeReportExcelPath({workReportId: detail.work_report_id, revisionNo: Number(selectedRevision.revision_no)}), `bao-cao-BM-GS-02-lan-${selectedRevision.revision_no}.xlsx`);
+      toast.success(`Đã xuất Excel lần gửi ${selectedRevision.revision_no}`);
+    } catch (requestError) { toast.error('Không xuất được Excel báo cáo', requestError); }
+    finally { setBusyAction(''); }
+  }
+
   function openSource() {
     if (!detail) return;
     navigate(`/projects/${detail.project_id}/operations?tab=timeline&report=${encodeURIComponent(detail.source_id)}`);
   }
 
-  const footer = detail && !loading && !error ? (
+  const footer = detail && !loading && !error && !revisionUnavailable ? (
     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
       {canOpenSource ? (
         <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" onClick={openSource}>
@@ -153,6 +168,7 @@ export function WorkReportReviewDialog({
         </button>
       ) : <span />}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {canExport && selectedRevision ? <button type="button" disabled={Boolean(busyAction)} className="inline-flex items-center justify-center gap-2 rounded-md border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-60" onClick={() => void exportExcel()}><Download className="h-4 w-4" />{busyAction === 'excel' ? 'Đang xuất…' : 'Xuất báo cáo'}</button> : null}
         {reviewCapabilities.discuss ? <button type="button" className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700" onClick={() => navigate(`/projects/${detail.project_id}/discussion`)}>Trao đổi</button> : null}
         {!isCurrentRevision && currentRevisionNo > 0 ? (
           <button type="button" className="rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={() => setSelectedRevisionNo(currentRevisionNo)}>Về bản hiện tại</button>
@@ -182,7 +198,7 @@ export function WorkReportReviewDialog({
     >
       {loading ? (
         <div className="grid min-h-80 place-items-center"><LoadingSpinner label="Đang tải báo cáo và minh chứng..." /></div>
-      ) : error ? (
+      ) : revisionUnavailable && !error ? <p role="alert" className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">Không tìm thấy lần gửi đã chọn hoặc anh không có quyền xem lần gửi này.</p> : error ? (
         <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-6 text-center">
           <AlertTriangle className="h-8 w-8 text-rose-500" />
           <h3 className="mt-3 font-semibold text-rose-900">Không tải được báo cáo</h3>
@@ -191,7 +207,7 @@ export function WorkReportReviewDialog({
         </div>
       ) : detail ? (
         <div ref={contentRef} className="space-y-5">
-          <ReportSummary detail={detail} revision={selectedRevision} view={view} />
+          <ReportSummary detail={detail} revision={selectedRevision} view={view} weather={selectedSnapshot.weather} />
           <section className="rounded-lg border border-line p-3" aria-label="Xác nhận đã xem theo người nhận và lần gửi">
             <h3 className="text-sm font-semibold">Đã xem · Lần {selectedRevision?.revision_no ?? currentRevisionNo}</h3>
             {(detail.read_receipts ?? []).filter((receipt) => receipt.revision_no === Number(selectedRevision?.revision_no ?? currentRevisionNo)).map((receipt) => <p key={receipt.user_id} className="mt-1 text-sm text-slate-600">{receipt.user_name}{receipt.user_id === userID ? ' (tôi)' : ''} · {dateTimeText(receipt.acknowledged_at)}{receipt.comment ? ` · ${receipt.comment}` : ''}</p>)}
@@ -250,22 +266,22 @@ export function WorkReportReviewDialog({
   );
 }
 
-function ReportSummary({ detail, revision, view }: { detail: WorkReportDetail; revision: WorkReportRevision | null; view: ReturnType<typeof constructionReportViewModel> }) {
+function ReportSummary({ detail, revision, view, weather }: { weather: unknown; detail: WorkReportDetail; revision: WorkReportRevision | null; view: ReturnType<typeof constructionReportViewModel> }) {
   return (
     <section className="overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-white to-white">
       <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-center">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-ink ring-1 ring-inset ring-blue-100"><CalendarDays className="h-4 w-4 text-blue-600" /> {dateText(view.reportDate || detail.report_date)}</span>
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-sm text-slate-700 ring-1 ring-inset ring-blue-100"><CloudSun className="h-4 w-4 text-amber-500" /> {view.weather || 'Chưa ghi thời tiết'}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-sm text-slate-700 ring-1 ring-inset ring-blue-100"><CloudSun className="h-4 w-4 text-amber-500" /> {constructionReportWeatherLabel(weather)}</span>
             <span className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">{sourceKindLabel(view.sourceKind)}</span>
             <span className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-blue-100">Lần {(revision?.revision_no ?? detail.current_revision_no) || '—'}</span>
           </div>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Ưu tiên đọc kết quả trong ngày, đối chiếu minh chứng hiện trường, sau đó xác nhận đã xem hoặc trả lại với nội dung cần bổ sung.</p>
         </div>
         <div>
-          <div className="mb-2 flex items-end justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ ghi nhận</span><strong className="text-2xl text-blue-700">{view.progressPercent}%</strong></div>
-          <div className="h-2.5 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-label="Tiến độ ghi nhận" aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.progressPercent}><div className="h-full rounded-full bg-blue-600" style={{ width: `${view.progressPercent}%` }} /></div>
+          <div className="mb-2 flex items-end justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ ghi nhận</span><strong className="text-2xl text-blue-700">{view.hasProgress ? `${view.progressPercent}%` : 'Chưa ghi tiến độ'}</strong></div>
+          {view.hasProgress ? <div className="h-2.5 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-label="Tiến độ ghi nhận" aria-valuemin={0} aria-valuemax={100} aria-valuenow={view.progressPercent}><div className="h-full rounded-full bg-blue-600" style={{ width: `${view.progressPercent}%` }} /></div> : null}
         </div>
       </div>
     </section>
@@ -280,8 +296,8 @@ function ReportContent({ view, evidence, filePath }: { view: ReturnType<typeof c
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <WorkGroup title="Đã làm" items={view.done} tone="emerald" empty="Chưa ghi hạng mục hoàn tất" />
           <WorkGroup title="Đang làm" items={view.current} tone="blue" empty="Không có hạng mục đang thực hiện" />
-          <WorkGroup title="Sẽ làm" items={view.next} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" />
-          <WorkGroup title="Vấn đề / trở ngại" items={view.timelineProblems} tone="rose" empty="Không có vấn đề được ghi nhận" />
+          <WorkGroup title="Sẽ làm" items={view.nextDetails} tone="slate" empty="Chưa ghi kế hoạch tiếp theo" />
+          <WorkGroup title="Vấn đề / trở ngại" items={view.blockerDetails.length ? view.blockerDetails : view.timelineProblems} tone="rose" empty="Không có vấn đề được ghi nhận" />
         </div>
       </section>
 
@@ -305,6 +321,8 @@ function ReportContent({ view, evidence, filePath }: { view: ReturnType<typeof c
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <ResourceCard icon={<Users className="h-4 w-4" />} title="Nhân lực / tổ đội" items={view.crew} empty="Chưa ghi nhân lực" />
           <ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" items={view.materials} empty="Chưa ghi vật tư" />
+          {view.materialArrivals.length ? <ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư nhập trường" items={view.materialArrivals} empty="" /> : null}
+          {view.supervision.length ? <ResourceCard icon={<CheckCircle2 className="h-4 w-4" />} title="Nội dung giám sát" items={view.supervision} empty="" /> : null}
         </div>
       </section>
 

@@ -1,0 +1,30 @@
+{
+  "id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+  "template_id": "0e819dac-0fef-47e5-b776-77c325bfecbb",
+  "version_no": 5,
+  "status": "published",
+  "schema_json": {
+    "code": "builtin_construction_daily_report",
+    "source": "builtin",
+    "variant": "operational_capture_v3",
+    "capture_policy": "business_input_only",
+    "source_revision": 7,
+    "native_capture_revision": 1,
+    "native_daily_blocker_revision": 1,
+    "native_risk_assignment_revision": 1
+  },
+  "validation_json": {
+    "phase": "construction",
+    "evidence_scope": "work_item",
+    "source_template_id": "40000000-0000-0000-0000-000000000026",
+    "material_usage_mode": "report_only",
+    "optional_section_label": "Thông tin bổ sung",
+    "source_form_version_id": "26001450-84df-438b-924f-5d6d97cd6d9f",
+    "creates_work_items_from": "next_plan_items"
+  },
+  "published_at": "2026-10-09T08:30:47.69548+00:00",
+  "created_by": null,
+  "created_at": "2026-10-09T08:30:47.69548+00:00",
+  "updated_at": "2026-10-09T08:30:47.69548+00:00",
+  "definition_hash": null
+}

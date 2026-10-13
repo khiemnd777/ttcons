@@ -1,0 +1,30 @@
+BÁO CÁO THI CÔNG
+NGÀY BÁO CÁO
+12-10-2026
+Báo cáo công việc trong ngày
+CÔNG TRÌNH
+[Synthetic Development] BM04 source location
+Người lập Người nhận
+Consflow Admin [Synthetic] BM02 người nhận — 2026-10-12
+Lần gửi Gửi lúc
+01 10:09 12-10-2026
+TIẾN ĐỘ GHI NHẬN THỜI TIẾT
+25% [Synthetic] Nắng — Lần 1
+01 CÔNG VIỆC TRONG NGÀY
+ĐÃ LÀM
+• [Synthetic] LẦN 1 — Kiểm tra
+bề mặt ô BM02
+ĐANG LÀM
+Chưa ghi nhận
+SẼ LÀM
+Chưa ghi nhận
+02 VẤN ĐỀ VÀ TRỞ NGẠI
+Chưa ghi nhận vấn đề hoặc trở ngại.
+03 NGUỒN LỰC
+Nhân lực [Synthetic] Tổ thử BM02 · 3 người · 8 giờ
+Vật tư sử dụng Chưa ghi nhận
+04 GHI CHÚ HIỆN TRƯỜNG
+[Synthetic] NỘI DUNG LẦN 1 — Giữ nguyên nội dung và ảnh khi xem lại lần gửi cũ.
+ĐỐI CHIẾU BẢN GỬI
+SHA-256: b9006547ae54b475a46423ced5db9cfa7a857bd909babf99de08778c3d649349
+Báo cáo ngày 12-10-2026 · Lần gửi 01 Trang 1/1

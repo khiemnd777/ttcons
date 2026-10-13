@@ -1,0 +1,21 @@
+{
+  "checksum_sha256": "97110eb8e64beb50b66a6fb989d1ef08bceca657c7e470421169fe369081ae2b",
+  "created_at": "2026-10-13T00:17:45Z",
+  "document_type": "signed_contract_scan",
+  "file_size": 40181,
+  "file_url": null,
+  "id": "e6747ac4-bb1a-4c4f-bf9b-a502451e29a0",
+  "mime_type": "application/pdf",
+  "name": "[Synthetic] Returned internal UAT signed PDF",
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "release_status": "released",
+  "released_at": "2026-10-13T00:17:45Z",
+  "released_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "revision_no": 1,
+  "status": "active",
+  "storage_key": "project-documents/432115cb-bd5b-4fae-9edc-74ce031eacf3/contract_returned_scan/79ebb2bf-5bf9-47d7-ae16-6d073556eab4/10b11e40-cf5b-4b6c-b320-a48c06c6d2e6.pdf",
+  "storage_provider": "local",
+  "target_id": "79ebb2bf-5bf9-47d7-ae16-6d073556eab4",
+  "target_type": "contract_returned_scan",
+  "uploaded_by": "f5250196-91bb-4df6-9666-b318a7036b42"
+}

@@ -1,0 +1,183 @@
+{
+  "answers": {
+    "material_items": [
+      {
+        "accepted_quantity": 25,
+        "decision": "accepted",
+        "delivered_quantity": 25,
+        "material": "[Synthetic] Waterproof test floor",
+        "unit": "m2"
+      }
+    ]
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Canonical Development source capture",
+      "created_at": "2026-10-13T02:13:10Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "ffcd7dcc-8387-49dd-a5e0-47f76bde51ad",
+      "instance_id": "b8c951f6-7634-4660-81d1-cdbf1b3885bb",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "b6cdcf60-a200-4ecf-a306-53f25a110733"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:56:15Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "bdd3d552-4531-4325-a46c-869264f8c5c0",
+      "instance_id": "b8c951f6-7634-4660-81d1-cdbf1b3885bb",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "b6cdcf60-a200-4ecf-a306-53f25a110733"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "material_items",
+      "field_type": "structured_list",
+      "form_version_id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+      "help_text": null,
+      "id": "b577ca76-24d4-49bc-a986-b881b034a83f",
+      "label": "Vật tư nghiệm thu",
+      "options_json": [],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {
+        "item_fields": [
+          {
+            "key": "material",
+            "label": "Vật tư",
+            "max_length": 160,
+            "min_length": 2,
+            "required": true,
+            "type": "text"
+          },
+          {
+            "key": "delivered_quantity",
+            "label": "KL giao",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "accepted_quantity",
+            "label": "KL nhận",
+            "min": 0,
+            "required": false,
+            "type": "number"
+          },
+          {
+            "key": "unit",
+            "label": "ĐVT",
+            "max_length": 30,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "decision",
+            "label": "Quyết định",
+            "options": [
+              {
+                "label": "Nhận",
+                "value": "accepted"
+              },
+              {
+                "label": "Nhận có điều kiện",
+                "value": "conditional"
+              },
+              {
+                "label": "Từ chối",
+                "value": "rejected"
+              }
+            ],
+            "required": true,
+            "type": "select"
+          }
+        ],
+        "max_items": 200,
+        "min_items": 1
+      },
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {
+      "material_items": [
+        {
+          "accepted_quantity": 25,
+          "decision": "accepted",
+          "delivered_quantity": 25,
+          "material": "[Synthetic] Waterproof test floor",
+          "unit": "m2"
+        }
+      ]
+    },
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:56:15Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 0,
+    "form_code": "client_material_incoming_acceptance_summary",
+    "form_description": "Tóm tắt nghiệm thu vật tư, chênh lệch đầu vào/đầu ra và minh chứng kiểm nhận.",
+    "form_name": "Nghiệm thu vật tư đầu vào / đầu ra",
+    "form_template_id": "003050d0-0a06-4a6a-aee5-56cead1bf1bf",
+    "form_type": "generic_submission",
+    "form_version_id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+    "form_version_no": 3,
+    "form_version_status": "published",
+    "id": "b8c951f6-7634-4660-81d1-cdbf1b3885bb",
+    "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "QA/QC"
+    ],
+    "run_node_id": "746724b1-60c1-418e-8710-3f41880eda1b",
+    "run_step_id": "a31ecff8-e57d-4bbe-90fd-d28385abd42b",
+    "status": "draft",
+    "submitted_at": null,
+    "submitted_by": null,
+    "template_step_id": "61a77f55-4b0f-44a3-a4cc-1d4be88f6f7b",
+    "title": "Nghiệm thu vật tư đầu vào",
+    "updated_at": "2026-10-13T02:13:10Z",
+    "work_item_id": "b6cdcf60-a200-4ecf-a306-53f25a110733",
+    "work_item_status": "in_progress",
+    "work_item_title": "Nghiệm thu vật tư đầu vào"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [],
+  "template": {
+    "code": "client_material_incoming_acceptance_summary",
+    "description": "Tóm tắt nghiệm thu vật tư, chênh lệch đầu vào/đầu ra và minh chứng kiểm nhận.",
+    "form_type": "generic_submission",
+    "id": "003050d0-0a06-4a6a-aee5-56cead1bf1bf",
+    "name": "Nghiệm thu vật tư đầu vào / đầu ra"
+  },
+  "version": {
+    "id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+    "status": "published",
+    "version_no": 3
+  }
+}

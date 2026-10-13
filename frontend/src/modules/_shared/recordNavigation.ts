@@ -18,6 +18,8 @@ export const recordKinds = {
   audit: { label: 'Sự kiện hệ thống', permissions: ['audit.view'] },
   incoming_acceptance: { label: 'Nghiệm thu đầu vào', permissions: ['acceptance.view', 'operation.view', 'warehouse.view'] },
   contract: { label: 'Hợp đồng', permissions: ['contract.view'] },
+  daily_report: { label: 'Báo cáo thi công', permissions: ['operation.view'] },
+  action: { label: 'Việc cần xử lý', permissions: ['operation.view', 'quality.view', 'rework.view'] },
   issue: { label: 'Vấn đề công trình', permissions: ['operation.view'] },
 } as const;
 
@@ -43,6 +45,7 @@ export function recordPath(target: RecordTarget): string | null {
     acceptance: `${project}/acceptance`, handover: `${project}/handover`, stock_document: `${project}/warehouse`,
     rework: '/rework', replanning: '/rework',
     partner: `/core-data/${target.partnerGroup ?? 'output'}`, role: '/roles', audit: `${project}/audit`, contract: `${project}/contracts`,
+    daily_report: `${project}/operations`, action: `${project}/operations`,
   };
   if (target.kind === 'work_item') return `${project}/work-items/${target.id}`;
   if (['planning_daily_report', 'meeting_minutes', 'planning_checklist'].includes(target.kind)) {
@@ -50,6 +53,8 @@ export function recordPath(target: RecordTarget): string | null {
   }
   if (target.kind === 'stock_document') params.set('tab', 'documents');
   if (target.kind === 'supplier_quotation') params.set('tab', 'quotes');
+  if (target.kind === 'daily_report') params.set('tab', 'timeline');
+  if (target.kind === 'action') params.set('tab', 'actions');
   const path = paths[target.kind];
   return path ? `${path}?${params}` : `/source-records/${target.kind}/${target.id}?project_id=${target.projectId}`;
 }
@@ -68,7 +73,7 @@ export class RecordUnavailable extends Error {
 }
 
 /** These reads keep the source endpoint's authorization and never execute a mutation. */
-export function recordRead(target: RecordTarget): { path: string; collection?: 'array' | 'items' } {
+export function recordRead(target: RecordTarget): { path: string; collection?: 'array' | 'items' | 'actions' } {
   if (!validRecordTarget(target)) throw new RecordUnavailable();
   const id = target.id;
   const project = target.projectId;
@@ -78,9 +83,11 @@ export function recordRead(target: RecordTarget): { path: string; collection?: '
   };
   if (direct[target.kind]) return { path: `${direct[target.kind]}/${id}` };
   if (target.kind === 'audit') return { path: `/audit-logs?record_id=${id}${project ? `&project_id=${project}` : ''}`, collection: 'items' };
+  if (target.kind === 'action') return {path: `/projects/${project}/construction-workspace`, collection: 'actions'};
   const lists: Partial<Record<RecordKind, string>> = {
     partner: '/partners?status=all', role: '/roles', stock_movement: `/stock/movements?project_id=${project}`,
     rework: `/projects/${project}/reworks`, replanning: `/projects/${project}/replannings`, issue: `/projects/${project}/issues`,
+    daily_report: `/projects/${project}/daily-reports`,
   };
   if (!lists[target.kind]) throw new RecordUnavailable();
   return { path: lists[target.kind]!, collection: 'array' };
@@ -92,7 +99,7 @@ export function selectSourceRecord(target: RecordTarget, payload: unknown): Reco
     && String(row.id).toLowerCase() === target.id.toLowerCase()
     && (['partner', 'role'].includes(target.kind) || !target.projectId || String(row.project_id).toLowerCase() === target.projectId.toLowerCase())
     && !['cancelled', 'deleted'].includes(row.status) && !row.deleted_at;
-  const rows = collection === 'items' ? (payload as { items?: unknown[] })?.items : payload;
+  const rows = collection === 'items' ? (payload as { items?: unknown[] })?.items : collection === 'actions' ? (payload as {actions?: unknown[]})?.actions : payload;
   const row = collection ? Array.isArray(rows) ? rows.find(matches) : undefined : matches(payload) ? payload : undefined;
   if (!row) throw new RecordUnavailable();
   return row as Record<string, any>;

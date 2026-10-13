@@ -1,0 +1,245 @@
+{
+  "builtin": {
+    "name": "[Synthetic Development] BM03 checklist hợp lệ",
+    "code": "DEV-BUILTIN-BM0308-20261013",
+    "nodes": [
+      {
+        "business_code": "incoming_acceptance",
+        "name": "Nghiệm thu Đầu Vào",
+        "description": "Hai gói nghiệm thu kỹ thuật: thầu phụ/khối lượng và vật tư; tài chính không chặn tiến độ kỹ thuật.",
+        "type": "incoming_acceptance",
+        "order_index": 1,
+        "responsible_role_ids": [
+          "QA/QC"
+        ],
+        "required_permission": "acceptance.approve",
+        "permissions": [
+          "acceptance.view",
+          "acceptance.create",
+          "acceptance.approve",
+          "project_finance.view",
+          "project_finance.cost_create",
+          "project_finance.request_create"
+        ],
+        "entry_conditions": {},
+        "exit_conditions": {
+          "text": "Nghiệm thu kỹ thuật đầu vào đã hoàn tất"
+        },
+        "approval_rule": null,
+        "approval_policy_json": {},
+        "rework_enabled": true,
+        "replanning_enabled": true,
+        "fail_path": "rework",
+        "status": "active",
+        "steps": [
+          {
+            "business_code": "incoming.subcontractor_checklist",
+            "name": "[Synthetic] BM03 checklist thầu phụ có sẵn",
+            "description": "QS tổng hợp checklist và khối lượng thầu phụ; trạng thái nguồn được kiểm tra trước khi chốt.",
+            "step_type": "acceptance_check",
+            "required_role_ids": [
+              "QS"
+            ],
+            "required_permission": "acceptance.create",
+            "checklist_required": true,
+            "document_required": false,
+            "photo_required": false,
+            "form_version_id": "61e9bf6c-33fb-4e62-ad98-5dc6d9cdba19",
+            "form_required": true,
+            "surface_kind": "subcontractor_reconciliation",
+            "domain_action_key": "source.subcontractor_reconciliation_ready",
+            "order_index": 1
+          }
+        ]
+      }
+    ]
+  },
+  "client": {
+    "name": "[Synthetic Development] BM03 gói client độc lập",
+    "code": "DEV-CLIENT-BM0308-20261013",
+    "nodes": [
+      {
+        "business_code": "incoming_acceptance",
+        "name": "Nghiệm thu Đầu Vào",
+        "description": "Hai gói nghiệm thu kỹ thuật: thầu phụ/khối lượng và vật tư; tài chính không chặn tiến độ kỹ thuật.",
+        "type": "incoming_acceptance",
+        "order_index": 1,
+        "responsible_role_ids": [
+          "QA/QC"
+        ],
+        "required_permission": "acceptance.approve",
+        "permissions": [
+          "acceptance.view",
+          "acceptance.create",
+          "acceptance.approve",
+          "project_finance.view",
+          "project_finance.cost_create",
+          "project_finance.request_create"
+        ],
+        "entry_conditions": {},
+        "exit_conditions": {
+          "text": "Nghiệm thu kỹ thuật đầu vào đã hoàn tất"
+        },
+        "approval_rule": null,
+        "approval_policy_json": {},
+        "rework_enabled": true,
+        "replanning_enabled": true,
+        "fail_path": "rework",
+        "status": "active",
+        "steps": [
+          {
+            "business_code": "incoming.subcontractor_package",
+            "name": "Nghiệm thu gói thầu phụ và khối lượng",
+            "description": "QS tổng hợp checklist và khối lượng thầu phụ; trạng thái nguồn được kiểm tra trước khi chốt.",
+            "step_type": "acceptance_check",
+            "required_role_ids": [
+              "QS"
+            ],
+            "required_permission": "acceptance.create",
+            "checklist_required": true,
+            "document_required": false,
+            "photo_required": false,
+            "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+            "form_required": true,
+            "surface_kind": "subcontractor_reconciliation",
+            "domain_action_key": "source.subcontractor_acceptance_package_ready",
+            "order_index": 1
+          }
+        ]
+      }
+    ]
+  },
+  "handover": {
+    "name": "[Synthetic Development] BM08 nghiệm thu cuối và bàn giao",
+    "code": "DEV-HANDOVER-BM0308-20261013",
+    "nodes": [
+      {
+        "business_code": "outgoing_acceptance",
+        "name": "Nghiệm thu Đầu Ra",
+        "description": "Một gói nghiệm thu cuối và đối chiếu chủ đầu tư; tài chính được theo dõi ngoài critical path.",
+        "type": "acceptance",
+        "order_index": 1,
+        "responsible_role_ids": [
+          "QA/QC"
+        ],
+        "required_permission": "acceptance.approve",
+        "permissions": [
+          "acceptance.view",
+          "acceptance.create",
+          "acceptance.approve",
+          "project_finance.view",
+          "project_finance.request_create"
+        ],
+        "entry_conditions": {},
+        "exit_conditions": {
+          "text": "Nghiệm thu cuối và đối chiếu chủ đầu tư đã hoàn tất"
+        },
+        "approval_rule": null,
+        "approval_policy_json": {},
+        "rework_enabled": true,
+        "replanning_enabled": true,
+        "fail_path": "rework",
+        "status": "active",
+        "steps": [
+          {
+            "business_code": "outgoing.final_package",
+            "name": "Chốt gói nghiệm thu cuối",
+            "description": "QA/QC chốt đối chiếu chủ đầu tư và hồ sơ nghiệm thu cuối đạt.",
+            "step_type": "acceptance_check",
+            "required_role_ids": [
+              "QA/QC"
+            ],
+            "required_permission": "acceptance.approve",
+            "checklist_required": true,
+            "document_required": false,
+            "photo_required": false,
+            "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+            "form_required": true,
+            "surface_kind": "owner_client_reconciliation",
+            "domain_action_key": "source.final_acceptance_package_ready",
+            "order_index": 1
+          }
+        ]
+      },
+      {
+        "business_code": "handover_finance",
+        "name": "Bàn giao công trình và hồ sơ kế toán",
+        "description": "Bàn giao vật lý được hoàn tất độc lập; hồ sơ thương mại đủ điều kiện được bàn giao và Kế toán xác nhận tiếp nhận.",
+        "type": "financial_closure",
+        "order_index": 2,
+        "responsible_role_ids": [
+          "PM"
+        ],
+        "required_permission": "handover.view",
+        "permissions": [
+          "handover.view",
+          "handover.approve",
+          "accounting_handoff.view",
+          "accounting_handoff.acknowledge"
+        ],
+        "entry_conditions": {},
+        "exit_conditions": {
+          "accounting_handoff_included": true,
+          "handover_included": true,
+          "separate_gates": true,
+          "text": "Bàn giao vật lý và bàn giao hồ sơ kế toán đã hoàn tất"
+        },
+        "approval_rule": "Kế toán và Giám đốc xác nhận hồ sơ quản trị",
+        "approval_policy_json": {
+          "comment_required": true,
+          "mode": "any",
+          "quorum": 1,
+          "requester_cannot_approve": true,
+          "roles": [
+            "Kế toán",
+            "PM",
+            "Giám đốc"
+          ],
+          "signature_required": false
+        },
+        "rework_enabled": false,
+        "replanning_enabled": false,
+        "fail_path": "none",
+        "status": "active",
+        "steps": [
+          {
+            "business_code": "closure.handover",
+            "name": "Hoàn tất bàn giao vật lý",
+            "description": "PM hoàn tất hồ sơ bàn giao sau khi chất lượng, tồn tại và vật tư dư đã đóng; tài chính không chặn bước này.",
+            "step_type": "handover_check",
+            "required_role_ids": [
+              "PM"
+            ],
+            "required_permission": "handover.approve",
+            "checklist_required": false,
+            "document_required": false,
+            "photo_required": false,
+            "form_version_id": null,
+            "form_required": false,
+            "surface_kind": "handover",
+            "domain_action_key": "source.handover_completed",
+            "order_index": 1
+          },
+          {
+            "business_code": "closure.finance",
+            "name": "Xác nhận bàn giao hồ sơ kế toán",
+            "description": "Kế toán xác nhận đã tiếp nhận toàn bộ hồ sơ mua sắm và mốc thu đủ điều kiện; hạch toán, hóa đơn, thuế và thanh toán tiếp tục thực hiện trên MISA.",
+            "step_type": "accounting_check",
+            "required_role_ids": [
+              "Kế toán"
+            ],
+            "required_permission": "accounting_handoff.acknowledge",
+            "checklist_required": false,
+            "document_required": false,
+            "photo_required": false,
+            "form_version_id": null,
+            "form_required": false,
+            "surface_kind": "finance",
+            "domain_action_key": "source.accounting_handoff_close_ready",
+            "order_index": 2
+          }
+        ]
+      }
+    ]
+  }
+}

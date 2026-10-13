@@ -7,19 +7,19 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import { canOpenRecord, isRecordKind, loadSourceRecord, RecordUnavailable, type RecordKind, type RecordTarget } from './recordNavigation';
 
 /** Apply an exact authorized source once per URL identity, independent of list filters/paging. */
-export function useRecordDeepLink({ kind, projectId, onOpen }: { kind: RecordKind; projectId?: string; onOpen: (row: any) => void }) {
+export function useRecordDeepLink({ kind, projectId, requestContext = '', onOpen }: { kind: RecordKind; projectId?: string; requestContext?: string; onOpen: (row: any) => void }) {
   const [params, setParams] = useSearchParams();
   const { user, hasPermission } = useAuth();
   const requested = params.get('record');
   const requestedKind = params.get('record_type') || kind;
   const active = requested !== null && requestedKind === kind;
   const target: RecordTarget = { kind, id: requested ?? '', projectId: projectId || params.get('project_id') || undefined };
-  const key = `${user?.id}:${kind}:${target.projectId ?? ''}:${requested}`;
+  const key = `${user?.id}:${kind}:${target.projectId ?? ''}:${requested}:${requestContext}`;
   const applied = useRef('');
   const callback = useRef(onOpen);
   callback.current = onOpen;
   const query = useQuery({
-    queryKey: ['record-link', user?.id, kind, target.projectId, requested],
+    queryKey: ['record-link', user?.id, kind, target.projectId, requested, requestContext],
     queryFn: () => {
       if (!canOpenRecord(target, hasPermission)) throw new RecordUnavailable();
       return loadSourceRecord(target, get);
@@ -38,7 +38,7 @@ export function useRecordDeepLink({ kind, projectId, onOpen }: { kind: RecordKin
   }, { replace: true });
   const error = active ? query.error : null;
   const unavailable = error instanceof RecordUnavailable || error instanceof ApiError && [401, 403, 404, 410].includes(error.status);
-  const companion: Partial<Record<RecordKind, RecordKind>> = { boq_item: 'supplier_quotation', supplier_quotation: 'boq_item', rework: 'replanning', replanning: 'rework' };
+  const companion: Partial<Record<RecordKind, RecordKind>> = { boq_item: 'supplier_quotation', supplier_quotation: 'boq_item', rework: 'replanning', replanning: 'rework', daily_report: 'action', action: 'daily_report' };
   const unknownKind = requested !== null && (!isRecordKind(requestedKind) || requestedKind !== kind && requestedKind !== companion[kind])
     && !['supplier_quotation', 'replanning'].includes(kind);
   const feedback = <Dialog manageFocus open={unknownKind || active && (query.isPending || query.isFetching || Boolean(error))} title="Mở hồ sơ" onClose={dismiss} size="md">

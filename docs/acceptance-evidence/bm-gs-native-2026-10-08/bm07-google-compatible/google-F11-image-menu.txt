@@ -1,0 +1,202 @@
+Browser tab: 334096665, Title: "BM07 — File tải trực tiếp từ Xuất báo cáo — Đã sửa tương thích 2026-10-08 - Google Sheets", URL: "https://docs.google.com/spreadsheets/d/1vjzyxWF5ImPpx7Atjr03w2QaYH6RaCNREkJv6rEkjJk/edit?gid=349641001#gid=349641001".
+0 AXWebArea BM07 — File tải trực tiếp từ Xuất báo cáo — Đã sửa tương thích 2026-10-08 - Google Sheets, URL: docs.google.com/spreadsheets/d/1vjzyxWF5ImPpx7Atjr03w2QaYH6RaCNREkJv6rEkjJk/edit?gid=349641001#gid=349641001
+	1 container
+		2 container Description: Menu bar, ID: docs-chrome
+			3 container docs-header
+				4 link Description: Sheets home, Value: docs.google.com/spreadsheets/u/0/?authuser=0&usp=sheets_web, ID: docs-branding-logo-link
+				5 container docs-titlebar-container
+					6 container BM07 — File tải trực tiếp từ Xuất báo cáo — Đã sửa tương thích 2026-10-08
+						7 container docs-title-widget
+							8 text BM07 — File tải trực tiếp từ Xuất báo cáo — Đã sửa tương thích 2026-10-08
+							9 text field (settable) Description: Rename, Value: BM07 — File tải trực tiếp từ Xuất báo cáo — Đã sửa tương thích 2026-10-08
+						105 checkbox Description: Star, Value: 0, ID: docs-star
+						106 button Description: Move, ID: docs-folder
+						10 button Description: Document status: Saved to Drive., ID: docs-save-indicator-badge
+					12 container
+						107 button Description: Last edit was 2 minutes ago, ID: docs-revisions-appbarbutton
+						13 checkbox Description: Show all comments, Value: 0, ID: docs-docos-commentsbutton
+						108 pop up button (collapsed) Description: Join a call here or present this tab to the call, ID: docs-meet-in-editors-entrypointbutton, Secondary Actions: Expand
+						14 container docs-titlebar-share-client-button
+							15 button Share. Private to only me. 
+								109 text Share
+							17 pop up button (collapsed) Description: Quick sharing actions, ID: scb-quick-actions-menu-button, Secondary Actions: Expand
+						18 link Upgrade
+							110 text Upgrade
+						111 container
+							112 button Try Gemini
+						19 pop up button (collapsed) Description: Google Account: Khiêm Nguyễn (khiemnd777@gmail.com), Secondary Actions: Expand
+			20 container docs-bars
+				21 container docs-menubars
+					22 menu bar docs-menubar
+						23 (collapsed) File, ID: docs-file-menu, Secondary Actions: Expand
+						24 (collapsed) Edit, ID: docs-edit-menu, Secondary Actions: Expand
+						25 (collapsed) View, ID: docs-view-menu, Secondary Actions: Expand
+						26 (collapsed) Insert, ID: docs-insert-menu, Secondary Actions: Expand
+						27 (collapsed) Format, ID: docs-format-menu, Secondary Actions: Expand
+						28 (collapsed) Data, ID: w183, Secondary Actions: Expand
+						29 (collapsed) Tools, ID: docs-tools-menu, Secondary Actions: Expand
+						30 (collapsed) Extensions, ID: docs-extensions-menu, Secondary Actions: Expand
+						31 (collapsed) Help, ID: docs-help-menu, Secondary Actions: Expand
+				32 container docs-toolbar-wrapper
+					33 container docs-primary-toolbars
+						34 toolbar Description: Search the menus (Option+/), ID: docs-omnibox-toolbar
+							35 container
+								36 combo box (settable) Menus
+						37 toolbar Description: Main, ID: docs-toolbar
+							38 button Description: Undo (⌘Z), ID: t-undo
+							39 button Description: Redo (⌘Y), ID: t-redo
+							40 button Description: Print (⌘P), ID: t-print
+							41 checkbox Description: Paint format, Value: 0, ID: t-paintformat
+							42 combo box (collapsed) Description: Zoom, ID: t-zoom, Secondary Actions: Expand
+								43 container
+									44 container Description: Zoom list. 100% selected., ID: :1x
+										45 text field (settable) Description: Zoom, Value: 100%
+							46 button Description: Format as currency, ID: t-num-fmt-currency
+								47 text $
+							48 button Description: Format as percent, ID: t-num-fmt-percent
+								49 text %
+							50 button Description: Decrease decimal places, ID: t-num-fmt-decimal-decrease
+							51 button Description: Increase decimal places, ID: t-num-fmt-decimal-increase
+							52 button (collapsed) Description: More formats, ID: t-num-fmt-other, Secondary Actions: Expand
+								53 text 123
+							54 list Description: Font, ID: docs-font-family
+								55 container
+									56 (selected) Value: Font list. Calibri selected., ID: :27
+							57 button Description: Decrease font size (⌘+Shift+comma), ID: fontSizeDecrement
+							58 combo box (collapsed) Description: Font size, ID: fontSizeSelect, Secondary Actions: Expand
+								59 container Description: Font size list. 10 selected., ID: :2c
+									60 text field (settable) Description: Font size, Value: 10
+							61 button Description: Increase font size (⌘+Shift+period), ID: fontSizeIncrement
+							62 checkbox Description: Bold (⌘B), Value: 0, ID: t-bold
+							63 checkbox Description: Italic (⌘I), Value: 0, ID: t-italic
+							64 checkbox Description: Strikethrough (⌘+Shift+X), Value: 0, ID: t-strikethrough
+							65 pop up button (collapsed) Description: Text color, ID: t-text-color, Secondary Actions: Expand
+							66 pop up button (collapsed) Description: Fill color, ID: t-cell-color, Secondary Actions: Expand
+							67 pop up button (collapsed) Description: Borders, ID: t-border, Secondary Actions: Expand
+							68 checkbox (disabled) Description: Merge cells, Value: 0, ID: t-merge-button
+							69 button (disabled, collapsed) Description: Select merge type, ID: t-merge-menu, Secondary Actions: Expand
+							70 pop up button (collapsed) Description: Horizontal align, ID: t-align, Secondary Actions: Expand
+							71 pop up button (collapsed) Description: Vertical align, ID: t-valign, Secondary Actions: Expand
+							72 pop up button (collapsed) Description: Text wrapping, ID: t-textwrap, Secondary Actions: Expand
+							73 pop up button (collapsed) Description: Text rotation, ID: t-text-rotation, Secondary Actions: Expand
+							74 button Description: Insert link (⌘K), ID: t-insert-link
+							75 button Description: Insert comment (⌘+Option+M), ID: t-insert-doco
+							76 button Description: Insert chart, ID: t-insert-chart
+							77 checkbox Description: Create a filter, Value: 0, ID: t-autofilter-toggle
+							78 pop up button (collapsed) Description: Filter views, ID: t-autofilter-menu, Secondary Actions: Expand
+							79 pop up button (collapsed) Description: Functions, ID: t-formula, Secondary Actions: Expand
+					80 toolbar Description: Mode and view, ID: docs-side-toolbar
+						81 button Description: Hide the menus (Ctrl+Shift+F), ID: viewModeButton
+			113 container
+				114 container Side panel
+					115 tab group
+						116 tab (selectable, settable, boolean) Description: Calendar, Value: 0, ID: gsc-gab-6
+						117 tab (selectable, settable, boolean) Description: Keep, Value: 0, ID: gsc-gab-2
+						118 tab (selectable, settable, boolean) Description: Tasks, Value: 0, ID: gsc-gab-4
+						119 tab (selectable, settable, boolean) Description: Contacts, Value: 0, ID: gsc-gab-9
+						120 tab (selectable, settable, boolean) Description: Maps, Value: 0, ID: gsc-gab-8
+						121 tab (selectable, settable, boolean) Description: Get Add-ons, Value: 0, ID: qJTzr
+				122 button Hide side panel
+			83 container docs-additional-bars
+				84 container formula-bar-name-box-wrapper
+					85 container Name box (⌘ + J)
+						86 text field (settable) Value: F11, ID: t-name-box
+						87 pop up button (collapsed) Description: Name box menu button. Select one of the menu items to navigate to its corresponding named range., ID: t-name-box-dropdown, Secondary Actions: Expand
+					88 text entry area (settable) 
+
+		90 container docs-editor
+			91 container 349641001-grid-container
+				92 container 349641001-static-overlay-container
+			93 container Sheet tab bar
+				94 toolbar
+					95 button Description: Add Sheet, ID: :e
+					96 pop up button (collapsed) Description: All Sheets, ID: :f, Secondary Actions: Expand
+				97 toolbar
+					98 pop up button (collapsed) BM-GS-07, ID: :z, Secondary Actions: Expand
+						99 container
+							100 text BM-GS-07
+		101 text entry area (settable) ID: waffle-rich-text-editor, Value: 
+
+
+
+		102 link Description: Turn on screen reader support, Value: docs.google.com/spreadsheets/d/1vjzyxWF5ImPpx7Atjr03w2QaYH6RaCNREkJv6rEkjJk/edit?gid=349641001#, ID: docs-a11y-aria-enable
+		103 text entry area (settable)
+		104 text To enable screen reader support, press ⌘+Option+Z To learn about keyboard shortcuts, press ⌘slash
+		123 text Banner hidden
+		124 text Name box. ⌘ + J. A1:G1 selected. Type a cell range or named range and hit the Enter key to navigate to the specified range.
+		125 menu
+			126 Cut ⌘X, ID: 5jeyt4:1bz
+				127 container
+					128 text Cut
+					129 container ⌘X
+						130 text ⌘X
+			131 Copy ⌘C, ID: 5jeyt4:1c0
+				132 container
+					133 text Copy
+					134 container ⌘C
+						135 text ⌘C
+			136 Paste ⌘V, ID: 5jeyt4:1c1
+				137 container
+					138 text Paste
+					139 container ⌘V
+						140 text ⌘V
+			141 Paste special ►, ID: 5jeyt4:1c2
+				142 container
+					143 text Paste special ►
+			144 Fill column with Gemini New, ID: 5jeyt4:1c4
+				145 container
+					146 text Fill column with Gemini New
+			147 Insert 1 row above, ID: 5jeyt4:1c6
+				148 text Insert 1 row above
+			149 Insert 1 column left, ID: 5jeyt4:1c7
+				150 text Insert 1 column left
+			151 Insert cells ►, ID: 5jeyt4:1c8
+				152 container
+					153 text Insert cells ►
+			154 Delete row, ID: 5jeyt4:1ca
+				155 text Delete row
+			156 Delete column, ID: 5jeyt4:1cb
+				157 text Delete column
+			158 Delete cells ►, ID: 5jeyt4:1cc
+				159 container
+					160 text Delete cells ►
+			161 Convert to table New, ID: 5jeyt4:1ce
+				162 container
+					163 text Convert to table New
+			164 Create a filter, ID: 5jeyt4:1cf
+				165 text Create a filter
+			166 Filter by cell value, ID: 5jeyt4:1cg
+				167 text Filter by cell value
+			168 Show edit history, ID: 5jeyt4:1cu
+				169 text Show edit history
+			170 Insert link, ID: 5jeyt4:1cz
+				171 text Insert link
+			172 Comment ⌘+Option+M, ID: 5jeyt4:1d0
+				173 container
+					174 text Comment
+					175 container ⌘+Option+M
+						176 text ⌘+Option+M
+			177 Insert note, ID: 5jeyt4:1d1
+				178 text Insert note
+			179 Pre-built tables, ID: 5jeyt4:1d2
+				180 text Pre-built tables
+			181 Dropdown, ID: 5jeyt4:1d3
+				182 text Dropdown
+			183 Smart chips ►, ID: 5jeyt4:1d4
+				184 container
+					185 text Smart chips ►
+			186 Image ►, ID: 5jeyt4:1d5
+				187 container
+					188 text Image ►
+			189 View more cell actions ►, ID: 5jeyt4:1d7
+				190 container
+					191 text View more cell actions ►
+		192 menu
+			193 Add alt text to cell, ID: 5jeyt4:1d8
+				194 text Add alt text to cell
+			195 Put image over cells, ID: 5jeyt4:1d9
+				196 text Put image over cells
+			197 Content credentials, ID: 5jeyt4:1da
+				198 text Content credentials
+
+The focused UI element is 125 menu

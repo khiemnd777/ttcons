@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { parseBMGSRevision } from '../_shared/bmgsSourceNavigation';
+import { isRecordID, RecordUnavailable } from '../_shared/recordNavigation';
 import {
   Download,
   Eye,
@@ -12,6 +14,7 @@ import clsx from 'clsx';
 import { DataTable } from '../../components/DataTable';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get } from '../../lib/api/client';
+import { downloadNativeReportExcel, nativeReportListExcelPath } from '../_shared/bmgsExport';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { dateText } from '../../lib/utils/format';
 import { AsyncProjectPicker } from '../_shared/AsyncProjectPicker';
@@ -58,6 +61,7 @@ export function WorkReportsPage() {
   const [selectedSourceID, setSelectedSourceID] = useState('');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('xlsx');
   const [exporting, setExporting] = useState(false);
+  const [exportingReports, setExportingReports] = useState(false);
   const filtersRef = useRef<HTMLElement | null>(null);
   const navigateFilterValidation = useValidationNavigation(filtersRef);
 
@@ -94,8 +98,8 @@ export function WorkReportsPage() {
   });
 
   const detail = useQuery({
-    queryKey: ['work-report-detail', selectedSourceID],
-    queryFn: () => get<WorkReportDetail>(`/work-reports/daily-reports/${selectedSourceID}`),
+    queryKey: ['work-report-detail', selectedSourceID, user?.id],
+    queryFn: () => { if (!isRecordID(selectedSourceID)) throw new RecordUnavailable(); return get<WorkReportDetail>(`/work-reports/daily-reports/${selectedSourceID}`); },
     enabled: Boolean(selectedSourceID),
     retry: false,
   });
@@ -155,6 +159,16 @@ export function WorkReportsPage() {
 
   const rows = reports.data ?? [];
 
+  async function exportReports() {
+    if (!canExport || exportingReports || reports.isFetching || reports.isError || !rows.length) return;
+    setExportingReports(true);
+    try {
+      await downloadNativeReportExcel(nativeReportListExcelPath('/work-reports', listQueryString));
+      toast.success('Đã xuất báo cáo Excel theo bộ lọc đang áp dụng');
+    } catch (error) { toast.error('Không xuất được báo cáo Excel', error); }
+    finally { setExportingReports(false); }
+  }
+
   function openReport(row: WorkReportListItem) {
     if (!row.work_report_id) {
       navigate(`/projects/${row.project_id}/operations?tab=timeline&report=${encodeURIComponent(row.source_id)}`);
@@ -165,6 +179,7 @@ export function WorkReportsPage() {
       const next = new URLSearchParams(current);
       next.set('scope', scope);
       next.set('report', row.source_id);
+      next.delete('revision');
       return next;
     }, { replace: true });
   }
@@ -174,6 +189,7 @@ export function WorkReportsPage() {
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.delete('report');
+      next.delete('revision');
       return next;
     }, { replace: true });
   }
@@ -193,6 +209,7 @@ export function WorkReportsPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {canExport ? <button type="button" disabled={exportingReports || reports.isFetching || reports.isError || !rows.length} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-50" onClick={() => void exportReports()}><Download className="h-4 w-4" />{exportingReports ? 'Đang xuất…' : 'Xuất báo cáo'}</button> : null}
             {canExport ? (
               <ExportControl format={exportFormat} exporting={exporting} onFormatChange={setExportFormat} onExport={() => void exportRegister()} />
             ) : null}
@@ -277,9 +294,11 @@ export function WorkReportsPage() {
       </section>
 
       <WorkReportReviewDialog
+        key={`${selectedSourceID}:${searchParams.get('revision') ?? ''}:${user?.id}`}
         open={Boolean(selectedSourceID)}
         detail={detail.data ?? null}
-        loading={detail.isLoading}
+        loading={detail.isLoading || detail.isFetching}
+        initialRevisionNo={parseBMGSRevision(searchParams.get('revision'))}
         error={detail.error}
         userID={user?.id ?? ''}
         canReview={canReview}
@@ -321,7 +340,7 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
 }
 
 function ExportControl({ format, exporting, onFormatChange, onExport }: { format: ExportFormat; exporting: boolean; onFormatChange: (format: ExportFormat) => void; onExport: () => void }) {
-  return <div className="inline-flex overflow-hidden rounded-md border border-blue-200 bg-white"><label className="sr-only" htmlFor="work-report-export-format">Định dạng xuất sổ báo cáo</label><select id="work-report-export-format" className="border-r border-blue-100 bg-white px-2 py-2 text-sm font-semibold text-blue-700 outline-none" value={format} onChange={(event) => onFormatChange(event.target.value as ExportFormat)} disabled={exporting}><option value="pdf">PDF</option><option value="xlsx">Excel</option><option value="csv">CSV</option></select><button type="button" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={exporting} onClick={onExport}>{exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? 'Đang xuất…' : 'Xuất sổ'}</button></div>;
+  return <div className="inline-flex overflow-hidden rounded-md border border-blue-200 bg-white"><label className="sr-only" htmlFor="work-report-export-format">Định dạng xuất sổ báo cáo</label><select id="work-report-export-format" className="border-r border-blue-100 bg-white px-2 py-2 text-sm font-semibold text-blue-700 outline-none" value={format} onChange={(event) => onFormatChange(event.target.value as ExportFormat)} disabled={exporting}><option value="pdf">PDF</option><option value="xlsx">Excel</option><option value="csv">CSV</option></select><button type="button" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-60" disabled={exporting} onClick={onExport}>{exporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{exporting ? 'Đang xuất…' : 'Xuất sổ đăng ký'}</button></div>;
 }
 
 function saveBlob(blob: Blob, filename: string) {

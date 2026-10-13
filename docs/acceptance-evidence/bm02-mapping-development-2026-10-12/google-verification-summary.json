@@ -1,0 +1,1007 @@
+[
+  {
+    "key": "bm02-form",
+    "url": "https://docs.google.com/spreadsheets/d/1rgH_x4gpuu_MKPgjoDevWapX9Y-KVYMQKxH6olqSsts/edit?usp=drivesdk",
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "sheetId": 209722783,
+        "errors": [],
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          }
+        ],
+        "formulaResults": [
+          {
+            "row": 28,
+            "col": 3,
+            "formula": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "title": "Hình ảnh",
+        "sheetId": 418498078,
+        "errors": [],
+        "formulaResults": []
+      }
+    ]
+  },
+  {
+    "key": "bm02-journal-two-days",
+    "url": "https://docs.google.com/spreadsheets/d/1eUc1kdhLiuPQJMLrKIr96noCiZ4wJaFJ-n4brfRe6gY/edit?usp=drivesdk",
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "sheetId": 1494006152,
+        "errors": [],
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          }
+        ],
+        "formulaResults": [
+          {
+            "row": 28,
+            "col": 3,
+            "formula": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "title": "2026-10-08_02",
+        "sheetId": 316816832,
+        "errors": [],
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "0%",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 2 · Giờ làm việc: 4",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chuẩn bị ô thử ngày 08 · Kết quả đã ghi nhận: Đã làm",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận rủi ro trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          }
+        ],
+        "formulaResults": [
+          {
+            "row": 28,
+            "col": 3,
+            "formula": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))",
+            "value": "2"
+          }
+        ]
+      },
+      {
+        "title": "Hình ảnh",
+        "sheetId": 1921850642,
+        "errors": [],
+        "formulaResults": []
+      }
+    ]
+  },
+  {
+    "key": "bm02-detail",
+    "url": "https://docs.google.com/spreadsheets/d/11ztXrRu1HpeEotYqrQLq3vErJi1CGkvusSmKSo_y0tY/edit?usp=drivesdk",
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "sheetId": 317244011,
+        "errors": [],
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          }
+        ],
+        "formulaResults": [
+          {
+            "row": 28,
+            "col": 3,
+            "formula": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "title": "Hình ảnh",
+        "sheetId": 1621363946,
+        "errors": [],
+        "formulaResults": []
+      }
+    ]
+  },
+  {
+    "key": "bm02-journal-filter08",
+    "url": "https://docs.google.com/spreadsheets/d/1Wed1RIsLogUpTFmODIYesjZOyr-R0zciLKFESEqMtks/edit?usp=drivesdk",
+    "sheets": [
+      {
+        "title": "2026-10-08_01",
+        "sheetId": 1265239485,
+        "errors": [],
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "0%",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 2 · Giờ làm việc: 4",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chuẩn bị ô thử ngày 08 · Kết quả đã ghi nhận: Đã làm",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận rủi ro trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          }
+        ],
+        "formulaResults": [
+          {
+            "row": 28,
+            "col": 3,
+            "formula": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))",
+            "value": "2"
+          }
+        ]
+      },
+      {
+        "title": "Hình ảnh",
+        "sheetId": 578613293,
+        "errors": [],
+        "formulaResults": []
+      }
+    ]
+  },
+  {
+    "key": "bm02-reports-list",
+    "url": "https://docs.google.com/spreadsheets/d/1Yt2xXvzAG4rK33hxHttuTflIERLixAXq9YXm2mjvsR8/edit?usp=drivesdk",
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "sheetId": 778892167,
+        "errors": [],
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          }
+        ],
+        "formulaResults": [
+          {
+            "row": 28,
+            "col": 3,
+            "formula": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))",
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "title": "2026-10-08_02",
+        "sheetId": 61678823,
+        "errors": [],
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "0%",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 2 · Giờ làm việc: 4",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chuẩn bị ô thử ngày 08 · Kết quả đã ghi nhận: Đã làm",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận rủi ro trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo.",
+            "fill": {
+              "red": 0.9490196,
+              "green": 0.9490196,
+              "blue": 0.9490196
+            }
+          }
+        ],
+        "formulaResults": [
+          {
+            "row": 28,
+            "col": 3,
+            "formula": "=IF(COUNT(C25:C27)=0,\"\",SUM(C25:C27))",
+            "value": "2"
+          }
+        ]
+      },
+      {
+        "title": "Hình ảnh",
+        "sheetId": 543474003,
+        "errors": [],
+        "formulaResults": []
+      }
+    ]
+  }
+]

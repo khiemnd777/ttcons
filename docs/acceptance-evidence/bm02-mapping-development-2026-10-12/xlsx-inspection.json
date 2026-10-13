@@ -1,0 +1,592 @@
+[
+  {
+    "key": "bm02-form",
+    "label": "Xuất báo cáo ngày",
+    "url": "http://127.0.0.1:5173/work-items/4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "download_path": "/Users/khiemnguyen/Downloads/BM-GS-02 (3).xlsx",
+    "evidence_path": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm02-mapping-development-2026-10-12/exports/bm02-form.xlsx",
+    "bytes": 16688,
+    "sha256": "0b9340a9400f667d75ade2b03fc33d7a8a2ddcc4907938a30aa477f13656c27c",
+    "original_equals_evidence": true,
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo."
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only"
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu"
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic"
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect"
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal"
+          }
+        ],
+        "dimension": {
+          "ref": "A1:H32"
+        }
+      },
+      {
+        "title": "Hình ảnh",
+        "criteria": null,
+        "dimension": {
+          "ref": "A1"
+        }
+      }
+    ],
+    "media": [
+      "xl/media/image1.png"
+    ]
+  },
+  {
+    "key": "bm02-journal-two-days",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "download_path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (9).xlsx",
+    "evidence_path": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm02-mapping-development-2026-10-12/exports/bm02-journal-two-days.xlsx",
+    "bytes": 20931,
+    "sha256": "f65fb182927966730634cc80bbf25cd4c0ba9d84c37ffc54d6d9167d1df98cf5",
+    "original_equals_evidence": true,
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo."
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only"
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu"
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic"
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect"
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal"
+          }
+        ],
+        "dimension": {
+          "ref": "A1:H32"
+        }
+      },
+      {
+        "title": "2026-10-08_02",
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "0%"
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 2 · Giờ làm việc: 4"
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chuẩn bị ô thử ngày 08 · Kết quả đã ghi nhận: Đã làm"
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận rủi ro trong nguồn báo cáo."
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect"
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo."
+          }
+        ],
+        "dimension": {
+          "ref": "A1:H32"
+        }
+      },
+      {
+        "title": "Hình ảnh",
+        "criteria": null,
+        "dimension": {
+          "ref": "A1"
+        }
+      }
+    ],
+    "media": [
+      "xl/media/image1.png"
+    ]
+  },
+  {
+    "key": "bm02-detail",
+    "label": "Xuất báo cáo ngày",
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "download_path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (10).xlsx",
+    "evidence_path": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm02-mapping-development-2026-10-12/exports/bm02-detail.xlsx",
+    "bytes": 17028,
+    "sha256": "cb30e6fb7c1f4cc50ff1247321de32b94cd4db8b65f2a36c6c86f5479d067372",
+    "original_equals_evidence": true,
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo."
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only"
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu"
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic"
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect"
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal"
+          }
+        ],
+        "dimension": {
+          "ref": "A1:H32"
+        }
+      },
+      {
+        "title": "Hình ảnh",
+        "criteria": null,
+        "dimension": {
+          "ref": "A1"
+        }
+      }
+    ],
+    "media": [
+      "xl/media/image1.png"
+    ]
+  },
+  {
+    "key": "bm02-journal-filter08",
+    "label": "Xuất báo cáo",
+    "filter": {
+      "from": "2026-10-08",
+      "to": "2026-10-08"
+    },
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "download_path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (11).xlsx",
+    "evidence_path": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm02-mapping-development-2026-10-12/exports/bm02-journal-filter08.xlsx",
+    "bytes": 16520,
+    "sha256": "7d12fb2ddadc8dafc4e9615ad5aa1285433288e94894d1a10bb2c5563e7baa55",
+    "original_equals_evidence": true,
+    "sheets": [
+      {
+        "title": "2026-10-08_01",
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "0%"
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 2 · Giờ làm việc: 4"
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chuẩn bị ô thử ngày 08 · Kết quả đã ghi nhận: Đã làm"
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận rủi ro trong nguồn báo cáo."
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect"
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo."
+          }
+        ],
+        "dimension": {
+          "ref": "A1:H32"
+        }
+      },
+      {
+        "title": "Hình ảnh",
+        "criteria": null,
+        "dimension": {
+          "ref": "A1"
+        }
+      }
+    ],
+    "media": [
+      "xl/media/image1.png"
+    ]
+  },
+  {
+    "key": "bm02-reports-list",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/reports?scope=source",
+    "download_path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (12).xlsx",
+    "evidence_path": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm02-mapping-development-2026-10-12/exports/bm02-reports-list.xlsx",
+    "bytes": 20930,
+    "sha256": "10d3dc58eef96c4c5738abd0246568233eefdd38e3f04fa656ece0ce05c3e774",
+    "original_equals_evidence": true,
+    "sheets": [
+      {
+        "title": "2026-10-09_01",
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận tiến độ trong nguồn báo cáo."
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 3 · Giờ làm việc: 8 · Đại diện: Đại diện synthetic · Liên hệ: demo-only"
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Hoàn thiện ô tường mẫu · Kết quả đã ghi nhận: Đã làm · Khối lượng đã ghi nhận: 2 · Đơn vị: m2 · Khu vực công việc: [Synthetic] Khu A · Ghi chú: [Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu"
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Trạng thái đã ghi nhận: Đang theo dõi synthetic"
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect"
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ đã ghi nhận: 0% · Trạng thái đã ghi nhận: Đang làm · Vai trò phụ trách: PM · Ưu tiên: normal"
+          }
+        ],
+        "dimension": {
+          "ref": "A1:H32"
+        }
+      },
+      {
+        "title": "2026-10-08_02",
+        "criteria": [
+          {
+            "row": 10,
+            "status": "Chưa đánh giá",
+            "note": "0%"
+          },
+          {
+            "row": 11,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Tổ thử A · Số người: 2 · Giờ làm việc: 4"
+          },
+          {
+            "row": 12,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận vật tư nhập trường trong nguồn báo cáo."
+          },
+          {
+            "row": 13,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chất lượng trong nguồn báo cáo."
+          },
+          {
+            "row": 14,
+            "status": "Chưa đánh giá",
+            "note": "[Synthetic] Chuẩn bị ô thử ngày 08 · Kết quả đã ghi nhận: Đã làm"
+          },
+          {
+            "row": 15,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận phát sinh trong nguồn báo cáo."
+          },
+          {
+            "row": 16,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận MEP trong nguồn báo cáo."
+          },
+          {
+            "row": 17,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận an toàn trong nguồn báo cáo."
+          },
+          {
+            "row": 18,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận nghiệm thu trong nguồn báo cáo."
+          },
+          {
+            "row": 19,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận rủi ro trong nguồn báo cáo."
+          },
+          {
+            "row": 20,
+            "status": "Chưa đánh giá",
+            "note": "Ảnh 1 • Tên tệp: [Synthetic] Gradient BM04/BM07 · Chú thích: [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp · Vị trí: [Synthetic] Khu B — ô 04 · Giai đoạn ảnh: defect"
+          },
+          {
+            "row": 21,
+            "status": "Chưa đánh giá",
+            "note": "Chưa có ghi nhận chỉ dẫn hiện trường trong nguồn báo cáo."
+          }
+        ],
+        "dimension": {
+          "ref": "A1:H32"
+        }
+      },
+      {
+        "title": "Hình ảnh",
+        "criteria": null,
+        "dimension": {
+          "ref": "A1"
+        }
+      }
+    ],
+    "media": [
+      "xl/media/image1.png"
+    ]
+  }
+]

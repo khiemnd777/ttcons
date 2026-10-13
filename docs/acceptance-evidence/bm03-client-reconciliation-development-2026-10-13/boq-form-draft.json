@@ -1,0 +1,152 @@
+{
+  "answers": {
+    "sent_channel": "meeting",
+    "sent_to": "[Synthetic] Internal test recipient"
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Canonical Development source capture",
+      "created_at": "2026-10-13T00:11:27Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "50fb9a0d-783d-4e9f-9837-9d0ede51a578",
+      "instance_id": "cf46a622-6524-4bda-b7d1-1325a08c1a2d",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "4c0160fd-336e-4f8a-8dd0-82f265805b41"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:56:15Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "8bf3b221-3cc2-4a11-8c33-de1d4d12e402",
+      "instance_id": "cf46a622-6524-4bda-b7d1-1325a08c1a2d",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "4c0160fd-336e-4f8a-8dd0-82f265805b41"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "sent_to",
+      "field_type": "text",
+      "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+      "help_text": null,
+      "id": "a952097b-d80e-464c-b27a-25f707d08f26",
+      "label": "Người nhận phía chủ đầu tư",
+      "options_json": [],
+      "order_index": 20,
+      "required": true,
+      "validation_json": {
+        "max_length": 160,
+        "min_length": 2
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "sent_channel",
+      "field_type": "select",
+      "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+      "help_text": null,
+      "id": "9b1a89a5-cadd-43a1-84ff-0cd87b60b736",
+      "label": "Kênh gửi",
+      "options_json": [
+        {
+          "label": "Email",
+          "value": "email"
+        },
+        {
+          "label": "Zalo",
+          "value": "zalo"
+        },
+        {
+          "label": "Bản cứng",
+          "value": "hardcopy"
+        },
+        {
+          "label": "Trong cuộc họp",
+          "value": "meeting"
+        },
+        {
+          "label": "Khác",
+          "value": "other"
+        }
+      ],
+      "order_index": 30,
+      "required": true,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {
+      "sent_channel": "meeting",
+      "sent_to": "[Synthetic] Internal test recipient"
+    },
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:56:15Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 0,
+    "form_code": "client_boq_owner_submission",
+    "form_description": "Ghi nhận bộ BOQ gửi chủ đầu tư, phiên bản, người nhận, kênh gửi và minh chứng.",
+    "form_name": "Gửi BOQ cho chủ đầu tư",
+    "form_template_id": "b63abca7-29fb-49a2-a899-46f046a4c0d1",
+    "form_type": "generic_submission",
+    "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+    "form_version_no": 3,
+    "form_version_status": "published",
+    "id": "cf46a622-6524-4bda-b7d1-1325a08c1a2d",
+    "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "QS"
+    ],
+    "run_node_id": "e8965925-33ba-43b5-826e-9d6670b9a399",
+    "run_step_id": "08e56b93-3182-4f9a-8a0e-d757614c7861",
+    "status": "draft",
+    "submitted_at": null,
+    "submitted_by": null,
+    "template_step_id": "ab81da79-30c3-4896-b5f9-6f9f25d5e953",
+    "title": "Phát hành BOQ không thiết kế",
+    "updated_at": "2026-10-13T00:11:27Z",
+    "work_item_id": "4c0160fd-336e-4f8a-8dd0-82f265805b41",
+    "work_item_status": "in_progress",
+    "work_item_title": "Phát hành BOQ không thiết kế"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [],
+  "template": {
+    "code": "client_boq_owner_submission",
+    "description": "Ghi nhận bộ BOQ gửi chủ đầu tư, phiên bản, người nhận, kênh gửi và minh chứng.",
+    "form_type": "generic_submission",
+    "id": "b63abca7-29fb-49a2-a899-46f046a4c0d1",
+    "name": "Gửi BOQ cho chủ đầu tư"
+  },
+  "version": {
+    "id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+    "status": "published",
+    "version_no": 3
+  }
+}

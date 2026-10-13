@@ -1,0 +1,49 @@
+{
+  "passed": true,
+  "assertions": {
+    "all_2889_baseline_rows_unchanged_and_retained": true,
+    "only_two_new_export_audits": true,
+    "migration_158_unchanged": true,
+    "all_149_storage_files_unchanged": true,
+    "current_source_matches_built_manifest": true,
+    "only_approved_existing_source_owners_changed": true,
+    "accepted_desktop_source_unchanged": true,
+    "one_labelled_header_launcher_at_all_mobile_sizes": true,
+    "mobile_no_document_horizontal_overflow": true,
+    "mobile_end_cta_visible_uncovered_and_hit_test_passes": true,
+    "header_launcher_inside_own_header": true,
+    "middle_scroll_observed_with_no_overlap": true,
+    "empty_state_retains_single_header_launcher": true,
+    "standard_header_keeps_one_icon_launcher": true,
+    "640_boundary_hides_mobile_launcher": true,
+    "desktop_action_column_geometry_unchanged": true,
+    "actual_browser_draft_preserved_after_spa_navigation": true,
+    "test_draft_cleared_without_sending": true,
+    "list_actual_download_byte_equal": true,
+    "list_all_cells_formulas_unchanged": true,
+    "list_embedded_photo_unchanged": true,
+    "detail_actual_download_byte_equal": true,
+    "detail_all_cells_formulas_unchanged": true,
+    "detail_embedded_photo_unchanged": true
+  },
+  "old_unique_rows_checked": 2889,
+  "changed_or_lost_rows": [],
+  "new_rows": [
+    [
+      "audit_logs",
+      "8d0c0225-de94-4504-b565-4ff4b14bcabb"
+    ],
+    [
+      "audit_logs",
+      "d941b922-f367-41ed-87c0-2a03cf2219b8"
+    ]
+  ],
+  "source_files_checked": 978,
+  "source_delta": [
+    "frontend/src/layouts/AppShell.tsx",
+    "frontend/src/modules/projects/ProjectWorkspaceLayout.tsx",
+    "frontend/src/modules/utilities/UtilityDock.tsx",
+    "frontend/tests/utilityDock.test.ts"
+  ],
+  "limits": "Development Admin, one existing BM04 open action plus empty filter; actual source UI screenshots, mobile/desktop geometry, real draft SPA navigation and unmodified downloads. Google import, physical Safari/Android safe-area/keyboard and capacity/all-role checks NOT_RUN. Standard MyWork390 documentWidth663 was observed separately; its cause not investigated. User UX sign-off pending."
+}

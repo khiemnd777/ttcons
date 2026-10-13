@@ -147,7 +147,7 @@ func main() {
 	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.FrontendOrigin + ",http://localhost:5173,http://127.0.0.1:5173",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, If-Match",
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowCredentials: true,
 		ExposeHeaders:    "Retry-After, X-Request-ID, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Source, X-RateLimit-Observed",

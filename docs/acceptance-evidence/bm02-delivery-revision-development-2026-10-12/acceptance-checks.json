@@ -1,0 +1,163 @@
+{
+  "scope": "Canonical Development manual-report delivery revisions; no application or schema edits",
+  "checks": {
+    "same_report_two_revisions": true,
+    "revision1_snapshot_hash_unchanged": true,
+    "revision1_snapshot_json_unchanged": true,
+    "revision1_entire_revision_record_unchanged": true,
+    "revision1_photo_membership": true,
+    "revision2_photo_membership": true,
+    "recipient_review_actor": true,
+    "revision2_distinct_snapshot_hash": true,
+    "workflow_runtime_unchanged": true,
+    "work_items_unchanged": true,
+    "database_projects_forms_migrations_preserved": true,
+    "recipient_active_internal_account": true,
+    "recipient_pm_only_in_test_project": true,
+    "recipient_active_membership_only_in_test_project": true,
+    "application_source_manifest_no_drift": true,
+    "BM02-lan-1-truoc.xlsx_original_download_byte_equal": true,
+    "BM02-lan-1-truoc.xlsx_no_error_cells": true,
+    "BM02-lan-1-truoc.xlsx_one_decodable_embedded_photo": true,
+    "BM02-lan-2.xlsx_original_download_byte_equal": true,
+    "BM02-lan-2.xlsx_no_error_cells": true,
+    "BM02-lan-2.xlsx_one_decodable_embedded_photo": true,
+    "BM02-lan-1-sau.xlsx_original_download_byte_equal": true,
+    "BM02-lan-1-sau.xlsx_no_error_cells": true,
+    "BM02-lan-1-sau.xlsx_one_decodable_embedded_photo": true,
+    "revision1_all_workbook_parts_equal_except_content_type_declaration_order": true,
+    "revision1_content_type_declarations_equal": true,
+    "revision1_progress_unchanged": true,
+    "revision1_field_notes_unchanged": true,
+    "revision1_caption_unchanged": true,
+    "revision1_media_unchanged": true,
+    "revision1_sheets_unchanged": true,
+    "revision1_correct_progress": true,
+    "revision2_correct_progress": true,
+    "revision2_distinct_embedded_photo": true,
+    "recipient_protected_original_revision1_matches_upload": true,
+    "recipient_protected_original_revision2_matches_upload": true,
+    "google_revision1_no_effective_errors": true,
+    "google_revision1_all_populated_cells_and_formulas_match_xlsx": true,
+    "google_revision1_crew_sum_recalculated": true,
+    "google_revision2_no_effective_errors": true,
+    "google_revision2_all_populated_cells_and_formulas_match_xlsx": true,
+    "google_revision2_crew_sum_recalculated": true
+  },
+  "snapshot_sha256": {
+    "revision1": "b9006547ae54b475a46423ced5db9cfa7a857bd909babf99de08778c3d649349",
+    "revision2": "5ebcaf9d6f9ea7c6903938b70babdbab1ffa1dbb4dd359f546d795894637de59"
+  },
+  "not_applicable": [
+    "No delivery revision existed before this fixture; prior-revision preservation check has an empty baseline. Revision1 of this fixture is independently compared above."
+  ],
+  "database": {
+    "database": "consflow",
+    "projects": 5,
+    "forms": 20,
+    "migration_count": 157
+  },
+  "source_file_count": 962,
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "files": {
+    "BM02-lan-1-truoc.xlsx": {
+      "sha256": "b23e39ece6acf1ed0f66bd7a3044dcc32e85e6c0a6f7be70d44f6eaac55b02dc",
+      "bytes": 28711,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "path": "xl/media/image1.png",
+          "sha256": "06de76dd3433c3a7a8855d3328b72cba297d15f357ae971ae2afff050467bc5b",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "8e4b45b49840ef6bb1582da97404c3decd4b6dc9a592e6bb9aa8f12cc5845bbf"
+        }
+      ],
+      "progress": "25%",
+      "field_notes": "[Synthetic] NỘI DUNG LẦN 1 — Giữ nguyên nội dung và ảnh khi xem lại lần gửi cũ.",
+      "caption": "[Synthetic] BM02 Lần 1 • dd9e5c97-a54d-43ea-8ea4-e380788b6a1b\nBáo cáo 7a22a2d6-86a1-41b3-b08f-af5aaed9ceec · lần gửi 1 • [Synthetic] Ô BM02\nTrong thi công\n[Synthetic] Ảnh thử Lần 1 — không phải ảnh công trình"
+    },
+    "BM02-lan-2.xlsx": {
+      "sha256": "06e8dade47e73e20c0ee67cc75590e346f1970a827290129161c9de6c4179db3",
+      "bytes": 28428,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "path": "xl/media/image1.png",
+          "sha256": "0af6745686dd778f451904b43e58305f0f1ce6b069d956c79f69bb748d855dfd",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "6604a8e3553bb39363cc9809cc80c226ecf2e202e626d6233b0c61dc99bf7ace"
+        }
+      ],
+      "progress": "60%",
+      "field_notes": "[Synthetic] NỘI DUNG LẦN 2 — Dùng ảnh xanh; lần gửi trước phải giữ nội dung và ảnh đỏ.",
+      "caption": "[Synthetic] BM02 Lần 2 • 9fdb5b88-b61e-42a0-bac2-3f84946a1930\nBáo cáo 7a22a2d6-86a1-41b3-b08f-af5aaed9ceec · lần gửi 2 • [Synthetic] Ô BM02\nTrong thi công\n[Synthetic] Ảnh thử Lần 2 — không phải ảnh công trình"
+    },
+    "BM02-lan-1-sau.xlsx": {
+      "sha256": "c7b5cd10ec562276fa3a4ea84b440c3bed64d2e8e302718078f6391ec97aca5b",
+      "bytes": 28711,
+      "sheets": [
+        "2026-10-12_01",
+        "Hình ảnh"
+      ],
+      "media": [
+        {
+          "path": "xl/media/image1.png",
+          "sha256": "06de76dd3433c3a7a8855d3328b72cba297d15f357ae971ae2afff050467bc5b",
+          "width": 900,
+          "height": 560,
+          "pixel_sha256": "8e4b45b49840ef6bb1582da97404c3decd4b6dc9a592e6bb9aa8f12cc5845bbf"
+        }
+      ],
+      "progress": "25%",
+      "field_notes": "[Synthetic] NỘI DUNG LẦN 1 — Giữ nguyên nội dung và ảnh khi xem lại lần gửi cũ.",
+      "caption": "[Synthetic] BM02 Lần 1 • dd9e5c97-a54d-43ea-8ea4-e380788b6a1b\nBáo cáo 7a22a2d6-86a1-41b3-b08f-af5aaed9ceec · lần gửi 1 • [Synthetic] Ô BM02\nTrong thi công\n[Synthetic] Ảnh thử Lần 1 — không phải ảnh công trình"
+    }
+  },
+  "revision1_archive_differences": [
+    "[Content_Types].xml"
+  ],
+  "protected_photos": [
+    {
+      "revision": 1,
+      "evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+      "sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144"
+    },
+    {
+      "revision": 2,
+      "evidence_id": "9fdb5b88-b61e-42a0-bac2-3f84946a1930",
+      "sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013"
+    }
+  ],
+  "google": [
+    {
+      "revision": 1,
+      "url": "https://docs.google.com/spreadsheets/d/1clVd-l6HwuEySFni8BTjSTLROpGSgb5XEEvwUkSNSE0/edit",
+      "ranges": [
+        "'2026-10-12_01'!A1:H50",
+        "'Hình ảnh'!A1:H5"
+      ],
+      "populated_cells_compared": 100,
+      "effective_error_count": 0,
+      "crew_sum": 3
+    },
+    {
+      "revision": 2,
+      "url": "https://docs.google.com/spreadsheets/d/1s_MFTLD3p8bIMrS-gWO_prnoRvPyEAHsqUPHB9ZBrOQ/edit",
+      "ranges": [
+        "'2026-10-12_01'!A1:H50",
+        "'Hình ảnh'!A1:H5"
+      ],
+      "populated_cells_compared": 100,
+      "effective_error_count": 0,
+      "crew_sum": 5
+    }
+  ]
+}

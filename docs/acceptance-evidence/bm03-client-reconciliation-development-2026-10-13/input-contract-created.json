@@ -1,0 +1,67 @@
+{
+  "activated_at": null,
+  "activated_by": null,
+  "advance_percent": "0.00",
+  "approval_request_id": null,
+  "approved_by": null,
+  "contract_code": "BM03-REV10-INPUT",
+  "contract_type": "supplier",
+  "counterparty_code": "BM03-REV10-SUPPLIER-20261013",
+  "counterparty_name": "[Synthetic] supplier Development BM03",
+  "counterparty_partner_id": "26cda344-e3f3-42c7-818c-167d2ea802c4",
+  "counterparty_tax_code": null,
+  "created_at": "2026-10-13T00:18:15Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "currency": "VND",
+  "current_amount": "2250000.00",
+  "current_version_id": null,
+  "current_version_label": null,
+  "current_version_no": null,
+  "current_version_status": null,
+  "direction": "payable",
+  "dispatches": [],
+  "effective_date": "2026-10-13T00:00:00Z",
+  "execution_readiness": {
+    "app_signed": false,
+    "contract_active": false,
+    "paper_dispatched": false,
+    "returned_scan_received": false
+  },
+  "expiry_date": null,
+  "id": "c1fce738-cb26-4600-ad07-e84272e61b00",
+  "milestones": [],
+  "original_amount": "2250000.00",
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "retention_percent": "0.00",
+  "signed_by": null,
+  "signed_date": null,
+  "signing_forms": [
+    {
+      "current_revision": 1,
+      "id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "signatures": [
+        {
+          "id": "0a090008-b83a-4f6f-807d-41d22d4acb05",
+          "linked_contract_version_id": "6b70386a-43a9-4722-b5a0-df697f6bf46f",
+          "purpose": "approved_by",
+          "signed_at": "2026-10-13T00:16:26.417911+00:00",
+          "signer_name": "admin@thuthiemcons.com",
+          "signer_user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "status": "submitted",
+      "step_business_code": "outbound_contract.execution_package",
+      "submitted_at": "2026-10-13T00:15:24Z",
+      "title": "Hoàn tất gói hợp đồng chủ đầu tư",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb",
+      "work_item_title": "Hoàn tất gói hợp đồng chủ đầu tư"
+    }
+  ],
+  "status": "draft",
+  "title": "[Synthetic] input internal test contract",
+  "updated_at": "2026-10-13T00:18:15Z",
+  "variations": [],
+  "versions": [],
+  "warranty_days": 0,
+  "workflow_signatures": []
+}

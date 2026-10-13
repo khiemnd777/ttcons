@@ -1,0 +1,20 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "success": true,
+    "converted": true,
+    "fileId": "1V9qcQQi7hggHKpBcCsg_tT6PX--rtLhiaSlqq2eoaxg",
+    "title": "BM08 Rev10 — Ngày bàn giao14-10-2026 — File từ Xuất báo cáo",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "url": "https://docs.google.com/spreadsheets/d/1V9qcQQi7hggHKpBcCsg_tT6PX--rtLhiaSlqq2eoaxg/edit?usp=drivesdk",
+    "spreadsheetId": "1V9qcQQi7hggHKpBcCsg_tT6PX--rtLhiaSlqq2eoaxg",
+    "parentId": null,
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1V9qcQQi7hggHKpBcCsg_tT6PX--rtLhiaSlqq2eoaxg"
+  },
+  "isError": false
+}

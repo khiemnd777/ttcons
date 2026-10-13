@@ -1,0 +1,106 @@
+{
+  "completed_at": null,
+  "completion_issues": [],
+  "current_node_id": "1b4e1e06-c40d-4ef8-ab22-3cf8188b8b2e",
+  "engine_version": 2,
+  "id": "04c4ffc5-3f6d-4b29-b956-0400b66314ae",
+  "nodes": [
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "incoming_acceptance",
+      "completed_at": null,
+      "completion_issues": [],
+      "description": "Hai gói nghiệm thu kỹ thuật: thầu phụ/khối lượng và vật tư; tài chính không chặn tiến độ kỹ thuật.",
+      "exit_conditions": {
+        "text": "Nghiệm thu kỹ thuật đầu vào đã hoàn tất"
+      },
+      "fail_path": "rework",
+      "id": "1b4e1e06-c40d-4ef8-ab22-3cf8188b8b2e",
+      "name": "Nghiệm thu Đầu Vào",
+      "order_index": 1,
+      "permissions": [
+        "acceptance.view",
+        "acceptance.create",
+        "acceptance.approve",
+        "project_finance.view",
+        "project_finance.cost_create",
+        "project_finance.request_create"
+      ],
+      "project_id": "8ae7b7e1-2bcd-4633-a83a-b117eab65ead",
+      "required_permission": "acceptance.approve",
+      "responsible_role_ids": [
+        "QA/QC"
+      ],
+      "run_id": "04c4ffc5-3f6d-4b29-b956-0400b66314ae",
+      "started_at": "2026-10-12T23:18:49Z",
+      "status": "in_progress",
+      "steps": [
+        {
+          "business_code": "incoming.subcontractor_package",
+          "checklist_required": true,
+          "description": "QS tổng hợp checklist và khối lượng thầu phụ; trạng thái nguồn được kiểm tra trước khi chốt.",
+          "document_required": false,
+          "domain_action_key": "source.subcontractor_acceptance_package_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+            "photo_required": false,
+            "required_permission": "acceptance.create"
+          },
+          "form_required": true,
+          "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+          "id": "55ec81f6-5268-4aaf-889a-b1299b83fac4",
+          "name": "Nghiệm thu gói thầu phụ và khối lượng",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "8ae7b7e1-2bcd-4633-a83a-b117eab65ead",
+          "required_permission": "acceptance.create",
+          "required_role_ids": [
+            "QS"
+          ],
+          "required_workflow_form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+          "reviewed_at": null,
+          "run_node_id": "1b4e1e06-c40d-4ef8-ab22-3cf8188b8b2e",
+          "status": "completed",
+          "step_type": "acceptance_check",
+          "submitted_at": "2026-10-12T23:19:58Z",
+          "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+          "surface_kind": "subcontractor_reconciliation",
+          "template_step_id": "edaceeee-9a29-48eb-a416-32f028517f7a",
+          "work_item_id": "2529730f-d785-4356-a685-583cff44db2b",
+          "work_item_role_ids": [
+            "QS"
+          ],
+          "work_item_status": "completed",
+          "work_item_title": "Nghiệm thu gói thầu phụ và khối lượng",
+          "workflow_form_instance_id": "86535cf4-9104-4ede-acb1-48554178df1b",
+          "workflow_form_required": true,
+          "workflow_form_revision": 1,
+          "workflow_form_status": "submitted",
+          "workflow_form_submitted_at": "2026-10-12T23:19:55Z",
+          "workflow_form_template_code": "client_subcontractor_acceptance_package",
+          "workflow_form_template_id": "48000000-0000-0000-0000-000000000004",
+          "workflow_form_template_name": "Gói nghiệm thu thầu phụ Rev8",
+          "workflow_form_type": "checklist",
+          "workflow_form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "1a1a7a45-f428-4888-96f3-bccdf15bfeb7",
+      "type": "incoming_acceptance"
+    }
+  ],
+  "project_id": "8ae7b7e1-2bcd-4633-a83a-b117eab65ead",
+  "project_name": "[Synthetic Development] BM03 gói client độc lập",
+  "started_at": "2026-10-12T23:18:49Z",
+  "status": "in_progress",
+  "template_definition_hash": "dcd0c6aca75010722d2cd77648a9e68f3c1b945dc005ea66b25bbc46f52554f3",
+  "template_id": "f9ba8f6b-c799-497e-a886-43a61cff9589",
+  "template_name": "[Synthetic Development] BM03 gói client độc lập"
+}

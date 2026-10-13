@@ -1,0 +1,24 @@
+{
+  "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6",
+  "form_instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+  "pdf_export_id": "0aa5d7a2-5eee-4dc1-a4e5-db79eade3671",
+  "type": "final",
+  "title": "[Synthetic] Nghiệm thu cuối khu WC thử BM08",
+  "acceptance_date": "2026-10-13",
+  "location": "[Synthetic] Khu WC tầng 1",
+  "client_representative": "[Synthetic] Đại diện CĐT thử",
+  "contractor_representative": "Consflow Admin",
+  "scope_summary": "[Synthetic] Hoàn thiện chống thấm và lát gạch",
+  "notes": "[Synthetic] Kiểm tra nghiệp vụ trên Development, không có hiệu lực pháp lý.",
+  "checklist": [
+    {
+      "item_index": 0,
+      "title": "[Synthetic] Hoàn thiện chống thấm và lát gạch",
+      "description": "[Synthetic] Hoàn thiện mẫu thử theo tiêu chí của phiếu đã chốt",
+      "decision": "pass",
+      "severity": "low",
+      "photo_required": false,
+      "note": "[Synthetic] Kiểm tra vùng mẫu đạt"
+    }
+  ]
+}

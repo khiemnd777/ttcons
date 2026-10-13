@@ -1,0 +1,104 @@
+ Image ttcons-backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 546B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.45kB done
+#2 DONE 0.0s
+
+#3 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#3 DONE 1.7s
+
+#4 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#4 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e done
+#4 CACHED
+
+#5 [internal] load metadata for docker.io/library/alpine:3.20
+#5 ...
+
+#6 [internal] load metadata for docker.io/library/golang:1.23-alpine
+#6 DONE 1.5s
+
+#5 [internal] load metadata for docker.io/library/alpine:3.20
+#5 DONE 1.5s
+
+#7 [internal] load .dockerignore
+#7 transferring context: 102B done
+#7 DONE 0.0s
+
+#8 [stage-1 1/8] FROM docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+#8 resolve docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc done
+#8 DONE 0.0s
+
+#9 [build  1/10] FROM docker.io/library/golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f
+#9 resolve docker.io/library/golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f done
+#9 DONE 0.0s
+
+#10 [internal] load build context
+#10 transferring context: 782.48kB 0.3s done
+#10 DONE 0.3s
+
+#11 [build  3/10] RUN apk add --no-cache git
+#11 CACHED
+
+#12 [build  4/10] COPY go.mod go.sum* ./
+#12 CACHED
+
+#13 [build  2/10] WORKDIR /src
+#13 CACHED
+
+#14 [build  5/10] RUN --mount=type=cache,target=/go/pkg/mod     go mod download
+#14 CACHED
+
+#15 [build  6/10] COPY . .
+#15 DONE 1.1s
+
+#16 [build  7/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow ./cmd/server
+#16 DONE 4.0s
+
+#17 [build  8/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-migrate ./cmd/migrate
+#17 DONE 0.4s
+
+#18 [build  9/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-storage-migrate ./cmd/storage-migrate
+#18 DONE 0.5s
+
+#19 [build 10/10] RUN --mount=type=cache,target=/go/pkg/mod     --mount=type=cache,target=/root/.cache/go-build     CGO_ENABLED=0 GOOS=linux go build -o /bin/consflow-bootstrap-admin ./cmd/bootstrap-admin
+#19 DONE 0.3s
+
+#20 [stage-1 2/8] WORKDIR /app
+#20 CACHED
+
+#21 [stage-1 3/8] RUN addgroup -S -g 10001 appgroup     && adduser -S -D -H -u 10001 -G appgroup appuser
+#21 CACHED
+
+#22 [stage-1 4/8] COPY --from=build /bin/consflow /app/consflow
+#22 DONE 0.1s
+
+#23 [stage-1 5/8] COPY --from=build /bin/consflow-migrate /app/consflow-migrate
+#23 DONE 0.0s
+
+#24 [stage-1 6/8] COPY --from=build /bin/consflow-storage-migrate /app/consflow-storage-migrate
+#24 DONE 0.0s
+
+#25 [stage-1 7/8] COPY --from=build /bin/consflow-bootstrap-admin /app/consflow-bootstrap-admin
+#25 DONE 0.0s
+
+#26 [stage-1 8/8] COPY --from=build /src/migrations /app/migrations
+#26 DONE 0.0s
+
+#27 exporting to image
+#27 exporting layers
+#27 exporting layers 0.9s done
+#27 exporting manifest sha256:ab5f2373f5d080740004d34902fc7f64825e2260a8372a92cfebdfce4106dcb9 done
+#27 exporting config sha256:83ba950d29c52c017c16adf8c4a92657022e2f74d6789602b7eee5fe1e17fdc4 done
+#27 exporting attestation manifest sha256:e7076ed44c0a9276e616677f2b46566cf3b616d215d054c5bbe5fa7340f13841 done
+#27 exporting manifest list sha256:f1aa879da541bb1636b7f8e9490f08a5a9b7374b012a9b1d70ea34c7e7254ee8 done
+#27 naming to docker.io/library/ttcons-backend:latest done
+#27 unpacking to docker.io/library/ttcons-backend:latest
+#27 unpacking to docker.io/library/ttcons-backend:latest 0.3s done
+#27 DONE 1.3s
+
+#28 resolving provenance for metadata file
+#28 DONE 0.0s
+ Image ttcons-backend Built 

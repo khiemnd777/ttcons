@@ -1,0 +1,52 @@
+{
+  "passed": true,
+  "assertions": {
+    "old_rows_unchanged_and_not_lost": true,
+    "only_two_new_export_audits": true,
+    "migration_count_158_unchanged": true,
+    "all_976_built_source_hashes_current": true,
+    "only_approved_ui_owner_changed": true,
+    "mobile_branch_unchanged": true,
+    "all_149_storage_files_unchanged": true,
+    "three_desktop_sizes_measured": true,
+    "all_desktop_buttons_inside_cell_no_title_overlap": true,
+    "narrow_table_scroll_observed_without_document_overflow": true,
+    "mobile_no_document_horizontal_overflow": true,
+    "list_actual_download_byte_equal": true,
+    "list_all_cells_formulas_unchanged": true,
+    "list_same_embedded_photo": true,
+    "detail_actual_download_byte_equal": true,
+    "detail_all_cells_formulas_unchanged": true,
+    "detail_same_embedded_photo": true
+  },
+  "old_unique_rows_checked": 2887,
+  "changed_or_lost_rows": [],
+  "new_rows": [
+    [
+      "audit_logs",
+      "5662d094-6ca4-4961-8958-14767b50181e"
+    ],
+    [
+      "audit_logs",
+      "8437b991-21fa-44ad-99f7-73b65dd09e62"
+    ]
+  ],
+  "source_delta": [
+    "frontend/src/modules/operations/ConstructionWorkspaceLists.tsx"
+  ],
+  "existing_mobile_utility_overlap": {
+    "observed": true,
+    "utilityRect": {
+      "x": 238.171875,
+      "y": 724,
+      "right": 382,
+      "bottom": 768,
+      "width": 143.828125,
+      "height": 44
+    },
+    "horizontalIntersectionPixels": 101.828125,
+    "verticalIntersectionPixels": 27.5,
+    "sourceScope": "mobile branch and utility owner unchanged"
+  },
+  "limits": "Admin synthetic Development, one open source. Desktop action-column repair verified. Existing mobile utility overlap remains unresolved. New downloads have identical cells/formulas/media to prior native Google verification; Google import was not repeated in this CSS-only turn. Other lifecycle rows, ordinary-role, capacity, native Excel and print NOT_RUN; user UX review pending."
+}

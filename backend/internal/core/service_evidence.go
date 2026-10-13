@@ -279,6 +279,9 @@ func validateWorkItemEvidenceRequestForStorage(req WorkItemEvidenceRequest, allo
 	if !validType[req.EvidenceType] {
 		return req, validationError("Loại minh chứng không hợp lệ", Record{"evidence_type": req.EvidenceType})
 	}
+	if err := normalizeEvidenceCaptureMetadata(&req); err != nil {
+		return req, err
+	}
 	validStorageProvider := map[string]bool{"external": true, sharedstorage.LocalProvider: true}
 	if allowS3 {
 		validStorageProvider[sharedstorage.S3Provider] = true

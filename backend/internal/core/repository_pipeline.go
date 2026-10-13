@@ -1080,17 +1080,23 @@ func (r *Repository) automateClientOperationalSourceGate(ctx context.Context, co
 		targetType, targetID = "subcontractor_reconciliation", cleanID(row["target_id"])
 	case "source.subcontractor_acceptance_package_ready":
 		metadata["label"] = "Gói nghiệm thu thầu phụ"
-		metadata["route"] = fmt.Sprintf("/projects/%s/acceptance", projectID)
+		metadata["route"] = fmt.Sprintf("/work-items/%s#subcontractor-reconciliation", workItemID)
 		row, err = r.QueryOne(ctx, `
-			SELECT COUNT(*) AS submitted_reconciliations,MAX(id::text) AS target_id
-			FROM subcontractor_checklist_reconciliations
-			WHERE project_id=$1 AND status='submitted'
-		`, projectID)
+			SELECT COUNT(*) AS submitted_reconciliations,MAX(scr.id::text) AS target_id
+			FROM subcontractor_checklist_reconciliations scr
+			JOIN workflow_form_instances wfi ON wfi.id=scr.form_instance_id AND wfi.project_id=scr.project_id AND wfi.work_item_id=scr.work_item_id
+			JOIN work_items wi ON wi.id=scr.work_item_id AND wi.project_id=scr.project_id
+			JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+			WHERE scr.project_id=$1 AND scr.work_item_id=$2 AND scr.status='submitted'
+			AND wfi.status='submitted' AND scr.form_revision_no=wfi.current_revision
+			AND wft.code='client_subcontractor_acceptance_package'
+			AND wfi.id=(SELECT id FROM workflow_form_instances WHERE work_item_id=wi.id AND project_id=wi.project_id AND status<>'cancelled' ORDER BY created_at DESC LIMIT 1)
+		`, projectID, workItemID)
 		reconciliationReady := number(row["submitted_reconciliations"]) > 0
 		ready = reconciliationReady
 		reason = "Đối chiếu checklist/khối lượng thầu phụ chưa được chốt"
 		metadata["checks"] = []Record{
-			workflowSourceReadinessCheck("subcontractor_reconciliation", "Đối chiếu thầu phụ đã chốt", reconciliationReady, "Chốt checklist và khối lượng tại workspace Nghiệm thu.", fmt.Sprintf("/projects/%s/acceptance", projectID)),
+			workflowSourceReadinessCheck("subcontractor_reconciliation", "Đối chiếu thầu phụ đã chốt", reconciliationReady, "Chốt đối soát của đúng phiên bản biểu mẫu tại đầu việc này.", fmt.Sprintf("/work-items/%s#subcontractor-reconciliation", workItemID)),
 		}
 		targetType, targetID = "subcontractor_reconciliation", cleanID(row["target_id"])
 	case "acceptance.incoming_material":

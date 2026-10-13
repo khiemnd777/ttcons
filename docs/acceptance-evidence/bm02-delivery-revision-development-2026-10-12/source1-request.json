@@ -1,0 +1,36 @@
+{
+  "report_date": "2026-10-12",
+  "weather": "[Synthetic] Nắng — Lần 1",
+  "progress_percent": 25,
+  "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+  "done_items": [
+    {
+      "title": "[Synthetic] LẦN 1 — Kiểm tra bề mặt ô BM02",
+      "location": "[Synthetic] Ô BM02-L1"
+    }
+  ],
+  "current_items": [],
+  "next_items": [],
+  "blockers": [],
+  "field_notes": "[Synthetic] NỘI DUNG LẦN 1 — Giữ nguyên nội dung và ảnh khi xem lại lần gửi cũ.",
+  "crew_items": [
+    {
+      "crew_name": "[Synthetic] Tổ thử BM02",
+      "worker_count": 3,
+      "work_hours": 8,
+      "note": "[Synthetic] Lần 1"
+    }
+  ],
+  "material_items": [],
+  "supervision_assessments": [],
+  "material_arrival_items": [],
+  "evidence_ids": [
+    "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b"
+  ],
+  "primary_evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+  "manpower_summary": "[Synthetic] 3 người",
+  "material_usage_summary": "",
+  "delivery": {
+    "mode": "draft"
+  }
+}

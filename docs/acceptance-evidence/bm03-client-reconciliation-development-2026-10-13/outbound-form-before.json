@@ -1,0 +1,148 @@
+{
+  "answers": {},
+  "auto_advance_when_ready": false,
+  "available": true,
+  "capabilities": {
+    "can_add_confirmation": false,
+    "can_amend": false,
+    "can_delete_pdf": false,
+    "can_generate_pdf": false
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:56:15Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "4a450bad-3e8e-465e-8f22-1b296a9958ee",
+      "instance_id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "hardcopy_set",
+      "field_type": "textarea",
+      "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+      "help_text": null,
+      "id": "3dfb3d52-a641-4229-9b7b-4135cf9a497e",
+      "label": "Bộ hồ sơ bản cứng",
+      "options_json": [],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {
+        "max_length": 4000,
+        "min_length": 3
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "receiver",
+      "field_type": "text",
+      "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+      "help_text": null,
+      "id": "3d9f1593-9eb4-4919-8dbf-628d43f1caaa",
+      "label": "Người nhận",
+      "options_json": [],
+      "order_index": 20,
+      "required": true,
+      "validation_json": {
+        "max_length": 160,
+        "min_length": 2
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "delivery_method",
+      "field_type": "select",
+      "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+      "help_text": null,
+      "id": "01afeb2d-11ef-4f98-9143-80a0111e59cb",
+      "label": "Cách gửi",
+      "options_json": [
+        {
+          "label": "Giao trực tiếp",
+          "value": "hand_delivery"
+        },
+        {
+          "label": "Chuyển phát",
+          "value": "courier"
+        },
+        {
+          "label": "CĐT nhận tại văn phòng",
+          "value": "client_pickup"
+        },
+        {
+          "label": "Khác",
+          "value": "other"
+        }
+      ],
+      "order_index": 30,
+      "required": true,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {},
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:56:15Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 0,
+    "form_code": "client_hardcopy_dispatch",
+    "form_description": "Ghi nhận bộ hồ sơ bản cứng, phương thức gửi, người nhận và minh chứng bàn giao.",
+    "form_name": "Gửi bản cứng hợp đồng / hồ sơ tạm ứng",
+    "form_template_id": "a979ef94-ada2-4ffb-bfd2-35769898d460",
+    "form_type": "generic_submission",
+    "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+    "form_version_no": 3,
+    "form_version_status": "published",
+    "id": "e88366dc-71bd-4356-bbac-ce890e18e6e2",
+    "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "Bộ phận HĐ"
+    ],
+    "run_node_id": "e2c1f726-03bc-47cd-892e-6badfb4a6a01",
+    "run_step_id": "5013c2dc-802e-4ed1-95b8-9f8575b0d979",
+    "status": "draft",
+    "submitted_at": null,
+    "submitted_by": null,
+    "template_step_id": "0a81bdb8-054d-4f76-980b-b223606cc526",
+    "title": "Hoàn tất gói hợp đồng chủ đầu tư",
+    "updated_at": "2026-10-12T23:56:15Z",
+    "work_item_id": "37d90fa3-abe5-4bbe-af17-34b1990730fb",
+    "work_item_status": "pending",
+    "work_item_title": "Hoàn tất gói hợp đồng chủ đầu tư"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [],
+  "suggested_answers": {},
+  "template": {
+    "code": "client_hardcopy_dispatch",
+    "description": "Ghi nhận bộ hồ sơ bản cứng, phương thức gửi, người nhận và minh chứng bàn giao.",
+    "form_type": "generic_submission",
+    "id": "a979ef94-ada2-4ffb-bfd2-35769898d460",
+    "name": "Gửi bản cứng hợp đồng / hồ sơ tạm ứng"
+  },
+  "version": {
+    "id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+    "status": "published",
+    "version_no": 3
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "d941b922-f367-41ed-87c0-2a03cf2219b8",
+    "event_type": "native_source_exported",
+    "target_type": "native_source",
+    "target_id": null
+  },
+  {
+    "id": "8d0c0225-de94-4504-b565-4ff4b14bcabb",
+    "event_type": "native_source_exported",
+    "target_type": "native_source",
+    "target_id": null
+  }
+]

@@ -7,17 +7,20 @@ import { createCameraCaptureSession } from './cameraCaptureSession';
 import { EvidenceDraftViewerDialog, formatEvidenceFileSize } from './EvidenceRecordViewerDialog';
 import { EvidenceUploader, type EvidenceUploadRow } from './EvidenceUploader';
 import { evidenceUploadSnapshot, retryEvidenceUpload, subscribeEvidenceUpload } from './evidenceUploadSession';
-import { classifyEvidenceFile, evidenceFileAccept, evidenceSupportedFileHint, type EvidenceFileKind } from './evidenceFileTypes';
+import { classifyEvidenceFile, evidenceAcceptForKinds, evidenceFileAllowed, evidenceSupportedFileHint, type EvidenceFileKind } from './evidenceFileTypes';
 import { useValidationNavigation } from '../../lib/utils/formValidationNavigation';
 import { useEffect } from 'react';
+import { appendEvidenceCaptureMetadata, type EvidenceCaptureMetadata } from './evidenceCaptureMetadata';
 
 export const constructionEvidenceMaxBytes = 10 * 1024 * 1024;
 export type ConstructionEvidenceUploadDraft = {
   id: string; file: File; evidenceType: 'photo' | 'document';
   fileKind: EvidenceFileKind; name: string; caption: string;
+  captureMetadata?: EvidenceCaptureMetadata;
 };
 export type EvidenceCaptureIntent = 'file' | 'camera';
 type ConstructionEvidenceCaptureProps = {
+  allowedFileKinds?: readonly EvidenceFileKind[];
   drafts: ConstructionEvidenceUploadDraft[];
   onChange: (drafts: ConstructionEvidenceUploadDraft[]) => void;
   hasSource: boolean;
@@ -29,7 +32,7 @@ type ConstructionEvidenceCaptureProps = {
   onSourceRequired?: (intent: EvidenceCaptureIntent, resume: () => void) => void;
 };
 
-export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, uploadScope, linkOnUpload = false, disabled = false, hint, maxFiles = 10, onSourceRequired }: ConstructionEvidenceCaptureProps) {
+export function ConstructionEvidenceCapture({ allowedFileKinds, drafts, onChange, hasSource, uploadScope, linkOnUpload = false, disabled = false, hint, maxFiles = 10, onSourceRequired }: ConstructionEvidenceCaptureProps) {
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fallbackCameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -48,15 +51,15 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, uploa
   const uploadRows: EvidenceUploadRow[] = drafts.map((draft) => ({ ...draft, classification: classifyEvidenceFile(draft.file), fileIssue: '', ...evidenceUploadSnapshot(draft, uploadScope) }));
   const uploading = disabled || uploadRows.some((row) => row.status === 'uploading' || row.status === 'processing');
 
-  function addFiles(files: File[], replaceId?: string) {
+  function addFiles(files: File[], replaceId?: string, captureMetadata?: EvidenceCaptureMetadata) {
     if (uploading) return false;
     let issue = '';
     const valid: ConstructionEvidenceUploadDraft[] = [];
     files.forEach((file) => {
       const classification = classifyEvidenceFile(file);
-      if (!classification) { issue = `${file.name}: chỉ nhận ${evidenceSupportedFileHint}.`; return; }
+      if (!classification || !evidenceFileAllowed(file, allowedFileKinds)) { issue = `${file.name}: chỉ nhận ${allowedFileKinds?.length === 1 && allowedFileKinds[0] === 'photo' ? 'PNG/JPG/JPEG/WebP/GIF' : evidenceSupportedFileHint}.`; return; }
       if (file.size <= 0 || file.size > constructionEvidenceMaxBytes) { issue = `${file.name}: tệp phải có nội dung, tối đa ${formatEvidenceFileSize(constructionEvidenceMaxBytes)}.`; return; }
-      valid.push({ id: newDraftID(), file, evidenceType: classification.evidenceType, fileKind: classification.kind, name: file.name, caption: '' });
+      valid.push({ id: newDraftID(), file, evidenceType: classification.evidenceType, fileKind: classification.kind, name: file.name, caption: '', captureMetadata: classification.kind === 'photo' ? { ...captureMetadata } : undefined });
     });
     const previous = draftsRef.current;
     const replacing = previous.some((draft) => draft.id === replaceId);
@@ -80,13 +83,13 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, uploa
     const row = uploadRows.find((item) => item.id === id);
     if (!row || uploading || row.status === 'success') return;
     const next = update(row);
-    onChange(drafts.map((draft) => draft.id === id ? { ...draft, name: next.name, caption: next.caption } : draft));
+    onChange(drafts.map((draft) => draft.id === id ? { ...draft, name: next.name, caption: next.caption, captureMetadata: next.captureMetadata } : draft));
   }
   const rows = uploadRows.length ? uploadRows : [{ id: 'evidence_files', file: null, classification: null, name: '', caption: '', fileIssue, status: 'queued' as const, progress: 0, error: '' }];
   return <div ref={captureRef} className="min-w-0 rounded-md border border-blue-100 bg-blue-50/40 p-3" data-validation-key="evidence_files" data-validation-error={fileIssue ? 'true' : undefined}>
-    <input ref={fileInputRef} type="file" multiple accept={evidenceFileAccept} className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
+    <input ref={fileInputRef} type="file" multiple accept={evidenceAcceptForKinds(allowedFileKinds)} className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
     <input ref={fallbackCameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { addFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} />
-    <EvidenceUploader uploadRows={rows} batchUploading={uploading} maxFiles={maxFiles}
+    <EvidenceUploader allowedFileKinds={allowedFileKinds} uploadRows={rows} batchUploading={uploading} maxFiles={maxFiles}
       updateUploadRow={updateUploadRow}
       onFileChange={(id, file, input) => { if (file) requestCapture('file', () => addFiles([file], id)); input.value = ''; }}
       addUploadRow={() => requestCapture('file', () => fileInputRef.current?.click())}
@@ -100,7 +103,7 @@ export function ConstructionEvidenceCapture({ drafts, onChange, hasSource, uploa
     <p className="mt-2 text-xs text-slate-500">{hint ?? 'Tệp được tải lên khi lưu cùng công việc liên quan đã chọn.'}</p>
     {!hasSource && drafts.length ? <p className="mt-2 text-xs text-amber-800">Đã giữ {drafts.length} tệp trong hàng đợi. Chọn công việc liên quan trước khi lưu.</p> : null}
     {uploadRows.some((row) => row.status === 'success') ? <p className="mt-2 text-xs text-emerald-700">{linkOnUpload ? 'Tệp tải thành công đã được đính kèm vào báo cáo.' : 'Đã giữ tệp tải thành công. Lưu để hoàn tất đính kèm.'}</p> : null}
-    <CameraCaptureModal open={cameraOpen && !uploading} selectedCount={drafts.filter((draft) => draft.evidenceType === 'photo').length} atCapacity={drafts.length >= maxFiles} onClose={() => setCameraOpen(false)} onUse={(file) => addFiles([file])} onFallback={() => { setCameraOpen(false); fallbackCameraInputRef.current?.click(); }} />
+    <CameraCaptureModal open={cameraOpen && !uploading} selectedCount={drafts.filter((draft) => draft.evidenceType === 'photo').length} atCapacity={drafts.length >= maxFiles} onClose={() => setCameraOpen(false)} onUse={(file, capturedAt) => addFiles([file], undefined, { captured_at: capturedAt })} onFallback={() => { setCameraOpen(false); fallbackCameraInputRef.current?.click(); }} />
     <EvidenceDraftViewerDialog open={Boolean(preview)} name={preview?.name ?? 'Minh chứng'} originalName={preview?.file.name ?? ''} file={preview?.file} mimeType={preview?.file.type} fileSize={preview?.file.size ?? 0} caption={preview?.caption} onClose={() => setPreview(null)} />
   </div>;
 }
@@ -114,16 +117,17 @@ export function constructionEvidenceFormData(draft: ConstructionEvidenceUploadDr
   formData.append('visibility', 'internal');
   formData.append('name', draft.name.trim() || draft.file.name);
   if (draft.caption.trim()) formData.append('caption', draft.caption.trim());
+  if (classification?.kind === 'photo') appendEvidenceCaptureMetadata(formData, draft.captureMetadata);
   return formData;
 }
 
-function CameraCaptureModal({ open, selectedCount = 0, atCapacity = false, onClose, onUse, onFallback }: { open: boolean; selectedCount?: number; atCapacity?: boolean; onClose: () => void; onUse: (file: File) => boolean; onFallback: () => void }) {
+function CameraCaptureModal({ open, selectedCount = 0, atCapacity = false, onClose, onUse, onFallback }: { open: boolean; selectedCount?: number; atCapacity?: boolean; onClose: () => void; onUse: (file: File, capturedAt: string) => boolean; onFallback: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState('');
-  const [captured, setCaptured] = useState<{ file: File; url: string } | null>(null);
+  const [captured, setCaptured] = useState<{ file: File; url: string; capturedAt: string } | null>(null);
   const [captureBusy, setCaptureBusy] = useState(false);
   const captureSession = useRef(createCameraCaptureSession());
   const usedFile = useRef<File | null>(null);
@@ -188,13 +192,15 @@ function CameraCaptureModal({ open, selectedCount = 0, atCapacity = false, onClo
     setCaptureBusy(true);
     setError('');
     try {
+      // Keep the shutter instant with its frame across encoding and user review.
+      const capturedAt = new Date().toISOString();
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
         if (!captureSession.current.finish(ticket)) return;
         setCaptureBusy(false);
         if (!blob) { setError('Không tạo được ảnh. Vui lòng chụp lại.'); return; }
-        const file = new File([blob], `hien-truong-${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`, { type: 'image/jpeg' });
-        setCaptured((current) => { if (current) URL.revokeObjectURL(current.url); return { file, url: URL.createObjectURL(file) }; });
+        const file = new File([blob], `hien-truong-${capturedAt.replace(/[:.]/g, '-')}.jpg`, { type: 'image/jpeg' });
+        setCaptured((current) => { if (current) URL.revokeObjectURL(current.url); return { file, url: URL.createObjectURL(file), capturedAt }; });
       }, 'image/jpeg', 0.9);
     } catch {
       if (captureSession.current.finish(ticket)) {
@@ -206,7 +212,7 @@ function CameraCaptureModal({ open, selectedCount = 0, atCapacity = false, onClo
 
   function useCaptured(keepOpen = false) {
     if (!captured || usedFile.current === captured.file) return;
-    if (!onUse(captured.file)) return;
+    if (!onUse(captured.file, captured.capturedAt)) return;
     usedFile.current = captured.file;
     if (keepOpen) setCaptured(null);
     else close();

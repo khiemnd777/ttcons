@@ -1,0 +1,1047 @@
+{
+  "checks_passed": 253,
+  "checks": [
+    {
+      "label": "database and migration count unchanged",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: projects",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: project_members",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: work_items",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: pipeline_templates",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: pipeline_template_nodes",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: pipeline_template_steps",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: pipeline_template_edges",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: pipeline_runs",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: pipeline_run_nodes",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: pipeline_run_steps",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: workflow_form_templates",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: workflow_form_versions",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: workflow_form_fields",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: workflow_form_instances",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: workflow_form_events",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: workflow_form_signatures",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: workflow_form_pdf_exports",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: acceptance_records",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: acceptance_checklist_items",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: handover_records",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: handover_checklist_items",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: documents",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: evidence_records",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: work_reports",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: work_report_revisions",
+      "passed": true
+    },
+    {
+      "label": "retained rows unchanged: work_report_events",
+      "passed": true
+    },
+    {
+      "label": "968 application files unchanged",
+      "passed": true
+    },
+    {
+      "label": "final acceptance completed pass with derived actual signature/PDF links",
+      "passed": true
+    },
+    {
+      "label": "internal test signature belongs to same submitted form/revision",
+      "passed": true
+    },
+    {
+      "label": "handover actually completed, correct project and final acceptance",
+      "passed": true
+    },
+    {
+      "label": "six verified required items; no readiness blockers",
+      "passed": true
+    },
+    {
+      "label": "warehouse/documents ready from source checks",
+      "passed": true
+    },
+    {
+      "label": "manual item linked to actual same-project document: operation_manuals",
+      "passed": true
+    },
+    {
+      "label": "manual item linked to actual same-project document: warranty_documents",
+      "passed": true
+    },
+    {
+      "label": "manual item linked to actual same-project document: signed_handover_minutes",
+      "passed": true
+    },
+    {
+      "label": "manual item linked to actual same-project document: as_built_documents",
+      "passed": true
+    },
+    {
+      "label": "client package own reconciliation unsupported is explicit",
+      "passed": true
+    },
+    {
+      "label": "builtin reconciliation submitted against exact own source",
+      "passed": true
+    },
+    {
+      "label": "official source readiness captured read-only, no completion claim",
+      "passed": true
+    },
+    {
+      "label": "isolated template is engine2; no official gate parity claim",
+      "passed": true
+    },
+    {
+      "label": "accounting closure intentionally not completed",
+      "passed": true
+    },
+    {
+      "label": "byte-equal actual browser download: bm03builtin",
+      "passed": true
+    },
+    {
+      "label": "one native source sheet: bm03builtin",
+      "passed": true
+    },
+    {
+      "label": "exact source sheet imported: bm03builtin",
+      "passed": true
+    },
+    {
+      "label": "zero effective cell errors including VALUE: bm03builtin",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A1",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A2",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A3",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A5",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value B5",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value E5",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value F5",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A6",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value B6",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value E6",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value F6",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A8",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value B8",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value C8",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value D8",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value E8",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value F8",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value G8",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value A9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value B9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value C9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value D9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value E9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value F9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value G9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value A10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value B10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value C10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value D10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value E10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value F10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value G10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value A11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value B11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value C11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value D11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value E11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin numeric source value F11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value G11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A13",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A15",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A16",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A17",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A18",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A19",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A20",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A21",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A22",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A23",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A24",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A25",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A26",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A27",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A28",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A29",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value C29",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value E29",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value A30",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value C30",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin text source value E30",
+      "passed": true
+    },
+    {
+      "label": "all60 populated cells verified: bm03builtin",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin separates measured versus reconciled quantity row9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin criteria and explicit quality source row9",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin separates measured versus reconciled quantity row10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin criteria and explicit quality source row10",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin separates measured versus reconciled quantity row11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin criteria and explicit quality source row11",
+      "passed": true
+    },
+    {
+      "label": "bm03builtin conclusion matches source",
+      "passed": true
+    },
+    {
+      "label": "byte-equal actual browser download: bm03client",
+      "passed": true
+    },
+    {
+      "label": "one native source sheet: bm03client",
+      "passed": true
+    },
+    {
+      "label": "exact source sheet imported: bm03client",
+      "passed": true
+    },
+    {
+      "label": "zero effective cell errors including VALUE: bm03client",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A1",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A2",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A3",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A5",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value B5",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value E5",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value F5",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A6",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value B6",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value E6",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value F6",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A8",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value B8",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value C8",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value D8",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value E8",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value F8",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value G8",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value A9",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value B9",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value C9",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value D9",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value E9",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value F9",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value G9",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value A10",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value B10",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value C10",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value D10",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value E10",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value F10",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value G10",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value A11",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value B11",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value C11",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value D11",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value E11",
+      "passed": true
+    },
+    {
+      "label": "bm03client numeric source value F11",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value G11",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A13",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A15",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A16",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A17",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A18",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A19",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A20",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A21",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A22",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A23",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A24",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A25",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A26",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A27",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A28",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A29",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value C29",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value E29",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value A30",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value C30",
+      "passed": true
+    },
+    {
+      "label": "bm03client text source value E30",
+      "passed": true
+    },
+    {
+      "label": "all60 populated cells verified: bm03client",
+      "passed": true
+    },
+    {
+      "label": "bm03client separates measured versus reconciled quantity row9",
+      "passed": true
+    },
+    {
+      "label": "bm03client criteria and explicit quality source row9",
+      "passed": true
+    },
+    {
+      "label": "bm03client separates measured versus reconciled quantity row10",
+      "passed": true
+    },
+    {
+      "label": "bm03client criteria and explicit quality source row10",
+      "passed": true
+    },
+    {
+      "label": "bm03client separates measured versus reconciled quantity row11",
+      "passed": true
+    },
+    {
+      "label": "bm03client criteria and explicit quality source row11",
+      "passed": true
+    },
+    {
+      "label": "bm03client conclusion matches source",
+      "passed": true
+    },
+    {
+      "label": "byte-equal actual browser download: bm08",
+      "passed": true
+    },
+    {
+      "label": "one native source sheet: bm08",
+      "passed": true
+    },
+    {
+      "label": "exact source sheet imported: bm08",
+      "passed": true
+    },
+    {
+      "label": "zero effective cell errors including VALUE: bm08",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A1",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A2",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A3",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A5",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B5",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value E5",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value F5",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A7",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B7",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C7",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D7",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value E7",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value F7",
+      "passed": true
+    },
+    {
+      "label": "bm08 numeric source value A8",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B8",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C8",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D8",
+      "passed": true
+    },
+    {
+      "label": "bm08 numeric source value A9",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B9",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C9",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D9",
+      "passed": true
+    },
+    {
+      "label": "bm08 numeric source value A10",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B10",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C10",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D10",
+      "passed": true
+    },
+    {
+      "label": "bm08 numeric source value A11",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B11",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C11",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D11",
+      "passed": true
+    },
+    {
+      "label": "bm08 numeric source value A12",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B12",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C12",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D12",
+      "passed": true
+    },
+    {
+      "label": "bm08 numeric source value A13",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B13",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C13",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D13",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A15",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A17",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A18",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A19",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A20",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A21",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A22",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A23",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A24",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A25",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A26",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A27",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A28",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A29",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A30",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A31",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B31",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C31",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D31",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value A32",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value B32",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value C32",
+      "passed": true
+    },
+    {
+      "label": "bm08 text source value D32",
+      "passed": true
+    },
+    {
+      "label": "all60 populated cells verified: bm08",
+      "passed": true
+    },
+    {
+      "label": "BM08 six native rows and source conclusion",
+      "passed": true
+    },
+    {
+      "label": "BM08 no invented defect deadline",
+      "passed": true
+    }
+  ],
+  "files": [
+    {
+      "name": "BM03-builtin-submitted.xlsx",
+      "downloaded_path": "/Users/khiemnguyen/Downloads/BM-GS-03 (10).xlsx",
+      "sha256": "b468aff395f1838bb99569a7a5bd4ceec41a19e36421140269dde62e78172018",
+      "google_id": "1J639lD-1oV-M4rrlzfTe4fiXO-oVR9D3DIOylf25vCs",
+      "source_range": "A1:G30",
+      "verified_populated_cells": 60,
+      "effective_errors": []
+    },
+    {
+      "name": "BM03-client-submitted.xlsx",
+      "downloaded_path": "/Users/khiemnguyen/Downloads/BM-GS-03 (11).xlsx",
+      "sha256": "0ca58c98b5ba4c477b7fa4437413467c0c4fc24309f9668f79ae568a4bbefef7",
+      "google_id": "1TseWwvZy1iFQLFHB6oWrecPr9aGN7LVW_sH9npzvelI",
+      "source_range": "A1:G30",
+      "verified_populated_cells": 60,
+      "effective_errors": []
+    },
+    {
+      "name": "BM08-handed-over.xlsx",
+      "downloaded_path": "/Users/khiemnguyen/Downloads/BM-GS-08 (7).xlsx",
+      "sha256": "c90ba269c5e583b83058f4ecd4c8e44d307491b3e1f186684b9dfee3bc43ac50",
+      "google_id": "10azuQoYtNei0hdAtud0GBiuEbSfrQ7CEDMJ5WnaxkPk",
+      "source_range": "A1:F32",
+      "verified_populated_cells": 60,
+      "effective_errors": []
+    }
+  ],
+  "scope": "Isolated synthetic Development dossier/export UAT. Full official Rev10 and accounting closure NOT_RUN. User visual acceptance pending. No workbook mutation."
+}

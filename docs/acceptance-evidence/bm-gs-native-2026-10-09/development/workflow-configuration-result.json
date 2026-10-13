@@ -1,0 +1,23 @@
+{
+  "source_id": "40000000-0000-0000-0000-000000000028",
+  "source_revision": 9,
+  "new_id": "60e28e04-1183-4d1f-a357-0c2e821442bf",
+  "new_revision": 10,
+  "changed_pins": [
+    {
+      "step": "incoming.subcontractor_package",
+      "from": "48100000-0000-0000-0000-000000000004",
+      "to": "0845e4bc-a008-48bc-be5e-6d873dad8d43"
+    }
+  ],
+  "original_definition_unchanged": true,
+  "nodes_steps_edges_unchanged_except_approved_pins_and_final_permissions": true,
+  "final_required_permission": "handover.view",
+  "final_permissions": [
+    "handover.view",
+    "handover.approve",
+    "accounting_handoff.view",
+    "accounting_handoff.acknowledge"
+  ],
+  "per_step_permissions_retained": true
+}

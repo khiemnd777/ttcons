@@ -1,0 +1,2001 @@
+{
+  "builtin": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "spreadsheetId": "1jBVLytRioWtM_6PUYkYhZ-hue6kA6XT8mw_054nlg6M",
+      "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1jBVLytRioWtM_6PUYkYhZ-hue6kA6XT8mw_054nlg6M/edit",
+      "properties": {
+        "title": "BM03 — Development — File từ Xuất báo cáo — 2026-10-09",
+        "locale": "en_US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "sheets": [
+        {
+          "properties": {
+            "sheetId": 42176848,
+            "title": "2026-10-09_01",
+            "index": 0,
+            "sheetType": "GRID",
+            "gridProperties": {
+              "rowCount": 1000,
+              "columnCount": 26,
+              "rowGroupControlAfter": true,
+              "columnGroupControlAfter": true
+            }
+          },
+          "data": [
+            {
+              "rowData": [
+                {
+                  "values": [
+                    {
+                      "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                      "userEnteredValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)",
+                      "userEnteredValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG",
+                      "userEnteredValue": {
+                        "stringValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Số biên bản:",
+                      "userEnteredValue": {
+                        "stringValue": "Số biên bản:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Số biên bản:"
+                      }
+                    },
+                    {
+                      "formattedValue": "NT-DEV-20261009-01",
+                      "userEnteredValue": {
+                        "stringValue": "NT-DEV-20261009-01"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "NT-DEV-20261009-01"
+                      }
+                    },
+                    {},
+                    {},
+                    {
+                      "formattedValue": "Ngày nghiệm thu:",
+                      "userEnteredValue": {
+                        "stringValue": "Ngày nghiệm thu:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Ngày nghiệm thu:"
+                      }
+                    },
+                    {
+                      "formattedValue": "2026-10-09",
+                      "userEnteredValue": {
+                        "stringValue": "2026-10-09"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "2026-10-09"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Hạng mục nghiệm thu:",
+                      "userEnteredValue": {
+                        "stringValue": "Hạng mục nghiệm thu:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hạng mục nghiệm thu:"
+                      }
+                    },
+                    {
+                      "formattedValue": "Sàn",
+                      "userEnteredValue": {
+                        "stringValue": "Sàn"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sàn"
+                      }
+                    },
+                    {},
+                    {},
+                    {
+                      "formattedValue": "Thầu phụ thi công:",
+                      "userEnteredValue": {
+                        "stringValue": "Thầu phụ thi công:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Thầu phụ thi công:"
+                      }
+                    },
+                    {
+                      "formattedValue": "Đội sàn thử development",
+                      "userEnteredValue": {
+                        "stringValue": "Đội sàn thử development"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Đội sàn thử development"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "STT",
+                      "userEnteredValue": {
+                        "stringValue": "STT"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "STT"
+                      }
+                    },
+                    {
+                      "formattedValue": "NỘI DUNG NGHỊỆM THU",
+                      "userEnteredValue": {
+                        "stringValue": "NỘI DUNG NGHỊỆM THU"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "NỘI DUNG NGHỊỆM THU"
+                      }
+                    },
+                    {
+                      "formattedValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU",
+                      "userEnteredValue": {
+                        "stringValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU"
+                      }
+                    },
+                    {
+                      "formattedValue": "YÊU CẦU KỸ THUẬT",
+                      "userEnteredValue": {
+                        "stringValue": "YÊU CẦU KỸ THUẬT"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "YÊU CẦU KỸ THUẬT"
+                      }
+                    },
+                    {
+                      "formattedValue": "KL THIẾT KẾ",
+                      "userEnteredValue": {
+                        "stringValue": "KL THIẾT KẾ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KL THIẾT KẾ"
+                      }
+                    },
+                    {
+                      "formattedValue": "KL THỰC TẾ",
+                      "userEnteredValue": {
+                        "stringValue": "KL THỰC TẾ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KL THỰC TẾ"
+                      }
+                    },
+                    {
+                      "formattedValue": "KẾT QUẢ & ĐÁNH GIÁ",
+                      "userEnteredValue": {
+                        "stringValue": "KẾT QUẢ & ĐÁNH GIÁ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KẾT QUẢ & ĐÁNH GIÁ"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "1",
+                      "userEnteredValue": {
+                        "numberValue": 1
+                      },
+                      "effectiveValue": {
+                        "numberValue": 1
+                      }
+                    },
+                    {
+                      "formattedValue": "Sàn tầng 1 — dữ liệu thử",
+                      "userEnteredValue": {
+                        "stringValue": "Sàn tầng 1 — dữ liệu thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sàn tầng 1 — dữ liệu thử"
+                      }
+                    },
+                    {
+                      "formattedValue": "Tiêu chuẩn nội bộ — dữ liệu thử • BV-DEV-01 Rev A",
+                      "userEnteredValue": {
+                        "stringValue": "Tiêu chuẩn nội bộ — dữ liệu thử • BV-DEV-01 Rev A"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Tiêu chuẩn nội bộ — dữ liệu thử • BV-DEV-01 Rev A"
+                      }
+                    },
+                    {
+                      "formattedValue": "Bề mặt phẳng theo yêu cầu đã ghi nhận",
+                      "userEnteredValue": {
+                        "stringValue": "Bề mặt phẳng theo yêu cầu đã ghi nhận"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Bề mặt phẳng theo yêu cầu đã ghi nhận"
+                      }
+                    },
+                    {
+                      "formattedValue": "24 m2",
+                      "userEnteredValue": {
+                        "numberValue": 24
+                      },
+                      "effectiveValue": {
+                        "numberValue": 24
+                      }
+                    },
+                    {
+                      "formattedValue": "23.5 m2",
+                      "userEnteredValue": {
+                        "numberValue": 23.5
+                      },
+                      "effectiveValue": {
+                        "numberValue": 23.5
+                      }
+                    },
+                    {
+                      "formattedValue": "Không đạt · Cần sửa mạch sàn; kết quả thực tế khác trạng thái hoàn tất checklist.",
+                      "userEnteredValue": {
+                        "stringValue": "Không đạt · Cần sửa mạch sàn; kết quả thực tế khác trạng thái hoàn tất checklist."
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Không đạt · Cần sửa mạch sàn; kết quả thực tế khác trạng thái hoàn tất checklist."
+                      }
+                    }
+                  ]
+                },
+                {},
+                {},
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "KẾT LUẬN NGHIỆM THU: [   ] ĐỒNG Ý NGHIỆM THU  |  [ X ] CẦN SỬA CHỮA TỒN TẠI",
+                      "userEnteredValue": {
+                        "stringValue": "KẾT LUẬN NGHIỆM THU: [   ] ĐỒNG Ý NGHIỆM THU  |  [ X ] CẦN SỬA CHỮA TỒN TẠI"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KẾT LUẬN NGHIỆM THU: [   ] ĐỒNG Ý NGHIỆM THU  |  [ X ] CẦN SỬA CHỮA TỒN TẠI"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)",
+                      "userEnteredValue": {
+                        "stringValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Sàn tầng 1 — dữ liệu thử · Trạng thái checklist: Đã thực hiện",
+                      "userEnteredValue": {
+                        "stringValue": "Sàn tầng 1 — dữ liệu thử · Trạng thái checklist: Đã thực hiện"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sàn tầng 1 — dữ liệu thử · Trạng thái checklist: Đã thực hiện"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                      "userEnteredValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "ĐẠI DIỆN THẦU PHỤ (24/7)",
+                      "userEnteredValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                      "userEnteredValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "isError": false
+  },
+  "client": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "spreadsheetId": "1SOumXdGnhJ-YwOnrZrRK6-oCpJIsr1KGA6NKWw34JAY",
+      "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1SOumXdGnhJ-YwOnrZrRK6-oCpJIsr1KGA6NKWw34JAY/edit",
+      "properties": {
+        "title": "BM03 — Gói nghiệm thu client — Development — 2026-10-09",
+        "locale": "en_US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "sheets": [
+        {
+          "properties": {
+            "sheetId": 2075100073,
+            "title": "2026-10-09_01",
+            "index": 0,
+            "sheetType": "GRID",
+            "gridProperties": {
+              "rowCount": 1000,
+              "columnCount": 26,
+              "rowGroupControlAfter": true,
+              "columnGroupControlAfter": true
+            }
+          },
+          "data": [
+            {
+              "rowData": [
+                {
+                  "values": [
+                    {
+                      "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                      "userEnteredValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)",
+                      "userEnteredValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG",
+                      "userEnteredValue": {
+                        "stringValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Số biên bản:",
+                      "userEnteredValue": {
+                        "stringValue": "Số biên bản:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Số biên bản:"
+                      }
+                    },
+                    {
+                      "formattedValue": "NT-DEV-CLIENT-20261009-02",
+                      "userEnteredValue": {
+                        "stringValue": "NT-DEV-CLIENT-20261009-02"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "NT-DEV-CLIENT-20261009-02"
+                      }
+                    },
+                    {},
+                    {},
+                    {
+                      "formattedValue": "Ngày nghiệm thu:",
+                      "userEnteredValue": {
+                        "stringValue": "Ngày nghiệm thu:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Ngày nghiệm thu:"
+                      }
+                    },
+                    {
+                      "formattedValue": "2026-10-09",
+                      "userEnteredValue": {
+                        "stringValue": "2026-10-09"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "2026-10-09"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Hạng mục nghiệm thu:",
+                      "userEnteredValue": {
+                        "stringValue": "Hạng mục nghiệm thu:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hạng mục nghiệm thu:"
+                      }
+                    },
+                    {
+                      "formattedValue": "Sơn",
+                      "userEnteredValue": {
+                        "stringValue": "Sơn"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sơn"
+                      }
+                    },
+                    {},
+                    {},
+                    {
+                      "formattedValue": "Thầu phụ thi công:",
+                      "userEnteredValue": {
+                        "stringValue": "Thầu phụ thi công:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Thầu phụ thi công:"
+                      }
+                    },
+                    {
+                      "formattedValue": "Đội sơn thử development",
+                      "userEnteredValue": {
+                        "stringValue": "Đội sơn thử development"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Đội sơn thử development"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "STT",
+                      "userEnteredValue": {
+                        "stringValue": "STT"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "STT"
+                      }
+                    },
+                    {
+                      "formattedValue": "NỘI DUNG NGHỊỆM THU",
+                      "userEnteredValue": {
+                        "stringValue": "NỘI DUNG NGHỊỆM THU"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "NỘI DUNG NGHỊỆM THU"
+                      }
+                    },
+                    {
+                      "formattedValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU",
+                      "userEnteredValue": {
+                        "stringValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU"
+                      }
+                    },
+                    {
+                      "formattedValue": "YÊU CẦU KỸ THUẬT",
+                      "userEnteredValue": {
+                        "stringValue": "YÊU CẦU KỸ THUẬT"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "YÊU CẦU KỸ THUẬT"
+                      }
+                    },
+                    {
+                      "formattedValue": "KL THIẾT KẾ",
+                      "userEnteredValue": {
+                        "stringValue": "KL THIẾT KẾ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KL THIẾT KẾ"
+                      }
+                    },
+                    {
+                      "formattedValue": "KL THỰC TẾ",
+                      "userEnteredValue": {
+                        "stringValue": "KL THỰC TẾ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KL THỰC TẾ"
+                      }
+                    },
+                    {
+                      "formattedValue": "KẾT QUẢ & ĐÁNH GIÁ",
+                      "userEnteredValue": {
+                        "stringValue": "KẾT QUẢ & ĐÁNH GIÁ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KẾT QUẢ & ĐÁNH GIÁ"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "1",
+                      "userEnteredValue": {
+                        "numberValue": 1
+                      },
+                      "effectiveValue": {
+                        "numberValue": 1
+                      }
+                    },
+                    {
+                      "formattedValue": "Sơn tường tầng 1 — dữ liệu thử",
+                      "userEnteredValue": {
+                        "stringValue": "Sơn tường tầng 1 — dữ liệu thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sơn tường tầng 1 — dữ liệu thử"
+                      }
+                    },
+                    {
+                      "formattedValue": "Tiêu chuẩn sơn — dữ liệu thử • BV-DEV-02 Rev B",
+                      "userEnteredValue": {
+                        "stringValue": "Tiêu chuẩn sơn — dữ liệu thử • BV-DEV-02 Rev B"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Tiêu chuẩn sơn — dữ liệu thử • BV-DEV-02 Rev B"
+                      }
+                    },
+                    {
+                      "formattedValue": "Sơn đồng màu, bề mặt sạch theo phiếu thử",
+                      "userEnteredValue": {
+                        "stringValue": "Sơn đồng màu, bề mặt sạch theo phiếu thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sơn đồng màu, bề mặt sạch theo phiếu thử"
+                      }
+                    },
+                    {
+                      "formattedValue": "40 m2",
+                      "userEnteredValue": {
+                        "numberValue": 40
+                      },
+                      "effectiveValue": {
+                        "numberValue": 40
+                      }
+                    },
+                    {
+                      "formattedValue": "40 m2",
+                      "userEnteredValue": {
+                        "numberValue": 40
+                      },
+                      "effectiveValue": {
+                        "numberValue": 40
+                      }
+                    },
+                    {
+                      "formattedValue": "Đạt · Đã đánh giá thực tế tại nguồn thử.",
+                      "userEnteredValue": {
+                        "stringValue": "Đạt · Đã đánh giá thực tế tại nguồn thử."
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Đạt · Đã đánh giá thực tế tại nguồn thử."
+                      }
+                    }
+                  ]
+                },
+                {},
+                {},
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "KẾT LUẬN NGHIỆM THU: [ X ] ĐỒNG Ý NGHIỆM THU  |  [   ] CẦN SỬA CHỮA TỒN TẠI",
+                      "userEnteredValue": {
+                        "stringValue": "KẾT LUẬN NGHIỆM THU: [ X ] ĐỒNG Ý NGHIỆM THU  |  [   ] CẦN SỬA CHỮA TỒN TẠI"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KẾT LUẬN NGHIỆM THU: [ X ] ĐỒNG Ý NGHIỆM THU  |  [   ] CẦN SỬA CHỮA TỒN TẠI"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)",
+                      "userEnteredValue": {
+                        "stringValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Sơn tường tầng 1 — dữ liệu thử · Trạng thái checklist: Đã thực hiện",
+                      "userEnteredValue": {
+                        "stringValue": "Sơn tường tầng 1 — dữ liệu thử · Trạng thái checklist: Đã thực hiện"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sơn tường tầng 1 — dữ liệu thử · Trạng thái checklist: Đã thực hiện"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                      "userEnteredValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "ĐẠI DIỆN THẦU PHỤ (24/7)",
+                      "userEnteredValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                      "userEnteredValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {},
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "isError": false
+  },
+  "handover_initial": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "spreadsheetId": "1KFMq1BHcStF-GS5NGj-y9n0tRvANCfFkGU66kV2jYao",
+      "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1KFMq1BHcStF-GS5NGj-y9n0tRvANCfFkGU66kV2jYao/edit",
+      "properties": {
+        "title": "BM08 — Development — File từ Xuất báo cáo — 2026-10-09",
+        "locale": "en_US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "sheets": [
+        {
+          "properties": {
+            "sheetId": 1248843118,
+            "title": "2026-10-12_01",
+            "index": 0,
+            "sheetType": "GRID",
+            "gridProperties": {
+              "rowCount": 1000,
+              "columnCount": 26,
+              "rowGroupControlAfter": true,
+              "columnGroupControlAfter": true
+            }
+          },
+          "data": [
+            {
+              "rowData": [
+                {
+                  "values": [
+                    {
+                      "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                      "userEnteredValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-08)",
+                      "userEnteredValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-08)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-08)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "DANH MỤC KIỂM TRA BÀN GIAO DỰ ÁN (HANDOVER CHECKLIST)",
+                      "userEnteredValue": {
+                        "stringValue": "DANH MỤC KIỂM TRA BÀN GIAO DỰ ÁN (HANDOVER CHECKLIST)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "DANH MỤC KIỂM TRA BÀN GIAO DỰ ÁN (HANDOVER CHECKLIST)"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Dự án:",
+                      "userEnteredValue": {
+                        "stringValue": "Dự án:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Dự án:"
+                      }
+                    },
+                    {
+                      "formattedValue": "[DEV-BM0308-20261009] [Thử development] BM03 và BM08",
+                      "userEnteredValue": {
+                        "stringValue": "[DEV-BM0308-20261009] [Thử development] BM03 và BM08"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "[DEV-BM0308-20261009] [Thử development] BM03 và BM08"
+                      }
+                    },
+                    {},
+                    {},
+                    {
+                      "formattedValue": "Giai đoạn bàn giao:",
+                      "userEnteredValue": {
+                        "stringValue": "Giai đoạn bàn giao:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Giai đoạn bàn giao:"
+                      }
+                    },
+                    {
+                      "formattedValue": "Hoàn thiện tầng 1 — dữ liệu thử",
+                      "userEnteredValue": {
+                        "stringValue": "Hoàn thiện tầng 1 — dữ liệu thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hoàn thiện tầng 1 — dữ liệu thử"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "STT",
+                      "userEnteredValue": {
+                        "stringValue": "STT"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "STT"
+                      }
+                    },
+                    {
+                      "formattedValue": "DANH MỤC HẠNG MỤC BÀN GIAO",
+                      "userEnteredValue": {
+                        "stringValue": "DANH MỤC HẠNG MỤC BÀN GIAO"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "DANH MỤC HẠNG MỤC BÀN GIAO"
+                      }
+                    },
+                    {
+                      "formattedValue": "YÊU CẦU HỒ SƠ & THỰC TẾ",
+                      "userEnteredValue": {
+                        "stringValue": "YÊU CẦU HỒ SƠ & THỰC TẾ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "YÊU CẦU HỒ SƠ & THỰC TẾ"
+                      }
+                    },
+                    {
+                      "formattedValue": "ĐÁNH GIÁ (ĐẠT/KĐ)",
+                      "userEnteredValue": {
+                        "stringValue": "ĐÁNH GIÁ (ĐẠT/KĐ)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐÁNH GIÁ (ĐẠT/KĐ)"
+                      }
+                    },
+                    {
+                      "formattedValue": "TỒN TẠI CẦN XỬ LÝ (NẾU CÓ)",
+                      "userEnteredValue": {
+                        "stringValue": "TỒN TẠI CẦN XỬ LÝ (NẾU CÓ)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "TỒN TẠI CẦN XỬ LÝ (NẾU CÓ)"
+                      }
+                    },
+                    {
+                      "formattedValue": "THỜI HẠN XỬ LÝ",
+                      "userEnteredValue": {
+                        "stringValue": "THỜI HẠN XỬ LÝ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "THỜI HẠN XỬ LÝ"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "1",
+                      "userEnteredValue": {
+                        "numberValue": 1
+                      },
+                      "effectiveValue": {
+                        "numberValue": 1
+                      }
+                    },
+                    {
+                      "formattedValue": "Biên bản nghiệm thu cuối đạt",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "2",
+                      "userEnteredValue": {
+                        "numberValue": 2
+                      },
+                      "effectiveValue": {
+                        "numberValue": 2
+                      }
+                    },
+                    {
+                      "formattedValue": "Bản vẽ và hồ sơ hoàn công",
+                      "userEnteredValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "3",
+                      "userEnteredValue": {
+                        "numberValue": 3
+                      },
+                      "effectiveValue": {
+                        "numberValue": 3
+                      }
+                    },
+                    {
+                      "formattedValue": "Hướng dẫn vận hành/bảo trì",
+                      "userEnteredValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "4",
+                      "userEnteredValue": {
+                        "numberValue": 4
+                      },
+                      "effectiveValue": {
+                        "numberValue": 4
+                      }
+                    },
+                    {
+                      "formattedValue": "Kho công trình và vật tư dư đã đóng",
+                      "userEnteredValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "5",
+                      "userEnteredValue": {
+                        "numberValue": 5
+                      },
+                      "effectiveValue": {
+                        "numberValue": 5
+                      }
+                    },
+                    {
+                      "formattedValue": "Cam kết và hồ sơ bảo hành",
+                      "userEnteredValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "6",
+                      "userEnteredValue": {
+                        "numberValue": 6
+                      },
+                      "effectiveValue": {
+                        "numberValue": 6
+                      }
+                    },
+                    {
+                      "formattedValue": "Biên bản bàn giao có xác nhận hai bên",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "7",
+                      "userEnteredValue": {
+                        "numberValue": 7
+                      },
+                      "effectiveValue": {
+                        "numberValue": 7
+                      }
+                    },
+                    {
+                      "formattedValue": "Sàn tầng 1 — kiểm tra bàn giao thử",
+                      "userEnteredValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử"
+                      }
+                    },
+                    {
+                      "formattedValue": "Hoàn thiện mạch sàn và vệ sinh trước bàn giao",
+                      "userEnteredValue": {
+                        "stringValue": "Hoàn thiện mạch sàn và vệ sinh trước bàn giao"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hoàn thiện mạch sàn và vệ sinh trước bàn giao"
+                      }
+                    },
+                    {
+                      "formattedValue": "Không đạt",
+                      "userEnteredValue": {
+                        "stringValue": "Không đạt"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Không đạt"
+                      }
+                    },
+                    {
+                      "formattedValue": "Mạch sàn cần chỉnh sửa — dữ liệu thử",
+                      "userEnteredValue": {
+                        "stringValue": "Mạch sàn cần chỉnh sửa — dữ liệu thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Mạch sàn cần chỉnh sửa — dữ liệu thử"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "KẾT LUẬN BÀN GIAO: [   ] ĐỦ ĐIỀU KIỆN BÀN GIAO  |  [ X ] CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)",
+                      "userEnteredValue": {
+                        "stringValue": "KẾT LUẬN BÀN GIAO: [   ] ĐỦ ĐIỀU KIỆN BÀN GIAO  |  [ X ] CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KẾT LUẬN BÀN GIAO: [   ] ĐỦ ĐIỀU KIỆN BÀN GIAO  |  [ X ] CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Trạng thái hồ sơ nguồn (không thay thế đánh giá thực tế)",
+                      "userEnteredValue": {
+                        "stringValue": "Trạng thái hồ sơ nguồn (không thay thế đánh giá thực tế)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Trạng thái hồ sơ nguồn (không thay thế đánh giá thực tế)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Biên bản nghiệm thu cuối đạt · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Bản vẽ và hồ sơ hoàn công · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Hướng dẫn vận hành/bảo trì · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Kho công trình và vật tư dư đã đóng · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Cam kết và hồ sơ bảo hành · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Biên bản bàn giao có xác nhận hai bên · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Sàn tầng 1 — kiểm tra bàn giao thử · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Ghi chú bàn giao",
+                      "userEnteredValue": {
+                        "stringValue": "Ghi chú bàn giao"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Ghi chú bàn giao"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Nguồn nháp tổng hợp để kiểm tra đánh giá và Xuất báo cáo; chưa có nghiệm thu cuối, không chứng nhận hoàn tất bàn giao.",
+                      "userEnteredValue": {
+                        "stringValue": "Nguồn nháp tổng hợp để kiểm tra đánh giá và Xuất báo cáo; chưa có nghiệm thu cuối, không chứng nhận hoàn tất bàn giao."
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Nguồn nháp tổng hợp để kiểm tra đánh giá và Xuất báo cáo; chưa có nghiệm thu cuối, không chứng nhận hoàn tất bàn giao."
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                      "userEnteredValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      }
+                    },
+                    {
+                      "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                      "userEnteredValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      }
+                    },
+                    {
+                      "formattedValue": "ĐẠI DIỆN THẦU PHỤ",
+                      "userEnteredValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ"
+                      }
+                    },
+                    {
+                      "formattedValue": "ĐẠI DIỆN CĐT / KHÁCH HÀNG",
+                      "userEnteredValue": {
+                        "stringValue": "ĐẠI DIỆN CĐT / KHÁCH HÀNG"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐẠI DIỆN CĐT / KHÁCH HÀNG"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "isError": false
+  },
+  "handover_final": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "spreadsheetId": "1UGRpqU7HyLOBxHhE6kurM8k08--__TX8WrwQNT0iIS0",
+      "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1UGRpqU7HyLOBxHhE6kurM8k08--__TX8WrwQNT0iIS0/edit",
+      "properties": {
+        "title": "BM08 — Development — Bản đã lưu hạn xử lý — 2026-10-09",
+        "locale": "en_US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "sheets": [
+        {
+          "properties": {
+            "sheetId": 1449844454,
+            "title": "2026-10-12_01",
+            "index": 0,
+            "sheetType": "GRID",
+            "gridProperties": {
+              "rowCount": 1000,
+              "columnCount": 26,
+              "rowGroupControlAfter": true,
+              "columnGroupControlAfter": true
+            }
+          },
+          "data": [
+            {
+              "rowData": [
+                {
+                  "values": [
+                    {
+                      "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                      "userEnteredValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-08)",
+                      "userEnteredValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-08)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-08)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "DANH MỤC KIỂM TRA BÀN GIAO DỰ ÁN (HANDOVER CHECKLIST)",
+                      "userEnteredValue": {
+                        "stringValue": "DANH MỤC KIỂM TRA BÀN GIAO DỰ ÁN (HANDOVER CHECKLIST)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "DANH MỤC KIỂM TRA BÀN GIAO DỰ ÁN (HANDOVER CHECKLIST)"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Dự án:",
+                      "userEnteredValue": {
+                        "stringValue": "Dự án:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Dự án:"
+                      }
+                    },
+                    {
+                      "formattedValue": "[DEV-BM0308-20261009] [Thử development] BM03 và BM08",
+                      "userEnteredValue": {
+                        "stringValue": "[DEV-BM0308-20261009] [Thử development] BM03 và BM08"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "[DEV-BM0308-20261009] [Thử development] BM03 và BM08"
+                      }
+                    },
+                    {},
+                    {},
+                    {
+                      "formattedValue": "Giai đoạn bàn giao:",
+                      "userEnteredValue": {
+                        "stringValue": "Giai đoạn bàn giao:"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Giai đoạn bàn giao:"
+                      }
+                    },
+                    {
+                      "formattedValue": "Hoàn thiện tầng 1 — dữ liệu thử",
+                      "userEnteredValue": {
+                        "stringValue": "Hoàn thiện tầng 1 — dữ liệu thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hoàn thiện tầng 1 — dữ liệu thử"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "STT",
+                      "userEnteredValue": {
+                        "stringValue": "STT"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "STT"
+                      }
+                    },
+                    {
+                      "formattedValue": "DANH MỤC HẠNG MỤC BÀN GIAO",
+                      "userEnteredValue": {
+                        "stringValue": "DANH MỤC HẠNG MỤC BÀN GIAO"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "DANH MỤC HẠNG MỤC BÀN GIAO"
+                      }
+                    },
+                    {
+                      "formattedValue": "YÊU CẦU HỒ SƠ & THỰC TẾ",
+                      "userEnteredValue": {
+                        "stringValue": "YÊU CẦU HỒ SƠ & THỰC TẾ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "YÊU CẦU HỒ SƠ & THỰC TẾ"
+                      }
+                    },
+                    {
+                      "formattedValue": "ĐÁNH GIÁ (ĐẠT/KĐ)",
+                      "userEnteredValue": {
+                        "stringValue": "ĐÁNH GIÁ (ĐẠT/KĐ)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐÁNH GIÁ (ĐẠT/KĐ)"
+                      }
+                    },
+                    {
+                      "formattedValue": "TỒN TẠI CẦN XỬ LÝ (NẾU CÓ)",
+                      "userEnteredValue": {
+                        "stringValue": "TỒN TẠI CẦN XỬ LÝ (NẾU CÓ)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "TỒN TẠI CẦN XỬ LÝ (NẾU CÓ)"
+                      }
+                    },
+                    {
+                      "formattedValue": "THỜI HẠN XỬ LÝ",
+                      "userEnteredValue": {
+                        "stringValue": "THỜI HẠN XỬ LÝ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "THỜI HẠN XỬ LÝ"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "1",
+                      "userEnteredValue": {
+                        "numberValue": 1
+                      },
+                      "effectiveValue": {
+                        "numberValue": 1
+                      }
+                    },
+                    {
+                      "formattedValue": "Biên bản nghiệm thu cuối đạt",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "2",
+                      "userEnteredValue": {
+                        "numberValue": 2
+                      },
+                      "effectiveValue": {
+                        "numberValue": 2
+                      }
+                    },
+                    {
+                      "formattedValue": "Bản vẽ và hồ sơ hoàn công",
+                      "userEnteredValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "3",
+                      "userEnteredValue": {
+                        "numberValue": 3
+                      },
+                      "effectiveValue": {
+                        "numberValue": 3
+                      }
+                    },
+                    {
+                      "formattedValue": "Hướng dẫn vận hành/bảo trì",
+                      "userEnteredValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "4",
+                      "userEnteredValue": {
+                        "numberValue": 4
+                      },
+                      "effectiveValue": {
+                        "numberValue": 4
+                      }
+                    },
+                    {
+                      "formattedValue": "Kho công trình và vật tư dư đã đóng",
+                      "userEnteredValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "5",
+                      "userEnteredValue": {
+                        "numberValue": 5
+                      },
+                      "effectiveValue": {
+                        "numberValue": 5
+                      }
+                    },
+                    {
+                      "formattedValue": "Cam kết và hồ sơ bảo hành",
+                      "userEnteredValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "6",
+                      "userEnteredValue": {
+                        "numberValue": 6
+                      },
+                      "effectiveValue": {
+                        "numberValue": 6
+                      }
+                    },
+                    {
+                      "formattedValue": "Biên bản bàn giao có xác nhận hai bên",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "7",
+                      "userEnteredValue": {
+                        "numberValue": 7
+                      },
+                      "effectiveValue": {
+                        "numberValue": 7
+                      }
+                    },
+                    {
+                      "formattedValue": "Sàn tầng 1 — kiểm tra bàn giao thử",
+                      "userEnteredValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử"
+                      }
+                    },
+                    {
+                      "formattedValue": "Hoàn thiện mạch sàn và vệ sinh trước bàn giao",
+                      "userEnteredValue": {
+                        "stringValue": "Hoàn thiện mạch sàn và vệ sinh trước bàn giao"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hoàn thiện mạch sàn và vệ sinh trước bàn giao"
+                      }
+                    },
+                    {
+                      "formattedValue": "Không đạt",
+                      "userEnteredValue": {
+                        "stringValue": "Không đạt"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Không đạt"
+                      }
+                    },
+                    {
+                      "formattedValue": "Mạch sàn cần chỉnh sửa — dữ liệu thử",
+                      "userEnteredValue": {
+                        "stringValue": "Mạch sàn cần chỉnh sửa — dữ liệu thử"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Mạch sàn cần chỉnh sửa — dữ liệu thử"
+                      }
+                    },
+                    {
+                      "formattedValue": "2026-10-11",
+                      "userEnteredValue": {
+                        "numberValue": 46306
+                      },
+                      "effectiveValue": {
+                        "numberValue": 46306
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "KẾT LUẬN BÀN GIAO: [   ] ĐỦ ĐIỀU KIỆN BÀN GIAO  |  [ X ] CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)",
+                      "userEnteredValue": {
+                        "stringValue": "KẾT LUẬN BÀN GIAO: [   ] ĐỦ ĐIỀU KIỆN BÀN GIAO  |  [ X ] CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "KẾT LUẬN BÀN GIAO: [   ] ĐỦ ĐIỀU KIỆN BÀN GIAO  |  [ X ] CHƯA ĐỦ ĐIỀU KIỆN (CHỜ KHẮC PHỤC TỒN TẠI)"
+                      }
+                    }
+                  ]
+                },
+                {},
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Trạng thái hồ sơ nguồn (không thay thế đánh giá thực tế)",
+                      "userEnteredValue": {
+                        "stringValue": "Trạng thái hồ sơ nguồn (không thay thế đánh giá thực tế)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Trạng thái hồ sơ nguồn (không thay thế đánh giá thực tế)"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Biên bản nghiệm thu cuối đạt · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản nghiệm thu cuối đạt · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Bản vẽ và hồ sơ hoàn công · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Bản vẽ và hồ sơ hoàn công · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Hướng dẫn vận hành/bảo trì · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Hướng dẫn vận hành/bảo trì · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Kho công trình và vật tư dư đã đóng · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Kho công trình và vật tư dư đã đóng · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Cam kết và hồ sơ bảo hành · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Cam kết và hồ sơ bảo hành · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Biên bản bàn giao có xác nhận hai bên · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Biên bản bàn giao có xác nhận hai bên · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Sàn tầng 1 — kiểm tra bàn giao thử · Trạng thái hồ sơ: pending",
+                      "userEnteredValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử · Trạng thái hồ sơ: pending"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Sàn tầng 1 — kiểm tra bàn giao thử · Trạng thái hồ sơ: pending"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Ghi chú bàn giao",
+                      "userEnteredValue": {
+                        "stringValue": "Ghi chú bàn giao"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Ghi chú bàn giao"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "Nguồn nháp tổng hợp để kiểm tra đánh giá và Xuất báo cáo; chưa có nghiệm thu cuối, không chứng nhận hoàn tất bàn giao.",
+                      "userEnteredValue": {
+                        "stringValue": "Nguồn nháp tổng hợp để kiểm tra đánh giá và Xuất báo cáo; chưa có nghiệm thu cuối, không chứng nhận hoàn tất bàn giao."
+                      },
+                      "effectiveValue": {
+                        "stringValue": "Nguồn nháp tổng hợp để kiểm tra đánh giá và Xuất báo cáo; chưa có nghiệm thu cuối, không chứng nhận hoàn tất bàn giao."
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                      "userEnteredValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                      }
+                    },
+                    {
+                      "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                      "userEnteredValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                      }
+                    },
+                    {
+                      "formattedValue": "ĐẠI DIỆN THẦU PHỤ",
+                      "userEnteredValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐẠI DIỆN THẦU PHỤ"
+                      }
+                    },
+                    {
+                      "formattedValue": "ĐẠI DIỆN CĐT / KHÁCH HÀNG",
+                      "userEnteredValue": {
+                        "stringValue": "ĐẠI DIỆN CĐT / KHÁCH HÀNG"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "ĐẠI DIỆN CĐT / KHÁCH HÀNG"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "values": [
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    },
+                    {
+                      "formattedValue": "(Ký & ghi rõ họ tên)",
+                      "userEnteredValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      },
+                      "effectiveValue": {
+                        "stringValue": "(Ký & ghi rõ họ tên)"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "isError": false
+  }
+}

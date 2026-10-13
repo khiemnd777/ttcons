@@ -1,0 +1,811 @@
+[
+  {
+    "id": "a9b84e29-9236-483d-a72b-1afea7d7153e",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "report_date",
+    "label": "Ngày report",
+    "field_type": "date",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "default_source": "current_date"
+    },
+    "help_text": null,
+    "order_index": 10,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "6d0dc7c7-3d3a-4ee1-9021-da9036440ce9",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "reported_by",
+    "label": "Người report",
+    "field_type": "text",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_length": 120,
+      "min_length": 2,
+      "default_source": "actor_name"
+    },
+    "help_text": null,
+    "order_index": 20,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "898d0963-1975-4a4c-8a6d-2677aed6854e",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "construction_scope",
+    "label": "Phạm vi thi công",
+    "field_type": "select",
+    "required": true,
+    "options_json": [
+      {
+        "label": "Chuẩn bị mặt bằng",
+        "value": "site_preparation"
+      },
+      {
+        "label": "Xây tô / phần thô",
+        "value": "civil"
+      },
+      {
+        "label": "Trần",
+        "value": "ceiling"
+      },
+      {
+        "label": "Sàn",
+        "value": "flooring"
+      },
+      {
+        "label": "Sơn",
+        "value": "painting"
+      },
+      {
+        "label": "MEP",
+        "value": "mep"
+      },
+      {
+        "label": "Mộc / nội thất",
+        "value": "carpentry"
+      },
+      {
+        "label": "Nhôm kính",
+        "value": "aluminum_glass"
+      },
+      {
+        "label": "Chuẩn bị bàn giao",
+        "value": "handover_prep"
+      },
+      {
+        "label": "Khác",
+        "value": "other"
+      }
+    ],
+    "validation_json": {},
+    "help_text": null,
+    "order_index": 30,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "a443ed3e-1f4d-4977-bc75-e8e186955466",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "weather",
+    "label": "Thời tiết / điều kiện thi công",
+    "field_type": "select",
+    "required": true,
+    "options_json": [
+      {
+        "label": "Bình thường",
+        "value": "normal"
+      },
+      {
+        "label": "Nắng nóng",
+        "value": "hot"
+      },
+      {
+        "label": "Mưa",
+        "value": "rain"
+      },
+      {
+        "label": "Gió mạnh",
+        "value": "wind"
+      },
+      {
+        "label": "Hạn chế mặt bằng",
+        "value": "restricted_access"
+      },
+      {
+        "label": "Khác",
+        "value": "other"
+      }
+    ],
+    "validation_json": {},
+    "help_text": null,
+    "order_index": 40,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "0d90a2fd-9b61-404f-9314-d8ae60a975c7",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "completed_items",
+    "label": "Đã làm",
+    "field_type": "structured_list",
+    "required": true,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 250,
+      "min_items": 1,
+      "item_fields": [
+        {
+          "key": "title",
+          "type": "text",
+          "label": "Hạng mục",
+          "required": true,
+          "max_length": 180,
+          "min_length": 3
+        },
+        {
+          "key": "work_area",
+          "type": "text",
+          "label": "Khu vực",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "key": "crew_name",
+          "type": "text",
+          "label": "Tổ / đội",
+          "required": false,
+          "max_length": 120
+        },
+        {
+          "key": "actual_quantity",
+          "min": 0,
+          "type": "number",
+          "label": "KL thực tế",
+          "required": false
+        },
+        {
+          "key": "unit",
+          "type": "text",
+          "label": "ĐVT",
+          "required": false,
+          "max_length": 30
+        },
+        {
+          "key": "material_used",
+          "type": "text",
+          "label": "Vật tư dùng",
+          "required": false,
+          "max_length": 180
+        },
+        {
+          "key": "result",
+          "type": "select",
+          "label": "Kết quả",
+          "options": [
+            {
+              "label": "Done",
+              "value": "done"
+            },
+            {
+              "label": "Partial",
+              "value": "partial"
+            },
+            {
+              "label": "Blocked",
+              "value": "blocked"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "evidence_id",
+          "type": "evidence_reference",
+          "label": "Ảnh / evidence",
+          "required": false
+        },
+        {
+          "key": "note",
+          "type": "textarea",
+          "label": "Ghi chú",
+          "required": false,
+          "max_length": 1000
+        }
+      ]
+    },
+    "help_text": "Ghi theo từng hạng mục đã làm trong ngày. Evidence nếu chọn phải thuộc đúng work item.",
+    "order_index": 70,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "0eafc106-8457-4591-b9ff-a14251f022a6",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "crew_items",
+    "label": "Nhân công / tổ đội",
+    "field_type": "structured_list",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 120,
+      "item_fields": [
+        {
+          "key": "crew_name",
+          "type": "text",
+          "label": "Tổ / đội",
+          "required": true,
+          "max_length": 120,
+          "min_length": 2
+        },
+        {
+          "key": "trade",
+          "type": "text",
+          "label": "Trade",
+          "required": false,
+          "max_length": 80
+        },
+        {
+          "key": "worker_count",
+          "min": 1,
+          "type": "number",
+          "label": "Số người",
+          "required": true
+        },
+        {
+          "key": "work_hours",
+          "min": 0,
+          "type": "number",
+          "label": "Giờ công",
+          "required": false
+        },
+        {
+          "key": "note",
+          "type": "textarea",
+          "label": "Ghi chú",
+          "required": false,
+          "max_length": 800
+        },
+        {
+          "key": "representative",
+          "type": "text",
+          "label": "Đại diện tổ đội (24/7)",
+          "required": false,
+          "max_length": 120
+        },
+        {
+          "key": "contact",
+          "type": "text",
+          "label": "Liên hệ đại diện",
+          "required": false,
+          "max_length": 100
+        }
+      ],
+      "capture_mode": "optional"
+    },
+    "help_text": null,
+    "order_index": 80,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "ec27b3fc-b873-4207-9c0f-39d2b7ddced5",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "material_usage_items",
+    "label": "Vật tư sử dụng",
+    "field_type": "structured_list",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 200,
+      "item_fields": [
+        {
+          "key": "material_name",
+          "type": "text",
+          "label": "Vật tư",
+          "required": true,
+          "max_length": 160,
+          "min_length": 2
+        },
+        {
+          "key": "material_code",
+          "type": "text",
+          "label": "Mã vật tư",
+          "required": false,
+          "max_length": 80
+        },
+        {
+          "key": "quantity",
+          "min": 0,
+          "type": "number",
+          "label": "Số lượng",
+          "required": true
+        },
+        {
+          "key": "unit",
+          "type": "text",
+          "label": "ĐVT",
+          "required": true,
+          "max_length": 30,
+          "min_length": 1
+        },
+        {
+          "key": "source",
+          "type": "select",
+          "label": "Nguồn",
+          "options": [
+            {
+              "label": "Đã xuất kho",
+              "value": "warehouse_issue"
+            },
+            {
+              "label": "Tồn tại công trường",
+              "value": "site_balance"
+            },
+            {
+              "label": "Thầu phụ mang vào",
+              "value": "subcontractor"
+            },
+            {
+              "label": "Khác",
+              "value": "other"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "note",
+          "type": "textarea",
+          "label": "Ghi chú",
+          "required": false,
+          "max_length": 800
+        }
+      ],
+      "capture_mode": "optional"
+    },
+    "help_text": "Chỉ ghi nhận báo cáo; không tự tạo stock movement.",
+    "order_index": 90,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "1f930e48-054f-47f4-a475-7b7fe7fab045",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "next_plan_items",
+    "label": "Sẽ làm",
+    "field_type": "structured_list",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 120,
+      "item_fields": [
+        {
+          "key": "title",
+          "type": "text",
+          "label": "Việc cần làm",
+          "required": true,
+          "max_length": 180,
+          "min_length": 3
+        },
+        {
+          "key": "owner_role",
+          "type": "text",
+          "label": "Owner role",
+          "required": true,
+          "max_length": 80,
+          "min_length": 2
+        },
+        {
+          "key": "owner_name",
+          "type": "text",
+          "label": "Owner",
+          "required": false,
+          "max_length": 120
+        },
+        {
+          "key": "due_date",
+          "type": "date",
+          "label": "Due date",
+          "required": true
+        },
+        {
+          "key": "priority",
+          "type": "select",
+          "label": "Priority",
+          "options": [
+            {
+              "label": "Low",
+              "value": "low"
+            },
+            {
+              "label": "Normal",
+              "value": "normal"
+            },
+            {
+              "label": "High",
+              "value": "high"
+            },
+            {
+              "label": "Urgent",
+              "value": "urgent"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "description",
+          "type": "textarea",
+          "label": "Ghi chú",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "instruction_code",
+          "type": "text",
+          "label": "Mã giao việc",
+          "required": false,
+          "max_length": 80
+        },
+        {
+          "key": "location",
+          "type": "text",
+          "label": "Vị trí và hạng mục",
+          "required": false,
+          "max_length": 200
+        },
+        {
+          "key": "subcontractor",
+          "type": "text",
+          "label": "Thầu phụ hoặc tổ đội nhận việc",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "key": "receiver",
+          "type": "text",
+          "label": "Đại diện nhận việc (24/7)",
+          "required": false,
+          "max_length": 120
+        },
+        {
+          "key": "contact",
+          "type": "text",
+          "label": "Liên hệ đại diện",
+          "required": false,
+          "max_length": 100
+        },
+        {
+          "key": "issued_date",
+          "type": "date",
+          "label": "Ngày giao việc thực tế",
+          "required": false
+        },
+        {
+          "key": "progress_percent",
+          "max": 100,
+          "min": 0,
+          "type": "number",
+          "label": "Tiến độ công việc ghi nhận (%)",
+          "required": false
+        },
+        {
+          "key": "state",
+          "type": "text",
+          "label": "Tình trạng công việc ghi nhận",
+          "required": false,
+          "max_length": 80
+        }
+      ],
+      "capture_mode": "optional"
+    },
+    "help_text": "Submit sẽ tạo work item theo từng việc cần làm.",
+    "order_index": 100,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "4be2a2aa-3503-4d23-a368-45709d475104",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "blockers",
+    "label": "Blocker / Risk",
+    "field_type": "structured_list",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 80,
+      "item_fields": [
+        {
+          "key": "content",
+          "type": "textarea",
+          "label": "Nội dung",
+          "required": true,
+          "max_length": 1000,
+          "min_length": 3
+        },
+        {
+          "key": "impact",
+          "type": "select",
+          "label": "Impact",
+          "options": [
+            {
+              "label": "Tiến độ",
+              "value": "schedule"
+            },
+            {
+              "label": "Ngân sách",
+              "value": "budget"
+            },
+            {
+              "label": "Vật tư",
+              "value": "material"
+            },
+            {
+              "label": "Chất lượng",
+              "value": "quality"
+            },
+            {
+              "label": "Mặt bằng",
+              "value": "access"
+            },
+            {
+              "label": "Khác",
+              "value": "other"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "owner_role",
+          "type": "text",
+          "label": "Owner role",
+          "required": false,
+          "max_length": 80
+        },
+        {
+          "key": "target_date",
+          "type": "date",
+          "label": "Target date",
+          "required": false
+        },
+        {
+          "key": "severity",
+          "type": "select",
+          "label": "Severity",
+          "options": [
+            {
+              "label": "Low",
+              "value": "low"
+            },
+            {
+              "label": "Medium",
+              "value": "medium"
+            },
+            {
+              "label": "High",
+              "value": "high"
+            },
+            {
+              "label": "Critical",
+              "value": "critical"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "risk_code",
+          "type": "text",
+          "label": "Mã vấn đề hoặc rủi ro",
+          "required": false,
+          "max_length": 80
+        },
+        {
+          "key": "detected_at",
+          "type": "date",
+          "label": "Ngày phát hiện thực tế",
+          "required": false
+        },
+        {
+          "key": "cause",
+          "type": "textarea",
+          "label": "Nguyên nhân",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "proposed_action",
+          "type": "textarea",
+          "label": "Hướng xử lý đề xuất",
+          "required": false,
+          "max_length": 1000
+        },
+        {
+          "key": "owner",
+          "type": "text",
+          "label": "Người phụ trách xử lý",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "key": "status",
+          "type": "text",
+          "label": "Tình trạng ghi nhận",
+          "required": false,
+          "max_length": 80
+        }
+      ],
+      "capture_mode": "optional"
+    },
+    "help_text": null,
+    "order_index": 110,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "12cb910b-8de8-4c38-b95f-67d541a9b20b",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "supervision_assessments",
+    "label": "Đánh giá giám sát trong ngày",
+    "field_type": "structured_list",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 12,
+      "item_fields": [
+        {
+          "key": "code",
+          "type": "select",
+          "label": "Nội dung giám sát",
+          "options": [
+            {
+              "label": "Tiến độ so với kế hoạch",
+              "value": "progress"
+            },
+            {
+              "label": "Nhân công và tổ đội",
+              "value": "workforce"
+            },
+            {
+              "label": "Vật tư và thiết bị đến hiện trường",
+              "value": "deliveries"
+            },
+            {
+              "label": "Chất lượng thi công",
+              "value": "quality"
+            },
+            {
+              "label": "Khối lượng hoàn thành",
+              "value": "completed_quantity"
+            },
+            {
+              "label": "Phát sinh ngoài hợp đồng",
+              "value": "variation"
+            },
+            {
+              "label": "Giao diện kỹ thuật MEP",
+              "value": "mep"
+            },
+            {
+              "label": "An toàn và vệ sinh",
+              "value": "safety"
+            },
+            {
+              "label": "Nghiệm thu nội bộ và tồn tại",
+              "value": "acceptance"
+            },
+            {
+              "label": "Vấn đề và rủi ro",
+              "value": "risk"
+            },
+            {
+              "label": "Ảnh hiện trường",
+              "value": "images"
+            },
+            {
+              "label": "Giao việc hiện trường",
+              "value": "instructions"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "assessment",
+          "type": "select",
+          "label": "Đánh giá",
+          "options": [
+            {
+              "label": "Đạt",
+              "value": "pass"
+            },
+            {
+              "label": "Không đạt",
+              "value": "fail"
+            },
+            {
+              "label": "Không áp dụng",
+              "value": "not_applicable"
+            },
+            {
+              "label": "Chưa đánh giá",
+              "value": "not_assessed"
+            }
+          ],
+          "required": true
+        },
+        {
+          "key": "note",
+          "type": "textarea",
+          "label": "Ghi chú đánh giá",
+          "required": false,
+          "max_length": 1000
+        }
+      ]
+    },
+    "help_text": "Chỉ ghi nội dung đã quan sát. Không bắt buộc đủ 12 nội dung; không thay thế quyết định nghiệm thu.",
+    "order_index": 125,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  },
+  {
+    "id": "83c91cea-e087-4f47-8a0a-b77197b46b6b",
+    "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+    "field_key": "material_arrival_items",
+    "label": "Vật tư và thiết bị đến hiện trường",
+    "field_type": "structured_list",
+    "required": false,
+    "options_json": [],
+    "validation_json": {
+      "max_items": 200,
+      "item_fields": [
+        {
+          "key": "material_name",
+          "type": "text",
+          "label": "Vật tư hoặc thiết bị",
+          "required": true,
+          "max_length": 160
+        },
+        {
+          "key": "specification",
+          "type": "text",
+          "label": "Quy cách",
+          "required": false,
+          "max_length": 300
+        },
+        {
+          "key": "origin",
+          "type": "text",
+          "label": "Nguồn gốc",
+          "required": false,
+          "max_length": 200
+        },
+        {
+          "key": "quantity",
+          "min": 0,
+          "type": "number",
+          "label": "Số lượng đến hiện trường",
+          "required": false
+        },
+        {
+          "key": "unit",
+          "type": "text",
+          "label": "Đơn vị tính",
+          "required": false,
+          "max_length": 30
+        },
+        {
+          "key": "note",
+          "type": "textarea",
+          "label": "Ghi chú",
+          "required": false,
+          "max_length": 800
+        }
+      ]
+    },
+    "help_text": "Ghi nhận hàng đến hiện trường, tách biệt vật tư sử dụng. Không tạo phiếu kho.",
+    "order_index": 130,
+    "visibility_condition_json": {},
+    "created_at": "2026-10-09T08:30:47.69548+00:00"
+  }
+]

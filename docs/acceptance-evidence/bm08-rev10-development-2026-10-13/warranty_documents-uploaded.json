@@ -1,0 +1,21 @@
+{
+  "checksum_sha256": "69f998f6f89fa2b67ff005350d46f039b04c0a982580716768d8e2eed7cdf71e",
+  "created_at": "2026-10-13T02:19:29Z",
+  "document_type": "warranty_documents",
+  "file_size": 2197,
+  "file_url": null,
+  "id": "e1de2081-5672-4960-bb26-19e5667b6171",
+  "mime_type": "application/pdf",
+  "name": "[Synthetic] BM08 Rev10 warranty_documents",
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "release_status": "released",
+  "released_at": "2026-10-13T02:19:29Z",
+  "released_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "revision_no": 1,
+  "status": "active",
+  "storage_key": "project-documents/432115cb-bd5b-4fae-9edc-74ce031eacf3/project_intake/432115cb-bd5b-4fae-9edc-74ce031eacf3/c9d5303b-de86-420d-9014-cedd328f78c1.pdf",
+  "storage_provider": "local",
+  "target_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "target_type": "project_intake",
+  "uploaded_by": "f5250196-91bb-4df6-9666-b318a7036b42"
+}

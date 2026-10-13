@@ -1,0 +1,48 @@
+{
+  "list": {
+    "actual_download_path": "/Users/khiemnguyen/Downloads/danh-sach-can-xu-ly-BM-GS-04 (1).xlsx",
+    "sha256": "1132c30c31d46dba7e9e34e2d46d34e60e369c43c71f2d1d0f693fcef5fc0a99",
+    "bytes": 14506,
+    "sheets": {
+      "2026-10-08_01": {
+        "rows": [
+          {
+            "row": 8,
+            "stt": 1,
+            "fault_code": null,
+            "description": "Nội dung lỗi giả lập: kiểm tra góc nền trước hoàn thiện",
+            "status": "Mới"
+          }
+        ],
+        "footer": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")",
+        "stored_errors": []
+      },
+      "Hình ảnh": {
+        "embedded_images": 1
+      }
+    }
+  },
+  "detail": {
+    "actual_download_path": "/Users/khiemnguyen/Downloads/BM-GS-04 (1).xlsx",
+    "sha256": "6f027ab2c7b8b99f95762db3472d74c5fc5a4dafe795c62e912a99d6fbff2adc",
+    "bytes": 14507,
+    "sheets": {
+      "2026-10-08_01": {
+        "rows": [
+          {
+            "row": 8,
+            "stt": 1,
+            "fault_code": null,
+            "description": "Nội dung lỗi giả lập: kiểm tra góc nền trước hoàn thiện",
+            "status": "Mới"
+          }
+        ],
+        "footer": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")",
+        "stored_errors": []
+      },
+      "Hình ảnh": {
+        "embedded_images": 1
+      }
+    }
+  }
+}

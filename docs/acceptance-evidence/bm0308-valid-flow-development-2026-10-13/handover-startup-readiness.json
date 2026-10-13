@@ -1,0 +1,82 @@
+{
+  "blockers": [],
+  "capabilities": {
+    "can_manage_project_manager": true,
+    "can_start_pipeline": true,
+    "can_update_project": true,
+    "is_startup_owner": true
+  },
+  "created_at": "2026-10-12T23:18:49Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "first_steps": [
+    {
+      "covered": true,
+      "eligible_users": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "id": "0412c30d-dbf1-4c77-8e6a-2fcd53fcb1d5",
+      "name": "Chốt gói nghiệm thu cuối",
+      "required_permission": "acceptance.approve",
+      "role_ids": [
+        "QA/QC"
+      ]
+    }
+  ],
+  "owner_name": "Consflow Admin",
+  "owner_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "pm_name": "Consflow Admin",
+  "pm_staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+  "pm_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "project_code": "DEV-HANDOVER-BM0308-20261013",
+  "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+  "project_name": "[Synthetic Development] BM08 nghiệm thu cuối và bàn giao",
+  "ready_to_start": true,
+  "role_coverage": [
+    {
+      "covered": true,
+      "members": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "node_count": 1,
+      "role_label": "QA/QC",
+      "step_count": 1
+    },
+    {
+      "covered": true,
+      "members": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "node_count": 1,
+      "role_label": "PM",
+      "step_count": 1
+    },
+    {
+      "covered": true,
+      "members": [
+        {
+          "full_name": "Consflow Admin",
+          "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+          "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+        }
+      ],
+      "node_count": 1,
+      "role_label": "Kế toán",
+      "step_count": 1
+    }
+  ],
+  "template_id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+  "template_name": "[Synthetic Development] BM08 nghiệm thu cuối và bàn giao",
+  "template_status": "published"
+}

@@ -32,15 +32,19 @@ func TestSQLMigrationRepositoryInventoriesEveryLocalRowAcrossSixFamilies(t *test
 		t.Fatal(err)
 	}
 	admin := stdlib.OpenDB(*baseConfig)
-	defer admin.Close()
-	if _, err := admin.ExecContext(ctx, `CREATE SCHEMA `+schema); err != nil {
-		t.Fatal(err)
-	}
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cleanupCancel()
-		_, _ = admin.ExecContext(cleanupCtx, `DROP SCHEMA IF EXISTS `+schema+` CASCADE`)
+		if _, err := admin.ExecContext(cleanupCtx, `DROP SCHEMA IF EXISTS `+schema+` CASCADE`); err != nil {
+			t.Errorf("drop isolated storage migration schema: %v", err)
+		}
+		if err := admin.Close(); err != nil {
+			t.Errorf("close storage migration admin database: %v", err)
+		}
 	})
+	if _, err := admin.ExecContext(ctx, `CREATE SCHEMA `+schema); err != nil {
+		t.Fatal(err)
+	}
 
 	if baseConfig.RuntimeParams == nil {
 		baseConfig.RuntimeParams = map[string]string{}

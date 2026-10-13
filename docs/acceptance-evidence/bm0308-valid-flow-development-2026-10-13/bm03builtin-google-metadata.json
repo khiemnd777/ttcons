@@ -1,0 +1,47 @@
+{
+  "import": {
+    "success": true,
+    "converted": true,
+    "fileId": "1J639lD-1oV-M4rrlzfTe4fiXO-oVR9D3DIOylf25vCs",
+    "title": "BM03 — Checklist đã chốt — UAT 13-10-2026",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "url": "https://docs.google.com/spreadsheets/d/1J639lD-1oV-M4rrlzfTe4fiXO-oVR9D3DIOylf25vCs/edit?usp=drivesdk",
+    "spreadsheetId": "1J639lD-1oV-M4rrlzfTe4fiXO-oVR9D3DIOylf25vCs",
+    "parentId": null,
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1J639lD-1oV-M4rrlzfTe4fiXO-oVR9D3DIOylf25vCs"
+  },
+  "metadata": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "spreadsheetId": "1J639lD-1oV-M4rrlzfTe4fiXO-oVR9D3DIOylf25vCs",
+      "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1J639lD-1oV-M4rrlzfTe4fiXO-oVR9D3DIOylf25vCs/edit",
+      "properties": {
+        "title": "BM03 — Checklist đã chốt — UAT 13-10-2026",
+        "locale": "en_US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "sheets": [
+        {
+          "properties": {
+            "sheetId": 1656379684,
+            "title": "2026-10-13_01",
+            "index": 0,
+            "sheetType": "GRID",
+            "gridProperties": {
+              "rowCount": 1000,
+              "columnCount": 26,
+              "rowGroupControlAfter": true,
+              "columnGroupControlAfter": true
+            }
+          }
+        }
+      ]
+    },
+    "isError": false
+  }
+}

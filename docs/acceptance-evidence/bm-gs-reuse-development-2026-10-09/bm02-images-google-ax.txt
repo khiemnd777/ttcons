@@ -1,0 +1,417 @@
+Browser tab: 334096846, Title: "BM02-FORM Development — Xuất báo cáo — 09-10-2026 - Google Sheets", URL: "https://docs.google.com/spreadsheets/d/13pejlEkLQZNC-cDsf5xmey4__PNxfCavd2t8w9P7bWk/edit?gid=2145232060".
+1 AXWebArea BM02-FORM Development — Xuất báo cáo — 09-10-2026 - Google Sheets, URL: docs.google.com/spreadsheets/d/13pejlEkLQZNC-cDsf5xmey4__PNxfCavd2t8w9P7bWk/edit?gid=2145232060
+	2 container
+		3 container Description: Menu bar, ID: docs-chrome
+			4 container docs-header
+				5 link Description: Sheets home, Value: docs.google.com/spreadsheets/u/0/?authuser=0&usp=sheets_web, ID: docs-branding-logo-link
+				6 container docs-titlebar-container
+					7 container BM02-FORM Development — Xuất báo cáo — 09-10-2026
+						8 container docs-title-widget
+							9 text BM02-FORM Development — Xuất báo cáo — 09-10-2026
+					10 container
+						11 container docs-titlebar-share-client-button
+							12 button (disabled)   Share
+								13 text Share
+							14 button Description: Quick sharing actions, ID: scb-quick-actions-menu-button
+						15 pop up button (collapsed) Description: Google Account: Khiêm Nguyễn (khiemnd777@gmail.com), Secondary Actions: Expand
+			16 container docs-bars
+				17 container docs-menubars
+					18 menu bar docs-menubar
+						19 File, ID: docs-file-menu
+						20 Edit, ID: docs-edit-menu
+						21 View, ID: docs-view-menu
+						22 Insert, ID: docs-insert-menu
+						23 Format, ID: docs-format-menu
+						24 Data, ID: w183
+						25 Tools, ID: docs-tools-menu
+						26 Extensions, ID: docs-extensions-menu
+						27 Help, ID: docs-help-menu
+				28 container docs-toolbar-wrapper
+					29 container docs-primary-toolbars
+						30 container
+							31 text field (settable)
+						32 container Description: Main, ID: docs-toolbar
+							33 button (disabled) $, ID: t-num-fmt-currency
+								34 text $
+							35 button (disabled) %, ID: t-num-fmt-percent
+								36 text %
+							37 button (disabled) 123, ID: t-num-fmt-other
+								38 text 123
+					39 container Description: Mode and view, ID: docs-side-toolbar
+			40 container Side panel
+			41 container docs-additional-bars
+				42 image Loading...
+		43 container docs-editor
+			44 container 2145232060-grid-container
+				45 table
+					46 row
+						47 cell 2145232060C0
+							48 text A
+						49 cell 2145232060C1
+							50 text B
+						51 cell 2145232060C2
+							52 text C
+						53 cell 2145232060C3
+							54 text D
+						55 cell 2145232060C4
+							56 text E
+						57 cell 2145232060C5
+							58 text F
+						59 cell 2145232060C6
+							60 text G
+						61 cell 2145232060C7
+							62 text H
+						63 cell 2145232060C8
+							64 text I
+						65 cell 2145232060C9
+							66 text J
+						67 cell 2145232060C10
+							68 text K
+						69 cell 2145232060C11
+							70 text L
+						71 cell 2145232060C12
+							72 text M
+						73 cell 2145232060C13
+							74 text N
+						75 cell 2145232060C14
+							76 text O
+						77 cell 2145232060C15
+							78 text P
+						79 cell 2145232060C16
+							80 text Q
+						81 cell 2145232060C17
+							82 text R
+						83 cell 2145232060C18
+							84 text S
+						85 cell 2145232060C19
+							86 text T
+						87 cell 2145232060C20
+							88 text U
+						89 cell 2145232060C21
+							90 text V
+						91 cell 2145232060C22
+							92 text W
+						93 cell 2145232060C23
+							94 text X
+						95 cell 2145232060C24
+							96 text Y
+						97 cell 2145232060C25
+							98 text Z
+					99 row
+						100 cell 2145232060R0
+							101 text 1
+						102 cell
+							103 text [Synthetic] Gradient BM04/BM07 • 864d4247-3f3e-48be-97b7-5dafd16b6e9d
+							104 text Phiếu nghiệp vụ · 35416810-63ab-4175-8340-5be6e13bb51b • [Synthetic] Khu B — ô 04
+							105 text Phát hiện lỗi
+							106 text [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp
+					107 row
+						108 cell 2145232060R1
+							109 text 2
+					110 row
+						111 cell 2145232060R2
+							112 text 3
+					113 row
+						114 cell 2145232060R3
+							115 text 4
+					116 row
+						117 cell 2145232060R4
+							118 text 5
+					119 row
+						120 cell 2145232060R5
+							121 text 6
+					122 row
+						123 cell 2145232060R6
+							124 text 7
+					125 row
+						126 cell 2145232060R7
+							127 text 8
+					128 row
+						129 cell 2145232060R8
+							130 text 9
+					131 row
+						132 cell 2145232060R9
+							133 text 10
+					134 row
+						135 cell 2145232060R10
+							136 text 11
+					137 row
+						138 cell 2145232060R11
+							139 text 12
+					140 row
+						141 cell 2145232060R12
+							142 text 13
+					143 row
+						144 cell 2145232060R13
+							145 text 14
+					146 row
+						147 cell 2145232060R14
+							148 text 15
+					149 row
+						150 cell 2145232060R15
+							151 text 16
+					152 row
+						153 cell 2145232060R16
+							154 text 17
+					155 row
+						156 cell 2145232060R17
+							157 text 18
+					158 row
+						159 cell 2145232060R18
+							160 text 19
+					161 row
+						162 cell 2145232060R19
+							163 text 20
+					164 row
+						165 cell 2145232060R20
+							166 text 21
+					167 row
+						168 cell 2145232060R21
+							169 text 22
+					170 row
+						171 cell 2145232060R22
+							172 text 23
+					173 row
+						174 cell 2145232060R23
+							175 text 24
+					176 row
+						177 cell 2145232060R24
+							178 text 25
+					179 row
+						180 cell 2145232060R25
+							181 text 26
+					182 row
+						183 cell 2145232060R26
+							184 text 27
+					185 row
+						186 cell 2145232060R27
+							187 text 28
+					188 row
+						189 cell 2145232060R28
+							190 text 29
+					191 row
+						192 cell 2145232060R29
+							193 text 30
+					194 row
+						195 cell 2145232060R30
+							196 text 31
+					197 row
+						198 cell 2145232060R31
+							199 text 32
+					200 row
+						201 cell 2145232060R32
+							202 text 33
+					203 row
+						204 cell 2145232060R33
+							205 text 34
+					206 row
+						207 cell 2145232060R34
+							208 text 35
+					209 row
+						210 cell 2145232060R35
+							211 text 36
+					212 row
+						213 cell 2145232060R36
+							214 text 37
+					215 row
+						216 cell 2145232060R37
+							217 text 38
+					218 row
+						219 cell 2145232060R38
+							220 text 39
+					221 row
+						222 cell 2145232060R39
+							223 text 40
+					224 row
+						225 cell 2145232060R40
+							226 text 41
+					227 row
+						228 cell 2145232060R41
+							229 text 42
+					230 row
+						231 cell 2145232060R42
+							232 text 43
+					233 row
+						234 cell 2145232060R43
+							235 text 44
+					236 row
+						237 cell 2145232060R44
+							238 text 45
+					239 row
+						240 cell 2145232060R45
+							241 text 46
+					242 row
+						243 cell 2145232060R46
+							244 text 47
+					245 row
+						246 cell 2145232060R47
+							247 text 48
+					248 row
+						249 cell 2145232060R48
+							250 text 49
+					251 row
+						252 cell 2145232060R49
+							253 text 50
+					254 row
+						255 cell 2145232060R50
+							256 text 51
+					257 row
+						258 cell 2145232060R51
+							259 text 52
+					260 row
+						261 cell 2145232060R52
+							262 text 53
+					263 row
+						264 cell 2145232060R53
+							265 text 54
+					266 row
+						267 cell 2145232060R54
+							268 text 55
+					269 row
+						270 cell 2145232060R55
+							271 text 56
+					272 row
+						273 cell 2145232060R56
+							274 text 57
+					275 row
+						276 cell 2145232060R57
+							277 text 58
+					278 row
+						279 cell 2145232060R58
+							280 text 59
+					281 row
+						282 cell 2145232060R59
+							283 text 60
+					284 row
+						285 cell 2145232060R60
+							286 text 61
+					287 row
+						288 cell 2145232060R61
+							289 text 62
+					290 row
+						291 cell 2145232060R62
+							292 text 63
+					293 row
+						294 cell 2145232060R63
+							295 text 64
+					296 row
+						297 cell 2145232060R64
+							298 text 65
+					299 row
+						300 cell 2145232060R65
+							301 text 66
+					302 row
+						303 cell 2145232060R66
+							304 text 67
+					305 row
+						306 cell 2145232060R67
+							307 text 68
+					308 row
+						309 cell 2145232060R68
+							310 text 69
+					311 row
+						312 cell 2145232060R69
+							313 text 70
+					314 row
+						315 cell 2145232060R70
+							316 text 71
+					317 row
+						318 cell 2145232060R71
+							319 text 72
+					320 row
+						321 cell 2145232060R72
+							322 text 73
+					323 row
+						324 cell 2145232060R73
+							325 text 74
+					326 row
+						327 cell 2145232060R74
+							328 text 75
+					329 row
+						330 cell 2145232060R75
+							331 text 76
+					332 row
+						333 cell 2145232060R76
+							334 text 77
+					335 row
+						336 cell 2145232060R77
+							337 text 78
+					338 row
+						339 cell 2145232060R78
+							340 text 79
+					341 row
+						342 cell 2145232060R79
+							343 text 80
+					344 row
+						345 cell 2145232060R80
+							346 text 81
+					347 row
+						348 cell 2145232060R81
+							349 text 82
+					350 row
+						351 cell 2145232060R82
+							352 text 83
+					353 row
+						354 cell 2145232060R83
+							355 text 84
+					356 row
+						357 cell 2145232060R84
+							358 text 85
+					359 row
+						360 cell 2145232060R85
+							361 text 86
+					362 row
+						363 cell 2145232060R86
+							364 text 87
+					365 row
+						366 cell 2145232060R87
+							367 text 88
+					368 row
+						369 cell 2145232060R88
+							370 text 89
+					371 row
+						372 cell 2145232060R89
+							373 text 90
+					374 row
+						375 cell 2145232060R90
+							376 text 91
+					377 row
+						378 cell 2145232060R91
+							379 text 92
+					380 row
+						381 cell 2145232060R92
+							382 text 93
+					383 row
+						384 cell 2145232060R93
+							385 text 94
+					386 row
+						387 cell 2145232060R94
+							388 text 95
+					389 row
+						390 cell 2145232060R95
+							391 text 96
+					392 row
+						393 cell 2145232060R96
+							394 text 97
+					395 row
+						396 cell 2145232060R97
+							397 text 98
+					398 row
+						399 cell 2145232060R98
+							400 text 99
+					401 row
+						402 cell 2145232060R99
+							403 text 100
+			404 container Sheet tab bar
+				405 container
+					406 container Add Sheet
+					407 container All Sheets
+					408 container Canvas menu
+				409 container
+					410 container
+						411 container
+							412 text 2026-10-09_01
+						413 container
+							414 text Hình ảnh
+
+The focused UI element is 1 AXWebArea BM02-FORM Development — Xuất báo cáo — 09-10-2026 - Google Sheets, URL: docs.google.com/spreadsheets/d/13pejlEkLQZNC-cDsf5xmey4__PNxfCavd2t8w9P7bWk/edit?gid=2145232060

@@ -14,7 +14,9 @@ const { QueryClient, QueryClientProvider } = createRequire(import.meta.url)('@ta
 // Real components and fixed query-cache fixtures. No DOM layout, browser, camera or HTTP.
 const bundle = await build({
   stdin: {
-    contents: `export { ConstructionReportFormDialog, CrewEditor, MaterialEditor } from './modules/operations/ConstructionReportFormDialog';
+    contents: `export { ConstructionReportFormDialog, CrewEditor, MaterialEditor, MaterialArrivalEditor, NextPlanEditor, BlockerEditor } from './modules/operations/ConstructionReportFormDialog';
+      export { constructionReportEditModel } from './modules/operations/constructionReportViewModel';
+      export { ConstructionActionDialogs } from './modules/operations/ConstructionActionDialogs';
       export { ConstructionEvidenceCapture, CameraCaptureModal } from './modules/_shared/EvidenceCapture';
       export { ToastProvider } from './components/ToastProvider';
       export { Dialog } from './components/Dialog';`,
@@ -23,7 +25,7 @@ const bundle = await build({
   bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
   loader: { '.css': 'empty' }, define: { 'import.meta.env': '{}', 'import.meta.url': '"file:///non-browser-test"' },
   plugins: [{ name: 'test-private-editors', setup(builder) {
-    builder.onLoad({ filter: /ConstructionReportFormDialog\.tsx$/ }, async ({ path }) => ({ contents: await readFile(path, 'utf8') + '\nexport { CrewEditor, MaterialEditor };', loader: 'tsx' }));
+    builder.onLoad({ filter: /ConstructionReportFormDialog\.tsx$/ }, async ({ path }) => ({ contents: await readFile(path, 'utf8') + '\nexport { CrewEditor, MaterialEditor, MaterialArrivalEditor, NextPlanEditor, BlockerEditor };', loader: 'tsx' }));
     builder.onLoad({ filter: /\/EvidenceCapture\.tsx$/ }, async ({ path }) => ({ contents: await readFile(path, 'utf8') + '\nexport { CameraCaptureModal };', loader: 'tsx' }));
   } }],
 });
@@ -74,7 +76,9 @@ test('ordinary dialogs retain opt-in fullscreen while all capture consumers shar
 
 test('each resource has one editable control per value across responsive layouts', () => {
   const crew = render(components.CrewEditor, { rows: [{ crew_name: 'Tổ <A>', worker_count: '8', work_hours: '7.5', note: 'Ca chiều' }], onChange() {}, reveal: 0 });
-  assert.equal((crew.match(/<input\b/g) ?? []).length, 4);
+  assert.equal((crew.match(/<input\b/g) ?? []).length, 6);
+  assert.match(crew, /aria-label="Đại diện tổ đội dòng 1"/);
+  assert.match(crew, /aria-label="Liên hệ tổ đội dòng 1"/);
   assert.match(crew, /value="Tổ &lt;A&gt;"/);
   assert.match(crew, /value="7.5"/);
   assert.match(crew, /data-label="Số người \*"/);
@@ -91,6 +95,74 @@ test('empty resources collapse while incomplete rows remain open with an error',
   const invalid = render(components.CrewEditor, { ...props, error: 'Thiếu số người', reveal: 1 });
   assert.match(invalid, /<details[^>]*open=""/);
   assert.match(invalid, /role="alert"[^>]*>Thiếu số người/);
+});
+
+test('native crew contact facts keep canonical row identity and arrivals remain separate from usage', () => {
+  const saved = components.constructionReportEditModel({ structured_json: { crew_items: [{ row_id: 'crew-1', crew_name: 'Tổ A', worker_count: 3, representative: 'Nguyễn A', contact: '0900' }], material_arrival_items: [{ row_id: 'arrival-1', material_name: 'Cát', quantity: null }], material_usage_items: [{ material_name: 'Thép', quantity: 2, unit: 'kg' }] } });
+  assert.equal(saved.crewItems[0].row_id, 'crew-1');
+  assert.equal(saved.crewItems[0].representative, 'Nguyễn A');
+  assert.equal(saved.crewItems[0].contact, '0900');
+  assert.equal(saved.materialArrivalItems[0].row_id, 'arrival-1');
+  assert.equal(saved.materialArrivalItems[0].quantity, '');
+  assert.equal(saved.materialItems[0].material_name, 'Thép');
+  const html = render(components.MaterialArrivalEditor, { rows: saved.materialArrivalItems, onChange() {}, reveal: 0 });
+  assert.match(html, /Vật tư nhập trường/);
+  assert.match(html, /aria-label="Quy cách nhập trường dòng 1"/);
+  assert.match(html, /aria-label="Xuất xứ nhập trường dòng 1"/);
+});
+
+test('native action capture keeps field severity distinct from priority and reuses shared photo capture', () => {
+  const html = render(components.ConstructionActionDialogs, { state: { type: 'create' }, projectId: 'project', workspace: { work_items: [], participants: [] }, onClose() {}, onSaved() {} });
+  assert.match(html, /Chi tiết hiện trường/);
+  assert.match(html, /Mã lỗi/);
+  assert.match(html, /Vị trí/);
+  assert.match(html, /Đơn vị phụ trách/);
+  assert.match(html, /Liên hệ 24\/7/);
+  assert.match(html, /Mức độ lỗi/);
+  assert.match(html, /Mức ưu tiên/);
+  assert.match(html, /value="critical"/);
+  assert.match(html, /value="urgent"/);
+  assert.match(html, /data-component="evidence-uploader"/);
+  assert.doesNotMatch(html, /BM-GS|Bổ sung thông tin/);
+});
+
+test('arrival zero quantity without unit points inline validation to the unit control', () => {
+  const row = { row_id: 'arrival-1', material_name: 'Cát', specification: '', origin: '', quantity: '0', unit: '', note: '' };
+  const html = render(components.MaterialArrivalEditor, { rows: [row], onChange() {}, reveal: 1, error: 'Đơn vị vật tư nhập trường khi có số lượng' });
+  assert.match(html, /aria-label="Đơn vị nhập trường dòng 1" aria-invalid="true" aria-describedby="arrival-unit-error-arrival-1"/);
+  assert.match(html, /id="arrival-unit-error-arrival-1" role="alert"/);
+  assert.match(html, /Nhập đơn vị khi có số lượng/);
+  assert.doesNotMatch(render(components.MaterialArrivalEditor, { rows: [{ ...row, quantity: '' }], onChange() {}, reveal: 0 }), /aria-invalid="true"/);
+});
+
+test('native plan and blocker row details render optional facts and exact validation in existing editors', () => {
+  const plan = { row_id: 'plan-a', title: 'Lắp cửa', instruction_code: 'CD01', location: 'Tầng 2', subcontractor: 'Tổ cửa', receiver: 'An', contact: '0900', issued_date: '2026-10-08', due_date: '', progress_percent: '0', state: 'Đã giao' };
+  const html = render(components.NextPlanEditor, { rows: [plan], errors: { 'next_plan-a_progress_percent': 'Sai tiến độ' }, onChange() {} });
+  assert.match(html, /Chi tiết kế hoạch/);
+  assert.match(html, /value="CD01"/);
+  assert.match(html, /aria-label="Tiến độ \(%\) · Sẽ làm 1" aria-invalid="true"/);
+  assert.match(html, /value="0"/);
+  const risk = { row_id: 'risk-a', id: 'risk-a', content: 'Thiếu cửa', risk_code: 'RR01', detected_at: '', cause: 'Chậm giao', impact: '', severity: 'high', proposed_action: 'Giao bổ sung', owner: 'Lan', target_date: '', status: '' };
+  const riskHTML = render(components.BlockerEditor, { rows: [risk], drafts: [], errors: {}, onDetails() {}, onChange() {}, onRelation() {}, onRemove() {}, onAdd() {}, canCreateCheck: true, canCreateAction: true, disabled: false });
+  assert.match(riskHTML, /Chi tiết vấn đề/);
+  assert.match(riskHTML, /Chậm giao/);
+  assert.match(riskHTML, /value="Lan"/);
+  assert.match(riskHTML, /Tạo kiểm tra/);
+  assert.match(riskHTML, /Giao xử lý/);
+});
+
+test('native plan editor removes by stable row identity while retaining facts on surviving duplicate titles', () => {
+  const rows = [{ row_id: 'plan-a', title: 'Lắp cửa', receiver: 'An' }, { row_id: 'plan-b', title: 'Lắp cửa', receiver: 'Bình' }].map(row => ({ instruction_code: '', location: '', subcontractor: '', contact: '', issued_date: '', due_date: '', progress_percent: '', state: '', ...row }));
+  let next: any[] = [];
+  const tree = components.NextPlanEditor({ rows, errors: {}, onChange(value: any[]) { next = value; } });
+  function find(node: any): any {
+    if (!node || typeof node !== 'object') return;
+    if (node.props?.['aria-label'] === 'Xóa Sẽ làm 1') return node;
+    for (const child of [node.props?.children].flat(Infinity)) { const found = find(child); if (found) return found; }
+  }
+  find(tree).props.onClick();
+  assert.deepEqual(next.map(row => row.row_id), ['plan-b']);
+  assert.equal(next[0].receiver, 'Bình');
 });
 
 test('report prioritizes photos, preserves required fields, and keeps draft/send permissions separate', () => {

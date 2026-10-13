@@ -1,0 +1,64 @@
+{
+  "id": "b3dd9bb4-20d7-450e-bf0e-6e85f29ee32b",
+  "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+  "work_item_id": "8faf4204-8f57-4e86-888f-01b0edae0620",
+  "pipeline_run_id": "d8d65feb-b70f-4bbc-9bd9-58de8ff508cf",
+  "run_node_id": "c272c0bd-47e1-4a49-bbf3-1ca4315aa4ee",
+  "run_step_id": "df06567f-7b5d-4e67-9916-1e7ca802b99e",
+  "template_step_id": "7c299706-e197-410e-8c79-684b0372eea3",
+  "form_template_id": "48000000-0000-0000-0000-000000000001",
+  "form_version_id": "bb618ed1-6cd8-4f03-823e-c06d916e582e",
+  "form_type": "generic_submission",
+  "title": "BM01 — Khảo sát synthetic",
+  "status": "draft",
+  "current_revision": 0,
+  "answers_snapshot_json": {
+    "risk_items": [
+      {
+        "risk": "[Synthetic] Lối tiếp cận bị giới hạn trong ô thử",
+        "cause": "[Synthetic] Vật liệu đặt sai khu thử",
+        "owner": "PM synthetic",
+        "impact": "[Synthetic] Chậm tiếp cận ô thử",
+        "status": "Đang theo dõi synthetic",
+        "category": "access",
+        "due_date": "2026-10-10",
+        "severity": "medium",
+        "issue_code": "SYN-RR-05",
+        "mitigation": "[Synthetic] Bố trí lối tạm",
+        "detected_date": "2026-10-09"
+      }
+    ],
+    "measured_by": "PM synthetic",
+    "survey_unit": "PM synthetic",
+    "dimension_items": [
+      {
+        "mep": "[Synthetic] Ống kỹ thuật bên vách A",
+        "area": "[Synthetic] Khu A",
+        "note": "[Synthetic] Đo mẫu, không dùng cho thi công thật",
+        "unit": "m",
+        "dimension": "4 x 3",
+        "assessment": "[Synthetic] Cần kiểm tra ô thử trước hoàn thiện",
+        "existing_condition": "[Synthetic] Tường mẫu còn vết xước"
+      }
+    ],
+    "requested_areas": "[Synthetic] Khu A — phòng mẫu",
+    "style_direction": "minimal",
+    "measurement_date": "2026-10-09",
+    "owner_requirement": "[Synthetic] Đo ô thử phục vụ nghiệm thu biểu mẫu",
+    "client_representative": "Đại diện synthetic"
+  },
+  "required_role_ids": [
+    "PM"
+  ],
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "submitted_by": null,
+  "submitted_at": null,
+  "reopened_by": null,
+  "reopened_at": null,
+  "created_at": "2026-10-09T16:13:12.075537+00:00",
+  "updated_at": "2026-10-09T16:14:55.00312+00:00",
+  "bm_gs_json": {},
+  "bm_gs_version": 0,
+  "bm_gs_updated_by": null,
+  "bm_gs_updated_at": null
+}

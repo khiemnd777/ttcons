@@ -1,0 +1,6 @@
+Bundled Poppler rendered all four test PDF pages, exit0; saved PNGs inspected.
+Poppler emitted repeated missing-default-fontconfig/writable-cache warnings.
+Only those repetitive generated render logs were removed after inspection.
+No global font configuration or dependency installation was performed.
+An attempted bundled pymupdf import was unavailable; no render claim from it.
+Final PDFs were rendered by the bundled pdftoppm binary, not pymupdf.

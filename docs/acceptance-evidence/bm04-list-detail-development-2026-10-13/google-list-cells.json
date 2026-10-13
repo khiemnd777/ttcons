@@ -1,0 +1,349 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1yJ1LsVr2D3VAcI0rvHzmvTckfYgVNL9TmVMd_YzGQig",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1yJ1LsVr2D3VAcI0rvHzmvTckfYgVNL9TmVMd_YzGQig/edit",
+    "properties": {
+      "title": "BM04 — Danh sách Cần xử lý — Nghiệm thu 13-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 1532828539,
+          "title": "2026-10-09_01",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                    "userEnteredValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-04)",
+                    "userEnteredValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-04)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-04)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "DANH SÁCH LỖI VÀ TỒN TẠI HẠNG MỤC (PUNCH LIST)",
+                    "userEnteredValue": {
+                      "stringValue": "DANH SÁCH LỖI VÀ TỒN TẠI HẠNG MỤC (PUNCH LIST)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "DANH SÁCH LỖI VÀ TỒN TẠI HẠNG MỤC (PUNCH LIST)"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "Dự án:",
+                    "userEnteredValue": {
+                      "stringValue": "Dự án:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Dự án:"
+                    }
+                  },
+                  {
+                    "formattedValue": "[DEV-BM04-REUSE-20261009] [Synthetic Development] BM04 source location",
+                    "userEnteredValue": {
+                      "stringValue": "[DEV-BM04-REUSE-20261009] [Synthetic Development] BM04 source location"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[DEV-BM04-REUSE-20261009] [Synthetic Development] BM04 source location"
+                    }
+                  },
+                  {},
+                  {},
+                  {},
+                  {},
+                  {
+                    "formattedValue": "Ngày cập nhật:",
+                    "userEnteredValue": {
+                      "stringValue": "Ngày cập nhật:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ngày cập nhật:"
+                    }
+                  },
+                  {
+                    "formattedValue": "2026-10-09",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-09"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-09"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "STT",
+                    "userEnteredValue": {
+                      "stringValue": "STT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "STT"
+                    }
+                  },
+                  {
+                    "formattedValue": "MÃ LỖI",
+                    "userEnteredValue": {
+                      "stringValue": "MÃ LỖI"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "MÃ LỖI"
+                    }
+                  },
+                  {
+                    "formattedValue": "VỊ TRÍ / HẠNG MỤC",
+                    "userEnteredValue": {
+                      "stringValue": "VỊ TRÍ / HẠNG MỤC"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "VỊ TRÍ / HẠNG MỤC"
+                    }
+                  },
+                  {
+                    "formattedValue": "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI",
+                    "userEnteredValue": {
+                      "stringValue": "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "MÔ TẢ CHI TIẾT LỖI / TỒN TẠI"
+                    }
+                  },
+                  {
+                    "formattedValue": "MỨC ĐỘ",
+                    "userEnteredValue": {
+                      "stringValue": "MỨC ĐỘ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "MỨC ĐỘ"
+                    }
+                  },
+                  {
+                    "formattedValue": "ĐƠN VỊ PHỤ TRÁCH",
+                    "userEnteredValue": {
+                      "stringValue": "ĐƠN VỊ PHỤ TRÁCH"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "ĐƠN VỊ PHỤ TRÁCH"
+                    }
+                  },
+                  {
+                    "formattedValue": "ĐẠI DIỆN 24/7",
+                    "userEnteredValue": {
+                      "stringValue": "ĐẠI DIỆN 24/7"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "ĐẠI DIỆN 24/7"
+                    }
+                  },
+                  {
+                    "formattedValue": "THỜI HẠN",
+                    "userEnteredValue": {
+                      "stringValue": "THỜI HẠN"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "THỜI HẠN"
+                    }
+                  },
+                  {
+                    "formattedValue": "TRẠNG THÁI",
+                    "userEnteredValue": {
+                      "stringValue": "TRẠNG THÁI"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "TRẠNG THÁI"
+                    }
+                  },
+                  {
+                    "formattedValue": "GHI CHÚ",
+                    "userEnteredValue": {
+                      "stringValue": "GHI CHÚ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GHI CHÚ"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "1",
+                    "userEnteredValue": {
+                      "numberValue": 1
+                    },
+                    "effectiveValue": {
+                      "numberValue": 1
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "[Synthetic] Khu B — ô kiểm tra 04",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Khu B — ô kiểm tra 04"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Khu B — ô kiểm tra 04"
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Bề mặt ô thử còn xước",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Bề mặt ô thử còn xước"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Bề mặt ô thử còn xước"
+                    }
+                  },
+                  {},
+                  {},
+                  {},
+                  {
+                    "formattedValue": "2026-10-10T10:00:00Z",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-10T10:00:00Z"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-10T10:00:00Z"
+                    }
+                  },
+                  {
+                    "formattedValue": "Mới",
+                    "userEnteredValue": {
+                      "stringValue": "Mới"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Mới"
+                    }
+                  }
+                ]
+              },
+              {},
+              {},
+              {},
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1",
+                    "userEnteredValue": {
+                      "formulaValue": "=\"TỔNG HỢP: Tổng lỗi: \"&COUNT(A8:A10)&\" | Đã khắc phục: \"&COUNTIF(I8:I10,\"Đã khắc phục\")&\" | Đang xử lý: \"&COUNTIFS(I8:I10,\"<>Đã khắc phục\",I8:I10,\"<>\")"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "TỔNG HỢP: Tổng lỗi: 1 | Đã khắc phục: 0 | Đang xử lý: 1"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "Nội dung lỗi đã ghi nhận",
+                    "userEnteredValue": {
+                      "stringValue": "Nội dung lỗi đã ghi nhận"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Nội dung lỗi đã ghi nhận"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Sửa bề mặt ô 04",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Sửa bề mặt ô 04"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Sửa bề mặt ô 04"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "properties": {
+          "sheetId": 1096122567,
+          "title": "Hình ảnh",
+          "index": 1,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Gradient BM04/BM07 • 8057abdc-e188-4605-b996-77f339d961a2\nLỗi và tồn tại · ae4aba28-043c-48fa-8125-6b6da4a313d4 • [Synthetic] Khu B — ô 04\nPhát hiện lỗi\n[Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Gradient BM04/BM07 • 8057abdc-e188-4605-b996-77f339d961a2\nLỗi và tồn tại · ae4aba28-043c-48fa-8125-6b6da4a313d4 • [Synthetic] Khu B — ô 04\nPhát hiện lỗi\n[Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Gradient BM04/BM07 • 8057abdc-e188-4605-b996-77f339d961a2\nLỗi và tồn tại · ae4aba28-043c-48fa-8125-6b6da4a313d4 • [Synthetic] Khu B — ô 04\nPhát hiện lỗi\n[Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "isError": false
+}

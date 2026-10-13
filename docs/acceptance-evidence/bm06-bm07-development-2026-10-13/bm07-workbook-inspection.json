@@ -1,0 +1,52 @@
+{
+  "bytes": 38562,
+  "sha256": "f3a2faa1d3ce5e1587993e8d5f1549388d551fbc60dbfb370a057ff6224b006c",
+  "tabs": [
+    {
+      "name": "BM-GS-07",
+      "row5": 33.0,
+      "rows": 14,
+      "values": {
+        "A1": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+        "A2": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-07)",
+        "A3": "SỔ QUẢN LÝ HÌNH ẢNH HIỆN TRƯỜNG (IMAGE LOG)",
+        "A5": "Dự án:",
+        "B5": "[DEV-BM04-REUSE-20261009] [Synthetic Development] BM04 source location",
+        "A7": "STT",
+        "B7": "VỊ TRÍ / HẠNG MỤC",
+        "C7": "THỜI ĐIỂM CHỤP",
+        "D7": "NỘI DUNG HÌNH ẢNH / BẰNG CHỨNG KĨ THUẬT",
+        "E7": "GIAI ĐOẠN",
+        "F7": "TÊN FILE ÂNH THAM CHIẾU",
+        "G7": "GHI CHÚ / BÀN GIAO",
+        "A8": 1,
+        "B8": "[Synthetic] Khu B — ô 04",
+        "D8": "[Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp",
+        "E8": "Phát hiện lỗi",
+        "F8": "",
+        "A9": 2,
+        "B9": "[Synthetic] Ô BM02",
+        "D9": "[Synthetic] Ảnh thử Lần 1 — không phải ảnh công trình",
+        "E9": "Trong thi công",
+        "F9": "",
+        "A10": 3,
+        "B10": "[Synthetic] Ô BM02",
+        "D10": "[Synthetic] Ảnh thử Lần 2 — không phải ảnh công trình",
+        "E10": "Trong thi công",
+        "F10": "",
+        "A13": "GIÁM SÁT CÔNG TRÌNH",
+        "D13": "PHÒNG HỒ SƠ / BQLDA",
+        "A14": "(Ký & ghi rõ họ tên)",
+        "D14": "(Ký & ghi rõ họ tên)"
+      },
+      "image_row_heights": {
+        "8": 85.415625,
+        "9": 82.9,
+        "10": 82.9
+      }
+    }
+  ],
+  "drawing_xml": {
+    "xl/drawings/drawing1.xml": "<xdr:wsDr xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><xdr:oneCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>7</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx=\"1600200\" cy=\"1027628\"></xdr:ext><xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"2\" name=\"Picture 2\" descr=\"[Synthetic] Gradient BM04/BM07 • 8057abdc-e188-4605-b996-77f339d961a2 • evidence:8057abdc-e188-4605-b996-77f339d961a2:0:8057abdc-e188-4605-b996-77f339d961a2\"></xdr:cNvPr><xdr:cNvPicPr preferRelativeResize=\"0\"></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip cstate=\"print\" r:embed=\"rId1\"></a:blip><a:stretch><a:fillRect></a:fillRect></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst=\"rect\"><a:avLst></a:avLst></a:prstGeom><a:noFill></a:noFill></xdr:spPr></xdr:pic><xdr:clientData fLocksWithSheet=\"0\"></xdr:clientData></xdr:oneCellAnchor><xdr:oneCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>8</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx=\"1600200\" cy=\"995680\"></xdr:ext><xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"3\" name=\"Picture 3\" descr=\"[Synthetic] BM02 Lần 1 • dd9e5c97-a54d-43ea-8ea4-e380788b6a1b • evidence:dd9e5c97-a54d-43ea-8ea4-e380788b6a1b:0:dd9e5c97-a54d-43ea-8ea4-e380788b6a1b\"></xdr:cNvPr><xdr:cNvPicPr preferRelativeResize=\"0\"></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip cstate=\"print\" r:embed=\"rId2\"></a:blip><a:stretch><a:fillRect></a:fillRect></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst=\"rect\"><a:avLst></a:avLst></a:prstGeom><a:noFill></a:noFill></xdr:spPr></xdr:pic><xdr:clientData fLocksWithSheet=\"0\"></xdr:clientData></xdr:oneCellAnchor><xdr:oneCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>9</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx=\"1600200\" cy=\"995680\"></xdr:ext><xdr:pic><xdr:nvPicPr><xdr:cNvPr id=\"4\" name=\"Picture 4\" descr=\"[Synthetic] BM02 Lần 2 • 9fdb5b88-b61e-42a0-bac2-3f84946a1930 • evidence:9fdb5b88-b61e-42a0-bac2-3f84946a1930:0:9fdb5b88-b61e-42a0-bac2-3f84946a1930\"></xdr:cNvPr><xdr:cNvPicPr preferRelativeResize=\"0\"></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip cstate=\"print\" r:embed=\"rId3\"></a:blip><a:stretch><a:fillRect></a:fillRect></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst=\"rect\"><a:avLst></a:avLst></a:prstGeom><a:noFill></a:noFill></xdr:spPr></xdr:pic><xdr:clientData fLocksWithSheet=\"0\"></xdr:clientData></xdr:oneCellAnchor></xdr:wsDr>"
+  }
+}

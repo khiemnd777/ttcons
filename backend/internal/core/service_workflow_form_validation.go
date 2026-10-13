@@ -41,6 +41,12 @@ func (s *Service) validateWorkflowFormAnswers(ctx context.Context, instance Reco
 		if err != nil {
 			return nil, validationError("Quy tắc bắt buộc biểu mẫu không hợp lệ", Record{"field": key, "error": err.Error()})
 		}
+		if fmt.Sprint(field["field_type"]) == "checkbox" && hasValue && value != nil {
+			if _, err := normalizeWorkflowCheckboxValue(value); err != nil {
+				fieldErrors[key] = err.Error()
+				continue
+			}
+		}
 		if submit && required && workflowFormValueEmpty(field, value) {
 			missing = append(missing, key)
 			fieldErrors[key] = fmt.Sprintf("%s là bắt buộc", field["label"])
@@ -72,6 +78,18 @@ func (s *Service) validateWorkflowFormAnswers(ctx context.Context, instance Reco
 	if submit && fmt.Sprint(instance["form_type"]) == "checklist" {
 		if err := validateChecklistSubmitReady(normalized); err != nil {
 			return nil, err
+		}
+	}
+	if cleanText(instance["form_code"]) == "builtin_construction_daily_report" {
+		if err := normalizeNativeDailyCaptureAnswers(normalized); err != nil {
+			return nil, err
+		}
+	}
+	if statusIn(cleanText(instance["form_code"]), "builtin_subcontractor_checklist", "client_subcontractor_acceptance_package") {
+		for index, row := range workflowAnswerRecordList(normalized["checklist_items"]) {
+			if (row["design_quantity"] != nil || row["actual_quantity"] != nil) && cleanText(row["unit"]) == "" {
+				return nil, validationError("Khối lượng thiết kế hoặc thực tế cần đơn vị tính", Record{"item_index": index})
+			}
 		}
 	}
 	return normalized, nil
@@ -137,11 +155,7 @@ func (s *Service) normalizeWorkflowFormValue(ctx context.Context, instance Recor
 		}
 		return values, nil
 	case "checkbox":
-		checked, ok := value.(bool)
-		if !ok {
-			return nil, errors.New("Giá trị checkbox phải là boolean")
-		}
-		return checked, nil
+		return normalizeWorkflowCheckboxValue(value)
 	case "evidence_reference":
 		evidenceID := cleanID(value)
 		if evidenceID == "" {
@@ -234,13 +248,25 @@ func (s *Service) normalizeWorkflowStructuredList(ctx context.Context, instance 
 		fieldByKey[key] = record
 	}
 	out := make([]Record, 0, len(items))
+	nativeRowID := cleanText(instance["form_code"]) == "builtin_construction_daily_report" && statusIn(cleanText(field["field_key"]), "crew_items", "material_arrival_items", "blockers", "next_plan_items")
 	for index, item := range items {
 		for key := range item {
+			if nativeRowID && key == "row_id" {
+				continue
+			}
 			if _, ok := fieldByKey[key]; !ok {
 				return nil, fmt.Errorf("%s dòng %d có field không thuộc schema: %s", field["label"], index+1, key)
 			}
 		}
 		normalized := Record{}
+		if nativeRowID {
+			if rowID := cleanID(item["row_id"]); rowID != "" {
+				if !validActivityUUID(rowID) {
+					return nil, fmt.Errorf("%s dòng %d có mã tổ đội không hợp lệ", field["label"], index+1)
+				}
+				normalized["row_id"] = rowID
+			}
+		}
 		for _, spec := range itemFields {
 			key := fmt.Sprint(spec["key"])
 			label := fmt.Sprint(spec["label"])
@@ -290,13 +316,22 @@ func workflowRecordList(value any) ([]Record, error) {
 	return items, nil
 }
 
+func normalizeWorkflowCheckboxValue(value any) (bool, error) {
+	checked, ok := value.(bool)
+	if !ok {
+		return false, errors.New("Giá trị checkbox phải là boolean")
+	}
+	return checked, nil
+}
+
 func structuredValueEmpty(field Record, value any) bool {
 	if value == nil {
 		return true
 	}
 	fieldType := fmt.Sprint(field["type"])
 	if fieldType == "checkbox" {
-		return value != true
+		checked, isBoolean := value.(bool)
+		return isBoolean && boolValue(field["required"]) && !checked
 	}
 	if values, ok := value.([]any); ok {
 		return len(values) == 0
@@ -311,6 +346,8 @@ func (s *Service) normalizeStructuredFieldValue(ctx context.Context, instance Re
 		label = fmt.Sprint(field["key"])
 	}
 	switch fieldType {
+	case "checkbox":
+		return normalizeWorkflowCheckboxValue(value)
 	case "text", "textarea":
 		text := strings.TrimSpace(fmt.Sprint(value))
 		if min := int(number(field["min_length"])); submit && min > 0 && len([]rune(text)) < min {

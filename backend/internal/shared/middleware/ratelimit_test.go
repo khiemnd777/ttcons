@@ -91,6 +91,15 @@ func TestClassifyRequest(t *testing.T) {
 		{fiber.MethodGet, "/api/workflow-form-pdf-exports/1/file", RequestClassExport},
 		{fiber.MethodGet, "/api/workflow-form-signatures/1/visual", RequestClassGeneral},
 		{fiber.MethodGet, "/api/projects", RequestClassGeneral},
+		{fiber.MethodGet, "/api/daily-reports/1/export.xlsx", RequestClassExport},
+		{fiber.MethodGet, "/api/work-reports/1/revisions/2/export.xlsx", RequestClassExport},
+		{fiber.MethodGet, "/api/projects/1/daily-reports/export.xlsx", RequestClassExport},
+		{fiber.MethodGet, "/api/work-reports/export.xlsx", RequestClassExport},
+		{fiber.MethodPost, "/api/daily-reports/1/export.xlsx", RequestClassGeneral},
+		{fiber.MethodPost, "/api/projects/1/bm-gs/preview", RequestClassGeneral},
+		{fiber.MethodGet, "/api/projects/1/bm-gs/preview", RequestClassGeneral},
+		{fiber.MethodPost, "/api/projects/1/preview", RequestClassGeneral},
+		{fiber.MethodPost, "/api/other/1/bm-gs/preview", RequestClassGeneral},
 	}
 	for _, test := range tests {
 		if got := ClassifyRequest(test.method, test.path); got != test.want {

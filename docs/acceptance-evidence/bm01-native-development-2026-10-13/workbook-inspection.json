@@ -1,0 +1,260 @@
+{
+  "sha256": "9820ef239f57f44d7063e83a857ccdaa12f2af951c218f24891e0d62e6fa45ba",
+  "download_sha256": "9820ef239f57f44d7063e83a857ccdaa12f2af951c218f24891e0d62e6fa45ba",
+  "size": 11041,
+  "tabs": {
+    "2026-10-09_01": {
+      "maxRow": 18,
+      "maxCol": 7,
+      "cells": {
+        "A1": {
+          "value": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A2": {
+          "value": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-01)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A3": {
+          "value": "BIÊN BẢN KHẢO SÁT HIỆN TRẠNG MẶT BẰNG",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A5": {
+          "value": "Tên dự án:",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B5": {
+          "value": "[Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E5": {
+          "value": "Mã dự án:",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "F5": {
+          "value": "DEV-BM-REUSE-20261009",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A6": {
+          "value": "Địa điểm:",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B6": {
+          "value": "[Synthetic] Khu thử A — không phải công trình thật",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E6": {
+          "value": "Ngày khảo sát:",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "F6": {
+          "value": "2026-10-09",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A7": {
+          "value": "Đơn vị khảo sát:",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B7": {
+          "value": "PM synthetic",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E7": {
+          "value": "Đại diện CĐT/Khách hàng:",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "F7": {
+          "value": "Đại diện synthetic",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A9": {
+          "value": "STT",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B9": {
+          "value": "VỊ TRÍ / KHU VỰC",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "C9": {
+          "value": "KÍCH THƯỚC / CAO ĐỘ",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "D9": {
+          "value": "ĐIỂM GIAO KỸ THUẬT (MEP)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E9": {
+          "value": "KẾT CẤU & HOÀN THIỆN HIỆN HỮU",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "F9": {
+          "value": "ĐÁNH GIÁ & YÊU CẦU XỬ LÝ",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "G9": {
+          "value": "GHI CHÚ",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A10": {
+          "value": 1,
+          "type": "n",
+          "number_format": "General",
+          "wrap": true
+        },
+        "B10": {
+          "value": "[Synthetic] Khu A",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "C10": {
+          "value": "4 x 3 • m",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "D10": {
+          "value": "[Synthetic] Ống kỹ thuật bên vách A",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E10": {
+          "value": "[Synthetic] Tường mẫu còn vết xước",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "F10": {
+          "value": "[Synthetic] Cần kiểm tra ô thử trước hoàn thiện",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "G10": {
+          "value": "[Synthetic] Đo mẫu, không dùng cho thi công thật",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A17": {
+          "value": "GIÁM SÁT CÔNG TRÌNH",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "C17": {
+          "value": "PHÒNG QS / KINH DOANH",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E17": {
+          "value": "QUẢN LÝ DỰ ÁN (PM)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "A18": {
+          "value": "(Ký & ghi rõ họ tên)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "C18": {
+          "value": "(Ký & ghi rõ họ tên)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        },
+        "E18": {
+          "value": "(Ký & ghi rõ họ tên)",
+          "type": "s",
+          "number_format": "General",
+          "wrap": true
+        }
+      },
+      "images": 0,
+      "merges": [
+        "A1:G1",
+        "A3:G3",
+        "E17:G17",
+        "A2:G2",
+        "E18:G18",
+        "A17:B17",
+        "A18:B18",
+        "C17:D17",
+        "C18:D18"
+      ],
+      "rows": {
+        "1": 28.0,
+        "2": 20.0,
+        "3": 26.0,
+        "5": 65.4,
+        "6": 50.550000000000004,
+        "7": 60.0,
+        "8": 15.75,
+        "9": 26.0,
+        "10": 46.5,
+        "11": 35.0,
+        "12": 57.0,
+        "13": 45.0,
+        "14": 47.0,
+        "17": 20.0
+      },
+      "columns": {
+        "A": 8.0,
+        "B": 24.0,
+        "C": 23.4285714285714,
+        "D": 25.1428571428571,
+        "E": 20.2857142857143,
+        "F": 29.5714285714286,
+        "G": 24.4285714285714
+      }
+    }
+  }
+}

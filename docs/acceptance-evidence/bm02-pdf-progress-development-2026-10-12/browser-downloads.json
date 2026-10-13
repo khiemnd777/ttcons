@@ -1,0 +1,38 @@
+[
+  {
+    "phase": "workflow3",
+    "file": "PDF-quy-trinh-lan-3.pdf",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-thi-cong-12-10-2026-lan-3 (1).pdf",
+    "revision_no": 3,
+    "expected_progress": "Chưa ghi tiến độ",
+    "expected_weather": "Mưa",
+    "source_kind": "workflow"
+  },
+  {
+    "phase": "workflow1",
+    "file": "PDF-quy-trinh-lan-1.pdf",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-thi-cong-12-10-2026-lan-1 (1).pdf",
+    "revision_no": 1,
+    "expected_progress": "Chưa ghi tiến độ",
+    "expected_weather": "Nắng nóng",
+    "source_kind": "workflow"
+  },
+  {
+    "phase": "manual2",
+    "file": "PDF-thu-cong-lan-2-60.pdf",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-thi-cong-12-10-2026-lan-2.pdf",
+    "revision_no": 2,
+    "expected_progress": "60%",
+    "expected_weather": "Mưa",
+    "source_kind": "manual"
+  },
+  {
+    "phase": "manual1",
+    "file": "PDF-thu-cong-lan-1-25.pdf",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-thi-cong-12-10-2026-lan-1 (2).pdf",
+    "revision_no": 1,
+    "expected_progress": "25%",
+    "expected_weather": "Nắng",
+    "source_kind": "manual"
+  }
+]

@@ -1,0 +1,98 @@
+{
+  "captured_at": "2026-10-09T17:11:22.275007+00:00",
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "worktree": "retained uncommitted main",
+  "source_manifest_files": 959,
+  "source_manifest_sha256": "f658859b6fb567530ca64c25c0c56df76542898ef7313848cf7d9513cf89e97e",
+  "source_drift": [],
+  "services": [
+    {
+      "Service": "admin",
+      "ID": "ad78d9c8ce1c",
+      "Image": "ttcons-admin",
+      "CreatedAt": "2026-10-09 23:08:21 +0700 +07",
+      "State": "running",
+      "Health": "",
+      "Ports": "127.0.0.1:5173->5173/tcp"
+    },
+    {
+      "Service": "backend",
+      "ID": "3828db37a3b0",
+      "Image": "ttcons-backend",
+      "CreatedAt": "2026-10-09 23:08:21 +0700 +07",
+      "State": "running",
+      "Health": "",
+      "Ports": "127.0.0.1:8080->8080/tcp"
+    },
+    {
+      "Service": "postgres",
+      "ID": "e007dac09e9c",
+      "Image": "postgres:16-alpine",
+      "CreatedAt": "2026-10-09 23:08:21 +0700 +07",
+      "State": "running",
+      "Health": "healthy",
+      "Ports": "127.0.0.1:5432->5432/tcp"
+    },
+    {
+      "Service": "redis",
+      "ID": "0a6e06256c9e",
+      "Image": "redis:7-alpine",
+      "CreatedAt": "2026-10-09 23:08:21 +0700 +07",
+      "State": "running",
+      "Health": "healthy",
+      "Ports": "127.0.0.1:6379->6379/tcp"
+    },
+    {
+      "Service": "redis-cache",
+      "ID": "8cdd9f2d9f07",
+      "Image": "redis:7-alpine",
+      "CreatedAt": "2026-10-09 23:08:21 +0700 +07",
+      "State": "running",
+      "Health": "healthy",
+      "Ports": "127.0.0.1:6380->6379/tcp"
+    }
+  ],
+  "health": {
+    "health": {
+      "success": true,
+      "data": {
+        "service": "consflow",
+        "status": "ok"
+      },
+      "message": "OK"
+    },
+    "ready": {
+      "success": true,
+      "data": {
+        "database": "ok",
+        "service": "consflow",
+        "status": "ready"
+      },
+      "message": "OK"
+    }
+  },
+  "database": {
+    "name": "consflow",
+    "migrations_count": 157,
+    "max_numeric_version": 157,
+    "before_restart": {
+      "projects": 3,
+      "workflow_forms": 17
+    },
+    "after_restart_before_fixtures": {
+      "projects": 3,
+      "workflow_forms": 17
+    },
+    "after_canonical_fixtures": {
+      "projects": 5,
+      "workflow_forms": 20
+    }
+  },
+  "restart_log": "/private/tmp/consflow-reuse-development-restart-20261009.log",
+  "backup": {
+    "path": "/private/tmp/consflow-before-reuse-development-20261009.dump",
+    "bytes": 1120940,
+    "sha256": "a08ca0fbda6648cfba6677544001dd24d581d5e8d21a871b604aeddafded07a3",
+    "restore_test": "NOT_RUN"
+  }
+}

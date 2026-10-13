@@ -1385,12 +1385,16 @@ func (r *Repository) GetContractDetail(ctx context.Context, contractID string) (
 				FROM workflow_form_signatures signature
 				LEFT JOIN contract_version_signature_links link ON link.workflow_form_signature_id=signature.id
 				WHERE signature.form_instance_id=wfi.id
+				AND signature.form_revision_no=wfi.current_revision
+				AND signature.project_id=wfi.project_id AND signature.work_item_id=wfi.work_item_id
+				AND signature.form_version_id=wfi.form_version_id AND signature.purpose='approved_by'
 			),'[]'::jsonb) AS signatures
 		FROM contracts contract
 		JOIN workflow_form_instances wfi ON wfi.project_id=contract.project_id AND wfi.status='submitted'
 		JOIN work_items wi ON wi.id=wfi.work_item_id
 		JOIN pipeline_run_steps rs ON rs.id=wfi.run_step_id
-		WHERE contract.id=$1 AND rs.business_code='outbound_contract.app_sign'
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE contract.id=$1 AND `+contractSigningFormSourceSQL+`
 		ORDER BY wfi.submitted_at DESC NULLS LAST,wfi.updated_at DESC,wfi.id
 	`, contractID)
 	if err != nil {
@@ -1764,8 +1768,13 @@ func (r *Repository) SignContractVersionWithWorkflowSignature(ctx context.Contex
 		FROM workflow_form_signatures signature
 		JOIN workflow_form_instances wfi ON wfi.id=signature.form_instance_id
 		JOIN pipeline_run_steps rs ON rs.id=wfi.run_step_id
-		WHERE signature.id=$1
-		FOR SHARE OF signature,wfi,rs
+		JOIN work_items wi ON wi.id=wfi.work_item_id
+		JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id
+		WHERE signature.id=$1 AND `+contractSigningFormSourceSQL+`
+		AND signature.form_revision_no=wfi.current_revision
+		AND signature.project_id=wfi.project_id AND signature.work_item_id=wfi.work_item_id
+		AND signature.form_version_id=wfi.form_version_id
+		FOR SHARE OF signature,wfi,rs,wi,wft
 	`, signatureID)
 	if err != nil {
 		return nil, err
@@ -1777,7 +1786,7 @@ func (r *Repository) SignContractVersionWithWorkflowSignature(ctx context.Contex
 	if cleanID(signature["form_project_id"]) != cleanID(version["project_id"]) {
 		return nil, validationError("Chữ ký workflow không thuộc cùng công trình với hợp đồng")
 	}
-	if fmt.Sprint(signature["purpose"]) != "approved_by" || fmt.Sprint(signature["step_business_code"]) != "outbound_contract.app_sign" {
+	if fmt.Sprint(signature["purpose"]) != "approved_by" {
 		return nil, validationError("Chữ ký không thuộc bước ký hợp đồng trên App", Record{"purpose": signature["purpose"], "step_business_code": signature["step_business_code"]})
 	}
 	if cleanID(signature["signer_user_id"]) != actorID {

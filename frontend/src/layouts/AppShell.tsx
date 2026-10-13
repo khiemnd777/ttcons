@@ -33,6 +33,7 @@ import { roleSummary } from '../lib/utils/roles';
 import { NotificationPanel } from '../modules/notifications/NotificationPanel';
 import { useShellIndicators } from '../modules/notifications/useShellIndicators';
 import { UtilityDock } from '../modules/utilities/UtilityDock';
+import { UtilityDockLauncherHost, UtilityDockLauncherProvider } from '../modules/utilities/UtilityDockLauncherHost';
 
 type NavItem = {
   to: string;
@@ -155,15 +156,15 @@ export function AppShell() {
 
   if (location.pathname.startsWith('/pipeline-builder') || projectFocusMode) {
     return (
-      <div className="min-h-screen bg-surface">
+      <UtilityDockLauncherProvider><div className="min-h-screen bg-surface">
         <Outlet />
         <UtilityDock key="global-utility-dock" />
-      </div>
+      </div></UtilityDockLauncherProvider>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface">
+    <UtilityDockLauncherProvider><div className="min-h-screen bg-surface">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-line bg-white lg:block">
         <div className="flex h-full flex-col">
           <div className="h-16 border-b border-line">
@@ -267,7 +268,7 @@ export function AppShell() {
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <NotificationPanel summary={indicators.notifications.data} />
-              <div id="utility-dock-mobile-launcher" className="sm:hidden" />
+              <UtilityDockLauncherHost presentation="icon" />
               <button
                 type="button"
                 className="hidden items-center gap-2 rounded-md px-2 py-1 text-right hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:flex"
@@ -300,7 +301,7 @@ export function AppShell() {
         </footer>
       </div>
       <UtilityDock key="global-utility-dock" />
-    </div>
+    </div></UtilityDockLauncherProvider>
   );
 }
 

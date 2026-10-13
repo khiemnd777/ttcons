@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, ExternalLink, FileText, Loader2, LockKeyhole, PenLine, Plus, Stamp, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
+import { NativeExcelExportButton } from '../_shared/NativeExcelExportButton';
+import { workflowFormExcelCode, workflowFormRiskExcelEligible } from './workflowFormExcelEligibility';
 import { CurrencyInput } from '../../components/CurrencyInput';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -649,9 +651,17 @@ export function WorkflowFormPanel({
   }
 
   const formActionPending = saveDraft.isPending || submitForm.isPending || amendForm.isPending;
+  const exportFormCode = workflowFormExcelCode(templateCode);
+  const exportDisabled = formActionPending || dirtyRef.current;
 
   return (
     <section ref={panelRef} tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md outline-none">
+      {instance?.id ? <div className="flex flex-wrap gap-2">
+        {exportFormCode ? <NativeExcelExportButton path={`/workflow-form-instances/${encodeURIComponent(instance.id)}/export.xlsx`} filename={`${exportFormCode}.xlsx`} label={exportFormCode === 'BM-GS-02' ? 'Xuất báo cáo ngày' : undefined} disabled={exportDisabled} /> : null}
+        {workflowFormRiskExcelEligible(templateCode, activeFields.map(field => field.field_key)) ? <NativeExcelExportButton path={`/workflow-form-instances/${encodeURIComponent(instance.id)}/risks/export.xlsx`} filename="BM-GS-05.xlsx" label="Xuất báo cáo rủi ro" disabled={exportDisabled} /> : null}
+        {templateCode === 'builtin_construction_daily_report' && activeFields.some(field => field.field_key === 'next_plan_items') ? <NativeExcelExportButton path={`/workflow-form-instances/${encodeURIComponent(instance.id)}/next-plan/export.xlsx`} filename="BM-GS-06.xlsx" label="Xuất báo cáo hiện trường" disabled={exportDisabled} /> : null}
+        {dirtyRef.current && (exportFormCode || templateCode === 'builtin_construction_daily_report') ? <p className="w-full text-xs text-slate-500">Lưu thay đổi trước khi xuất Excel.</p> : null}
+      </div> : null}
       <div ref={actionCenterRef} tabIndex={-1} className="scroll-mt-24 rounded-md outline-none">
         <WorkflowFormActionCenter
           title={businessFormTitle}

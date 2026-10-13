@@ -1,0 +1,1806 @@
+[
+  {
+    "entry": "02-list-all",
+    "check": "selected source report dates",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08",
+      "2026-10-07"
+    ]
+  },
+  {
+    "entry": "02-list-filter07",
+    "check": "selected source report dates",
+    "status": "PASS",
+    "observed": [
+      "2026-10-07"
+    ]
+  },
+  {
+    "entry": "02-detail-08",
+    "check": "selected source report dates",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08"
+    ]
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "selected source report dates",
+    "status": "PASS",
+    "observed": [
+      "2026-10-09"
+    ]
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "saved marker 0%",
+    "status": "PASS",
+    "observed": "0%"
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "saved marker RR-MANUAL-UAT",
+    "status": "PASS",
+    "observed": "RR-MANUAL-UAT"
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "saved marker CV-MANUAL-UAT",
+    "status": "PASS",
+    "observed": "CV-MANUAL-UAT"
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "saved marker Đại diện nhận việc UAT",
+    "status": "PASS",
+    "observed": "Đại diện nhận việc UAT"
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "saved marker Lối vận chuyển chưa thông thoáng",
+    "status": "PASS",
+    "observed": "Lối vận chuyển chưa thông thoáng"
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "saved marker Tiến độ đã ghi nhận: 0%",
+    "status": "PASS",
+    "observed": "Tiến độ đã ghi nhận: 0%"
+  },
+  {
+    "entry": "06-detail-09",
+    "check": "zero remains zero",
+    "status": "PASS",
+    "observed": "0"
+  },
+  {
+    "entry": "06-detail-09",
+    "check": "saved instruction/receiver",
+    "status": "PASS",
+    "observed": {
+      "B8": "CV-MANUAL-UAT",
+      "F8": "Đại diện nhận việc UAT"
+    }
+  },
+  {
+    "entry": "05-detail-09",
+    "check": "saved risk identity/status",
+    "status": "PASS",
+    "observed": {
+      "B8": "RR-MANUAL-UAT",
+      "K8": "Đang theo dõi"
+    }
+  },
+  {
+    "entry": "04-list/detail",
+    "check": "same saved action row",
+    "status": "PASS",
+    "observed": {
+      "D8": "Nội dung lỗi giả lập: kiểm tra góc nền trước hoàn thiện",
+      "H8": "2026-10-10T17:00:00+07:00",
+      "I8": "Mới"
+    }
+  },
+  {
+    "entry": "02-list-all",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-list-all",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 2
+  },
+  {
+    "entry": "02-list-all",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "2026-10-07_02": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-list-all",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "2026-10-07_02",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "02-detail-08",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-detail-08",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "02-detail-08",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-detail-08",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "06-detail-08",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "06-detail-08",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "06-detail-08",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "06-detail-08",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "02-list-filter07",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-list-filter07",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "02-list-filter07",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-07_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-list-filter07",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-07_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "04-list",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "04-list",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "04-list",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "04-list",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "04-detail",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "04-detail",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "04-detail",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "04-detail",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-09_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-detail-09",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-09_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "05-detail-09",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "05-detail-09",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "05-detail-09",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-09_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "05-detail-09",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-09_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "06-detail-09",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "06-detail-09",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "06-detail-09",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-09_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "06-detail-09",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-09_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "08-handover",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "08-handover",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "08-handover",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "08-handover",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "02-workreports-list",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-workreports-list",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "02-workreports-list",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-07_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-workreports-list",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-07_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "02-workreport-revision1",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-workreport-revision1",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "02-workreport-revision1",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-07_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-workreport-revision1",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-07_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": []
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 0
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {}
+    }
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01"
+    ]
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "01-survey-form",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": []
+  },
+  {
+    "entry": "01-survey-form",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 0
+  },
+  {
+    "entry": "01-survey-form",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {}
+    }
+  },
+  {
+    "entry": "01-survey-form",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01"
+    ]
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": []
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 0
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {}
+    }
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01"
+    ]
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": [
+      {
+        "part": "xl/media/image1.png",
+        "bytes": 5244,
+        "width": 1280,
+        "height": 822,
+        "format": "PNG",
+        "sha256": "8dadf6ffe4103ef893eeb56aedf0ef85addd18d8f7dad87a972536e58db44ad0"
+      }
+    ]
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 1
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "2026-10-08_01": {},
+      "Hình ảnh": {}
+    }
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "2026-10-08_01",
+      "Hình ảnh"
+    ]
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "embedded media bounded dimensions",
+    "status": "PASS",
+    "observed": []
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "expected saved source photo anchors",
+    "status": "PASS",
+    "observed": 0
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "no stored cell error values",
+    "status": "PASS",
+    "observed": {
+      "BM-GS-05-2892baa9_01": {}
+    }
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "only intended template and image sheets",
+    "status": "PASS",
+    "observed": [
+      "BM-GS-05-2892baa9_01"
+    ]
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source B7",
+    "status": "PASS",
+    "observed": "Đội khảo sát UAT"
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source F7",
+    "status": "PASS",
+    "observed": "Đại diện mẫu UAT"
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source B10",
+    "status": "PASS",
+    "observed": "Sảnh tầng 1 (giả lập)"
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source C10",
+    "status": "PASS",
+    "observed": "6 × 4 • m"
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source D10",
+    "status": "PASS",
+    "observed": "Tuyến điện mẫu"
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source E10",
+    "status": "PASS",
+    "observed": "Nền cũ trong bộ mẫu"
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source F10",
+    "status": "PASS",
+    "observed": "Cần vệ sinh theo ghi nhận mẫu"
+  },
+  {
+    "entry": "01-measurement-form",
+    "check": "saved source G10",
+    "status": "PASS",
+    "observed": "Không phải số đo công trình thật"
+  },
+  {
+    "entry": "01-survey-form",
+    "check": "saved source B10",
+    "status": "PASS",
+    "observed": "Lối vận chuyển mẫu"
+  },
+  {
+    "entry": "01-survey-form",
+    "check": "saved source C10",
+    "status": "PASS",
+    "observed": "2 × 8 • m"
+  },
+  {
+    "entry": "01-survey-form",
+    "check": "saved source G10",
+    "status": "PASS",
+    "observed": "Bộ dữ liệu nghiệm thu giao diện"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source B8",
+    "status": "PASS",
+    "observed": "RR-UAT-01"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source C8",
+    "status": "PASS",
+    "observed": "2026-10-08"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source D8",
+    "status": "PASS",
+    "observed": "Lối vận chuyển hẹp (giả lập)"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source E8",
+    "status": "PASS",
+    "observed": "Không gian giới hạn trong bộ mẫu"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source F8",
+    "status": "PASS",
+    "observed": "Chậm vận chuyển mẫu"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source G8",
+    "status": "PASS",
+    "observed": "Trung bình"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source H8",
+    "status": "PASS",
+    "observed": "Bố trí biển cảnh báo mẫu"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source I8",
+    "status": "PASS",
+    "observed": "Giám sát UAT"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source J8",
+    "status": "PASS",
+    "observed": "2026-10-10"
+  },
+  {
+    "entry": "05-survey-context",
+    "check": "saved source K8",
+    "status": "PASS",
+    "observed": "Đang theo dõi"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "saved source B8",
+    "status": "PASS",
+    "observed": "RR-NATIVE-UAT"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "saved source D8",
+    "status": "PASS",
+    "observed": "Mặt bằng chưa dọn (giả lập)"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "saved source E8",
+    "status": "PASS",
+    "observed": "Vật tư mẫu chưa di chuyển"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "saved source G8",
+    "status": "PASS",
+    "observed": "Cao"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "saved source I8",
+    "status": "PASS",
+    "observed": "PM UAT"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "saved source K8",
+    "status": "PASS",
+    "observed": "Đang theo dõi"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source B8",
+    "status": "PASS",
+    "observed": "CV-UAT-01"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source C8",
+    "status": "PASS",
+    "observed": "Lắp gạch khu vực mẫu"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source D8",
+    "status": "PASS",
+    "observed": "Sảnh mẫu"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source E8",
+    "status": "PASS",
+    "observed": "Tổ mẫu"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source F8",
+    "status": "PASS",
+    "observed": "Đại diện nhận việc UAT • Liên hệ nội bộ"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source G8",
+    "status": "PASS",
+    "observed": "2026-10-08"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source H8",
+    "status": "PASS",
+    "observed": "2026-10-09"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source I8",
+    "status": "PASS",
+    "observed": "0"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "saved source J8",
+    "status": "PASS",
+    "observed": "Chưa bắt đầu"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "saved source B9",
+    "status": "PASS",
+    "observed": "Kiểm tra mạch gạch mẫu"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "saved source C9",
+    "status": "PASS",
+    "observed": "Tiêu chuẩn mẫu UAT • UAT-R1"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "saved source D9",
+    "status": "PASS",
+    "observed": "Bề mặt theo bộ mẫu"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "saved source E9",
+    "status": "PASS",
+    "observed": "24"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "saved source F9",
+    "status": "PASS",
+    "observed": "23.5"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "saved source G9",
+    "status": "PASS",
+    "observed": "Trạng thái checklist: Đã thực hiện"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "saved source B9",
+    "status": "PASS",
+    "observed": "Kiểm tra vách mẫu"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "saved source C9",
+    "status": "PASS",
+    "observed": "Yêu cầu mẫu UAT • UAT-R2"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "saved source D9",
+    "status": "PASS",
+    "observed": "Đúng vị trí mẫu"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "saved source E9",
+    "status": "PASS",
+    "observed": "10"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "saved source F9",
+    "status": "PASS",
+    "observed": "9.5"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "saved source G9",
+    "status": "PASS",
+    "observed": "Trạng thái checklist: Đã thực hiện"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source B8",
+    "status": "PASS",
+    "observed": "RR-UAT-02"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source C8",
+    "status": "PASS",
+    "observed": "2026-10-08"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source D8",
+    "status": "PASS",
+    "observed": "Khu vực tiếp cận hạn chế mẫu"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source E8",
+    "status": "PASS",
+    "observed": "Vật cản trong bộ mẫu"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source F8",
+    "status": "PASS",
+    "observed": "Ảnh hưởng lối đi mẫu"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source G8",
+    "status": "PASS",
+    "observed": "Cao"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source H8",
+    "status": "PASS",
+    "observed": "Khoanh vùng mẫu"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source I8",
+    "status": "PASS",
+    "observed": "Giám sát UAT"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source J8",
+    "status": "PASS",
+    "observed": "2026-10-10"
+  },
+  {
+    "entry": "05-risk-form",
+    "check": "saved source K8",
+    "status": "PASS",
+    "observed": "Đang theo dõi"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "saved source B8",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "saved source C8",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "saved source D8",
+    "status": "PASS",
+    "observed": "Ảnh giả lập cho nguồn native"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "saved source E8",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "saved source F8",
+    "status": "PASS",
+    "observed": "Ảnh nguồn native UAT.png"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "saved source G8",
+    "status": "PASS",
+    "observed": "Bộ dữ liệu nghiệm thu giao diện"
+  },
+  {
+    "entry": "08-handover",
+    "check": "saved source B8",
+    "status": "PASS",
+    "observed": "Ảnh hiện trạng trong bộ mẫu UAT"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail Khối lượng đã ghi nhận: 24",
+    "status": "PASS",
+    "observed": "Khối lượng đã ghi nhận: 24"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail Đơn vị: m2",
+    "status": "PASS",
+    "observed": "Đơn vị: m2"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail Khối lượng giả lập",
+    "status": "PASS",
+    "observed": "Khối lượng giả lập"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail RR-NATIVE-UAT",
+    "status": "PASS",
+    "observed": "RR-NATIVE-UAT"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail Người phụ trách: PM UAT",
+    "status": "PASS",
+    "observed": "Người phụ trách: PM UAT"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail CV-UAT-01",
+    "status": "PASS",
+    "observed": "CV-UAT-01"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail Người nhận: Đại diện nhận việc UAT",
+    "status": "PASS",
+    "observed": "Người nhận: Đại diện nhận việc UAT"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved daily form detail Tiến độ đã ghi nhận: 0%",
+    "status": "PASS",
+    "observed": "Tiến độ đã ghi nhận: 0%"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "missing report progress remains missing",
+    "status": "PASS",
+    "observed": "no header progress section"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved crew/arrival B25",
+    "status": "PASS",
+    "observed": "Tổ xây UAT"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved crew/arrival C25",
+    "status": "PASS",
+    "observed": "3"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved crew/arrival D25",
+    "status": "PASS",
+    "observed": "Đại diện tổ mẫu • Liên hệ nội bộ UAT"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved crew/arrival E26",
+    "status": "PASS",
+    "observed": "Gạch nhập trường mẫu"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved crew/arrival F26",
+    "status": "PASS",
+    "observed": "600 × 600 • Bộ dữ liệu tổng hợp"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "saved crew/arrival G26",
+    "status": "PASS",
+    "observed": "12"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "unrecorded 12 assessments remain blank",
+    "status": "PASS",
+    "observed": "C10:C21 blank"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail Khối lượng đã ghi nhận: 24",
+    "status": "PASS",
+    "observed": "Khối lượng đã ghi nhận: 24"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail Đơn vị: m2",
+    "status": "PASS",
+    "observed": "Đơn vị: m2"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail Khối lượng giả lập",
+    "status": "PASS",
+    "observed": "Khối lượng giả lập"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail RR-NATIVE-UAT",
+    "status": "PASS",
+    "observed": "RR-NATIVE-UAT"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail Người phụ trách: PM UAT",
+    "status": "PASS",
+    "observed": "Người phụ trách: PM UAT"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail CV-UAT-01",
+    "status": "PASS",
+    "observed": "CV-UAT-01"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail Người nhận: Đại diện nhận việc UAT",
+    "status": "PASS",
+    "observed": "Người nhận: Đại diện nhận việc UAT"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved daily form detail Tiến độ đã ghi nhận: 0%",
+    "status": "PASS",
+    "observed": "Tiến độ đã ghi nhận: 0%"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "missing report progress remains missing",
+    "status": "PASS",
+    "observed": "no header progress section"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved crew/arrival B25",
+    "status": "PASS",
+    "observed": "Tổ xây UAT"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved crew/arrival C25",
+    "status": "PASS",
+    "observed": "3"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved crew/arrival D25",
+    "status": "PASS",
+    "observed": "Đại diện tổ mẫu • Liên hệ nội bộ UAT"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved crew/arrival E26",
+    "status": "PASS",
+    "observed": "Gạch nhập trường mẫu"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved crew/arrival F26",
+    "status": "PASS",
+    "observed": "600 × 600 • Bộ dữ liệu tổng hợp"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "saved crew/arrival G26",
+    "status": "PASS",
+    "observed": "12"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "unrecorded 12 assessments remain blank",
+    "status": "PASS",
+    "observed": "C10:C21 blank"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "desktop/mobile workbook content identical",
+    "status": "PASS",
+    "observed": "compared cell/formula/anchor/print data"
+  },
+  {
+    "entry": "02-workreports-list",
+    "check": "saved revision date/progress",
+    "status": "PASS",
+    "observed": {
+      "G5": "2026-10-07",
+      "A34": "20%"
+    }
+  },
+  {
+    "entry": "02-workreports-list",
+    "check": "selected report revision provenance",
+    "status": "PASS",
+    "observed": "exact report ID and revision1"
+  },
+  {
+    "entry": "02-workreport-revision1",
+    "check": "saved revision date/progress",
+    "status": "PASS",
+    "observed": {
+      "G5": "2026-10-07",
+      "A34": "20%"
+    }
+  },
+  {
+    "entry": "02-workreport-revision1",
+    "check": "selected report revision provenance",
+    "status": "PASS",
+    "observed": "exact report ID and revision1"
+  },
+  {
+    "entry": "08-handover",
+    "check": "missing physical fact remains blank D8",
+    "status": "PASS",
+    "observed": null
+  },
+  {
+    "entry": "08-handover",
+    "check": "missing physical fact remains blank E8",
+    "status": "PASS",
+    "observed": null
+  },
+  {
+    "entry": "08-handover",
+    "check": "missing physical fact remains blank F8",
+    "status": "PASS",
+    "observed": null
+  },
+  {
+    "entry": "08-handover",
+    "check": "verified does not infer physical pass",
+    "status": "PASS",
+    "observed": "KẾT LUẬN BÀN GIAO: "
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "native evidence ID provenance",
+    "status": "PASS",
+    "observed": "c8487008-4944-4cc4-a912-bbb202b641d1"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "captured image metadata Sảnh mẫu UAT",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "captured image metadata 2026-10-08T10:00:00+07:00",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "07-evidence-register",
+    "check": "captured image metadata Trong thi công",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "native evidence ID provenance",
+    "status": "PASS",
+    "observed": "f97c3752-7019-4a8f-98bf-edb4bb0481c1"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "native form ID provenance",
+    "status": "PASS",
+    "observed": "a2fcafe6-2a14-453e-8934-cfd59b0fd07e"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "captured image metadata Sảnh mẫu UAT",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "captured image metadata 2026-10-08T10:00:00+07:00",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "02-daily-workflow",
+    "check": "captured image metadata Trong thi công",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "native evidence ID provenance",
+    "status": "PASS",
+    "observed": "f97c3752-7019-4a8f-98bf-edb4bb0481c1"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "native form ID provenance",
+    "status": "PASS",
+    "observed": "a2fcafe6-2a14-453e-8934-cfd59b0fd07e"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "captured image metadata Sảnh mẫu UAT",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "captured image metadata 2026-10-08T10:00:00+07:00",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "02-daily-workflow-mobile390",
+    "check": "captured image metadata Trong thi công",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "native evidence ID provenance",
+    "status": "PASS",
+    "observed": "f97c3752-7019-4a8f-98bf-edb4bb0481c1"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "native form ID provenance",
+    "status": "PASS",
+    "observed": "a2fcafe6-2a14-453e-8934-cfd59b0fd07e"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "captured image metadata Sảnh mẫu UAT",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "captured image metadata 2026-10-08T10:00:00+07:00",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "05-daily-workflow",
+    "check": "captured image metadata Trong thi công",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "native evidence ID provenance",
+    "status": "PASS",
+    "observed": "f97c3752-7019-4a8f-98bf-edb4bb0481c1"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "native form ID provenance",
+    "status": "PASS",
+    "observed": "a2fcafe6-2a14-453e-8934-cfd59b0fd07e"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "captured image metadata Sảnh mẫu UAT",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "captured image metadata 2026-10-08T10:00:00+07:00",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "06-daily-workflow",
+    "check": "captured image metadata Trong thi công",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "native evidence ID provenance",
+    "status": "PASS",
+    "observed": "1a600c61-10f7-4b25-8de5-acdf8e7d914e"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "native form ID provenance",
+    "status": "PASS",
+    "observed": "e05f3656-5904-407b-b351-b6de7ab84967"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "captured image metadata Sảnh mẫu UAT",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "captured image metadata 2026-10-08T10:00:00+07:00",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "03-subcontractor-checklist",
+    "check": "captured image metadata Trong thi công",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "native evidence ID provenance",
+    "status": "PASS",
+    "observed": "588d3ecc-78d8-4048-b18b-ad282b36c6b1"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "native form ID provenance",
+    "status": "PASS",
+    "observed": "3c358a29-1680-407e-8438-3eebad2c27d4"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "captured image metadata Sảnh mẫu UAT",
+    "status": "PASS",
+    "observed": "Sảnh mẫu UAT"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "captured image metadata 2026-10-08T10:00:00+07:00",
+    "status": "PASS",
+    "observed": "2026-10-08T10:00:00+07:00"
+  },
+  {
+    "entry": "03-subcontractor-package",
+    "check": "captured image metadata Trong thi công",
+    "status": "PASS",
+    "observed": "Trong thi công"
+  }
+]

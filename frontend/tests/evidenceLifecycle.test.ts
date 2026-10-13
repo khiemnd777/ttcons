@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const react = require('react');
 const code = await build({
   stdin: { resolveDir: fileURLToPath(new URL('../src/', import.meta.url)), contents: `
-    export { useProtectedEvidencePreview, EvidenceDraftViewerDialog, ProtectedDocumentViewerDialog } from './modules/_shared/EvidenceRecordViewerDialog';
+    export { useProtectedEvidencePreview, EvidenceRecordViewerDialog, EvidenceDraftViewerDialog, ProtectedDocumentViewerDialog } from './modules/_shared/EvidenceRecordViewerDialog';
     export { DocumentReferenceViewButton } from './modules/_shared/DocumentReferenceViewer';
     export { EvidenceReferenceViewButton, EvidenceReferenceViewer } from './modules/_shared/EvidenceReferenceViewer';
     export { DesignReleaseFiles } from './modules/work-items/DesignReleasePanel';
@@ -118,6 +118,30 @@ test('revision paths are part of preview identity; forbidden/missing file errors
   assert.match(hooks.render('useProtectedEvidencePreview', record('ev'), 'pdf', revision2).error, /404 missing file/);
   assert.deepEqual(paths, [revision1, revision1, revision2]);
   hooks.close();
+});
+
+test('sanitized frozen metadata uses only the supplied protected revision path without inventing storage fields', async (t) => {
+  const paths: string[] = [];
+  const pending: ReturnType<typeof deferred>[] = [];
+  const revoked: string[] = [];
+  t.mock.method(URL, 'createObjectURL', () => 'blob:frozen');
+  t.mock.method(URL, 'revokeObjectURL', (url: string) => revoked.push(url));
+  (globalThis as any).__evidenceTestDownload = (path: string) => { paths.push(path); const request = deferred(); pending.push(request); return request.promise; };
+  const frozen = { id: 'ev', name: 'Ảnh nguồn', evidence_type: 'photo', mime_type: 'image/jpeg', file_size: 5 };
+  const path = '/work-reports/report/revisions/3/evidence/ev/file';
+  const hooks = fixture();
+  const props = { record: frozen, protectedFilePath: path, onClose() {} };
+  assert.equal(hooks.render('EvidenceRecordViewerDialog', props).props.loading, true);
+  hooks.flush();
+  assert.deepEqual(paths, [path]);
+  pending[0].resolve(new Blob(['photo'], { type: 'image/jpeg' })); await settle();
+  const viewer = hooks.render('EvidenceRecordViewerDialog', props);
+  assert.equal(viewer.props.mediaType, 'photo'); assert.equal(viewer.props.previewUrl, 'blob:frozen');
+  assert.equal('storage_key' in frozen, false); assert.equal('storage_provider' in frozen, false);
+  const next = hooks.render('EvidenceRecordViewerDialog', { ...props, protectedFilePath: undefined });
+  assert.equal(next.props.previewUrl, undefined); hooks.flush();
+  assert.deepEqual(paths, [path], 'missing path must not fetch generic live evidence');
+  assert.deepEqual(revoked, ['blob:frozen']); hooks.close();
 });
 
 test('draft URL belongs to its File and is released when replaced or closed', (t) => {

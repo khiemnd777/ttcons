@@ -1,0 +1,30 @@
+BÁO CÁO THI CÔNG
+NGÀY BÁO CÁO
+12-10-2026
+Báo cáo công việc trong ngày
+CÔNG TRÌNH
+[Synthetic Development] BM02 phiếu quy trình và vật tư
+Người lập Người nhận
+Consflow Admin [Synthetic] BM02 người nhận — 2026-10-12
+Lần gửi Gửi lúc
+01 13:22 12-10-2026
+TIẾN ĐỘ GHI NHẬN THỜI TIẾT
+0% Nắng nóng
+01 CÔNG VIỆC TRONG NGÀY
+ĐÃ LÀM
+• [Synthetic] WORKFLOW LẦN
+1 — Lát ô thử BM02
+ĐANG LÀM
+Chưa ghi nhận
+SẼ LÀM
+Chưa ghi nhận
+02 VẤN ĐỀ VÀ TRỞ NGẠI
+Chưa ghi nhận vấn đề hoặc trở ngại.
+03 NGUỒN LỰC
+Nhân lực 3 nhân sự / 1 đội
+Vật tư sử dụng Chưa ghi nhận
+04 GHI CHÚ HIỆN TRƯỜNG
+Chưa ghi nhận
+ĐỐI CHIẾU BẢN GỬI
+SHA-256: f9b3b922f8a5f4b08640d78298f2631dd13f3561def3f36bd1fd11cb9341563c
+Báo cáo ngày 12-10-2026 · Lần gửi 01 Trang 1/1

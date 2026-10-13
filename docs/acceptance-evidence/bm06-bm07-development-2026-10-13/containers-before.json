@@ -1,0 +1,86 @@
+[
+  {
+    "service": "admin",
+    "id": "55602300277d2210b652e7d8ca3f466dfbcf2be8766aedc792acab1fe623f8e8",
+    "image": "sha256:9e1c580f71a017e37d98959be99d6136d7214de99c0a9a6c9a9a1fb143e1884a",
+    "started_at": "2026-10-13T00:30:06.742369627Z",
+    "ports": {
+      "5173/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "5173"
+        }
+      ]
+    },
+    "compose_env_file": "/private/tmp/consflow-bm02-development-20261012.env",
+    "scope_env": {}
+  },
+  {
+    "service": "backend",
+    "id": "3a98b375d6883a31a94d7422cbefff5b7e43b405ae746d951f9299e303860081",
+    "image": "sha256:f1aa879da541bb1636b7f8e9490f08a5a9b7374b012a9b1d70ea34c7e7254ee8",
+    "started_at": "2026-10-13T04:58:17.775151297Z",
+    "ports": {
+      "8080/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "8081"
+        }
+      ]
+    },
+    "compose_env_file": "/private/tmp/consflow-bm02-development-20261012.env",
+    "scope_env": {
+      "APP_ENV": "development",
+      "AUTO_MIGRATE": "true",
+      "PORT": "8080"
+    }
+  },
+  {
+    "service": "postgres",
+    "id": "9015920a781a57a8fd81bea99768cf3904ea85a875bc935d0149ed2ae04d5b26",
+    "image": "sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f",
+    "started_at": "2026-10-13T00:30:01.06814568Z",
+    "ports": {
+      "5432/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "5432"
+        }
+      ]
+    },
+    "compose_env_file": "/private/tmp/consflow-bm02-development-20261012.env",
+    "scope_env": {}
+  },
+  {
+    "service": "redis",
+    "id": "c21709c85ecae2639c975620e119727ec5e9acb9c23087088b505c49cb794301",
+    "image": "sha256:7aec734b2bb298a1d769fd8729f13b8514a41bf90fcdd1f38ec52267fbaa8ee6",
+    "started_at": "2026-10-13T00:30:00.991271138Z",
+    "ports": {
+      "6379/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "6379"
+        }
+      ]
+    },
+    "compose_env_file": "/private/tmp/consflow-bm02-development-20261012.env",
+    "scope_env": {}
+  },
+  {
+    "service": "redis-cache",
+    "id": "aa25c5dd76cb5e66f247a2eaab270c41f720b7818ec344d2a5a28c0203b3bcf4",
+    "image": "sha256:7aec734b2bb298a1d769fd8729f13b8514a41bf90fcdd1f38ec52267fbaa8ee6",
+    "started_at": "2026-10-13T00:30:00.883890846Z",
+    "ports": {
+      "6379/tcp": [
+        {
+          "HostIp": "127.0.0.1",
+          "HostPort": "6380"
+        }
+      ]
+    },
+    "compose_env_file": "/private/tmp/consflow-bm02-development-20261012.env",
+    "scope_env": {}
+  }
+]

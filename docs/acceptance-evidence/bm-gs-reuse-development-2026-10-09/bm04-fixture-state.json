@@ -1,0 +1,66 @@
+{
+  "synthetic": true,
+  "scope": "BM04-only source fixture; browser acceptance owned by root",
+  "template_id": "ad94c5be-6324-4071-b859-287422a7c3ff",
+  "node_type": "construction",
+  "node_business_code": "construction_execution",
+  "surface_kind": "quality",
+  "execution_workspace": "operations",
+  "form_required": false,
+  "scope_limits": [
+    "Ảnh gradient synthetic, không phải ảnh công trình",
+    "captured_at bị bỏ trống khi nhập file",
+    "Không tạo incoming acceptance hoặc movement kho",
+    "Fixture cũ cấu hình node sai được giữ nguyên; không phải lỗi ứng dụng"
+  ],
+  "step_id": "c13cb4ad-e873-443f-999a-a14291e80ee3",
+  "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+  "project_code": "DEV-BM04-REUSE-20261009",
+  "run_id": "8c359116-260e-447b-85ac-f5a84e07ceef",
+  "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+  "work_item_status": "in_progress",
+  "stage": "sources_saved",
+  "photo_id": "8057abdc-e188-4605-b996-77f339d961a2",
+  "photo_facts": {
+    "name": "[Synthetic] Gradient BM04/BM07",
+    "caption": "[Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp",
+    "capture_metadata": {
+      "location": "[Synthetic] Khu B — ô 04",
+      "photo_phase": "defect"
+    }
+  },
+  "check_id": "6ee90828-61b2-4402-af9b-a22e8f41658f",
+  "check_location": "[Synthetic] Khu B — ô kiểm tra 04",
+  "check_completed": true,
+  "workspace_keys": [
+    "actions",
+    "checks",
+    "participants",
+    "runtime",
+    "templates",
+    "work_items"
+  ],
+  "action_id": "ae4aba28-043c-48fa-8125-6b6da4a313d4",
+  "action_facts": {
+    "id": "ae4aba28-043c-48fa-8125-6b6da4a313d4",
+    "title": "[Synthetic] Sửa bề mặt ô 04",
+    "status": "open",
+    "fault_code": null,
+    "location": null,
+    "source_check_id": "6ee90828-61b2-4402-af9b-a22e8f41658f",
+    "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+    "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+  },
+  "work_item_can_act": true,
+  "project_url": "http://localhost:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd",
+  "operations_url": "http://localhost:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/operations",
+  "checks_url": "http://localhost:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/operations?tab=checks",
+  "actions_url": "http://localhost:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/operations?tab=actions",
+  "work_item_url": "http://localhost:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/work-items/2c969a28-945f-4abe-bf9a-8d44c722699d",
+  "export_list_api": "/api/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/construction-actions/export.xlsx",
+  "export_detail_api": "/api/construction-actions/ae4aba28-043c-48fa-8125-6b6da4a313d4/export.xlsx",
+  "api_source_status": "VERIFIED via canonical create/start/upload/check/complete/read APIs",
+  "canonical_read_assertions": "PASS: exact check/action/WorkItem IDs; check location saved; action location and fault_code null; parent in_progress and can_act true",
+  "fixture_script_syntax": "PASS: python3 -m py_compile /private/tmp/consflow-reuse-bm04-fixture.py",
+  "browser_acceptance_status": "NOT_RUN by worker; root owns button and screenshot verification"
+}

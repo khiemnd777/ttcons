@@ -1,0 +1,26 @@
+{
+  "time": "2026-10-09T04:17:51.935Z",
+  "downloads": [
+    {
+      "case": "bm08-not-eligible",
+      "source_id": "d4d8d476-3d44-4fb6-8cbe-5476ce86d837",
+      "path": "/Users/khiemnguyen/Downloads/BM-GS-08 (3).xlsx",
+      "supersedes_path": "/Users/khiemnguyen/Downloads/BM-GS-08 (1).xlsx"
+    },
+    {
+      "case": "bm08-eligible",
+      "source_id": "bb2ae20e-6899-4632-ba27-e802758f3756",
+      "path": "/Users/khiemnguyen/Downloads/BM-GS-08 (2).xlsx"
+    },
+    {
+      "case": "bm03-accepted",
+      "source_id": "26c01b3c-25e1-45c7-9158-e9858687a563",
+      "path": "/Users/khiemnguyen/Downloads/BM-GS-03 (4).xlsx"
+    },
+    {
+      "case": "bm03-rework",
+      "source_id": "fd224aba-8416-499b-a2a5-f0a5cdf422d9",
+      "path": "/Users/khiemnguyen/Downloads/BM-GS-03 (5).xlsx"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "title": "[Synthetic] Đợt kiểm tra ảnh thử",
+  "notes": "[Synthetic] Activate exact submitted source; retain mandatory evidence.",
+  "source_run_node_id": "e42afc27-ca13-432d-9d93-b2f362a62f1c",
+  "source_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+  "source_form_revision_no": 1,
+  "items": [
+    {
+      "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "criteria": [
+        {
+          "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc",
+          "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+          "evidence_required": true
+        }
+      ],
+      "evidence_required": true,
+      "location": "[Synthetic] Vùng thử Development",
+      "responsible_role": "Giám sát",
+      "scheduled_at": "2026-10-13T09:00:00+07:00",
+      "source_field_key": "inspection_items",
+      "source_form_code": "client_construction_handoff_plan",
+      "source_item_index": 0,
+      "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+    }
+  ]
+}

@@ -54,10 +54,10 @@ func (r *Repository) CreateHandoverPackage(ctx context.Context, body Record, mut
 		INSERT INTO handover_records (
 			project_id,handover_code,status,final_acceptance_id,workflow_form_instance_id,handover_date,
 			client_representative,company_representative,documents_ready,warehouse_closed,
-			notes,created_by
-		) VALUES ($1,$2,'draft',NULLIF($3,'')::uuid,NULLIF($4,'')::uuid,NULLIF($5,'')::date,$6,$7,false,false,NULLIF($8,''),NULLIF($9,'')::uuid)
+			notes,created_by,handover_stage
+		) VALUES ($1,$2,'draft',NULLIF($3,'')::uuid,NULLIF($4,'')::uuid,NULLIF($5,'')::date,$6,$7,false,false,NULLIF($8,''),NULLIF($9,'')::uuid,NULLIF($10,''))
 		RETURNING *
-	`, body["project_id"], body["handover_code"], cleanID(body["final_acceptance_id"]), cleanID(body["workflow_form_instance_id"]), body["handover_date"], body["client_representative"], body["company_representative"], body["notes"], actorID)
+	`, body["project_id"], body["handover_code"], cleanID(body["final_acceptance_id"]), cleanID(body["workflow_form_instance_id"]), body["handover_date"], body["client_representative"], body["company_representative"], body["notes"], actorID, body["handover_stage"])
 	if err != nil {
 		return nil, err
 	}
@@ -348,6 +348,13 @@ func (r *Repository) UpdateHandoverChecklistItem(ctx context.Context, id string,
 		return nil, sql.ErrNoRows
 	}
 	item := rows[0]
+	allowed, accessErr := r.withReadTransaction(tx).CanAccessProjectPermission(ctx, actorID, cleanID(item["project_id"]), []string{"handover.verify"})
+	if accessErr != nil {
+		return nil, accessErr
+	}
+	if !allowed {
+		return nil, forbiddenError("Bạn không có quyền xác minh checklist bàn giao")
+	}
 	if statusIn(fmt.Sprint(item["handover_status"]), "handed_over", "cancelled", "deleted") {
 		return nil, validationError("Hồ sơ bàn giao đã khóa", Record{"status": item["handover_status"]})
 	}
@@ -378,14 +385,22 @@ func (r *Repository) UpdateHandoverChecklistItem(ctx context.Context, id string,
 	updated, err := queryTx(ctx, tx, `
 		UPDATE handover_checklist_items
 		SET status=$2,evidence_id=NULLIF($3,'')::uuid,document_id=NULLIF($4,'')::uuid,notes=NULLIF($5,''),
+			requirement=CASE WHEN $7::text IS NULL THEN requirement ELSE NULLIF($7,'') END,physical_result=CASE WHEN $8::text IS NULL THEN physical_result ELSE NULLIF($8,'') END,defect=CASE WHEN $9::text IS NULL THEN defect ELSE NULLIF($9,'') END,due_date=CASE WHEN $10::text IS NULL THEN due_date ELSE NULLIF($10,'')::date END,
 			verified_by=CASE WHEN $2 IN ('verified','waived') THEN NULLIF($6,'')::uuid ELSE NULL END,
 			verified_at=CASE WHEN $2 IN ('verified','waived') THEN now() ELSE NULL END,updated_at=now()
 		WHERE id=$1 RETURNING *
-	`, id, status, evidenceID, documentID, body["notes"], actorID)
+	`, id, status, evidenceID, documentID, body["notes"], actorID, body["requirement"], body["physical_result"], body["defect"], body["due_date"])
 	if err != nil {
 		return nil, err
 	}
-	if err := addAuditTx(ctx, tx, cleanID(item["project_id"]), actorID, actorName, "handover_checklist_updated", "handover_checklist_item", id, "Cập nhật checklist bàn giao", Record{"handover_id": item["handover_id"], "item_code": item["item_code"], "from_status": item["status"], "to_status": status, "evidence_id": evidenceID, "document_id": documentID}); err != nil {
+	fieldBefore, fieldAfter := Record{}, Record{}
+	for _, key := range []string{"requirement", "physical_result", "defect", "due_date"} {
+		if _, exists := body[key]; exists {
+			fieldBefore[key] = item[key]
+			fieldAfter[key] = updated[0][key]
+		}
+	}
+	if err := addAuditTx(ctx, tx, cleanID(item["project_id"]), actorID, actorName, "handover_checklist_updated", "handover_checklist_item", id, "Cập nhật checklist bàn giao", Record{"handover_id": item["handover_id"], "item_code": item["item_code"], "from_status": item["status"], "to_status": status, "evidence_id": evidenceID, "document_id": documentID, "field_observations_before": fieldBefore, "field_observations_after": fieldAfter}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -505,6 +520,13 @@ func (r *Repository) HandoverCheck(ctx context.Context, id, actorID, actorName s
 		"ready": ready, "blockers": blockers, "counts": counts,
 		"checked_at": time.Now().UTC().Format(time.RFC3339),
 	}
+	// Capture the observations with this readiness check without using an
+	// observation as a readiness decision. Old snapshots remain unchanged.
+	checklistSnapshot, err := queryTx(ctx, tx, `SELECT id,item_code,category,title,required,status,source_type,source_id,evidence_id,document_id,notes,requirement,physical_result,defect,due_date FROM handover_checklist_items WHERE handover_id=$1 ORDER BY id`, id)
+	if err != nil {
+		return nil, err
+	}
+	snapshot["checklist_items"] = checklistSnapshot
 	rawSnapshot, _ := json.Marshal(snapshot)
 	updated, err := queryTx(ctx, tx, `
 		UPDATE handover_records SET status=$2,documents_ready=$3,warehouse_closed=$4,

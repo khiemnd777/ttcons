@@ -1,0 +1,64 @@
+{
+  "author_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "author_name": "Consflow Admin",
+  "bm_gs_json": {},
+  "bm_gs_updated_at": null,
+  "bm_gs_updated_by": null,
+  "bm_gs_version": 0,
+  "created_at": "2026-10-12T06:18:21Z",
+  "delivery_recipient_id": null,
+  "delivery_recipient_name": null,
+  "delivery_review_comment": null,
+  "delivery_revision_no": null,
+  "delivery_source_changed": false,
+  "delivery_status": null,
+  "id": "4c13526f-7fd6-4fc3-9526-18144148e687",
+  "issues_summary": "",
+  "manpower_summary": "3 nhân sự / 1 đội",
+  "material_usage_summary": "",
+  "photos": [],
+  "primary_evidence_id": null,
+  "progress_percent": 0,
+  "project_address": "[Synthetic] Khu thử BM02",
+  "project_code": "DEV-BM02-WORKFLOW-20261012",
+  "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+  "project_name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+  "report_date": "2026-10-12T00:00:00Z",
+  "report_delivery_eligible": true,
+  "reported_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "runtime_compliant": false,
+  "source_id": "4c13526f-7fd6-4fc3-9526-18144148e687",
+  "structured_json": {
+    "completed_items": [
+      {
+        "actual_quantity": 2,
+        "crew_name": "[Synthetic] Tổ workflow",
+        "evidence_id": "68a802fd-8282-4eae-8cde-82de9e8d039e",
+        "note": "[Synthetic] Nội dung phiếu quy trình Lần 1 — dùng ảnh đỏ",
+        "result": "done",
+        "title": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02",
+        "unit": "m2",
+        "work_area": "[Synthetic] Khu thử BM02"
+      }
+    ],
+    "construction_scope": "flooring",
+    "crew_items": [
+      {
+        "crew_name": "[Synthetic] Tổ workflow",
+        "note": "[Synthetic] Phiếu Lần 1",
+        "row_id": "31e61729-4844-4359-927f-b13b082d4bcf",
+        "work_hours": 8,
+        "worker_count": 3
+      }
+    ],
+    "report_date": "2026-10-12",
+    "reported_by": "Consflow Admin",
+    "weather": "hot"
+  },
+  "weather": "hot",
+  "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1",
+  "work_item_title": "[Synthetic] BM02 báo cáo từ phiếu quy trình",
+  "work_report_id": null,
+  "work_summary": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02",
+  "workflow_form_instance_id": "a6edf273-25fb-4a49-aaa5-fdd525c4c4a2"
+}

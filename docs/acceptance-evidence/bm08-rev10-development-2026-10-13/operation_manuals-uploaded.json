@@ -1,0 +1,21 @@
+{
+  "checksum_sha256": "5b3acac5d4baf178e1a3efef55e960ad3ae8fe2c148b482400018238e5f50fea",
+  "created_at": "2026-10-13T02:19:29Z",
+  "document_type": "operation_manuals",
+  "file_size": 2197,
+  "file_url": null,
+  "id": "f1bb36b2-e21a-4a41-975c-78ee2b8dd7bb",
+  "mime_type": "application/pdf",
+  "name": "[Synthetic] BM08 Rev10 operation_manuals",
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "release_status": "released",
+  "released_at": "2026-10-13T02:19:29Z",
+  "released_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "revision_no": 1,
+  "status": "active",
+  "storage_key": "project-documents/432115cb-bd5b-4fae-9edc-74ce031eacf3/project_intake/432115cb-bd5b-4fae-9edc-74ce031eacf3/baba94b2-3717-48cd-a757-70191c6b9ef4.pdf",
+  "storage_provider": "local",
+  "target_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "target_type": "project_intake",
+  "uploaded_by": "f5250196-91bb-4df6-9666-b318a7036b42"
+}

@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "assertions": {
+    "actual_button_download_retained_byte_for_byte": true,
+    "exact_linked_source_form_work_item_project": true,
+    "exact_template_and_version_three_pin": true,
+    "draft_status_and_revision_zero_preserved": true,
+    "one_saved_dimension_row_and_one_exported_row": true,
+    "project_name_code_address_match_source": true,
+    "measurement_date_uses_saved_business_date": true,
+    "survey_unit_and_client_representative_match_source": true,
+    "all_seven_original_client_headers_preserved": true,
+    "original_title_and_signature_placeholders_preserved": true,
+    "all_original_sample_rows_cleared": true,
+    "single_output_tab_no_added_photo_columns_or_sheet": true,
+    "native_google_conversion_confirmed": true,
+    "google_tab_identity_matches_download": true,
+    "all_140_bounded_google_cells_equal_xlsx": true,
+    "no_google_effective_error_or_value_error": true,
+    "new_google_file_private": true,
+    "all_baseline_old_rows_unchanged_and_retained": true,
+    "only_one_native_source_export_audit_added": true,
+    "migration_158_and_database_unchanged": true,
+    "all_storage_files_preserved": true,
+    "all_978_built_source_hashes_unchanged": true
+  },
+  "old_unique_rows_checked": 2891,
+  "changed_or_lost_rows": [],
+  "new_rows": [
+    [
+      "audit_logs",
+      "ec87c827-2289-4996-aa05-ef58bd734d0d"
+    ]
+  ],
+  "bounded_google_cells_compared": 140,
+  "populated_google_cells": 35,
+  "google_errors": [],
+  "source_files_checked": 978,
+  "storage_files_checked": 149,
+  "formula_count": 0,
+  "limits": "Development Admin; one saved native survey v3 draftR0, one measurement row, no evidence. Browser desktop and unchanged native Google import. Not submitted/Chot ho so/full Rev10 completion. Alternate client_site_measurement_record, multirow/capacity, mobile/physical device, other roles, Excel desktop/print NOT_RUN. User visual sign-off pending."
+}

@@ -1,0 +1,36 @@
+[
+  {
+    "form_id": "b3dd9bb4-20d7-450e-bf0e-6e85f29ee32b",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "project_code": "DEV-BM-REUSE-20261009",
+    "work_item_id": "8faf4204-8f57-4e86-888f-01b0edae0620",
+    "title": "BM01 — Khảo sát synthetic",
+    "form_code": "client_survey_work_package",
+    "version_no": 3,
+    "status": "draft",
+    "revision": 0,
+    "work_status": "in_progress",
+    "dimension_items": [
+      {
+        "mep": "[Synthetic] Ống kỹ thuật bên vách A",
+        "area": "[Synthetic] Khu A",
+        "note": "[Synthetic] Đo mẫu, không dùng cho thi công thật",
+        "unit": "m",
+        "dimension": "4 x 3",
+        "assessment": "[Synthetic] Cần kiểm tra ô thử trước hoàn thiện",
+        "existing_condition": "[Synthetic] Tường mẫu còn vết xước"
+      }
+    ],
+    "answer_keys": [
+      "risk_items",
+      "measured_by",
+      "survey_unit",
+      "dimension_items",
+      "requested_areas",
+      "style_direction",
+      "measurement_date",
+      "owner_requirement",
+      "client_representative"
+    ]
+  }
+]

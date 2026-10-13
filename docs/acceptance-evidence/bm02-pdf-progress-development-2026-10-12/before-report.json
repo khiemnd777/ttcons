@@ -1,0 +1,554 @@
+{
+  "author_account_deleted": false,
+  "author_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "author_name": "Consflow Admin",
+  "bm_gs_evidence": [
+    {
+      "caption": "[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2",
+      "checksum_sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+      "created_at": "2026-10-12T06:25:36Z",
+      "description": null,
+      "evidence_type": "photo",
+      "file_size": 15669,
+      "file_url": null,
+      "id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+      "mime_type": "image/png",
+      "name": "[Synthetic] BM02 quy trình Lần 2",
+      "payload_json": {
+        "capture_metadata": {
+          "location": "[Synthetic] Khu thử workflow BM02",
+          "photo_phase": "during"
+        },
+        "detected_mime_type": "image/png",
+        "original_filename": "BM02-workflow-Lan-2.png"
+      },
+      "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+      "status": "submitted",
+      "storage_key": "evidence/b705236b-9cc5-42dd-ac2d-abf77e699cc4/40ccc567-6b74-4925-b4b4-72e1cae418f1/2f838324-a918-4a50-b614-fd3945411c0e.png",
+      "storage_provider": "local",
+      "title": "[Synthetic] BM02 quy trình Lần 2",
+      "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+    }
+  ],
+  "capabilities": {
+    "can_acknowledge": true,
+    "can_discuss": true,
+    "can_request_changes": true
+  },
+  "created_at": "2026-10-12T06:18:21Z",
+  "current_revision_no": 3,
+  "delivery_source_changed": false,
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-12T06:22:18Z",
+      "event_type": "submitted",
+      "id": "e0de422a-5417-4a3b-a5db-602c8307aa24",
+      "metadata_json": {
+        "recipient_id": "bc554766-1b43-425e-ab4a-295dd86060bd"
+      },
+      "revision_no": 1
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "bc554766-1b43-425e-ab4a-295dd86060bd",
+      "actor_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+      "comment": "[Synthetic] Đổi phiếu quy trình sang Lần 2, khối lượng 9 m2, 6 người và ảnh xanh. Giữ nguyên nội dung/ảnh Lần 1.",
+      "created_at": "2026-10-12T06:24:41Z",
+      "event_type": "needs_changes",
+      "id": "444ef83a-4156-4858-b1c5-6800684cb3d4",
+      "metadata_json": {},
+      "revision_no": 1
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-12T06:26:25Z",
+      "event_type": "resubmitted",
+      "id": "8b869a89-48db-481b-a5f5-9ccf94e1c59a",
+      "metadata_json": {
+        "recipient_id": "bc554766-1b43-425e-ab4a-295dd86060bd"
+      },
+      "revision_no": 2
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "bc554766-1b43-425e-ab4a-295dd86060bd",
+      "actor_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+      "comment": "[Synthetic] Nghiệm thu lại mapping vật tư: tận dụng phiếu nhận hợp lệ 12 m², không nhập lại vật tư và không thêm field.",
+      "created_at": "2026-10-12T07:19:50Z",
+      "event_type": "needs_changes",
+      "id": "4f160d69-3ba3-41a5-8b9b-89308ca0f9d0",
+      "metadata_json": {},
+      "revision_no": 2
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-12T07:32:43Z",
+      "event_type": "resubmitted",
+      "id": "17265049-ad0b-40dc-b314-98bc6173e523",
+      "metadata_json": {
+        "recipient_id": "bc554766-1b43-425e-ab4a-295dd86060bd"
+      },
+      "revision_no": 3
+    }
+  ],
+  "id": "4c13526f-7fd6-4fc3-9526-18144148e687",
+  "is_supervisor_report": false,
+  "issues_summary": "",
+  "manpower_summary": "6 nhân sự / 1 đội",
+  "material_usage_summary": "",
+  "photos": [],
+  "primary_evidence_id": null,
+  "progress_percent": 0,
+  "project_address": "[Synthetic] Khu thử BM02",
+  "project_code": "DEV-BM02-WORKFLOW-20261012",
+  "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+  "project_name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+  "read_receipts": [],
+  "recipient_account_deleted": false,
+  "recipient_id": "bc554766-1b43-425e-ab4a-295dd86060bd",
+  "recipient_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+  "report_date": "2026-10-12T00:00:00Z",
+  "report_delivery_eligible": true,
+  "reported_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "review_comment": null,
+  "reviewed_at": null,
+  "reviewed_by": null,
+  "reviewed_by_account_deleted": false,
+  "reviewed_by_name": null,
+  "revisions": [
+    {
+      "comment": null,
+      "evidence_ids": [
+        "b4281dc0-6c7f-48d0-8846-81845956d963"
+      ],
+      "evidence_records": [
+        {
+          "caption": "[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2",
+          "checksum_sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+          "created_at": "2026-10-12T06:25:36Z",
+          "description": null,
+          "evidence_type": "photo",
+          "file_size": 15669,
+          "file_url": null,
+          "id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+          "mime_type": "image/png",
+          "name": "[Synthetic] BM02 quy trình Lần 2",
+          "payload_json": {
+            "capture_metadata": {
+              "location": "[Synthetic] Khu thử workflow BM02",
+              "photo_phase": "during"
+            },
+            "detected_mime_type": "image/png",
+            "original_filename": "BM02-workflow-Lan-2.png"
+          },
+          "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+          "status": "submitted",
+          "storage_key": "evidence/b705236b-9cc5-42dd-ac2d-abf77e699cc4/40ccc567-6b74-4925-b4b4-72e1cae418f1/2f838324-a918-4a50-b614-fd3945411c0e.png",
+          "storage_provider": "local",
+          "title": "[Synthetic] BM02 quy trình Lần 2",
+          "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+        }
+      ],
+      "id": "cf511903-5244-486b-974e-092cf98a3c95",
+      "revision_no": 3,
+      "snapshot_json": {
+        "address": "[Synthetic] Khu thử BM02",
+        "author_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "author_name": "Consflow Admin",
+        "bm_gs_evidence": [
+          {
+            "caption": "[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2",
+            "checksum_sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+            "created_at": "2026-10-12T06:25:36Z",
+            "description": null,
+            "evidence_type": "photo",
+            "file_size": 15669,
+            "file_url": null,
+            "id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+            "mime_type": "image/png",
+            "name": "[Synthetic] BM02 quy trình Lần 2",
+            "payload_json": {
+              "capture_metadata": {
+                "location": "[Synthetic] Khu thử workflow BM02",
+                "photo_phase": "during"
+              },
+              "detected_mime_type": "image/png",
+              "original_filename": "BM02-workflow-Lan-2.png"
+            },
+            "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+            "status": "submitted",
+            "storage_key": "evidence/b705236b-9cc5-42dd-ac2d-abf77e699cc4/40ccc567-6b74-4925-b4b4-72e1cae418f1/2f838324-a918-4a50-b614-fd3945411c0e.png",
+            "storage_provider": "local",
+            "title": "[Synthetic] BM02 quy trình Lần 2",
+            "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+          }
+        ],
+        "issues_summary": "",
+        "manpower_summary": "6 nhân sự / 1 đội",
+        "material_usage_summary": "",
+        "photos": [],
+        "primary_evidence_id": "",
+        "progress_percent": 0,
+        "project_code": "DEV-BM02-WORKFLOW-20261012",
+        "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+        "project_name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+        "report_date": "2026-10-12T00:00:00Z",
+        "report_type": "construction_daily",
+        "source_id": "4c13526f-7fd6-4fc3-9526-18144148e687",
+        "source_kind": "operation_daily_report",
+        "structured_json": {
+          "completed_items": [
+            {
+              "actual_quantity": 9,
+              "crew_name": "[Synthetic] Tổ workflow",
+              "evidence_id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+              "note": "[Synthetic] Phiên bản 3 — nghiệm thu mapping vật tư từ phiếu nhận hợp lệ 12 m²; ảnh xanh và khối lượng 9 m² giữ nguyên.",
+              "result": "done",
+              "title": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+              "unit": "m2",
+              "work_area": "[Synthetic] Khu thử BM02"
+            }
+          ],
+          "construction_scope": "flooring",
+          "crew_items": [
+            {
+              "crew_name": "[Synthetic] Tổ workflow",
+              "note": "[Synthetic] Phiếu Lần 2",
+              "row_id": "31e61729-4844-4359-927f-b13b082d4bcf",
+              "work_hours": 7,
+              "worker_count": 6
+            }
+          ],
+          "material_arrival_items": [
+            {
+              "material_name": "[Synthetic] Gạch nhận trường BM02",
+              "note": "[Synthetic] Nhận thực tế 12 m2, chưa phải vật tư sử dụng",
+              "quantity": "12.000",
+              "received_at": "2026-10-12T00:00:00Z",
+              "row_id": "2047a2ae-24a6-4c79-8ecb-27d959469cfb",
+              "source_id": "1f43491c-202e-4a09-bb8e-1dcbb21b0c02",
+              "source_item_id": "2047a2ae-24a6-4c79-8ecb-27d959469cfb",
+              "source_item_work_item_id": "58969f9e-8a27-44b1-b2d9-7759442c61a5",
+              "source_type": "incoming_acceptance",
+              "source_work_item_id": "58969f9e-8a27-44b1-b2d9-7759442c61a5",
+              "unit": "m2"
+            }
+          ],
+          "report_date": "2026-10-12",
+          "reported_by": "Consflow Admin",
+          "weather": "rain"
+        },
+        "weather": "rain",
+        "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1",
+        "work_item_title": "[Synthetic] BM02 báo cáo từ phiếu quy trình",
+        "work_summary": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+        "workflow_form_instance_id": "a6edf273-25fb-4a49-aaa5-fdd525c4c4a2"
+      },
+      "snapshot_sha256": "664f5f67562e167deea46fb10ba3ef9b8cdb2f21781d48fad8a0da50d235b9ae",
+      "submitted_at": "2026-10-12T07:32:43Z",
+      "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "submitted_by_account_deleted": false,
+      "submitted_by_name": "Consflow Admin"
+    },
+    {
+      "comment": null,
+      "evidence_ids": [
+        "b4281dc0-6c7f-48d0-8846-81845956d963"
+      ],
+      "evidence_records": [
+        {
+          "caption": "[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2",
+          "checksum_sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+          "created_at": "2026-10-12T06:25:36Z",
+          "description": null,
+          "evidence_type": "photo",
+          "file_size": 15669,
+          "file_url": null,
+          "id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+          "mime_type": "image/png",
+          "name": "[Synthetic] BM02 quy trình Lần 2",
+          "payload_json": {
+            "capture_metadata": {
+              "location": "[Synthetic] Khu thử workflow BM02",
+              "photo_phase": "during"
+            },
+            "detected_mime_type": "image/png",
+            "original_filename": "BM02-workflow-Lan-2.png"
+          },
+          "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+          "status": "submitted",
+          "storage_key": "evidence/b705236b-9cc5-42dd-ac2d-abf77e699cc4/40ccc567-6b74-4925-b4b4-72e1cae418f1/2f838324-a918-4a50-b614-fd3945411c0e.png",
+          "storage_provider": "local",
+          "title": "[Synthetic] BM02 quy trình Lần 2",
+          "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+        }
+      ],
+      "id": "81bde317-43ec-40ef-8099-bb02a525bfde",
+      "revision_no": 2,
+      "snapshot_json": {
+        "address": "[Synthetic] Khu thử BM02",
+        "author_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "author_name": "Consflow Admin",
+        "bm_gs_evidence": [
+          {
+            "caption": "[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 2",
+            "checksum_sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+            "created_at": "2026-10-12T06:25:36Z",
+            "description": null,
+            "evidence_type": "photo",
+            "file_size": 15669,
+            "file_url": null,
+            "id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+            "mime_type": "image/png",
+            "name": "[Synthetic] BM02 quy trình Lần 2",
+            "payload_json": {
+              "capture_metadata": {
+                "location": "[Synthetic] Khu thử workflow BM02",
+                "photo_phase": "during"
+              },
+              "detected_mime_type": "image/png",
+              "original_filename": "BM02-workflow-Lan-2.png"
+            },
+            "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+            "status": "submitted",
+            "storage_key": "evidence/b705236b-9cc5-42dd-ac2d-abf77e699cc4/40ccc567-6b74-4925-b4b4-72e1cae418f1/2f838324-a918-4a50-b614-fd3945411c0e.png",
+            "storage_provider": "local",
+            "title": "[Synthetic] BM02 quy trình Lần 2",
+            "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+          }
+        ],
+        "issues_summary": "",
+        "manpower_summary": "6 nhân sự / 1 đội",
+        "material_usage_summary": "",
+        "photos": [],
+        "primary_evidence_id": "",
+        "progress_percent": 0,
+        "project_code": "DEV-BM02-WORKFLOW-20261012",
+        "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+        "project_name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+        "report_date": "2026-10-12T00:00:00Z",
+        "report_type": "construction_daily",
+        "source_id": "4c13526f-7fd6-4fc3-9526-18144148e687",
+        "source_kind": "operation_daily_report",
+        "structured_json": {
+          "completed_items": [
+            {
+              "actual_quantity": 9,
+              "crew_name": "[Synthetic] Tổ workflow",
+              "evidence_id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+              "note": "[Synthetic] Nội dung phiếu quy trình Lần 2 — dùng ảnh xanh",
+              "result": "done",
+              "title": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+              "unit": "m2",
+              "work_area": "[Synthetic] Khu thử BM02"
+            }
+          ],
+          "construction_scope": "flooring",
+          "crew_items": [
+            {
+              "crew_name": "[Synthetic] Tổ workflow",
+              "note": "[Synthetic] Phiếu Lần 2",
+              "row_id": "31e61729-4844-4359-927f-b13b082d4bcf",
+              "work_hours": 7,
+              "worker_count": 6
+            }
+          ],
+          "report_date": "2026-10-12",
+          "reported_by": "Consflow Admin",
+          "weather": "rain"
+        },
+        "weather": "rain",
+        "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1",
+        "work_item_title": "[Synthetic] BM02 báo cáo từ phiếu quy trình",
+        "work_summary": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+        "workflow_form_instance_id": "a6edf273-25fb-4a49-aaa5-fdd525c4c4a2"
+      },
+      "snapshot_sha256": "070dd290323eefbd0b89fcaccca6efb33f855200aaf4ba5be23c9bd006e6b49a",
+      "submitted_at": "2026-10-12T06:26:25Z",
+      "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "submitted_by_account_deleted": false,
+      "submitted_by_name": "Consflow Admin"
+    },
+    {
+      "comment": null,
+      "evidence_ids": [
+        "68a802fd-8282-4eae-8cde-82de9e8d039e"
+      ],
+      "evidence_records": [
+        {
+          "caption": "[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 1",
+          "checksum_sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+          "created_at": "2026-10-12T06:17:20Z",
+          "description": null,
+          "evidence_type": "photo",
+          "file_size": 15800,
+          "file_url": null,
+          "id": "68a802fd-8282-4eae-8cde-82de9e8d039e",
+          "mime_type": "image/png",
+          "name": "[Synthetic] BM02 quy trình Lần 1",
+          "payload_json": {
+            "capture_metadata": {
+              "location": "[Synthetic] Khu thử workflow BM02",
+              "photo_phase": "during"
+            },
+            "detected_mime_type": "image/png",
+            "original_filename": "BM02-workflow-Lan-1.png"
+          },
+          "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+          "status": "submitted",
+          "storage_key": "evidence/b705236b-9cc5-42dd-ac2d-abf77e699cc4/40ccc567-6b74-4925-b4b4-72e1cae418f1/9be7be4d-f5ad-434b-9c34-260fbf134f33.png",
+          "storage_provider": "local",
+          "title": "[Synthetic] BM02 quy trình Lần 1",
+          "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+        }
+      ],
+      "id": "50e025aa-f868-4bc3-ad19-2ae5da3865fc",
+      "revision_no": 1,
+      "snapshot_json": {
+        "address": "[Synthetic] Khu thử BM02",
+        "author_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "author_name": "Consflow Admin",
+        "bm_gs_evidence": [
+          {
+            "caption": "[Synthetic] Ảnh BM02 từ phiếu quy trình Lần 1",
+            "checksum_sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+            "created_at": "2026-10-12T06:17:20Z",
+            "description": null,
+            "evidence_type": "photo",
+            "file_size": 15800,
+            "file_url": null,
+            "id": "68a802fd-8282-4eae-8cde-82de9e8d039e",
+            "mime_type": "image/png",
+            "name": "[Synthetic] BM02 quy trình Lần 1",
+            "payload_json": {
+              "capture_metadata": {
+                "location": "[Synthetic] Khu thử workflow BM02",
+                "photo_phase": "during"
+              },
+              "detected_mime_type": "image/png",
+              "original_filename": "BM02-workflow-Lan-1.png"
+            },
+            "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+            "status": "submitted",
+            "storage_key": "evidence/b705236b-9cc5-42dd-ac2d-abf77e699cc4/40ccc567-6b74-4925-b4b4-72e1cae418f1/9be7be4d-f5ad-434b-9c34-260fbf134f33.png",
+            "storage_provider": "local",
+            "title": "[Synthetic] BM02 quy trình Lần 1",
+            "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1"
+          }
+        ],
+        "issues_summary": "",
+        "manpower_summary": "3 nhân sự / 1 đội",
+        "material_usage_summary": "",
+        "photos": [],
+        "primary_evidence_id": "",
+        "progress_percent": 0,
+        "project_code": "DEV-BM02-WORKFLOW-20261012",
+        "project_id": "b705236b-9cc5-42dd-ac2d-abf77e699cc4",
+        "project_name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+        "report_date": "2026-10-12T00:00:00Z",
+        "report_type": "construction_daily",
+        "source_id": "4c13526f-7fd6-4fc3-9526-18144148e687",
+        "source_kind": "operation_daily_report",
+        "structured_json": {
+          "completed_items": [
+            {
+              "actual_quantity": 2,
+              "crew_name": "[Synthetic] Tổ workflow",
+              "evidence_id": "68a802fd-8282-4eae-8cde-82de9e8d039e",
+              "note": "[Synthetic] Nội dung phiếu quy trình Lần 1 — dùng ảnh đỏ",
+              "result": "done",
+              "title": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02",
+              "unit": "m2",
+              "work_area": "[Synthetic] Khu thử BM02"
+            }
+          ],
+          "construction_scope": "flooring",
+          "crew_items": [
+            {
+              "crew_name": "[Synthetic] Tổ workflow",
+              "note": "[Synthetic] Phiếu Lần 1",
+              "row_id": "31e61729-4844-4359-927f-b13b082d4bcf",
+              "work_hours": 8,
+              "worker_count": 3
+            }
+          ],
+          "report_date": "2026-10-12",
+          "reported_by": "Consflow Admin",
+          "weather": "hot"
+        },
+        "weather": "hot",
+        "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1",
+        "work_item_title": "[Synthetic] BM02 báo cáo từ phiếu quy trình",
+        "work_summary": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02",
+        "workflow_form_instance_id": "a6edf273-25fb-4a49-aaa5-fdd525c4c4a2"
+      },
+      "snapshot_sha256": "f9b3b922f8a5f4b08640d78298f2631dd13f3561def3f36bd1fd11cb9341563c",
+      "submitted_at": "2026-10-12T06:22:18Z",
+      "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "submitted_by_account_deleted": false,
+      "submitted_by_name": "Consflow Admin"
+    }
+  ],
+  "source_id": "4c13526f-7fd6-4fc3-9526-18144148e687",
+  "status": "submitted",
+  "structured_json": {
+    "completed_items": [
+      {
+        "actual_quantity": 9,
+        "crew_name": "[Synthetic] Tổ workflow",
+        "evidence_id": "b4281dc0-6c7f-48d0-8846-81845956d963",
+        "note": "[Synthetic] Phiên bản 3 — nghiệm thu mapping vật tư từ phiếu nhận hợp lệ 12 m²; ảnh xanh và khối lượng 9 m² giữ nguyên.",
+        "result": "done",
+        "title": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+        "unit": "m2",
+        "work_area": "[Synthetic] Khu thử BM02"
+      }
+    ],
+    "construction_scope": "flooring",
+    "crew_items": [
+      {
+        "crew_name": "[Synthetic] Tổ workflow",
+        "note": "[Synthetic] Phiếu Lần 2",
+        "row_id": "31e61729-4844-4359-927f-b13b082d4bcf",
+        "work_hours": 7,
+        "worker_count": 6
+      }
+    ],
+    "material_arrival_items": [
+      {
+        "material_name": "[Synthetic] Gạch nhận trường BM02",
+        "note": "[Synthetic] Nhận thực tế 12 m2, chưa phải vật tư sử dụng",
+        "quantity": "12.000",
+        "received_at": "2026-10-12T00:00:00Z",
+        "row_id": "2047a2ae-24a6-4c79-8ecb-27d959469cfb",
+        "source_id": "1f43491c-202e-4a09-bb8e-1dcbb21b0c02",
+        "source_item_id": "2047a2ae-24a6-4c79-8ecb-27d959469cfb",
+        "source_item_work_item_id": "58969f9e-8a27-44b1-b2d9-7759442c61a5",
+        "source_type": "incoming_acceptance",
+        "source_work_item_id": "58969f9e-8a27-44b1-b2d9-7759442c61a5",
+        "unit": "m2"
+      }
+    ],
+    "report_date": "2026-10-12",
+    "reported_by": "Consflow Admin",
+    "weather": "rain"
+  },
+  "submitted_at": "2026-10-12T07:32:43Z",
+  "viewer_acknowledged": false,
+  "weather": "rain",
+  "work_item_id": "40ccc567-6b74-4925-b4b4-72e1cae418f1",
+  "work_item_title": "[Synthetic] BM02 báo cáo từ phiếu quy trình",
+  "work_report_id": "2bed89af-0988-4c6d-a4d5-23ee7fbc7f86",
+  "work_summary": "[Synthetic] WORKFLOW LẦN 2 — Đã bổ sung lát ô thử BM02",
+  "workflow_form_instance_id": "a6edf273-25fb-4a49-aaa5-fdd525c4c4a2"
+}

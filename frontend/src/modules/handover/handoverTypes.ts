@@ -6,6 +6,10 @@ export type HandoverRow = {
   final_acceptance_id?: string;
   final_acceptance_title?: string;
   handover_date?: string;
+  handover_stage?: string;
+  handover_conclusion?: 'eligible' | 'not_eligible' | '';
+  handover_conclusion_by?: string;
+  handover_conclusion_at?: string;
   client_representative: string;
   company_representative: string;
   notes?: string;
@@ -20,6 +24,10 @@ export type HandoverRow = {
 };
 
 export type ChecklistItem = {
+  requirement?: string;
+  physical_result?: 'pass' | 'fail' | 'not_assessed';
+  defect?: string;
+  due_date?: string;
   id: string;
   item_code: string;
   category: string;

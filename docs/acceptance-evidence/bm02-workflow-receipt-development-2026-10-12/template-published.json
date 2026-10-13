@@ -1,0 +1,132 @@
+{
+  "created_at": "2026-10-12T06:16:36Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "definition_hash": "4205b4314215ea62925292b49ccd2c0869ddf446d7c8702e05f3b86ea831fc51",
+  "description": "Nghiệm thu BM02 với hai chủ sở hữu riêng: nhận vật tư và báo cáo thi công. Không thay workflow chính thức.",
+  "edges": [
+    {
+      "condition_config": {},
+      "condition_type": "always",
+      "created_at": "2026-10-12T06:16:59Z",
+      "from_node_id": "76ea5c8f-6894-4027-993c-256e3e2447a8",
+      "id": "d7f12223-a974-4bc0-92c6-38bcd7afcb34",
+      "label": "Sau khi chốt bước nhận vật tư",
+      "priority": 1,
+      "template_id": "9ee7563a-e8ee-4648-b0ca-33815af10c5f",
+      "to_node_id": "6992e1f6-56fc-4762-b521-c5198b8df6c0"
+    }
+  ],
+  "engine_version": 2,
+  "id": "9ee7563a-e8ee-4648-b0ca-33815af10c5f",
+  "name": "[Synthetic Development] BM02 phiếu quy trình và vật tư",
+  "nodes": [
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "business_code": "incoming_acceptance",
+      "created_at": "2026-10-12T06:16:36Z",
+      "description": null,
+      "entry_conditions": {},
+      "exit_conditions": {},
+      "fail_path": "previous",
+      "id": "76ea5c8f-6894-4027-993c-256e3e2447a8",
+      "name": "[Synthetic] Nhận vật tư",
+      "order_index": 1,
+      "permissions": [],
+      "position_x": 0,
+      "position_y": 0,
+      "replanning_enabled": false,
+      "required_permission": null,
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "rework_enabled": false,
+      "status": "active",
+      "steps": [
+        {
+          "business_code": "incoming.material_acceptance",
+          "checklist_required": false,
+          "created_at": "2026-10-12T06:16:36Z",
+          "description": null,
+          "document_required": false,
+          "domain_action_key": "acceptance.incoming_material",
+          "form_required": false,
+          "form_version_id": null,
+          "id": "1bb42b8c-9f6f-481a-bb41-82ecfe775282",
+          "name": "[Synthetic] Nghiệm thu vật tư nhập trường",
+          "node_id": "76ea5c8f-6894-4027-993c-256e3e2447a8",
+          "order_index": 1,
+          "photo_required": false,
+          "required_permission": null,
+          "required_role_ids": [
+            "PM"
+          ],
+          "step_type": "task",
+          "surface_kind": "incoming_acceptance"
+        }
+      ],
+      "template_id": "9ee7563a-e8ee-4648-b0ca-33815af10c5f",
+      "type": "incoming_acceptance",
+      "updated_at": "2026-10-12T06:16:36Z"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "business_code": "construction_execution",
+      "created_at": "2026-10-12T06:16:36Z",
+      "description": null,
+      "entry_conditions": {},
+      "exit_conditions": {},
+      "fail_path": "previous",
+      "id": "6992e1f6-56fc-4762-b521-c5198b8df6c0",
+      "name": "[Synthetic] Thi công và báo cáo",
+      "order_index": 2,
+      "permissions": [],
+      "position_x": 0,
+      "position_y": 0,
+      "replanning_enabled": false,
+      "required_permission": null,
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "rework_enabled": false,
+      "status": "active",
+      "steps": [
+        {
+          "business_code": "construction.item_reporting",
+          "checklist_required": false,
+          "created_at": "2026-10-12T06:16:36Z",
+          "description": null,
+          "document_required": false,
+          "domain_action_key": null,
+          "form_required": true,
+          "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+          "id": "58432f35-785c-4455-bef1-a961859972b7",
+          "name": "[Synthetic] BM02 báo cáo từ phiếu quy trình",
+          "node_id": "6992e1f6-56fc-4762-b521-c5198b8df6c0",
+          "order_index": 1,
+          "photo_required": false,
+          "required_permission": null,
+          "required_role_ids": [
+            "PM"
+          ],
+          "step_type": "daily_report",
+          "surface_kind": "workflow_form"
+        }
+      ],
+      "template_id": "9ee7563a-e8ee-4648-b0ca-33815af10c5f",
+      "type": "construction",
+      "updated_at": "2026-10-12T06:16:36Z"
+    }
+  ],
+  "project_type": null,
+  "published_at": "2026-10-12T06:16:59Z",
+  "published_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "report_config_json": {},
+  "revision_no": 1,
+  "source_template_id": null,
+  "status": "published",
+  "template_family_id": "9ee7563a-e8ee-4648-b0ca-33815af10c5f",
+  "updated_at": "2026-10-12T06:16:59Z",
+  "version": 1
+}

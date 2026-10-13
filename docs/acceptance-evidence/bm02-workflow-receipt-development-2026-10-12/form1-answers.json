@@ -1,0 +1,31 @@
+{
+  "report_date": "2026-10-12",
+  "reported_by": "Consflow Admin",
+  "construction_scope": "flooring",
+  "weather": "hot",
+  "completed_items": [
+    {
+      "title": "[Synthetic] WORKFLOW LẦN 1 — Lát ô thử BM02",
+      "work_area": "[Synthetic] Khu thử BM02",
+      "crew_name": "[Synthetic] Tổ workflow",
+      "actual_quantity": 2,
+      "unit": "m2",
+      "result": "done",
+      "evidence_id": "68a802fd-8282-4eae-8cde-82de9e8d039e",
+      "note": "[Synthetic] Nội dung phiếu quy trình Lần 1 — dùng ảnh đỏ"
+    }
+  ],
+  "crew_items": [
+    {
+      "crew_name": "[Synthetic] Tổ workflow",
+      "worker_count": 3,
+      "work_hours": 8,
+      "note": "[Synthetic] Phiếu Lần 1"
+    }
+  ],
+  "material_usage_items": [],
+  "next_plan_items": [],
+  "blockers": [],
+  "supervision_assessments": [],
+  "material_arrival_items": []
+}

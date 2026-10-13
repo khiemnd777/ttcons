@@ -1,0 +1,244 @@
+{
+  "status": "PASS",
+  "verified_at_utc": "2026-10-09T04:26:06.067599+00:00",
+  "database": "bmgs_native_browser_20261008",
+  "migration_count": 157,
+  "max_numeric_migration": 157,
+  "checks": {
+    "old_pin_answer_count_unchanged": 27,
+    "linked_verification_unchanged": true,
+    "explicit_blank_clears": true,
+    "canonical_rows_pending_unverified": 7,
+    "date_saved": "2026-10-12",
+    "physical_row_nonmandatory": true,
+    "readiness_not_checked_parents_remain_draft": true,
+    "decision_actor_time_saved": true,
+    "bm03_native_facts_saved": true,
+    "regression_database_removed": true
+  },
+  "headers": [
+    {
+      "id": "bb2ae20e-6899-4632-ba27-e802758f3756",
+      "status": "draft",
+      "handover_stage": "Bàn giao hoàn thiện kiến trúc — UAT",
+      "handover_conclusion": "eligible",
+      "handover_conclusion_by": "e506223b-421c-498c-808e-2a6058dbfdff",
+      "handover_conclusion_at": "2026-10-09T04:14:09.966751+00:00",
+      "readiness_snapshot_json": {},
+      "documents_ready": false,
+      "warehouse_closed": false,
+      "completed_at": null
+    },
+    {
+      "id": "d4d8d476-3d44-4fb6-8cbe-5476ce86d837",
+      "status": "draft",
+      "handover_stage": "Bàn giao hoàn thiện kiến trúc — UAT tự động",
+      "handover_conclusion": "not_eligible",
+      "handover_conclusion_by": "e506223b-421c-498c-808e-2a6058dbfdff",
+      "handover_conclusion_at": "2026-10-09T04:14:21.985842+00:00",
+      "readiness_snapshot_json": {},
+      "documents_ready": false,
+      "warehouse_closed": false,
+      "completed_at": null
+    }
+  ],
+  "canonical_items": [
+    {
+      "id": "e88f3aa0-cb9a-4e14-83a8-d9723fbff12a",
+      "item_code": "as_built_documents",
+      "required": true,
+      "status": "pending",
+      "source_type": null,
+      "source_id": null,
+      "evidence_id": null,
+      "document_id": null,
+      "verified_by": null,
+      "verified_at": null,
+      "requirement": "Đủ bản vẽ hoàn công của khu vực mẫu",
+      "physical_result": "pass",
+      "defect": null,
+      "due_date": null
+    },
+    {
+      "id": "48d812b1-1bef-4bf8-ac2d-8ecc4e7c75fd",
+      "item_code": "final_acceptance",
+      "required": true,
+      "status": "pending",
+      "source_type": "acceptance",
+      "source_id": null,
+      "evidence_id": null,
+      "document_id": null,
+      "verified_by": null,
+      "verified_at": null,
+      "requirement": null,
+      "physical_result": null,
+      "defect": null,
+      "due_date": null
+    },
+    {
+      "id": "076cdd07-710d-4371-b83e-cfd014966f62",
+      "item_code": "operation_manuals",
+      "required": true,
+      "status": "pending",
+      "source_type": null,
+      "source_id": null,
+      "evidence_id": null,
+      "document_id": null,
+      "verified_by": null,
+      "verified_at": null,
+      "requirement": null,
+      "physical_result": null,
+      "defect": null,
+      "due_date": null
+    },
+    {
+      "id": "39b1484a-265b-490e-8dd9-5664c8f3f991",
+      "item_code": "physical_39b1484a-265b-490e-8dd9-5664c8f3f991",
+      "required": false,
+      "status": "pending",
+      "source_type": null,
+      "source_id": null,
+      "evidence_id": null,
+      "document_id": null,
+      "verified_by": null,
+      "verified_at": null,
+      "requirement": "Sạch mặt bằng, đủ số chìa khóa giả lập",
+      "physical_result": "pass",
+      "defect": null,
+      "due_date": null
+    },
+    {
+      "id": "b87aae8d-7344-4daa-a91c-6ef0d83dbb60",
+      "item_code": "signed_handover_minutes",
+      "required": true,
+      "status": "pending",
+      "source_type": null,
+      "source_id": null,
+      "evidence_id": null,
+      "document_id": null,
+      "verified_by": null,
+      "verified_at": null,
+      "requirement": null,
+      "physical_result": null,
+      "defect": null,
+      "due_date": null
+    },
+    {
+      "id": "d01389a7-5efd-4fa2-9c27-5090f18077d3",
+      "item_code": "warehouse_closure",
+      "required": true,
+      "status": "pending",
+      "source_type": "system_check",
+      "source_id": "d4d8d476-3d44-4fb6-8cbe-5476ce86d837",
+      "evidence_id": null,
+      "document_id": null,
+      "verified_by": null,
+      "verified_at": null,
+      "requirement": "Đối chiếu số lượng vật tư và khu vực kho mẫu",
+      "physical_result": "fail",
+      "defect": "Còn vật tư tổng hợp chưa xử lý — UAT",
+      "due_date": "2026-10-12"
+    },
+    {
+      "id": "378b2c67-a347-476f-bb66-938593195b12",
+      "item_code": "warranty_documents",
+      "required": true,
+      "status": "pending",
+      "source_type": null,
+      "source_id": null,
+      "evidence_id": null,
+      "document_id": null,
+      "verified_by": null,
+      "verified_at": null,
+      "requirement": null,
+      "physical_result": null,
+      "defect": null,
+      "due_date": null
+    }
+  ],
+  "linked_item": {
+    "id": "5f157d53-874a-4cee-ae92-c32e6d8374d7",
+    "status": "verified",
+    "source_type": "evidence",
+    "source_id": null,
+    "evidence_id": "499ca547-9844-43a7-8c6f-ae0688ae6850",
+    "document_id": null,
+    "verified_by": "e506223b-421c-498c-808e-2a6058dbfdff",
+    "verified_at": "2026-10-08T06:52:22.964064+00:00",
+    "requirement": "Ảnh đối chiếu hiện trạng của bộ dữ liệu UAT",
+    "physical_result": "pass",
+    "defect": null,
+    "due_date": null
+  },
+  "forms": [
+    {
+      "id": "26c01b3c-25e1-45c7-9158-e9858687a563",
+      "form_version_id": "71ea0e17-e827-4e56-868d-78784d758a38",
+      "status": "draft",
+      "answers_snapshot_json": {
+        "check_date": "2026-10-09",
+        "reference_no": "NT-UAT-157-01",
+        "work_package": "flooring",
+        "checklist_items": [
+          {
+            "unit": "m2",
+            "title": "Lát gạch sảnh — dữ liệu giả lập",
+            "status": "done",
+            "quality_note": "Đạt theo kiểm tra giả lập, không phải công trình thật",
+            "quality_result": "pass",
+            "actual_quantity": 23.5,
+            "design_quantity": 24,
+            "drawing_reference": "UAT-R157",
+            "standard_reference": "Tiêu chuẩn UAT",
+            "technical_requirement": "Mạch đều, bề mặt phẳng theo dữ liệu mẫu"
+          },
+          {
+            "title": "Kiểm tra khu vực chưa đánh giá — UAT",
+            "status": "done",
+            "quality_note": "Chưa có đánh giá vật lý; trạng thái công việc vẫn Done",
+            "quality_result": "not_assessed"
+          },
+          {
+            "title": "Hạng mục bổ sung giả lập 3",
+            "status": "done",
+            "quality_note": "Đạt theo số liệu giả lập",
+            "quality_result": "pass"
+          },
+          {
+            "title": "Hạng mục bổ sung giả lập 4",
+            "status": "done",
+            "quality_note": "Đạt theo số liệu giả lập",
+            "quality_result": "pass"
+          }
+        ],
+        "subcontractor_name": "Tổ thi công giả lập UAT",
+        "acceptance_conclusion": "accepted"
+      }
+    },
+    {
+      "id": "fd224aba-8416-499b-a2a5-f0a5cdf422d9",
+      "form_version_id": "029cc9c6-aef7-42ce-8016-c031c740a58e",
+      "status": "draft",
+      "answers_snapshot_json": {
+        "check_date": "2026-10-09",
+        "reference_no": "NT-UAT-157-02",
+        "work_package": "carpentry",
+        "checklist_items": [
+          {
+            "unit": "m2",
+            "title": "Vách mẫu cần sửa — dữ liệu giả lập",
+            "status": "done",
+            "quality_note": "Không đạt: khe nối chưa đều trong dữ liệu giả lập",
+            "quality_result": "fail",
+            "actual_quantity": 9.5,
+            "design_quantity": 10,
+            "drawing_reference": "UAT-V157",
+            "standard_reference": "Tiêu chuẩn UAT"
+          }
+        ],
+        "subcontractor_name": "Tổ vách giả lập UAT",
+        "acceptance_conclusion": "rework_required"
+      }
+    }
+  ]
+}

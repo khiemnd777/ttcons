@@ -1,0 +1,654 @@
+[
+  {
+    "ctaCenterHit": null,
+    "ctaRect": {
+      "bottom": 1127,
+      "height": 36,
+      "left": 195.5234375,
+      "right": 340,
+      "top": 1091,
+      "width": 144.4765625,
+      "x": 195.5234375,
+      "y": 1091
+    },
+    "ctaVisible": false,
+    "documentWidth": 390,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 230.171875,
+      "right": 374,
+      "top": 73,
+      "width": 143.828125,
+      "x": 230.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1219,
+    "scrollY": 0,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "mobile390-top"
+  },
+  {
+    "ctaCenterHit": true,
+    "ctaRect": {
+      "bottom": 751.5,
+      "height": 36,
+      "left": 195.5234375,
+      "right": 340,
+      "top": 715.5,
+      "width": 144.4765625,
+      "x": 195.5234375,
+      "y": 715.5
+    },
+    "ctaVisible": true,
+    "documentWidth": 390,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 230.171875,
+      "right": 374,
+      "top": 73,
+      "width": 143.828125,
+      "x": 230.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1219,
+    "scrollY": 375.5,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "mobile390-end"
+  },
+  {
+    "ctaCenterHit": null,
+    "ctaVisible": false,
+    "documentWidth": 663,
+    "headerRect": {
+      "bottom": 64,
+      "height": 64,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 51.5,
+      "height": 40,
+      "left": 334,
+      "right": 374,
+      "top": 11.5,
+      "width": 40,
+      "x": 334,
+      "y": 11.5
+    },
+    "launcherText": "15",
+    "scrollHeight": 3028,
+    "scrollY": 0,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "standard390-open-session"
+  },
+  {
+    "ctaCenterHit": null,
+    "ctaRect": {
+      "bottom": 1078.5,
+      "height": 36,
+      "left": 195.5234375,
+      "right": 340,
+      "top": 1042.5,
+      "width": 144.4765625,
+      "x": 195.5234375,
+      "y": 1042.5
+    },
+    "ctaVisible": false,
+    "documentWidth": 390,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 230.171875,
+      "right": 374,
+      "top": 73,
+      "width": 143.828125,
+      "x": 230.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1219,
+    "scrollY": 48.5,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "project390-return-open-session"
+  },
+  {
+    "ctaCenterHit": true,
+    "ctaRect": {
+      "bottom": 475.5,
+      "height": 36,
+      "left": 126,
+      "right": 270.4765625,
+      "top": 439.5,
+      "width": 144.4765625,
+      "x": 126,
+      "y": 439.5
+    },
+    "ctaVisible": true,
+    "documentWidth": 320,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 320,
+      "top": 0,
+      "width": 320,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 160.171875,
+      "right": 304,
+      "top": 73,
+      "width": 143.828125,
+      "x": 160.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1295,
+    "scrollY": 727.5,
+    "viewport": {
+      "height": 568,
+      "width": 320
+    },
+    "scenario": "mobile320-end"
+  },
+  {
+    "ctaCenterHit": true,
+    "ctaRect": {
+      "bottom": 839.5,
+      "height": 36,
+      "left": 235.5234375,
+      "right": 380,
+      "top": 803.5,
+      "width": 144.4765625,
+      "x": 235.5234375,
+      "y": 803.5
+    },
+    "ctaVisible": true,
+    "documentWidth": 430,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 430,
+      "top": 0,
+      "width": 430,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 270.171875,
+      "right": 414,
+      "top": 73,
+      "width": 143.828125,
+      "x": 270.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1175,
+    "scrollY": 243.5,
+    "viewport": {
+      "height": 932,
+      "width": 430
+    },
+    "scenario": "mobile430-end"
+  },
+  {
+    "ctaCenterHit": true,
+    "ctaRect": {
+      "bottom": 751.5,
+      "height": 36,
+      "left": 444.5234375,
+      "right": 589,
+      "top": 715.5,
+      "width": 144.4765625,
+      "x": 444.5234375,
+      "y": 715.5
+    },
+    "ctaVisible": true,
+    "documentWidth": 639,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 639,
+      "top": 0,
+      "width": 639,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 479.171875,
+      "right": 623,
+      "top": 73,
+      "width": 143.828125,
+      "x": 479.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1141,
+    "scrollY": 297.5,
+    "viewport": {
+      "height": 844,
+      "width": 639
+    },
+    "scenario": "mobile639-end"
+  },
+  {
+    "ctaCenterHit": true,
+    "ctaRect": {
+      "bottom": 751.5,
+      "height": 36,
+      "left": 445.5234375,
+      "right": 590,
+      "top": 715.5,
+      "width": 144.4765625,
+      "x": 445.5234375,
+      "y": 715.5
+    },
+    "ctaVisible": true,
+    "documentWidth": 640,
+    "intersectionArea": 0,
+    "launcherCount": 0,
+    "launcherInHeader": false,
+    "scrollHeight": 1036,
+    "scrollY": 192.5,
+    "viewport": {
+      "height": 844,
+      "width": 640
+    },
+    "scenario": "boundary640-end"
+  },
+  {
+    "actionCell": {
+      "bottom": 666.5,
+      "height": 157.5,
+      "right": 606.4765625,
+      "width": 244.4765625,
+      "x": 362,
+      "y": 509
+    },
+    "actionGroup": {
+      "bottom": 606,
+      "classes": "flex w-max gap-2",
+      "height": 36,
+      "right": 594.4765625,
+      "width": 220.4765625,
+      "x": 374,
+      "y": 570
+    },
+    "buttons": [
+      {
+        "bottom": 603,
+        "height": 30,
+        "name": "Xem chi tiết",
+        "right": 404,
+        "width": 30,
+        "x": 374,
+        "y": 573
+      },
+      {
+        "bottom": 603,
+        "height": 30,
+        "name": "Chỉnh sửa",
+        "right": 442,
+        "width": 30,
+        "x": 412,
+        "y": 573
+      },
+      {
+        "bottom": 606,
+        "height": 36,
+        "name": "Gửi khắc phục",
+        "right": 594.4765625,
+        "width": 144.4765625,
+        "x": 450,
+        "y": 570
+      }
+    ],
+    "buttonsInsideActionCell": true,
+    "documentWidth": 1024,
+    "horizontalOverlapPixels": 0,
+    "tableScroll": {
+      "clientWidth": 620,
+      "overflowX": "auto",
+      "scrollWidth": 757
+    },
+    "titleButton": {
+      "bottom": 649.5,
+      "height": 128,
+      "right": 706.2890625,
+      "width": 87.8125,
+      "x": 618.4765625,
+      "y": 521.5
+    },
+    "titleGapPixels": 24,
+    "viewport": {
+      "height": 768,
+      "width": 1024
+    },
+    "scenario": "desktop1024"
+  },
+  {
+    "actionCell": {
+      "bottom": 614.5,
+      "height": 105.5,
+      "right": 606.4765625,
+      "width": 244.4765625,
+      "x": 362,
+      "y": 509
+    },
+    "actionGroup": {
+      "bottom": 580,
+      "classes": "flex w-max gap-2",
+      "height": 36,
+      "right": 594.4765625,
+      "width": 220.4765625,
+      "x": 374,
+      "y": 544
+    },
+    "buttons": [
+      {
+        "bottom": 577,
+        "height": 30,
+        "name": "Xem chi tiết",
+        "right": 404,
+        "width": 30,
+        "x": 374,
+        "y": 547
+      },
+      {
+        "bottom": 577,
+        "height": 30,
+        "name": "Chỉnh sửa",
+        "right": 442,
+        "width": 30,
+        "x": 412,
+        "y": 547
+      },
+      {
+        "bottom": 580,
+        "height": 36,
+        "name": "Gửi khắc phục",
+        "right": 594.4765625,
+        "width": 144.4765625,
+        "x": 450,
+        "y": 544
+      }
+    ],
+    "buttonsInsideActionCell": true,
+    "documentWidth": 1280,
+    "horizontalOverlapPixels": 0,
+    "tableScroll": {
+      "clientWidth": 876,
+      "overflowX": "auto",
+      "scrollWidth": 876
+    },
+    "titleButton": {
+      "bottom": 597.5,
+      "height": 76,
+      "right": 760.1953125,
+      "width": 141.71875,
+      "x": 618.4765625,
+      "y": 521.5
+    },
+    "titleGapPixels": 24,
+    "viewport": {
+      "height": 720,
+      "width": 1280
+    },
+    "scenario": "desktop1280"
+  },
+  {
+    "ctaCenterHit": null,
+    "ctaVisible": false,
+    "documentWidth": 390,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 230.171875,
+      "right": 374,
+      "top": 73,
+      "width": 143.828125,
+      "x": 230.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1125,
+    "scrollY": 148,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "mobile390-empty"
+  },
+  {
+    "ctaCenterHit": null,
+    "ctaVisible": false,
+    "documentWidth": 390,
+    "headerRect": {
+      "bottom": 64,
+      "height": 64,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 51.5,
+      "height": 40,
+      "left": 334,
+      "right": 374,
+      "top": 11.5,
+      "width": 40,
+      "x": 334,
+      "y": 11.5
+    },
+    "launcherText": "15",
+    "scrollHeight": 844,
+    "scrollY": 0,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "standard390-project-list"
+  },
+  {
+    "ctaCenterHit": true,
+    "ctaRect": {
+      "bottom": 751.5,
+      "height": 36,
+      "left": 195.5234375,
+      "right": 340,
+      "top": 715.5,
+      "width": 144.4765625,
+      "x": 195.5234375,
+      "y": 715.5
+    },
+    "ctaVisible": true,
+    "documentWidth": 390,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 230.171875,
+      "right": 374,
+      "top": 73,
+      "width": 143.828125,
+      "x": 230.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1219,
+    "scrollY": 375.5,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "mobile390-end-after-navigation"
+  },
+  {
+    "ctaCenterHit": null,
+    "ctaRect": {
+      "bottom": 962.5,
+      "height": 36,
+      "left": 195.5234375,
+      "right": 340,
+      "top": 926.5,
+      "width": 144.4765625,
+      "x": 195.5234375,
+      "y": 926.5
+    },
+    "ctaVisible": false,
+    "documentWidth": 390,
+    "headerRect": {
+      "bottom": 126,
+      "height": 126,
+      "left": 0,
+      "right": 390,
+      "top": 0,
+      "width": 390,
+      "x": 0,
+      "y": 0
+    },
+    "intersectionArea": 0,
+    "launcherAria": "Mở tiện ích, 15 việc làm ngay, 0 tin mới",
+    "launcherCount": 1,
+    "launcherInHeader": true,
+    "launcherRect": {
+      "bottom": 117,
+      "height": 44,
+      "left": 230.171875,
+      "right": 374,
+      "top": 73,
+      "width": 143.828125,
+      "x": 230.171875,
+      "y": 73
+    },
+    "launcherText": "Tiện ích 15",
+    "scrollHeight": 1219,
+    "scrollY": 164.5,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    },
+    "scenario": "mobile390-middle"
+  }
+]

@@ -1,0 +1,74 @@
+{
+  "status": "PASS — package and synthetic source identity only",
+  "xlsx": "/Users/khiemnguyen/Downloads/BM-GS-07 (1).xlsx",
+  "sha256": "19fa2ffc73ee9fa6cab36d4a4824b2a159ee99a37a5eb74f1c0ed3e766165896",
+  "bytes": 87954,
+  "sheet": "BM-GS-07",
+  "header_F7": "TÊN FILE ÂNH THAM CHIẾU",
+  "column_F_width": 24.0,
+  "native_image_count": 4,
+  "floating_drawing_count": 0,
+  "rows": [
+    {
+      "cell": "F8",
+      "shape": "LANDSCAPE",
+      "evidence_id": "5e9822c7-36bb-43f9-af2f-b2b3ca048f1b",
+      "filename": "synthetic-duplicate-name.png",
+      "image_px": [
+        1280,
+        720
+      ],
+      "image_bytes": 32488,
+      "original_bytes": 14151,
+      "row_pt": 114.0,
+      "image_sha256": "d9b79bec0cd450e3d9a8425b9cbb421711e6b12b65e25aeaaba8f707f4920bb3",
+      "caption_chars": 219
+    },
+    {
+      "cell": "F9",
+      "shape": "PORTRAIT",
+      "evidence_id": "4c00ee36-f0b4-4890-90ee-8d30bdc837b6",
+      "filename": "synthetic-duplicate-name.png",
+      "image_px": [
+        720,
+        1280
+      ],
+      "image_bytes": 35155,
+      "original_bytes": 14085,
+      "row_pt": 236.66666666666666,
+      "image_sha256": "7d9ca57e23f548a35b47a2955bbf619b58b1b5993668ce37e07b79dd939e9e2a",
+      "caption_chars": 218
+    },
+    {
+      "cell": "F10",
+      "shape": "SQUARE",
+      "evidence_id": "c27d5f38-127d-4f0e-b3c6-56b8176a475e",
+      "filename": "synthetic-SQUARE.png",
+      "image_px": [
+        1000,
+        1000
+      ],
+      "image_bytes": 10756,
+      "original_bytes": 10756,
+      "row_pt": 135.75,
+      "image_sha256": "a5c359bece95aacfc94352e8541ae0fd90e928833cdbdc2799c7c46fe027fd73",
+      "caption_chars": 216
+    },
+    {
+      "cell": "F11",
+      "shape": "TALL",
+      "evidence_id": "6c9cfa96-63f4-456f-ae5b-ea29472903dc",
+      "filename": "synthetic-TALL.png",
+      "image_px": [
+        355,
+        1280
+      ],
+      "image_bytes": 22066,
+      "original_bytes": 10079,
+      "row_pt": 240.0,
+      "image_sha256": "a2f4ea689e17aaae391d8f53f2004f81e214695487fca2c439254ddce9fb3b0b",
+      "caption_chars": 214
+    }
+  ],
+  "visual_acceptance": "NOT VERIFIED by this read-only inspection"
+}

@@ -483,7 +483,7 @@ func insertSampleCurrentWorkflowSourcesTx(ctx context.Context, tx *sql.Tx, plan 
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO subcontractor_checklist_reconciliation_items (reconciliation_id,project_id,work_item_id,form_instance_id,item_index,checklist_title,boq_item_id,claimed_quantity,confirmed_quantity,unit,status,evidence_id,decision,payload_json)
-		SELECT id,$1,$2,$3,0,'Khối lượng hoàn thiện đã đối chiếu',$4,10,10,'bộ','done',$5,'accepted','{"simulated":true}'::jsonb FROM subcontractor_checklist_reconciliations WHERE work_item_id=$2
+		SELECT id,$1,$2,$3,0,'Khối lượng hoàn thiện đã đối chiếu',$4,10,10,'bộ','done',$5,'accepted','{"simulated":true}'::jsonb FROM subcontractor_checklist_reconciliations WHERE project_id=$1 AND work_item_id=$2 AND form_instance_id=$3 AND form_revision_no=1
 	`, plan.ProjectID, subcontractorStep.WorkItemID, subcontractorStep.FormInstanceID, ids.boqItemID, sampleFirstEvidence(*subcontractorStep)); err != nil {
 		return err
 	}
@@ -583,7 +583,7 @@ func sampleCompletedGateQuery(action string) string {
 	case "construction.activate_handoff":
 		predicate = `EXISTS (SELECT 1 FROM construction_handoffs WHERE project_id=$1 AND status='activated')`
 	case "source.subcontractor_acceptance_package_ready":
-		predicate = `EXISTS (SELECT 1 FROM subcontractor_checklist_reconciliations WHERE project_id=$1 AND status='submitted')`
+		return `SELECT EXISTS (SELECT 1 FROM subcontractor_checklist_reconciliations scr JOIN workflow_form_instances wfi ON wfi.id=scr.form_instance_id AND wfi.project_id=scr.project_id AND wfi.work_item_id=scr.work_item_id JOIN work_items wi ON wi.id=scr.work_item_id AND wi.project_id=scr.project_id JOIN workflow_form_templates wft ON wft.id=wfi.form_template_id WHERE scr.project_id=$1 AND scr.work_item_id=$2 AND scr.status='submitted' AND wfi.status='submitted' AND scr.form_revision_no=wfi.current_revision AND wft.code='client_subcontractor_acceptance_package' AND wfi.id=(SELECT id FROM workflow_form_instances WHERE work_item_id=wi.id AND project_id=wi.project_id AND status<>'cancelled' ORDER BY created_at DESC LIMIT 1))`
 	case "acceptance.incoming_material":
 		predicate = `EXISTS (SELECT 1 FROM incoming_acceptance_records WHERE project_id=$1 AND status='submitted')`
 	case "source.final_acceptance_package_ready":
@@ -613,7 +613,11 @@ func validateSampleCompletedSourcesTx(ctx context.Context, tx *sql.Tx, plan samp
 				return validationError("Chưa có bộ kiểm chứng điều kiện nguồn cho Pipeline mẫu", Record{"domain_action_key": action})
 			}
 			var ready bool
-			if err := tx.QueryRowContext(ctx, query, plan.ProjectID).Scan(&ready); err != nil {
+			args := []any{plan.ProjectID}
+			if action == "source.subcontractor_acceptance_package_ready" {
+				args = append(args, step.WorkItemID)
+			}
+			if err := tx.QueryRowContext(ctx, query, args...).Scan(&ready); err != nil {
 				return fmt.Errorf("validate sample source gate %s: %w", action, err)
 			}
 			if !ready {

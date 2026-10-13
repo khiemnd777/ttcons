@@ -18,7 +18,9 @@ test('manual desktop tables keep the blank action header and action cell first',
   assert.match(supplier, /<tr><th[^>]*><span className="sr-only">Thao tác<\/span><\/th><th[^>]*>Mã<\/th>/);
   assert.match(supplier, /<tr key=\{quotation\.id\}>\s*<td[^>]*><div className="flex gap-2">/);
   assert.match(acceptance, /<tr><th[^>]*><span className="sr-only">Thao tác<\/span><\/th><th[^>]*>#<\/th>/);
-  assert.equal((operations.match(/<tr><Th><span className="sr-only">Thao tác<\/span><\/Th>/g) ?? []).length, 2);
+  assert.equal((operations.match(/<tr><Th\b[^>]*><span className="sr-only">Thao tác<\/span><\/Th>/g) ?? []).length, 2);
+  assert.match(operations, /<tr><Th\b[^>]*><span className="sr-only">Thao tác<\/span><\/Th><Th>Nội dung \/ vị trí<\/Th>/);
+  assert.match(operations, /<tr><Th\b[^>]*><span className="sr-only">Thao tác<\/span><\/Th><Th>Việc \/ nguồn<\/Th>/);
   assert.match(planning, /<tr[^>]*>\s*<th[^>]*><span className="sr-only">Thao tác<\/span><\/th>\s*<th[^>]*>Công việc<\/th>/);
   assert.match(handover, /<tr><th[^>]*><span className="sr-only">Thao tác<\/span><\/th><th[^>]*>Nội dung<\/th>/);
   assert.match(handover, /return <tr><td[^>]*><ChecklistAction/);

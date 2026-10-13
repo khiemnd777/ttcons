@@ -1,0 +1,101 @@
+{
+  "activated_at": "2026-10-13T00:32:06Z",
+  "activated_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "activated_by_account_deleted": false,
+  "activated_by_name": "Consflow Admin",
+  "created_at": "2026-10-13T00:32:06Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "id": "fadd1e67-7634-455e-a357-f3a61fc52451",
+  "idempotent_replay": false,
+  "items": [
+    {
+      "assigned_user_account_deleted": false,
+      "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "assigned_user_name": "Consflow Admin",
+      "check_result": null,
+      "check_status": "pending",
+      "created_at": "2026-10-13T00:32:06Z",
+      "criteria_jsonb": [
+        {
+          "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+          "evidence_required": true,
+          "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+        }
+      ],
+      "evidence_required": true,
+      "generated_check_id": "39f8482d-b279-453d-93c4-b5050c7ae968",
+      "generated_work_item_id": "531b42e1-3e29-4f56-b6e6-aec1e7bc1b52",
+      "handoff_id": "fadd1e67-7634-455e-a357-f3a61fc52451",
+      "id": "3a1c460e-16f3-4554-a1ef-50b79e80b187",
+      "location": "[Synthetic] Vùng thử Development",
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "responsible_role_ids": [
+        "Giám sát"
+      ],
+      "scheduled_at": null,
+      "source_field_key": "inspection_items",
+      "source_item_index": 0,
+      "source_snapshot_jsonb": {
+        "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "criteria": [
+          {
+            "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+            "evidence_required": true,
+            "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+          }
+        ],
+        "evidence_required": true,
+        "location": "[Synthetic] Vùng thử Development",
+        "responsible_role": "Giám sát",
+        "scheduled_at": "",
+        "source_field_key": "inspection_items",
+        "source_item_index": 0,
+        "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+      },
+      "status": "activated",
+      "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc",
+      "updated_at": "2026-10-13T00:32:06Z",
+      "work_item_status": "ready"
+    }
+  ],
+  "notes": "[Synthetic] Revised immediate internal test schedule, no early-start waiver.",
+  "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+  "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+  "revision_no": 2,
+  "source_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+  "source_form_revision_no": 2,
+  "source_node_name": "Thi công",
+  "source_run_node_id": "80c03fbe-9105-4469-9b6e-b36129911b19",
+  "source_snapshot_hash": "778a7d99166aaa9d285d1dc3df5bf2ed4607f1e1823e2e735d2a666a6821527c",
+  "source_snapshot_jsonb": {
+    "items": [
+      {
+        "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "criteria": [
+          {
+            "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+            "evidence_required": true,
+            "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+          }
+        ],
+        "evidence_required": true,
+        "location": "[Synthetic] Vùng thử Development",
+        "responsible_role": "Giám sát",
+        "scheduled_at": "",
+        "source_field_key": "inspection_items",
+        "source_item_index": 0,
+        "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+      }
+    ],
+    "notes": "[Synthetic] Revised immediate internal test schedule, no early-start waiver.",
+    "source_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+    "source_form_revision_no": 2,
+    "source_run_node_id": "80c03fbe-9105-4469-9b6e-b36129911b19",
+    "title": "[Synthetic] Đợt kiểm tra ảnh thử"
+  },
+  "status": "activated",
+  "target_node_name": "Thi công",
+  "target_run_node_id": "80c03fbe-9105-4469-9b6e-b36129911b19",
+  "title": "[Synthetic] Đợt kiểm tra ảnh thử",
+  "updated_at": "2026-10-13T00:32:06Z"
+}

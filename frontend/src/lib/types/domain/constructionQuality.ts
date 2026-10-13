@@ -234,6 +234,12 @@ export type ConstructionActionEvent = ProjectOperationsRecord & {
 };
 
 export type ConstructionActionItem = ProjectOperationsRecord & {
+  fault_code?: string;
+  location?: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  responsible_unit?: string;
+  representative?: string;
+  contact?: string;
   work_item_id: string;
   work_item_title?: string;
   source_daily_report_id?: string;

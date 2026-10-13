@@ -1,0 +1,86 @@
+[
+  {
+    "id": "bd131f5c-ccf0-4c3f-b862-7d2dfc551eb4",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "report_date": "2026-10-09",
+    "reported_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "weather": "normal",
+    "work_summary": "[Synthetic] Hoàn thiện ô tường mẫu",
+    "manpower_summary": "3 nhân sự / 1 đội",
+    "material_usage_summary": "[Synthetic] Gạch đã dùng",
+    "issues_summary": "[Synthetic] Lối thử còn vật liệu",
+    "progress_percent": 0,
+    "photos": [],
+    "created_at": "2026-10-09T16:15:54.98209+00:00",
+    "workflow_form_instance_id": "35416810-63ab-4175-8340-5be6e13bb51b",
+    "work_item_id": "4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "structured_json": {
+      "weather": "normal",
+      "blockers": [
+        {
+          "cause": "[Synthetic] Sắp xếp ô thử",
+          "owner": "PM synthetic",
+          "impact": "access",
+          "row_id": "049046b1-1ad7-451c-a00d-49eb552bc3dc",
+          "status": "Đang theo dõi synthetic",
+          "content": "[Synthetic] Lối thử còn vật liệu",
+          "severity": "medium",
+          "risk_code": "SYN-RR-02",
+          "target_date": "2026-10-10"
+        }
+      ],
+      "crew_items": [
+        {
+          "row_id": "00dcbec2-d0d1-420e-b9c8-efa1bb42999f",
+          "contact": "demo-only",
+          "crew_name": "[Synthetic] Tổ thử A",
+          "work_hours": 8,
+          "worker_count": 3,
+          "representative": "Đại diện synthetic"
+        }
+      ],
+      "report_date": "2026-10-09",
+      "reported_by": "PM synthetic",
+      "completed_items": [
+        {
+          "note": "[Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+          "unit": "m2",
+          "title": "[Synthetic] Hoàn thiện ô tường mẫu",
+          "result": "done",
+          "work_area": "[Synthetic] Khu A",
+          "evidence_id": "864d4247-3f3e-48be-97b7-5dafd16b6e9d",
+          "actual_quantity": 2
+        }
+      ],
+      "next_plan_items": [
+        {
+          "title": "[Synthetic] Chỉnh sửa ô tường mẫu",
+          "row_id": "8e48a7ac-27d4-428f-8589-2098b5da1be2",
+          "contact": "demo-only",
+          "due_date": "2026-10-10",
+          "location": "[Synthetic] Khu A — ô tường",
+          "priority": "normal",
+          "receiver": "Đại diện synthetic",
+          "owner_role": "PM",
+          "instruction_code": "SYN-GV-06",
+          "progress_percent": 0
+        }
+      ],
+      "construction_scope": "civil",
+      "material_usage_items": [
+        {
+          "unit": "viên",
+          "source": "other",
+          "quantity": 2,
+          "material_name": "[Synthetic] Gạch đã dùng"
+        }
+      ]
+    },
+    "primary_evidence_id": null,
+    "report_delivery_eligible": true,
+    "bm_gs_json": {},
+    "bm_gs_version": 0,
+    "bm_gs_updated_by": null,
+    "bm_gs_updated_at": null
+  }
+]

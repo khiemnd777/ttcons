@@ -1,0 +1,104 @@
+[
+  {
+    "key": "bm03",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-03 (8).xlsx"
+  },
+  {
+    "key": "bm03-client",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-03 (9).xlsx"
+  },
+  {
+    "key": "bm08",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-08 (6).xlsx"
+  },
+  {
+    "key": "bm01",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/work-items/8faf4204-8f57-4e86-888f-01b0edae0620",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-01 (2).xlsx"
+  },
+  {
+    "key": "bm05-survey",
+    "label": "Xuất báo cáo rủi ro",
+    "url": "http://127.0.0.1:5173/work-items/8faf4204-8f57-4e86-888f-01b0edae0620",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-05 (4).xlsx"
+  },
+  {
+    "key": "bm05",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/work-items/0e59ca7e-d8d3-4ded-b28d-67253cfda970",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-05 (5).xlsx"
+  },
+  {
+    "key": "bm04-list",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/operations?tab=actions",
+    "path": "/Users/khiemnguyen/Downloads/danh-sach-can-xu-ly-BM-GS-04 (2).xlsx"
+  },
+  {
+    "key": "bm04-detail",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/projects/5020b7b5-d383-4504-967d-5e705c4ee2dd/operations?tab=actions",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-04 (2).xlsx"
+  },
+  {
+    "key": "bm07",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/work-items/2c969a28-945f-4abe-bf9a-8d44c722699d",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-07 (4).xlsx"
+  },
+  {
+    "key": "bm02-form",
+    "label": "Xuất báo cáo ngày",
+    "url": "http://127.0.0.1:5173/work-items/4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-02 (2).xlsx"
+  },
+  {
+    "key": "bm05-daily-form",
+    "label": "Xuất báo cáo rủi ro",
+    "url": "http://127.0.0.1:5173/work-items/4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-05 (6).xlsx"
+  },
+  {
+    "key": "bm06-form",
+    "label": "Xuất báo cáo hiện trường",
+    "url": "http://127.0.0.1:5173/work-items/4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-06 (3).xlsx"
+  },
+  {
+    "key": "bm02-journal-two-days",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (5).xlsx"
+  },
+  {
+    "key": "bm02-journal-filter08",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (6).xlsx"
+  },
+  {
+    "key": "bm02-detail",
+    "label": "Xuất báo cáo ngày",
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (7).xlsx"
+  },
+  {
+    "key": "bm05-daily-detail",
+    "label": "Xuất báo cáo rủi ro",
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-05 (7).xlsx"
+  },
+  {
+    "key": "bm06-daily-detail",
+    "label": "Xuất báo cáo hiện trường",
+    "url": "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline",
+    "path": "/Users/khiemnguyen/Downloads/BM-GS-06 (4).xlsx"
+  },
+  {
+    "key": "bm02-reports-list",
+    "label": "Xuất báo cáo",
+    "url": "http://127.0.0.1:5173/reports?scope=source",
+    "path": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02 (8).xlsx"
+  }
+]

@@ -1,0 +1,257 @@
+Browser tab: 3, Title: "Thủ Thiêm Workflow", URL: "http://127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline".
+1 AXWebArea Thủ Thiêm Workflow, URL: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline
+	2 container root
+		3 container
+			4 link Description: Về trang mặc định, Value: 127.0.0.1:5173/
+			5 button Công trình
+				6 image
+				68 text Công trình
+			69 text DEV-BM-REUSE-20261009 · [Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06 Chủ đầu tư: [Synthetic] Chủ đầu tư nghiệm thu biểu mẫu · Phụ trách: Consflow Admin · Trạng thái: Đang lập kế hoạch
+			7 pop up button (collapsed) Description: Thông báo, 24 chưa đọc, Secondary Actions: Expand
+				8 image
+			9 button Mở hồ sơ cá nhân
+				70 text Consflow Admin
+				71 text Admin
+			10 button Đăng xuất
+				11 image
+				72 text Đăng xuất
+		12 container
+			13 image
+			73 text Cây nghiệp vụ
+			14 container
+				15 link Description: Tổng quan, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2
+				16 link Description: Trao đổi, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/discussion
+				17 link Description: Kế hoạch, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/preparation
+				18 link Description: Hồ sơ chuẩn bị, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/preparation
+				19 link Description: Kế hoạch công việc, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/planning
+				20 link Description: Quy trình, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/pipeline
+				21 link Description: Thương mại & Vật tư, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/boq
+				22 link Description: BOQ, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/boq
+				23 link Description: Hợp đồng, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/contracts
+				24 link Description: Mua sắm, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/procurement
+				25 link Description: Kho vật tư, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/warehouse
+				26 link Description: Thi công & Chất lượng, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations
+				27 link Description: Thi công, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations
+				28 link Description: Nghiệm thu, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/acceptance
+				29 link Description: Bàn giao & Kế toán, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/handover
+				30 link Description: Bàn giao, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/handover
+				31 link Description: Bàn giao kế toán, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/accounting
+				32 link Description: Quản trị công trình, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2?tab=members
+				33 link Description: Thành viên, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2?tab=members
+				34 link Description: Hồ sơ, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2?tab=files
+				35 link Description: Nhật ký, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/audit
+			74 text POWERED BY
+			36 link Description: Mở KNASOFTWARE trong tab mới, Value: knasoftware.com/
+		37 container
+			38 heading Thi công, Value: 1
+				75 text Thi công
+			76 text Ghi nhật ký, kiểm tra chất lượng và xử lý việc phát sinh ngay tại công trường.
+			39 link Description: Về công trình, Value: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2
+			77 button (disabled) Báo cáo hôm nay, Help: Chỉ lập báo cáo khi quy trình đang ở Node Thi công
+				78 image
+				79 text Báo cáo hôm nay
+			80 text Không gian Thi công đang ở chế độ theo dõi
+			81 container
+				82 text Quy trình hiện ở  [Synthetic] Thi công kiểm thử nguồn . Nhật ký cũ vẫn xem được; tạo báo cáo, kiểm tra và việc cần xử lý sẽ mở khi Node Thi công bắt đầu.
+			40 tab group Không gian thi công
+				41 tab (selected, settable, boolean) Nhật ký, Value: 1
+				42 tab (selectable, settable, boolean) Kiểm tra 0, Value: 0
+				43 tab (selectable, settable, boolean) Cần xử lý 0, Value: 0
+			83 container Bộ lọc nhật ký
+				84 container
+					85 text Từ ngày
+					86 date field (settable) Từ ngày
+						87 container
+							88 stepper
+							89 stepper
+							90 stepper
+						91 pop up button Show date picker Show date picker
+				92 container
+					93 text Đến ngày
+					94 date field (settable) Đến ngày
+						95 container
+							96 stepper
+							97 stepper
+							98 stepper
+						99 pop up button Show date picker Show date picker
+				100 button Áp dụng
+				101 button Xuất báo cáo
+					102 image
+					103 text Xuất báo cáo
+			104 container
+				105 heading 09-10-2026, Value: 2
+					106 text 09-10-2026
+				107 text Bình thường 3 nhân sự / 1 đội  ·  [Synthetic] Gạch đã dùng TIẾN ĐỘ BÁO CÁO Chưa ghi tiến độ
+				108 button Xem báo cáo
+					109 image
+				110 heading ĐÃ LÀM · 1, Value: 3
+					111 text ĐÃ LÀM  ·  1
+				112 content list
+					113 text [Synthetic] Hoàn thiện ô tường mẫu
+				114 heading ĐANG LÀM · 0, Value: 3
+					115 text ĐANG LÀM  ·  0
+				116 text Không có hạng mục dở dang
+				117 heading SẼ LÀM · 1, Value: 3
+					118 text SẼ LÀM  ·  1
+				119 content list
+					120 text [Synthetic] Chỉnh sửa ô tường mẫu
+				121 heading VẤN ĐỀ PHÁT SINH · 1, Value: 3
+					122 text VẤN ĐỀ PHÁT SINH  ·  1
+				123 content list
+					124 text [Synthetic] Lối thử còn vật liệu
+			125 container
+				126 heading 08-10-2026, Value: 2
+					127 text 08-10-2026
+				128 text Nắng synthetic [Synthetic] Tổ thử A · 2 người · 4 giờ  ·  Chưa ghi vật tư TIẾN ĐỘ BÁO CÁO 0%
+				129 button Xem báo cáo
+					130 image
+				131 heading ĐÃ LÀM · 1, Value: 3
+					132 text ĐÃ LÀM  ·  1
+				133 content list
+					134 text [Synthetic] Chuẩn bị ô thử ngày 08
+				135 heading ĐANG LÀM · 0, Value: 3
+					136 text ĐANG LÀM  ·  0
+				137 text Không có hạng mục dở dang
+				138 heading SẼ LÀM · 0, Value: 3
+					139 text SẼ LÀM  ·  0
+				140 text Chưa ghi kế hoạch tiếp theo
+				141 heading VẤN ĐỀ PHÁT SINH · 0, Value: 3
+					142 text VẤN ĐỀ PHÁT SINH  ·  0
+				143 text Không có vấn đề
+			144 button Đóng dialog
+			145 container Chi tiết báo cáo thi công
+				146 heading Chi tiết báo cáo thi công, Value: 2, ID: :r7:
+					147 text Chi tiết báo cáo thi công
+				148 text Tổng hợp tiến độ, công việc, nguồn lực và minh chứng của một ngày thi công.
+				149 button Đóng
+					150 image
+				151 container
+					152 image
+					153 text 09-10-2026
+					154 image
+					155 text Bình thường BÁO CÁO TỪ QUY TRÌNH
+					156 text Nhịp thi công trong ngày được tách rõ thành kết quả, việc đang tiếp diễn, kế hoạch tiếp theo và blocker cần xử lý.
+					157 text TIẾN ĐỘ BÁO CÁO
+					158 text Chưa ghi tiến độ
+					159 button Xuất báo cáo ngày
+						160 image
+						161 text Xuất báo cáo ngày
+					162 container Công việc trong ngày
+						163 image
+						164 heading Công việc trong ngày, Value: 3, ID: report-work-heading
+							165 text Công việc trong ngày
+						166 text Đọc từ trái sang phải để nắm kết quả và bước tiếp theo.
+						167 button Xuất báo cáo rủi ro
+							168 image
+							169 text Xuất báo cáo rủi ro
+						170 button Xuất báo cáo hiện trường
+							171 image
+							172 text Xuất báo cáo hiện trường
+						173 container
+							174 heading Đã làm, Value: 4
+								175 text Đã làm
+							176 text 1
+							177 content list
+								178 text [Synthetic] Hoàn thiện ô tường mẫu
+						179 container
+							180 heading Đang làm, Value: 4
+								181 text Đang làm
+							182 text 0 Không có hạng mục dở dang
+						183 container
+							184 heading Sẽ làm, Value: 4
+								185 text Sẽ làm
+							186 text 1
+							187 content list
+								188 text [Synthetic] Chỉnh sửa ô tường mẫu · Mã chỉ dẫn: SYN-GV-06 · Vị trí: [Synthetic] Khu A — ô tường · Người nhận: Đại diện synthetic · Liên hệ: demo-only · Hạn thực hiện: 2026-10-10 · Tiến độ: 0%
+						189 container
+							190 heading Blocker cần xử lý, Value: 4
+								191 text Blocker cần xử lý
+							192 text 1
+							193 content list
+								194 text [Synthetic] Lối thử còn vật liệu · Mã rủi ro: SYN-RR-02 · Nguyên nhân: [Synthetic] Sắp xếp ô thử · Ảnh hưởng: access · Mức độ: Trung bình · Người phụ trách: PM synthetic · Hạn xử lý: 2026-10-10 · Tình trạng: Đang theo dõi synthetic
+					195 container Nguồn lực sử dụng
+						196 image
+						197 heading Nguồn lực sử dụng, Value: 3, ID: report-resource-heading
+							198 text Nguồn lực sử dụng
+						199 text Nhân công và vật tư đã ghi nhận trong ca thi công.
+						200 container
+							201 heading Nhân công / tổ đội, Value: 4
+								202 image
+								203 text Nhân công / tổ đội
+							204 content list
+								205 text [Synthetic] Tổ thử A · 3 người · 8 giờ · Đại diện: Đại diện synthetic · Liên hệ: demo-only
+						206 container
+							207 heading Vật tư sử dụng, Value: 4
+								208 image
+								209 text Vật tư sử dụng
+							210 content list
+								211 text [Synthetic] Gạch đã dùng · 2 viên
+					212 container Ghi chú hiện trường
+						213 image
+						214 heading Ghi chú hiện trường, Value: 3, ID: report-note-heading
+							215 text Ghi chú hiện trường
+						216 text Thông tin bổ sung; không được tính là blocker nếu báo cáo không khai báo blocker có cấu trúc.
+						217 content list
+							218 text [Synthetic] Lối thử còn vật liệu
+					219 container Minh chứng · 1
+						220 image
+						221 heading Minh chứng · 1, Value: 3, ID: report-evidence-heading
+							222 text Minh chứng · 1
+						223 text Ảnh và tài liệu được liên kết trực tiếp với báo cáo.
+						224 container
+							225 button Xem chi tiết hồ sơ [Synthetic] Gradient BM04/BM07
+								226 image [Synthetic] Gradient BM04/BM07
+								227 text [Synthetic] Gradient BM04/BM07
+								228 text Đã gửi
+								229 container
+									230 text Ảnh  ·  Nội bộ  ·  23:51 09-10-2026
+								231 text BM02 — Báo cáo ngày synthetic
+								232 text image/png
+								233 text 5.9 KB
+								234 text sha256:
+								235 text 050f1fabbe61
+							236 text Tệp được bảo vệ
+							237 button Xem ảnh
+								238 image
+								239 text Xem ảnh
+							240 text [Synthetic] Ảnh gradient nhập từ file; không có thời điểm chụp
+					241 container Nguồn báo cáo
+						242 image
+						243 heading Nguồn báo cáo, Value: 3, ID: report-source-heading
+							244 text Nguồn báo cáo
+						245 text Truy vết báo cáo về đầu việc và biểu mẫu quy trình đã tạo ra dữ liệu.
+						246 text BM02 — Báo cáo ngày synthetic
+						247 text Đang xử lý
+						248 container
+							249 text BM02 — Báo cáo ngày synthetic  · Có biểu mẫu báo cáo
+						250 button Mở đầu việc
+							251 image
+							252 text Mở đầu việc
+					253 container Chuỗi liên quan
+						254 image
+						255 heading Chuỗi liên quan, Value: 3, ID: report-linked-construction-heading
+							256 text Chuỗi liên quan
+						257 text Kiểm tra, xử lý và kết quả khắc phục của báo cáo.
+						258 text Chưa có kiểm tra hoặc việc xử lý
+					259 container
+						260 heading Kiểm tra & xử lý, Value: 3
+							261 text Kiểm tra & xử lý
+						262 text Chuẩn bị việc phát sinh ngay tại báo cáo, không cần đổi màn hình. TẠO NHANH TỪ BLOCKER [Synthetic] Lối thử còn vật liệu
+						263 image
+						264 text Chưa có phát sinh cần tạo Có thể chỉ lưu báo cáo hoặc thêm nhanh khi cần.
+				265 button Đóng
+				266 button Mở công việc liên quan
+					267 image
+					268 text Mở công việc liên quan
+				269 text Chưa có người nhận hợp lệ
+		59 container
+			60 button (collapsed) Description: Mở danh sách trao đổi, 0 tin mới, Secondary Actions: Expand
+				61 image
+				62 text Trao đổi
+				63 text 0
+			64 button (collapsed) Làm ngay 15, Secondary Actions: Expand
+				65 image
+				66 text Làm ngay
+				67 text 15
+
+The focused UI element is 1 AXWebArea Thủ Thiêm Workflow, URL: 127.0.0.1:5173/projects/d2398f6e-83db-4171-a729-fc2e2e1557d2/operations?tab=timeline

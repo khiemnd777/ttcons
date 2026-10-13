@@ -1,0 +1,10 @@
+Browser tab: 334096846, Title: "BM07 Development — Xuất báo cáo — 09-10-2026 - Google Sheets", URL: "https://docs.google.com/spreadsheets/d/1c9TtjL_YAJSUSCWAjgRAnBLzACB4Bgx0ZyAN1oSJFAs/edit?gid=707024086#gid=707024086".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
++		190 menu
++			191 Add alt text to cell, ID: aaerao:19k
++				192 text Add alt text to cell
++			193 Put image over cells, ID: aaerao:19l
++				194 text Put image over cells
++			195 Content credentials, ID: aaerao:19m
++				196 text Content credentials
+The focused UI element is 125 menu

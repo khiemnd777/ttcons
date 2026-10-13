@@ -1,0 +1,342 @@
+{
+  "answers": {},
+  "auto_advance_when_ready": false,
+  "available": true,
+  "capabilities": {
+    "can_add_confirmation": false,
+    "can_amend": false,
+    "can_delete_pdf": false,
+    "can_generate_pdf": false
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:18:49Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "a91ceb55-ca0b-4284-a0bf-558c9f905b1d",
+      "instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "to_status": "draft",
+      "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "check_date",
+      "field_type": "date",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "48dad02d-56c9-47eb-8168-c3a2fedb7473",
+      "label": "Ngày kiểm tra",
+      "options_json": [],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {
+        "default_source": "current_date"
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "client_representative",
+      "field_type": "text",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "19446ad7-6c56-4e02-86f8-b152ed400143",
+      "label": "Đại diện chủ đầu tư",
+      "options_json": [],
+      "order_index": 20,
+      "required": true,
+      "validation_json": {
+        "max_length": 160,
+        "min_length": 2
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "company_representative",
+      "field_type": "text",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "88a6a415-61d8-4efa-8e75-7157be3481bc",
+      "label": "Đại diện công ty",
+      "options_json": [],
+      "order_index": 30,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "default_source": "actor_name",
+        "max_length": 160
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "handover_scope",
+      "field_type": "select",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "2e8a42c2-3e8e-4c61-8f83-be44e3c42da1",
+      "label": "Phạm vi kiểm tra",
+      "options_json": [
+        {
+          "label": "Khu vực / phòng",
+          "value": "area"
+        },
+        {
+          "label": "Gói thi công",
+          "value": "work_package"
+        },
+        {
+          "label": "Mốc nghiệm thu",
+          "value": "milestone"
+        },
+        {
+          "label": "Hạng mục bàn giao",
+          "value": "handover_item"
+        },
+        {
+          "label": "Đóng tồn tại",
+          "value": "defect_closure"
+        },
+        {
+          "label": "Khác",
+          "value": "other"
+        }
+      ],
+      "order_index": 40,
+      "required": true,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "scope_detail",
+      "field_type": "text",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "789514e0-1201-4fde-b91b-0215f3a91997",
+      "label": "Chi tiết phạm vi",
+      "options_json": [],
+      "order_index": 50,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 240
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "checklist_items",
+      "field_type": "structured_list",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": "Submit chỉ được phép khi mọi item ở trạng thái Done hoặc N/A. Chữ ký/PDF dùng flow workflow form sau khi submit.",
+      "id": "abb35ae6-7f4a-48ff-8037-32bbcc25bb2a",
+      "label": "Checklist items",
+      "options_json": [],
+      "order_index": 60,
+      "required": true,
+      "validation_json": {
+        "item_fields": [
+          {
+            "key": "title",
+            "label": "Hạng mục",
+            "max_length": 180,
+            "min_length": 3,
+            "required": true,
+            "type": "text"
+          },
+          {
+            "key": "output_ref",
+            "label": "Output / mã việc",
+            "max_length": 120,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "options": [
+              {
+                "label": "Done",
+                "value": "done"
+              },
+              {
+                "label": "N/A",
+                "value": "not_applicable"
+              },
+              {
+                "label": "Needs follow-up",
+                "value": "needs_follow_up"
+              },
+              {
+                "label": "Blocked",
+                "value": "blocked"
+              }
+            ],
+            "required": true,
+            "type": "select"
+          },
+          {
+            "key": "client_decision",
+            "label": "Quyết định CĐT",
+            "options": [
+              {
+                "label": "Đạt",
+                "value": "pass"
+              },
+              {
+                "label": "Đạt có điều kiện",
+                "value": "conditional_pass"
+              },
+              {
+                "label": "Không đạt",
+                "value": "fail"
+              },
+              {
+                "label": "N/A",
+                "value": "not_applicable"
+              }
+            ],
+            "required": true,
+            "type": "select"
+          },
+          {
+            "key": "evidence_id",
+            "label": "Evidence",
+            "required": false,
+            "type": "evidence_reference"
+          },
+          {
+            "key": "severity",
+            "label": "Severity",
+            "options": [
+              {
+                "label": "Low",
+                "value": "low"
+              },
+              {
+                "label": "Medium",
+                "value": "medium"
+              },
+              {
+                "label": "High",
+                "value": "high"
+              },
+              {
+                "label": "Critical",
+                "value": "critical"
+              }
+            ],
+            "required": false,
+            "type": "select"
+          },
+          {
+            "key": "required_action",
+            "label": "Yêu cầu bổ sung",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          },
+          {
+            "key": "due_date",
+            "label": "Due date",
+            "required": false,
+            "type": "date"
+          },
+          {
+            "key": "comment",
+            "label": "Comment",
+            "max_length": 1000,
+            "required": false,
+            "type": "textarea"
+          }
+        ],
+        "max_items": 250,
+        "min_items": 1,
+        "submit_clear_statuses": [
+          "done",
+          "not_applicable"
+        ]
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "final_client_note",
+      "field_type": "textarea",
+      "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+      "help_text": null,
+      "id": "c91cb0a2-70c8-41d5-9448-8fd7b5aded6c",
+      "label": "Ghi chú cuối của chủ đầu tư",
+      "options_json": [],
+      "order_index": 70,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 2000
+      },
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {},
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:18:49Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 0,
+    "form_code": "builtin_owner_client_checklist",
+    "form_description": "Checklist đầu ra dành cho chủ đầu tư/client xác nhận hạng mục, evidence, quyết định và yêu cầu bổ sung.",
+    "form_name": "Checklist chủ đầu tư",
+    "form_template_id": "ae075c31-f6d3-4c37-a7a5-5b4ca4e78eb1",
+    "form_type": "checklist",
+    "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+    "form_version_no": 2,
+    "form_version_status": "published",
+    "id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+    "pipeline_run_id": "d56c563e-2adb-4c64-9b10-b1596c3af852",
+    "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "QA/QC"
+    ],
+    "run_node_id": "e8ab37d3-ecbf-455f-bec0-9c97c5c04a56",
+    "run_step_id": "41e635d6-c679-43e9-914f-ee41edc7e7fc",
+    "status": "draft",
+    "submitted_at": null,
+    "submitted_by": null,
+    "template_step_id": "0412c30d-dbf1-4c77-8e6a-2fcd53fcb1d5",
+    "title": "Chốt gói nghiệm thu cuối",
+    "updated_at": "2026-10-12T23:18:49Z",
+    "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6",
+    "work_item_status": "ready",
+    "work_item_title": "Chốt gói nghiệm thu cuối"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [],
+  "suggested_answers": {
+    "check_date": "2026-10-12",
+    "company_representative": "Consflow Admin"
+  },
+  "template": {
+    "code": "builtin_owner_client_checklist",
+    "description": "Checklist đầu ra dành cho chủ đầu tư/client xác nhận hạng mục, evidence, quyết định và yêu cầu bổ sung.",
+    "form_type": "checklist",
+    "id": "ae075c31-f6d3-4c37-a7a5-5b4ca4e78eb1",
+    "name": "Checklist chủ đầu tư"
+  },
+  "version": {
+    "id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+    "status": "published",
+    "version_no": 2
+  }
+}

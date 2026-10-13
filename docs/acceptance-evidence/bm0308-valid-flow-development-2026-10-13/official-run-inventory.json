@@ -1,0 +1,1715 @@
+{
+  "completed_at": null,
+  "completion_issues": [
+    {
+      "code": "RUN_STEP_INCOMPLETE",
+      "message": "Bước quy trình chưa hoàn tất",
+      "run_step_id": "b2b6bd5c-7ba6-46e5-b31e-5a5d5da0b022",
+      "status": "pending",
+      "step_name": "Xác nhận điểm bắt đầu"
+    },
+    {
+      "code": "WORK_ITEM_INCOMPLETE",
+      "message": "Đầu việc của bước quy trình chưa hoàn tất",
+      "status": "ready",
+      "title": "Xác nhận điểm bắt đầu",
+      "work_item_id": "1e2580b3-ae89-4b19-b7b6-259f404e6285"
+    },
+    {
+      "code": "REQUIRED_FORM_INCOMPLETE",
+      "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+      "message": "Biểu mẫu bắt buộc đúng phiên bản chưa được gửi",
+      "run_step_id": "b2b6bd5c-7ba6-46e5-b31e-5a5d5da0b022",
+      "step_name": "Xác nhận điểm bắt đầu",
+      "workflow_form_instance_id": "e652103a-8f1f-4f87-a831-4c49507a05c8",
+      "workflow_form_status": "draft"
+    }
+  ],
+  "current_node_id": "7ce4c35f-36b7-40fe-9d31-9a593cdef395",
+  "engine_version": 4,
+  "id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+  "nodes": [
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "project_intake",
+      "completed_at": null,
+      "completion_issues": [
+        {
+          "code": "RUN_STEP_INCOMPLETE",
+          "message": "Bước quy trình chưa hoàn tất",
+          "run_step_id": "b2b6bd5c-7ba6-46e5-b31e-5a5d5da0b022",
+          "status": "pending",
+          "step_name": "Xác nhận điểm bắt đầu"
+        },
+        {
+          "code": "WORK_ITEM_INCOMPLETE",
+          "message": "Đầu việc của bước quy trình chưa hoàn tất",
+          "status": "ready",
+          "title": "Xác nhận điểm bắt đầu",
+          "work_item_id": "1e2580b3-ae89-4b19-b7b6-259f404e6285"
+        },
+        {
+          "code": "REQUIRED_FORM_INCOMPLETE",
+          "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+          "message": "Biểu mẫu bắt buộc đúng phiên bản chưa được gửi",
+          "run_step_id": "b2b6bd5c-7ba6-46e5-b31e-5a5d5da0b022",
+          "step_name": "Xác nhận điểm bắt đầu",
+          "workflow_form_instance_id": "e652103a-8f1f-4f87-a831-4c49507a05c8",
+          "workflow_form_status": "draft"
+        }
+      ],
+      "description": "Xác nhận lựa chọn Khảo sát hoặc Chủ đầu tư có BOQ ngay trong biểu mẫu; Connector quyết định node kế tiếp.",
+      "exit_conditions": {
+        "auto_advance_when_ready": true,
+        "text": "Điểm bắt đầu và hồ sơ đầu vào đã được xác nhận"
+      },
+      "fail_path": "none",
+      "id": "7ce4c35f-36b7-40fe-9d31-9a593cdef395",
+      "name": "Tiếp nhận dự án",
+      "order_index": 1,
+      "permissions": [
+        "project.view",
+        "project.update",
+        "pipeline.view"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "project.update",
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": "2026-10-09T09:56:39Z",
+      "status": "in_progress",
+      "steps": [
+        {
+          "business_code": "project_intake.confirm",
+          "checklist_required": true,
+          "description": "PM xác nhận điểm bắt đầu và bộ hồ sơ đầu vào của công trình.",
+          "document_required": false,
+          "domain_action_key": null,
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+            "photo_required": false,
+            "required_permission": "project.update"
+          },
+          "form_required": true,
+          "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+          "id": "b2b6bd5c-7ba6-46e5-b31e-5a5d5da0b022",
+          "name": "Xác nhận điểm bắt đầu",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "project.update",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+          "reviewed_at": null,
+          "run_node_id": "7ce4c35f-36b7-40fe-9d31-9a593cdef395",
+          "status": "pending",
+          "step_type": "task",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "6e9c5e5b-603a-4070-be84-28729e15208a",
+          "work_item_id": "1e2580b3-ae89-4b19-b7b6-259f404e6285",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "ready",
+          "work_item_title": "Xác nhận điểm bắt đầu",
+          "workflow_form_instance_id": "e652103a-8f1f-4f87-a831-4c49507a05c8",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_project_intake_routing",
+          "workflow_form_template_id": "45700000-0000-0000-0000-000000000001",
+          "workflow_form_template_name": "Tiếp nhận dự án và chọn luồng đầu vào",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+          "workflow_form_version_no": 2,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "8a57ed57-18fd-4dc3-a5fe-747d5244ea46",
+      "type": "project_intake"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "survey",
+      "completed_at": null,
+      "description": "Một gói khảo sát hiện trạng và một biên bản chốt; ảnh hiện trường thuộc cùng gói khảo sát.",
+      "exit_conditions": {
+        "text": "Gói khảo sát và biên bản khảo sát đã hoàn tất"
+      },
+      "fail_path": "previous",
+      "id": "cbbc5462-c2d8-40b8-883d-c84a5483269a",
+      "name": "Khảo sát",
+      "order_index": 2,
+      "permissions": [
+        "planning.edit"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "planning.edit",
+      "responsible_role_ids": [
+        "Giám sát"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "survey.work_package",
+          "checklist_required": true,
+          "description": "Giám sát ghi một lần yêu cầu, phong cách, kích thước, rủi ro và ảnh hiện trường.",
+          "document_required": false,
+          "domain_action_key": null,
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "48100000-0000-0000-0000-000000000001",
+            "photo_required": true,
+            "required_permission": "planning.edit"
+          },
+          "form_required": true,
+          "form_version_id": "48100000-0000-0000-0000-000000000001",
+          "id": "7c97b82c-2d7b-431d-938b-45376da137d2",
+          "name": "Ghi nhận gói khảo sát hiện trạng",
+          "order_index": 1,
+          "photo_required": true,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "planning.edit",
+          "required_role_ids": [
+            "Giám sát"
+          ],
+          "required_workflow_form_version_id": "48100000-0000-0000-0000-000000000001",
+          "reviewed_at": null,
+          "run_node_id": "cbbc5462-c2d8-40b8-883d-c84a5483269a",
+          "status": "pending",
+          "step_type": "task",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "60466cf5-5bce-450e-bbe2-22a82e3b9f14",
+          "work_item_id": "d7996d1f-6089-46c4-b472-e302cfde3e21",
+          "work_item_role_ids": [
+            "Giám sát"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Ghi nhận gói khảo sát hiện trạng",
+          "workflow_form_instance_id": "546a9962-77b4-4c3e-a0fe-7373a3190421",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_survey_work_package",
+          "workflow_form_template_id": "48000000-0000-0000-0000-000000000001",
+          "workflow_form_template_name": "Gói khảo sát hiện trạng Rev8",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "48100000-0000-0000-0000-000000000001",
+          "workflow_form_version_no": 1,
+          "workflow_form_version_status": "published"
+        },
+        {
+          "business_code": "survey.minutes",
+          "checklist_required": true,
+          "description": "PM chốt biên bản khảo sát và các điểm cần xử lý tiếp theo.",
+          "document_required": true,
+          "domain_action_key": null,
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": true,
+            "form_required": true,
+            "form_version_id": "26260852-4fb4-4b85-baaa-c892c06799d0",
+            "photo_required": false,
+            "required_permission": "planning.edit"
+          },
+          "form_required": true,
+          "form_version_id": "26260852-4fb4-4b85-baaa-c892c06799d0",
+          "id": "970910ff-d531-44dd-a6e8-ea3727cd10c3",
+          "name": "Chốt biên bản khảo sát",
+          "order_index": 2,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "planning.edit",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": "26260852-4fb4-4b85-baaa-c892c06799d0",
+          "reviewed_at": null,
+          "run_node_id": "cbbc5462-c2d8-40b8-883d-c84a5483269a",
+          "status": "pending",
+          "step_type": "document_upload",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "29b77c9e-5c32-45cf-8d19-25ba226d6e48",
+          "work_item_id": "7b271fe3-0e26-4c9c-938b-baf7e429e3b6",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Chốt biên bản khảo sát",
+          "workflow_form_instance_id": "f4a1278c-4a56-4fa1-b5e7-f98a4f7334f6",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_site_survey_minutes",
+          "workflow_form_template_id": "030b0173-70df-4aab-8e85-a2f8a18ba39c",
+          "workflow_form_template_name": "Biên bản khảo sát hiện trạng",
+          "workflow_form_type": "meeting_minutes",
+          "workflow_form_version_id": "26260852-4fb4-4b85-baaa-c892c06799d0",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "eeae72b0-87fa-4e75-a757-4bf410528daa",
+      "type": "survey"
+    },
+    {
+      "approval_policy_json": {
+        "comment_required": true,
+        "mode": "any",
+        "quorum": 1,
+        "requester_cannot_approve": true,
+        "roles": [
+          "PM",
+          "QS",
+          "Giám sát"
+        ],
+        "signature_required": false
+      },
+      "approval_rule": "PM chốt biên bản họp",
+      "block_reason": null,
+      "business_code": "survey_review",
+      "completed_at": null,
+      "description": "PM chốt nhánh có thiết kế hoặc không thiết kế từ một biên bản quyết định.",
+      "exit_conditions": {
+        "text": "Biên bản họp đã chốt nhánh Có thiết kế hoặc Không thiết kế"
+      },
+      "fail_path": "previous",
+      "id": "fc101de5-179e-49df-a209-09b498d20039",
+      "name": "Họp báo cáo khảo sát",
+      "order_index": 3,
+      "permissions": [
+        "planning.edit",
+        "boq.view"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "planning.edit",
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "survey_review.branch_decision",
+          "checklist_required": true,
+          "description": "PM xác nhận dự án đi nhánh có thiết kế hoặc không thiết kế.",
+          "document_required": false,
+          "domain_action_key": null,
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "68d73e2a-70a1-4494-9afa-e98d6ac61c1f",
+            "photo_required": false,
+            "required_permission": "planning.edit"
+          },
+          "form_required": true,
+          "form_version_id": "68d73e2a-70a1-4494-9afa-e98d6ac61c1f",
+          "id": "46e26cae-235c-49a4-bad1-5a0e579051ef",
+          "name": "Chốt nhánh xử lý",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "planning.edit",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": "68d73e2a-70a1-4494-9afa-e98d6ac61c1f",
+          "reviewed_at": null,
+          "run_node_id": "fc101de5-179e-49df-a209-09b498d20039",
+          "status": "pending",
+          "step_type": "meeting_minutes",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "84c0f0c7-f260-48cf-b945-08728038f523",
+          "work_item_id": "fa8cc1a0-6c5f-4b2f-b2e1-5d4916498a1a",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Chốt nhánh xử lý",
+          "workflow_form_instance_id": "86c54835-4249-426d-a61c-46b58f5ab7ea",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_design_branch_decision",
+          "workflow_form_template_id": "80000000-0000-0000-0000-000000000020",
+          "workflow_form_template_name": "Quyết định nhánh thiết kế",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "68d73e2a-70a1-4494-9afa-e98d6ac61c1f",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "3b0f3bfd-c68d-4fbd-a991-b72275a4ff6d",
+      "type": "survey"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "design",
+      "completed_at": null,
+      "description": "Thiết kế phát hành một gói hồ sơ và PM bàn giao bản phát hành cho QS.",
+      "exit_conditions": {
+        "text": "Gói thiết kế đã phát hành và bàn giao QS"
+      },
+      "fail_path": "replanning",
+      "id": "d9dab4bf-8bf0-40db-bafc-c2df521a038c",
+      "name": "Thiết kế",
+      "order_index": 4,
+      "permissions": [
+        "planning.edit"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "planning.edit",
+      "responsible_role_ids": [
+        "Thiết kế"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "design.delivery_package",
+          "checklist_required": true,
+          "description": "Thiết kế tổng hợp phương án, bản vẽ và kết quả review thành một gói phát hành.",
+          "document_required": true,
+          "domain_action_key": null,
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": true,
+            "form_required": true,
+            "form_version_id": "48100000-0000-0000-0000-000000000002",
+            "photo_required": false,
+            "required_permission": "planning.edit"
+          },
+          "form_required": true,
+          "form_version_id": "48100000-0000-0000-0000-000000000002",
+          "id": "0b81cca3-a5d9-4cc3-a552-58bc925637d4",
+          "name": "Phát hành gói hồ sơ thiết kế",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "planning.edit",
+          "required_role_ids": [
+            "Thiết kế"
+          ],
+          "required_workflow_form_version_id": "48100000-0000-0000-0000-000000000002",
+          "reviewed_at": null,
+          "run_node_id": "d9dab4bf-8bf0-40db-bafc-c2df521a038c",
+          "status": "pending",
+          "step_type": "document_upload",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "0d281d59-19dd-4c3f-b12e-12d6b2c50310",
+          "work_item_id": "9376da1e-9405-4502-a36c-88be75f56e90",
+          "work_item_role_ids": [
+            "Thiết kế"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Phát hành gói hồ sơ thiết kế",
+          "workflow_form_instance_id": "c4b260c8-7519-4d6d-b86b-e136f66142d8",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_design_delivery_package",
+          "workflow_form_template_id": "48000000-0000-0000-0000-000000000002",
+          "workflow_form_template_name": "Gói hồ sơ thiết kế Rev8",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "48100000-0000-0000-0000-000000000002",
+          "workflow_form_version_no": 1,
+          "workflow_form_version_status": "published"
+        },
+        {
+          "business_code": "design.release_to_qs",
+          "checklist_required": true,
+          "description": "PM xác nhận hồ sơ thiết kế nguồn đã phát hành và bàn giao đúng revision cho QS.",
+          "document_required": false,
+          "domain_action_key": "source.design_documents_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "d334ccbc-ec57-44b6-97af-a4f6648ba463",
+            "photo_required": false,
+            "required_permission": "planning.edit"
+          },
+          "form_required": true,
+          "form_version_id": "d334ccbc-ec57-44b6-97af-a4f6648ba463",
+          "id": "70626991-cfc5-4125-a47e-bee73d610843",
+          "name": "Bàn giao bản phát hành cho QS",
+          "order_index": 2,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "planning.edit",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": "d334ccbc-ec57-44b6-97af-a4f6648ba463",
+          "reviewed_at": null,
+          "run_node_id": "d9dab4bf-8bf0-40db-bafc-c2df521a038c",
+          "status": "pending",
+          "step_type": "task",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "fe32e387-c9bf-4007-b77e-4b93b24371f1",
+          "work_item_id": "d494cfaa-c3da-4454-a885-1339efaa79c0",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Bàn giao bản phát hành cho QS",
+          "workflow_form_instance_id": "8fb43da9-cedb-4d9e-9041-883f31a88724",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_design_to_qs_handoff",
+          "workflow_form_template_id": "f61cef9e-0bb9-4783-9677-8aed86295934",
+          "workflow_form_template_name": "Bàn giao thiết kế cho QS",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "d334ccbc-ec57-44b6-97af-a4f6648ba463",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "59b4c911-614f-43c1-bfab-6f5bd4657982",
+      "type": "design"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "boq_without_design",
+      "completed_at": null,
+      "description": "QS hoàn tất và phát hành BOQ không thiết kế từ module BOQ.",
+      "exit_conditions": {
+        "text": "BOQ không thiết kế đã được kiểm tra và gửi chủ đầu tư"
+      },
+      "fail_path": "previous",
+      "id": "5a331a96-71a8-4cc5-9cab-fad162309a03",
+      "name": "BOQ (Không thiết kế)",
+      "order_index": 5,
+      "permissions": [
+        "boq.view",
+        "boq.update",
+        "boq.approve"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "boq.update",
+      "responsible_role_ids": [
+        "QS"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "boq_without_design.release_package",
+          "checklist_required": true,
+          "description": "QS chốt bản phát hành BOQ và gửi chủ đầu tư; hệ thống tạo yêu cầu mua từ BOQ đã khóa.",
+          "document_required": true,
+          "domain_action_key": "procurement.generate_from_boq",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": true,
+            "form_required": true,
+            "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+            "photo_required": false,
+            "required_permission": "boq.update"
+          },
+          "form_required": true,
+          "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+          "id": "76ecea4f-4de2-48a1-9dc7-88f3681b66b0",
+          "name": "Phát hành BOQ không thiết kế",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "boq.update",
+          "required_role_ids": [
+            "QS"
+          ],
+          "required_workflow_form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+          "reviewed_at": null,
+          "run_node_id": "5a331a96-71a8-4cc5-9cab-fad162309a03",
+          "status": "pending",
+          "step_type": "document_upload",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "ab81da79-30c3-4896-b5f9-6f9f25d5e953",
+          "work_item_id": "97408dfb-74e8-43b4-838a-ab5d0be4cb42",
+          "work_item_role_ids": [
+            "QS"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Phát hành BOQ không thiết kế",
+          "workflow_form_instance_id": "02b03832-a6bb-467b-8797-c6fe91215c29",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_boq_owner_submission",
+          "workflow_form_template_id": "b63abca7-29fb-49a2-a899-46f046a4c0d1",
+          "workflow_form_template_name": "Gửi BOQ cho chủ đầu tư",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "a900a343-828f-40d2-bf53-13364de83e04",
+      "type": "boq"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "boq_with_design",
+      "completed_at": null,
+      "description": "QS hoàn tất và phát hành BOQ có thiết kế từ module BOQ.",
+      "exit_conditions": {
+        "text": "BOQ có thiết kế đã gửi chủ đầu tư"
+      },
+      "fail_path": "previous",
+      "id": "e24f9e61-8498-4d44-baad-be0697e9c5ae",
+      "name": "BOQ (Có thiết kế)",
+      "order_index": 6,
+      "permissions": [
+        "boq.view",
+        "boq.update"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "boq.update",
+      "responsible_role_ids": [
+        "QS"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "boq_with_design.release_package",
+          "checklist_required": true,
+          "description": "QS chốt bản phát hành BOQ và gửi chủ đầu tư; hệ thống tạo yêu cầu mua từ BOQ đã khóa.",
+          "document_required": true,
+          "domain_action_key": "procurement.generate_from_boq",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": true,
+            "form_required": true,
+            "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+            "photo_required": false,
+            "required_permission": "boq.update"
+          },
+          "form_required": true,
+          "form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+          "id": "5b41f7c3-72b8-42da-8101-101b31f15bea",
+          "name": "Phát hành BOQ có thiết kế",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "boq.update",
+          "required_role_ids": [
+            "QS"
+          ],
+          "required_workflow_form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+          "reviewed_at": null,
+          "run_node_id": "e24f9e61-8498-4d44-baad-be0697e9c5ae",
+          "status": "pending",
+          "step_type": "document_upload",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "2adcd189-f5db-429a-8484-50bf7dddff02",
+          "work_item_id": "ec9362d1-41d2-4222-97e2-4f3694a7a4fa",
+          "work_item_role_ids": [
+            "QS"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Phát hành BOQ có thiết kế",
+          "workflow_form_instance_id": "7cc6f616-02f8-4a3a-a69a-ee7605fd2f37",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_boq_owner_submission",
+          "workflow_form_template_id": "b63abca7-29fb-49a2-a899-46f046a4c0d1",
+          "workflow_form_template_name": "Gửi BOQ cho chủ đầu tư",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "fb7d7b5f-283a-4c84-baf4-27c024c9667b",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "13bd1ddc-4402-4c2b-ae99-695b491af40d",
+      "type": "boq"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "outbound_contract",
+      "completed_at": null,
+      "description": "Bộ phận HĐ chịu trách nhiệm một gói hợp đồng; checklist nguồn theo dõi version, ký App, hồ sơ giấy và kích hoạt.",
+      "exit_conditions": {
+        "text": "Hợp đồng chủ đầu tư đủ điều kiện triển khai"
+      },
+      "fail_path": "previous",
+      "id": "bbc1319e-af3f-4474-b610-38de024ec313",
+      "name": "Chốt Hợp đồng với chủ đầu tư",
+      "order_index": 7,
+      "permissions": [
+        "contract.view",
+        "contract.create",
+        "contract.review",
+        "contract.approve",
+        "contract.sign",
+        "contract.dispatch",
+        "contract.scan_manage"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "contract.view",
+      "responsible_role_ids": [
+        "Bộ phận HĐ"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "outbound_contract.execution_package",
+          "checklist_required": true,
+          "description": "Bộ phận HĐ điều phối version, ký App, gửi/nhận hồ sơ giấy và kích hoạt hợp đồng.",
+          "document_required": true,
+          "domain_action_key": "contract.require_execution_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": true,
+            "form_required": true,
+            "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+            "photo_required": false,
+            "required_permission": "contract.dispatch"
+          },
+          "form_required": true,
+          "form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+          "id": "26b10b6c-83ed-488a-81cc-06b9084252d0",
+          "name": "Hoàn tất gói hợp đồng chủ đầu tư",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "contract.dispatch",
+          "required_role_ids": [
+            "Bộ phận HĐ"
+          ],
+          "required_workflow_form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+          "reviewed_at": null,
+          "run_node_id": "bbc1319e-af3f-4474-b610-38de024ec313",
+          "status": "pending",
+          "step_type": "document_upload",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "contract",
+          "template_step_id": "0a81bdb8-054d-4f76-980b-b223606cc526",
+          "work_item_id": "c3fd145d-3cb7-4485-b0df-f1572f24f8b6",
+          "work_item_role_ids": [
+            "Bộ phận HĐ"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Hoàn tất gói hợp đồng chủ đầu tư",
+          "workflow_form_instance_id": "e5fb67d4-02d3-411b-a31f-86c02209805a",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_hardcopy_dispatch",
+          "workflow_form_template_id": "a979ef94-ada2-4ffb-bfd2-35769898d460",
+          "workflow_form_template_name": "Gửi bản cứng hợp đồng / hồ sơ tạm ứng",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "8d9e4935-a20e-4f39-8d96-682da918f37b",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "89d74fab-df5f-4bed-a1a8-7a317b93e697",
+      "type": "contract"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "input_takeoff_purchase",
+      "completed_at": null,
+      "description": "QS chốt bóc tách, Mua hàng hoàn tất báo giá nhà cung cấp tại module nguồn.",
+      "exit_conditions": {
+        "text": "Khối lượng và giá đầu vào đã được tập hợp"
+      },
+      "fail_path": "previous",
+      "id": "2541b488-94b9-4126-828e-aef82613fa32",
+      "name": "Bóc tách và lấy giá đầu vào",
+      "order_index": 8,
+      "permissions": [
+        "boq.view",
+        "boq.update",
+        "procurement.view",
+        "procurement.create"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "boq.update",
+      "responsible_role_ids": [
+        "Mua hàng"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "input.takeoff",
+          "checklist_required": false,
+          "description": "QS xác nhận bản phát hành BOQ dùng cho mua hàng đầu vào.",
+          "document_required": false,
+          "domain_action_key": "source.boq_release_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "boq.update"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "749682f4-a68d-4ac9-94bf-f82eb94efd07",
+          "name": "Chốt bóc khối lượng đầu vào",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "boq.update",
+          "required_role_ids": [
+            "QS"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "2541b488-94b9-4126-828e-aef82613fa32",
+          "status": "pending",
+          "step_type": "task",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "b2bdbd64-1379-4ac6-9626-26896526d36d",
+          "work_item_id": "78eaad73-5d66-4825-aebb-3b66cf3be067",
+          "work_item_role_ids": [
+            "QS"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Chốt bóc khối lượng đầu vào",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        },
+        {
+          "business_code": "input.price_sourcing",
+          "checklist_required": false,
+          "description": "Mua hàng hoàn tất báo giá nhà cung cấp đủ điều kiện tại module mua sắm.",
+          "document_required": false,
+          "domain_action_key": "source.supplier_quotation_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "procurement.create"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "221273b7-3cea-479a-b7d5-7bc6dcd291ed",
+          "name": "Hoàn tất lấy giá nhà cung cấp",
+          "order_index": 2,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "procurement.create",
+          "required_role_ids": [
+            "Mua hàng"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "2541b488-94b9-4126-828e-aef82613fa32",
+          "status": "pending",
+          "step_type": "material_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "9f98d635-cc37-460c-8fd9-d49cda40ec35",
+          "work_item_id": "761f4776-e3de-41fe-bb9e-f68b66975788",
+          "work_item_role_ids": [
+            "Mua hàng"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Hoàn tất lấy giá nhà cung cấp",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        }
+      ],
+      "template_node_id": "9a69ed43-09e0-41d6-8fff-1dec6d347dcf",
+      "type": "procurement"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "price_negotiation",
+      "completed_at": null,
+      "description": "Mua hàng chốt lựa chọn báo giá sau đàm phán.",
+      "exit_conditions": {
+        "text": "Đơn giá và định mức đã chốt"
+      },
+      "fail_path": "previous",
+      "id": "786a1b7b-7a39-4ce0-a90f-d69cbf37d1ae",
+      "name": "Đàm phán giá",
+      "order_index": 9,
+      "permissions": [
+        "boq.view",
+        "boq.approve",
+        "accounting.budget_view"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "boq.approve",
+      "responsible_role_ids": [
+        "Mua hàng"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "price_negotiation.complete",
+          "checklist_required": false,
+          "description": "Mua hàng chốt lựa chọn báo giá sau đàm phán.",
+          "document_required": false,
+          "domain_action_key": "source.supplier_selection_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "boq.approve"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "144f8550-7f45-4266-970c-71276bc1740d",
+          "name": "Chốt lựa chọn giá đầu vào",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "boq.approve",
+          "required_role_ids": [
+            "Mua hàng"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "786a1b7b-7a39-4ce0-a90f-d69cbf37d1ae",
+          "status": "pending",
+          "step_type": "budget_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "7075d97f-c541-46f7-a95d-87476b1e5f8a",
+          "work_item_id": "ef9ff413-2ce0-44a7-80da-0aaa1234dc84",
+          "work_item_role_ids": [
+            "Mua hàng"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Chốt lựa chọn giá đầu vào",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        }
+      ],
+      "template_node_id": "2ead082b-fde4-4bc4-812e-c015ba4f7e99",
+      "type": "budget_approval"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "input_contract_advance",
+      "completed_at": null,
+      "description": "Mua hàng hoàn tất một gói hợp đồng đầu vào và procurement đã duyệt.",
+      "exit_conditions": {
+        "mandatory_gate": true,
+        "text": "Đầu vào đã được rà soát và kiểm tra"
+      },
+      "fail_path": "previous",
+      "id": "0fc6c9f9-938f-488d-a7b3-d380865a813a",
+      "name": "Hợp đồng và tạm ứng đầu vào",
+      "order_index": 10,
+      "permissions": [
+        "contract.view",
+        "contract.create",
+        "contract.review",
+        "procurement.view",
+        "procurement.approve"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "contract.view",
+      "responsible_role_ids": [
+        "Mua hàng"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "input.contract_package",
+          "checklist_required": false,
+          "description": "Mua hàng hoàn tất procurement được duyệt và hợp đồng đầu vào đủ điều kiện.",
+          "document_required": false,
+          "domain_action_key": "source.input_contract_package_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "procurement.create"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "31a02497-6c60-4713-af77-96fdc25fb404",
+          "name": "Hoàn tất gói hợp đồng đầu vào",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "procurement.create",
+          "required_role_ids": [
+            "Mua hàng"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "0fc6c9f9-938f-488d-a7b3-d380865a813a",
+          "status": "pending",
+          "step_type": "document_upload",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "contract",
+          "template_step_id": "f26697c0-55af-4b15-a343-a0f0b66bb810",
+          "work_item_id": "381b2e4e-3c9f-47ca-806e-86b13f23cb77",
+          "work_item_role_ids": [
+            "Mua hàng"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Hoàn tất gói hợp đồng đầu vào",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        }
+      ],
+      "template_node_id": "83859279-1280-4336-8668-a783fb10599e",
+      "type": "procurement"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "construction_planning",
+      "completed_at": null,
+      "description": "PM lập một gói kế hoạch thi công và kích hoạt bàn giao ra hiện trường.",
+      "exit_conditions": {
+        "handoff_required": true,
+        "text": "Kế hoạch giám sát đã được kích hoạt và bàn giao"
+      },
+      "fail_path": "rework",
+      "id": "82dff894-44d2-4462-bafb-5809d2dcdb85",
+      "name": "Kế hoạch thi công",
+      "order_index": 11,
+      "permissions": [
+        "operation.view",
+        "operation.report",
+        "operation.issue_create"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "operation.report",
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "planning.execution_package",
+          "checklist_required": true,
+          "description": "PM ghi một lần biên bản triển khai và checklist QA của kế hoạch thi công.",
+          "document_required": true,
+          "domain_action_key": null,
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": true,
+            "form_required": true,
+            "form_version_id": "48100000-0000-0000-0000-000000000003",
+            "photo_required": false,
+            "required_permission": "operation.report"
+          },
+          "form_required": true,
+          "form_version_id": "48100000-0000-0000-0000-000000000003",
+          "id": "0c5f5721-b9e5-4889-afd7-b2fdab2dbfa7",
+          "name": "Lập gói kế hoạch thi công",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "operation.report",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": "48100000-0000-0000-0000-000000000003",
+          "reviewed_at": null,
+          "run_node_id": "82dff894-44d2-4462-bafb-5809d2dcdb85",
+          "status": "pending",
+          "step_type": "document_upload",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "490ebccc-5aa6-453b-a64c-763291e9d5e7",
+          "work_item_id": "4c70b467-73b2-4235-ae06-1f30051de4da",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Lập gói kế hoạch thi công",
+          "workflow_form_instance_id": "b55de26c-9f64-4fc4-87d7-f98a34168539",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_construction_execution_plan",
+          "workflow_form_template_id": "48000000-0000-0000-0000-000000000003",
+          "workflow_form_template_name": "Gói kế hoạch thi công Rev8",
+          "workflow_form_type": "meeting_minutes",
+          "workflow_form_version_id": "48100000-0000-0000-0000-000000000003",
+          "workflow_form_version_no": 1,
+          "workflow_form_version_status": "published"
+        },
+        {
+          "business_code": "planning.construction_handoff",
+          "checklist_required": true,
+          "description": "PM chốt hạng mục giám sát và kích hoạt bàn giao ra hiện trường.",
+          "document_required": false,
+          "domain_action_key": "construction.activate_handoff",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+            "photo_required": false,
+            "required_permission": "construction.handoff.manage"
+          },
+          "form_required": true,
+          "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+          "id": "55b53099-307f-4ff6-9752-9aa71bd2648c",
+          "name": "Kích hoạt bàn giao thi công",
+          "order_index": 2,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "construction.handoff.manage",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+          "reviewed_at": null,
+          "run_node_id": "82dff894-44d2-4462-bafb-5809d2dcdb85",
+          "status": "pending",
+          "step_type": "checklist",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "workflow_form",
+          "template_step_id": "5d6a6585-6a94-47f9-b722-f5be512d6bdf",
+          "work_item_id": "19970bf3-8de8-4333-b563-f3536443392c",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Kích hoạt bàn giao thi công",
+          "workflow_form_instance_id": "6e36495b-3f96-4849-84bb-bb5d17dae0d6",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_construction_handoff_plan",
+          "workflow_form_template_id": "80000000-0000-0000-0000-000000000066",
+          "workflow_form_template_name": "Kế hoạch giám sát và bàn giao thi công",
+          "workflow_form_type": "checklist",
+          "workflow_form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+          "workflow_form_version_no": 2,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "ec1af32a-f921-47d7-838b-075d694ca162",
+      "type": "construction_planning"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "construction_execution",
+      "completed_at": null,
+      "description": "Giám sát cập nhật báo cáo thi công liên tục; lỗi, NCR và rework ở module nguồn.",
+      "exit_conditions": {
+        "handoff_checks_completed": true,
+        "text": "Các kiểm tra và khắc phục từ kế hoạch đã hoàn tất"
+      },
+      "fail_path": "rework",
+      "id": "49a1314a-88e6-4e59-9135-30994651440e",
+      "name": "Thi công",
+      "order_index": 12,
+      "permissions": [
+        "operation.view",
+        "operation.report",
+        "operation.issue_create"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "operation.report",
+      "responsible_role_ids": [
+        "Giám sát"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "construction.item_reporting",
+          "checklist_required": true,
+          "description": "Giám sát cập nhật tiến độ, nhật ký, vấn đề và minh chứng theo diễn biến thực tế.",
+          "document_required": false,
+          "domain_action_key": null,
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "9b2d4d1d-a705-48ac-a529-3e95b9cacd7f",
+            "photo_required": false,
+            "required_permission": "operation.report"
+          },
+          "form_required": true,
+          "form_version_id": "9b2d4d1d-a705-48ac-a529-3e95b9cacd7f",
+          "id": "30e49a6f-f395-4ea9-a0c7-279f7eca5337",
+          "name": "Báo cáo thi công liên tục",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "operation.report",
+          "required_role_ids": [
+            "Giám sát"
+          ],
+          "required_workflow_form_version_id": "9b2d4d1d-a705-48ac-a529-3e95b9cacd7f",
+          "reviewed_at": null,
+          "run_node_id": "49a1314a-88e6-4e59-9135-30994651440e",
+          "status": "pending",
+          "step_type": "daily_report",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "quality",
+          "template_step_id": "4dcd9024-5f58-40bf-87ea-5bba911286a0",
+          "work_item_id": "2ea0f595-d50a-4376-8a35-641ad8786120",
+          "work_item_role_ids": [
+            "Giám sát"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Báo cáo thi công liên tục",
+          "workflow_form_instance_id": "c540e5e6-3263-422f-99a8-b3197aad0806",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "builtin_construction_daily_report",
+          "workflow_form_template_id": "0e819dac-0fef-47e5-b776-77c325bfecbb",
+          "workflow_form_template_name": "Daily report thi công",
+          "workflow_form_type": "daily_report",
+          "workflow_form_version_id": "9b2d4d1d-a705-48ac-a529-3e95b9cacd7f",
+          "workflow_form_version_no": 2,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "ebe5f3a0-c2d2-4def-a8af-ecdb530c80a9",
+      "type": "construction"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "incoming_acceptance",
+      "completed_at": null,
+      "description": "Hai gói nghiệm thu kỹ thuật: thầu phụ/khối lượng và vật tư; tài chính không chặn tiến độ kỹ thuật.",
+      "exit_conditions": {
+        "text": "Nghiệm thu kỹ thuật đầu vào đã hoàn tất"
+      },
+      "fail_path": "rework",
+      "id": "b3f5d8a3-e1d3-4d0a-a899-13ad86175dad",
+      "name": "Nghiệm thu Đầu Vào",
+      "order_index": 13,
+      "permissions": [
+        "acceptance.view",
+        "acceptance.create",
+        "acceptance.approve",
+        "project_finance.view",
+        "project_finance.cost_create",
+        "project_finance.request_create"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "acceptance.approve",
+      "responsible_role_ids": [
+        "QA/QC"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "incoming.subcontractor_package",
+          "checklist_required": true,
+          "description": "QS tổng hợp checklist và khối lượng thầu phụ; trạng thái nguồn được kiểm tra trước khi chốt.",
+          "document_required": false,
+          "domain_action_key": "source.subcontractor_acceptance_package_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+            "photo_required": false,
+            "required_permission": "acceptance.create"
+          },
+          "form_required": true,
+          "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+          "id": "f264aeed-bdc2-4418-ab62-56393b2d3a92",
+          "name": "Nghiệm thu gói thầu phụ và khối lượng",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "acceptance.create",
+          "required_role_ids": [
+            "QS"
+          ],
+          "required_workflow_form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+          "reviewed_at": null,
+          "run_node_id": "b3f5d8a3-e1d3-4d0a-a899-13ad86175dad",
+          "status": "pending",
+          "step_type": "acceptance_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "subcontractor_reconciliation",
+          "template_step_id": "606c3a96-8d5e-40cb-b972-c43f7dc2e16a",
+          "work_item_id": "2f10e39a-d2ee-412e-a343-36e3d0f8cee6",
+          "work_item_role_ids": [
+            "QS"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Nghiệm thu gói thầu phụ và khối lượng",
+          "workflow_form_instance_id": "df2de63a-aeba-45ed-96fc-070284448eb1",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_subcontractor_acceptance_package",
+          "workflow_form_template_id": "48000000-0000-0000-0000-000000000004",
+          "workflow_form_template_name": "Gói nghiệm thu thầu phụ Rev8",
+          "workflow_form_type": "checklist",
+          "workflow_form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        },
+        {
+          "business_code": "incoming.material_acceptance",
+          "checklist_required": true,
+          "description": "QA/QC chốt hồ sơ nghiệm thu vật tư nguồn.",
+          "document_required": false,
+          "domain_action_key": "acceptance.incoming_material",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+            "photo_required": false,
+            "required_permission": "acceptance.create"
+          },
+          "form_required": true,
+          "form_version_id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+          "id": "931f6082-57b3-4a1f-bfee-27185ce53b79",
+          "name": "Nghiệm thu vật tư đầu vào",
+          "order_index": 2,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "acceptance.create",
+          "required_role_ids": [
+            "QA/QC"
+          ],
+          "required_workflow_form_version_id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+          "reviewed_at": null,
+          "run_node_id": "b3f5d8a3-e1d3-4d0a-a899-13ad86175dad",
+          "status": "pending",
+          "step_type": "acceptance_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "incoming_acceptance",
+          "template_step_id": "61a77f55-4b0f-44a3-a4cc-1d4be88f6f7b",
+          "work_item_id": "65b57226-ebb7-4d90-968b-e9f95879f044",
+          "work_item_role_ids": [
+            "QA/QC"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Nghiệm thu vật tư đầu vào",
+          "workflow_form_instance_id": "a5997acf-d7a1-4c70-9a65-eb939eedc0bb",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "client_material_incoming_acceptance_summary",
+          "workflow_form_template_id": "003050d0-0a06-4a6a-aee5-56cead1bf1bf",
+          "workflow_form_template_name": "Nghiệm thu vật tư đầu vào / đầu ra",
+          "workflow_form_type": "generic_submission",
+          "workflow_form_version_id": "384a94c2-db47-42f7-9eb8-a48f387e39e4",
+          "workflow_form_version_no": 3,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "2521164a-11e0-449e-a763-9dcd52e95855",
+      "type": "incoming_acceptance"
+    },
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "outgoing_acceptance",
+      "completed_at": null,
+      "description": "Một gói nghiệm thu cuối và đối chiếu chủ đầu tư; tài chính được theo dõi ngoài critical path.",
+      "exit_conditions": {
+        "text": "Nghiệm thu cuối và đối chiếu chủ đầu tư đã hoàn tất"
+      },
+      "fail_path": "rework",
+      "id": "37ca9779-4e41-4d65-a737-e47576551340",
+      "name": "Nghiệm thu Đầu Ra",
+      "order_index": 14,
+      "permissions": [
+        "acceptance.view",
+        "acceptance.create",
+        "acceptance.approve",
+        "project_finance.view",
+        "project_finance.request_create"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "acceptance.approve",
+      "responsible_role_ids": [
+        "QA/QC"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "outgoing.final_package",
+          "checklist_required": true,
+          "description": "QA/QC chốt đối chiếu chủ đầu tư và hồ sơ nghiệm thu cuối đạt.",
+          "document_required": false,
+          "domain_action_key": "source.final_acceptance_package_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+            "photo_required": false,
+            "required_permission": "acceptance.approve"
+          },
+          "form_required": true,
+          "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+          "id": "8410b6fb-43de-4557-9018-7aa282d07fc1",
+          "name": "Chốt gói nghiệm thu cuối",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "acceptance.approve",
+          "required_role_ids": [
+            "QA/QC"
+          ],
+          "required_workflow_form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+          "reviewed_at": null,
+          "run_node_id": "37ca9779-4e41-4d65-a737-e47576551340",
+          "status": "pending",
+          "step_type": "acceptance_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "owner_client_reconciliation",
+          "template_step_id": "56610ba7-8060-4c1e-875d-28cd8448a4ba",
+          "work_item_id": "c2b612e4-6455-4d29-a3cd-c5601c635bd2",
+          "work_item_role_ids": [
+            "QA/QC"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Chốt gói nghiệm thu cuối",
+          "workflow_form_instance_id": "9e18ce3e-9fc3-48cf-8f0f-4ca1927b4ec7",
+          "workflow_form_required": true,
+          "workflow_form_revision": 0,
+          "workflow_form_status": "draft",
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": "builtin_owner_client_checklist",
+          "workflow_form_template_id": "ae075c31-f6d3-4c37-a7a5-5b4ca4e78eb1",
+          "workflow_form_template_name": "Checklist chủ đầu tư",
+          "workflow_form_type": "checklist",
+          "workflow_form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+          "workflow_form_version_no": 2,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "0f520fbc-0020-441b-a675-8a15800371f8",
+      "type": "acceptance"
+    },
+    {
+      "approval_policy_json": {
+        "comment_required": true,
+        "mode": "any",
+        "quorum": 1,
+        "requester_cannot_approve": true,
+        "roles": [
+          "Kế toán",
+          "PM",
+          "Giám đốc"
+        ],
+        "signature_required": false
+      },
+      "approval_rule": "Kế toán và Giám đốc xác nhận hồ sơ quản trị",
+      "block_reason": null,
+      "business_code": "handover_finance",
+      "completed_at": null,
+      "description": "Bàn giao vật lý được hoàn tất độc lập; hồ sơ thương mại đủ điều kiện được bàn giao và Kế toán xác nhận tiếp nhận.",
+      "exit_conditions": {
+        "accounting_handoff_included": true,
+        "handover_included": true,
+        "separate_gates": true,
+        "text": "Bàn giao vật lý và bàn giao hồ sơ kế toán đã hoàn tất"
+      },
+      "fail_path": "none",
+      "id": "1a650896-cfaf-4e18-af58-b41d7e7a36d2",
+      "name": "Kết thúc: Bàn giao + Tài chính công trình",
+      "order_index": 15,
+      "permissions": [
+        "handover.view",
+        "handover.approve",
+        "accounting_handoff.view",
+        "accounting_handoff.acknowledge"
+      ],
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "required_permission": "handover.view",
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+      "started_at": null,
+      "status": "pending",
+      "steps": [
+        {
+          "business_code": "closure.handover",
+          "checklist_required": false,
+          "description": "PM hoàn tất hồ sơ bàn giao sau khi chất lượng, tồn tại và vật tư dư đã đóng; tài chính không chặn bước này.",
+          "document_required": false,
+          "domain_action_key": "source.handover_completed",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "handover.approve"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "5e298ed9-5270-4057-9757-eaf33a9e282c",
+          "name": "Hoàn tất bàn giao vật lý",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "handover.approve",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "1a650896-cfaf-4e18-af58-b41d7e7a36d2",
+          "status": "pending",
+          "step_type": "handover_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "handover",
+          "template_step_id": "29ff5d3f-8367-49dc-a391-80d720bfa41e",
+          "work_item_id": "c2b81d12-c008-43d8-ab54-05417d16ae08",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Hoàn tất bàn giao vật lý",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        },
+        {
+          "business_code": "closure.finance",
+          "checklist_required": false,
+          "description": "Kế toán xác nhận đã tiếp nhận toàn bộ hồ sơ mua sắm và mốc thu đủ điều kiện; hạch toán, hóa đơn, thuế và thanh toán tiếp tục thực hiện trên MISA.",
+          "document_required": false,
+          "domain_action_key": "source.accounting_handoff_close_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "accounting_handoff.acknowledge"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "205c4c1c-dc13-4ebb-8933-e8a16f004c61",
+          "name": "Xác nhận bàn giao hồ sơ kế toán",
+          "order_index": 2,
+          "photo_required": false,
+          "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+          "required_permission": "accounting_handoff.acknowledge",
+          "required_role_ids": [
+            "Kế toán"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "1a650896-cfaf-4e18-af58-b41d7e7a36d2",
+          "status": "pending",
+          "step_type": "accounting_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "finance",
+          "template_step_id": "d5559c45-fb3b-4790-b5f0-1f3335fb4b3c",
+          "work_item_id": "4ee7e0d2-6947-45b2-bc7d-2b8cbedd8285",
+          "work_item_role_ids": [
+            "Kế toán"
+          ],
+          "work_item_status": "pending",
+          "work_item_title": "Xác nhận bàn giao hồ sơ kế toán",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        }
+      ],
+      "template_node_id": "f017c4d0-89c8-48e7-a30e-f6909fc55e11",
+      "type": "financial_closure"
+    }
+  ],
+  "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+  "project_name": "[Thử development] Workflow chính thức Rev10",
+  "started_at": "2026-10-09T09:56:39Z",
+  "status": "in_progress",
+  "template_definition_hash": "e77ea198f5cddf329f9f707e7a70ae441ae11ce68e69525e07baae596a764787",
+  "template_id": "60e28e04-1183-4d1f-a357-0c2e821442bf",
+  "template_name": "[Client] Workflow hoàn thiện công trình chính thức"
+}

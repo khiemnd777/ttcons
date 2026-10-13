@@ -87,6 +87,10 @@ func workItemExecutionTarget(item Record, businessSource Record) Record {
 		route = executionRouteWithTask(sourceRoute, workItemID)
 	}
 	fallbackRoute := executionWorkspaceRoute(projectID, workItemID, "")
+	if actionKey == "source.subcontractor_acceptance_package_ready" {
+		route = fmt.Sprintf("/work-items/%s#subcontractor-reconciliation", workItemID)
+		actionLabel = "Mở đối soát"
+	}
 	if route == "" {
 		route = fallbackRoute
 	}

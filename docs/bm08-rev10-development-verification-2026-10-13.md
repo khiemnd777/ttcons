@@ -1,0 +1,69 @@
+# BM08 — Nghiệm thu ngày bàn giao và export trên Rev10, 13-10-2026
+
+**UX ACCEPTED:** anh xác nhận `Chốt nghiệm thu BM08` ngày13-10-2026 sau khi review bằng chứng và follow-up. Đầu việc `Hoàn tất bàn giao vật lý` và Gói công việc tương ứng đã `completed` qua nút trên trình duyệt. Hồ sơ BM08 vẫn `handed_over`; bước kế toán vẫn `ready`, chưa bắt đầu/chốt; Giai đoạn/run vẫn `in_progress` theo phạm vi đã duyệt. Không có blocker còn lại trong phạm vi BM08 đã nghiệm thu; không đóng plan hoặc mở rộng sang kế toán.
+
+**Ranh giới duyệt trước đó đã được giải quyết:** cơ chế duyệt tự động từng từ chối click Hoàn tất Đầu việc vì coi đây là chuyển trạng thái riêng ngoài phạm vi nghiệm thu file/readiness BM08. Không có retry hoặc API workaround. Sau khi anh duyệt rõ riêng transition này, thao tác trình duyệt chạy thành công. Mục follow-up cuối báo cáo ghi bằng chứng mới; các số liệu nghiệm thu file trước đó giữ đúng thời điểm của chúng.
+
+**Phần đã TECHNICALLY VERIFIED và được anh chốt:** nhập/lưu/tải lại ngày14-10-2026, giữ ngày sau hoàn tất hồ sơ, nguồn hợp lệ của cùng full Rev10, actual Xuất báo cáo, nguyên file Google Sheets và hình desktop/mobile; follow-up chốt riêng Đầu việc vật lý. Nghiệm thu giới hạn ở các tình huống Development đã ghi, không chứng nhận mọi nhánh/quyền/công trình thật.
+
+## Phạm vi và môi trường
+
+- User duyệt nghiệm thu BM08 theo luồng Rev10 hợp lệ, nhập/lưu ngày, actual download/browser/Google, giữ lịch sử/không field mới. Không code/migration, Production, Git delivery, guard bypass hoặc template rút gọn.
+- HEAD `75dc44707785d399ed2408959bf784928a544e96` + dirty tree đã giữ.976 application/test/migration hashes bằng build checkbox đã chạy; source không đổi trong lượt này. UI5173/API8081; `/api/health` và `/api/ready`200; database consflow vẫn158 migrations. Không rebuild/restart/tests application không cần thiết; chạy verifier UAT riêng.
+- Tái dùng full published Rev10 `60e28e04-1183-4d1f-a357-0c2e821442bf`, project `432115cb-bd5b-4fae-9edc-74ce031eacf3`, run `d94e292e-7349-4d48-b741-0aa821241e68`, engine4. BM03 đã được anh chốt; không chỉnh phiếu/ledger/file R1/R2 của BM03.
+- Actor Admin với membership đã có. Không chứng minh ordinary-role/denied-permission/all-branch/real-client/site-quality/legal/Excel desktop/printing/finance. Xác nhận ký UAT, nguồn receipt và bốn PDF đều ghi rõ nội bộ giả lập; không có giao dịch/gửi client/thực địa thật.
+- Maps central/backend/frontend/triage + Quality/Materials đã đọc. Owners: service_acceptance_incoming/outgoing, repository_handover/pipeline, HandoverCreateDialog/SimpleForm, HandoverWorkspace, WorkflowFormPanel, native export. Không thay hành vi nên mapping maintenance không cần thêm thay đổi ở lượt nghiệm thu này.
+
+## Nguồn Rev10 đã thực hiện
+
+1. Incoming material WI `b6cdcf60-a200-4ecf-a306-53f25a110733`: đúng form client material summary v3 chốt25m2, receipt supplier `5d565737-3f3b-4523-a6a5-e62992148cf6` cùng công trình/Đầu việc, ngày13-10, giao/nhận25 và accepted; canonical submit/complete/advance. Dòng BOQ/procurement đã duyệt là phạm vi công việc, không có material identity/name, nên không tạo quan hệ receiving giả vào dòng đó. Nhánh supplier tên tự do là backend có hỗ trợ, UI không có ô tên tự do; source preparation dùng API, không tuyên bố nghiệm thu UI nhập vật tư hoặc stock movement. Gate incoming hiện kiểm submitted record theo công trình; UAT vẫn dùng đúng owner WI.
+2. Outgoing WI `4fad1dc4-13b5-46b8-982b-f07ee3d875c1`: đúng owner checklist v2; actual browser Chốt hồ sơ, ký hiệu UAT qua dialog chuẩn `internal_ack`, actual Tạo PDF. Instance `0c091759-a7bf-43a7-8512-a8282f3eb64c`, PDF `36d4b513-6d6d-43e4-8c55-ea21ea8f4d5a` được tải đúng protected file; không spoof signature/document/waiver header.
+3. Final acceptance `e6111f15-bbc2-4ff9-ab41-beda8337ac23` dùng chính form/PDF/WI, canonical submit/pass → completed/pass. Owner reconciliation gắn đúng acceptance này được gửi; complete/advance outgoing bình thường tới Giai đoạn Bàn giao công trình và hồ sơ kế toán. Source preparation bằng API; không tuyên bố owner reconciliation panel đã chạy UI, vì form-first hiện chưa hiển thị panel đó.
+4. BM08 actual CreateDialog có source eligible cùng công trình. Create với context WI `73e77a9e-7abd-4f2c-b768-c62e3fd31627`, mã `UAT-BM08-REV10-20261013`, ngày14-10 và đại diện gợi ý đúng nguồn. Record mới `4fafa862-a292-408f-bd33-695d9c1e5b81`; canonical first-mutation bridge đưa WI vật lý sang in_progress.
+5. Bốn PDF thật được render/đọc trước upload: hoàn công, hướng dẫn vận hành, bảo hành, biên bản hai bên mô phỏng. Upload vào đúng project qua `/documents/upload`; actual UI Xác minh chọn đúng từng document, ghi yêu cầu/kết quả/ghi chú nguồn. Hai mục final acceptance/warehouse tự được nguồn đối chiếu; không tự đánh verified hoặc waive nguồn tự động. Sau check đạt6/6, documents_ready/warehouse_closed true, blockers0.
+6. Six explicit assessment results và conclusion eligible được lưu bằng controls hiện có, tách khỏi verified/readiness. Actual UI Hoàn tất bàn giao với căn cứ thử nội bộ → `handed_over/completed_at`. Click chốt WI vật lý bị duyệt tự động từ chối; record đã hoàn tất vẫn giữ nguyên. Finance WI chỉ ready do activation Giai đoạn; chưa start/complete/acknowledge. Run/Giai đoạn chưa chốt.
+
+## Ngày bàn giao: đã kiểm đúng gì
+
+- Chọn14-10-2026 làm ngày dự kiến thử để khác server current date13-10-2026. Nhập trên date control, dùng ArrowUp/ArrowDown/Tab để phát sinh thao tác bàn phím; đọc lại input ISO `2026-10-14` và CreateSummary `14-10-2026` trước Save. Không chỉ nhìn một lệnh fill thành công.
+- Sau Create: API/SQL DATE là14-10; actual browser Reload vẫn hiện14-10 ở danh sách/detail. Trước và sau Complete cũng14-10. Complete thực hiện13-10, không thay ngày dự kiến bằng CURRENT_DATE. Raw HTTP POST body không được thu; không tuyên bố đã capture body. UI state, source serializer và persisted readback là ba bằng chứng riêng.
+- Source đã đọc: SimpleForm giữ YYYY-MM-DD, service normalizeOptionalDate kiểm calendar, repository insert vào DATE và Complete dùng COALESCE chỉ khi NULL. API có thể serialize DATE thành RFC3339 midnight; verifier so calendar date/SQL và ý nghĩa UI, không coi định dạng API là date bug.
+- Đọc lại workbook client và TOC: BM08 không có ô riêng ngày bàn giao. Native DateLabel lấy handover_date để đặt tên sheet `2026-10-14_01`. Cột F là THỜI HẠN XỬ LÝ, chỉ từ deadline tồn tại; sáu ô F8:F13 giữ blank vì không có deadline. Không thêm field/cột hoặc dùng ngày bàn giao lấp deadline. Câu commentary ban đầu "đối chiếu ô ngày" đã được đính chính thành tên sheet.
+- Lượt trước ngày null chưa chứng minh lỗi code. Lượt này ngày nhập/lưu/tải lại/xuất được kiểm đúng; không có app date fix hoặc history rewrite.
+
+## Actual download và Google
+
+- Actual nút Xuất báo cáo tải `/Users/khiemnguyen/Downloads/BM-GS-08 (8).xlsx`.
+- Copy `docs/acceptance-evidence/bm08-rev10-development-2026-10-13/BM08-Rev10-handed-over.xlsx` bằng từng byte, ZIP hợp lệ, SHA256 `846c3c8516bf96e3a6755577145863a666e16bbc0948df9c469cd18196844a53`.
+- Một sheet `2026-10-14_01`, A1:F32. Headers client,6 dòng, D8:D13 Đạt, A15 eligible, blank defects/deadlines, notes/source appendices và bốn chỗ ký giữ đúng nguồn. Không thêm ảnh tự chọn/field/schema; nguồn không có ảnh nên workbook không có media appendix.
+- Import đúng copy nguyên byte vào native private Google: https://docs.google.com/spreadsheets/d/1V9qcQQi7hggHKpBcCsg_tT6PX--rtLhiaSlqq2eoaxg/edit . Không sửa cells/style/dimensions sau tải/import, không đổi sharing.
+- Metadata trước cells; `2026-10-14_01!A1:F32`:192 ô kiểm,60 populated bằng nguồn,0 mismatches và0 effective errors/#VALUE. Tên sheet giữ14-10 dù native Google timezone America/Los_Angeles. Actual Google top/footer đã nhìn/chụp100%, text/columns/conclusion/signature placeholders đủ, không thấy tràn hoặc cắt nội dung ở vùng kiểm.
+- Desktop screenshot completed có nút xuất/ngày14/6-6/zero blockers. Mobile390×844 có cùng ngày/nút xuất/trạng thái, document/body width390; temporary viewport reset.
+
+## Lịch sử và kiểm chứng
+
+`uat.py baseline before/after`, `storage` và `verify` dùng SQL read-only/API snapshots; mọi domain write ở trên dùng canonical API/UI. Không sửa applied migration, template pins hoặc historical snapshot.
+
+-39 bảng,2482 rows có trước lượt này được đối chiếu.14 rows thuộc project/run/nodes/steps/active WI/form của chính luồng thử thay đổi theo canonical transitions đã duyệt;2468 rows còn lại không đổi. Không nói toàn2482 rows đều unchanged. Các events/signatures/PDFs/ledger đã chốt, BM03 và hồ sơ bàn giao trước đó còn nguyên.
+-143 storage files có trước giữ nguyên SHA256;149 sau lượt này. Source976 hashes unchanged, migration count158 unchanged.
+- Verifier32 assertions PASS: date saved/preserved≠default, exact same-project sources/documents, six verified/assessment/eligible, handed_over, byte-equal XLSX, original columns/deadline meaning,192 Google cell equality/errors, immutable older data, physical WI still in_progress and finance unstarted.
+- Independent GPT-6.1 Sol High final evidence audit PASS, không P0–P2 trong bằng chứng BM08/date/export. Reviewer chạy verifier không ghi file/domain, kiểm toàn bộ2482 ID/14 expected updates/2468 unchanged,143 files,976 build/current hashes, full15-node engine4/pin parity và192 Google cells. Đã xem13 screenshots/renders, xác nhận ngày14 qua3 snapshot và giữ đúng giới hạn approval boundary/PDF nguồn. Kết quả là technical evidence, không thay user acceptance.
+- Không chạy lại build/unit suites khi application source/built source giống nhau. Không coi verifier UAT là application test coverage hoặc user acceptance.
+
+## Giới hạn và bước tiếp theo
+
+- Anh đã chốt nghiệm thu BM08 ngày13-10-2026; không còn công việc trong phạm vi đã chốt. Sổ tổng còn01/04/05/06/07 chờ user acceptance và BM02 PDF-progress chờ chốt riêng; đề xuất tiếp theo BM04. Không chạy lại browser/runtime trong lượt ghi nhận này.
+- Chốt riêng Đầu việc Hoàn tất bàn giao vật lý đã được duyệt và nghiệm thu trình duyệt ở follow-up bên dưới. Không bypass qua API. Hồ sơ kế toán và chốt Giai đoạn cuối ngoài scope.
+- Native source workflow PDF có2 trang; ký hiệu UAT trang2 đọc được. Header project/quy trình trang1 bị chồng chữ khi tên project dài, là hiện trạng PDF nguồn ngoài BM08 XLSX; không sửa và không tuyên bố PDF đó đạt layout đầy đủ. Bốn PDF test riêng đọc được. Generic Work Item copy còn nhắc tài chính ở một section, không dùng nó làm gate hoặc thay nghiệp vụ.
+- Initial fixture input condition dùng text thay enum và attempt liên kết procurement line không có material name bị validator từ chối; đã chuyển sang nhánh supplier hợp lệ, không sửa validator/guard. Một upload gọi sai route404 được đổi sang route chuẩn; một đường dẫn render tool không tồn tại được đổi sang bundled override. Không coi các lỗi orchestration đó là application defects; không có source record bị ghi bởi request thất bại.
+
+Evidence: `docs/acceptance-evidence/bm08-rev10-development-2026-10-13/`. Ảnh chính: date-entered-create-dialog.jpg, date-saved-reloaded.jpg, bm08-ready-date.jpg, bm08-completed-export-button.jpg, bm08-completed-mobile.jpg, bm08-google-top.jpg, bm08-google-footer.jpg. File actual, Google metadata/cells, before/after hashes, canonical responses, PDFs/renders và approval-boundary.json nằm cùng folder.
+
+## Follow-up — chốt riêng Đầu việc vật lý đã duyệt, 13-10-2026
+
+- Yêu cầu trực tiếp: `Duyệt chốt riêng Đầu việc Hoàn tất bàn giao vật lý của công trình thử Rev10, giữ bước kế toán chưa chốt. Nghiệm thu trên trình duyệt và chụp hình để tôi review.` Không có code, field, migration, kế toán, phê duyệt/chốt Giai đoạn hoặc đóng run được bổ sung vào phạm vi.
+- Environment: main Development UI5173/API8081/consflow; cùng HEAD75dc447 và dirty application tree đã build ở lượt checkbox. Đối chiếu976 source/test/migration hashes không đổi;158 migrations trước/sau. Không rebuild/unit-suite cho nguồn không đổi; chỉ chạy đối chiếu UAT mới. Không có mapping update vì không thay application behavior/contract/owner.
+- Actual browser: đăng nhập lại bằng credentials Development hiện có sau session hết hạn; mở đúng task73e77..., `Kiểm tra điều kiện & chốt bước` cho nguồn1/1/no blockers → click `Hoàn tất`. Toast Đã hoàn tất, status Hoàn tất, nút complete không còn. Lịch sử có system/completion events mới với Consflow Admin. Reload giữ Hoàn tất; mở Quy trình/Tất cả hiển thị hai Đầu việc: vật lý Hoàn tất, kế toán Sẵn sàng. Không bấm start/complete của kế toán.
+- Persisted readback: WI73e77... completed_at `2026-10-13T02:37:01Z` (09:37:01ICT), own Run Stepbc19... completed. Accounting WId787... vẫnready, started_at/completed_at NULL. Run/node không đổi, run vẫnin_progress; Giai đoạn cuối1/2 Gói công việc hoàn tất. Hồ sơ4fafa... handed_over và ngày dự kiến14-10/checklist/conclusion/completed_at giữ nguyên.
+- Root kiểm tra14 assertions PASS; không dùng kết quả review High trước đó để tuyên bố đã review độc lập thao tác mới. Baseline mới39 tables/2515 existing rows: chỉ WI73e77... và Stepbc19... thay đổi,2513 rows còn lại unchanged/0 lost IDs. All handover/checklist, finance, pipeline run/node and previous history row hashes unchanged.976 current source hashes và migration count158 không đổi. Actual BM08 XLSX SHA256 vẫn846c3c8516bf96e3a6755577145863a666e16bbc0948df9c469cd18196844a53. Không tải/import Google lại vì source/file BM08 không đổi; Google proof vẫn thuộc lượt nghiệm thu file trước.
+- Evidence mới: subfolder `physical-work-item-approved/`, trước/sau SQL row hashes, API readbacks, `verification.json`; ảnh `before-complete.jpg`, `after-complete-dialog.jpg`, `completion-history.jpg`, `completed-reloaded.jpg`, `physical-completed-accounting-ready.jpg`. Nghiệm thu bằng Admin trong công trình synthetic; không chứng minh ordinary-role/real physical handover/legal/finance/whole-project closure. Bước tiếp theo: anh review ảnh để chốt nghiệm thu BM08; bước kế toán giữ nguyên chưa chốt.

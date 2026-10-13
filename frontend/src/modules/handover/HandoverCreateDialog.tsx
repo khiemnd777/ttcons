@@ -11,6 +11,7 @@ export function HandoverCreateDialog({ open, projectId, acceptances, loading, er
     { name: 'handover_code', label: 'Mã hồ sơ', defaultValue: `HO-${Date.now().toString().slice(-6)}` },
     { name: 'final_acceptance_id', label: 'Nghiệm thu cuối đạt', type: 'select', required: true, options: acceptances.map((row) => ({ value: row.id, label: `${row.title} · ${resultLabel(row.result)}` })), helperText: 'Nguồn được khóa vào hồ sơ và được kiểm tra lại khi hoàn tất.' },
     { name: 'handover_date', label: 'Ngày dự kiến bàn giao', type: 'date' },
+    { name: 'handover_stage', label: 'Giai đoạn bàn giao', validate: value => Array.from(String(value ?? '').trim()).length > 160 ? 'Giai đoạn bàn giao tối đa 160 ký tự' : undefined },
     { name: 'client_representative', label: 'Đại diện chủ đầu tư', required: true },
     { name: 'company_representative', label: 'Đại diện nhà thầu', required: true },
     { name: 'notes', label: 'Ghi chú', type: 'textarea' },
@@ -22,7 +23,7 @@ export function HandoverCreateDialog({ open, projectId, acceptances, loading, er
       layout="two-column"
       sections={[
         { title: 'Nguồn nghiệm thu', description: 'Chọn đúng nghiệm thu cuối của công trình; thông tin đại diện sẽ được gợi ý từ nguồn.', fields: ['final_acceptance_id'] },
-        { title: 'Thông tin bàn giao', fields: ['handover_code', 'handover_date', 'client_representative', 'company_representative', 'notes'] },
+        { title: 'Thông tin bàn giao', fields: ['handover_code', 'handover_date', 'handover_stage', 'client_representative', 'company_representative', 'notes'] },
       ]}
       onFieldChange={(name, value, values) => {
         if (name !== 'final_acceptance_id') return undefined;

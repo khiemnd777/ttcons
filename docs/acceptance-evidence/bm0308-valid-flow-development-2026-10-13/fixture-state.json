@@ -1,0 +1,120 @@
+{
+  "builtin": {
+    "template_id": "95c2c83a-0ec6-417d-a74b-935fd31a57cc",
+    "node_ids": [
+      "29009ff5-9c4e-435b-b826-0513ae4c0477"
+    ],
+    "step_ids": [
+      "2a197aab-4568-462a-95cf-b1dda95dd1c7"
+    ],
+    "published": true,
+    "project_id": "dad2862d-def4-4833-a1f8-c8b7e329bd54",
+    "member_id": "573a06fc-413b-42ef-840b-136382aa12e0",
+    "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+    "pm_set": true,
+    "roles_covered": [
+      "PM",
+      "QA/QC",
+      "QS"
+    ],
+    "run_id": "20c79a7e-6f27-432a-bb7d-1c329adbd734",
+    "work_items": [
+      {
+        "id": "0269cd8b-d6b4-41f5-8173-1dc4e08df8ee",
+        "title": "[Synthetic] BM03 checklist thầu phụ có sẵn",
+        "status": "ready",
+        "run_node_id": "c58ea988-6c03-4a9d-8a9f-2315a67cf419",
+        "run_step_id": "cd3288fd-acd1-4965-b9dc-4d02edcc5a69"
+      }
+    ],
+    "form_id": "122f0acb-6a1d-4337-a737-814764dbfb9a"
+  },
+  "client": {
+    "template_id": "f9ba8f6b-c799-497e-a886-43a61cff9589",
+    "node_ids": [
+      "1a1a7a45-f428-4888-96f3-bccdf15bfeb7"
+    ],
+    "step_ids": [
+      "edaceeee-9a29-48eb-a416-32f028517f7a"
+    ],
+    "published": true,
+    "project_id": "8ae7b7e1-2bcd-4633-a83a-b117eab65ead",
+    "member_id": "bd527cb8-d889-4aee-8470-4882b91d97f3",
+    "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+    "pm_set": true,
+    "roles_covered": [
+      "PM",
+      "QA/QC",
+      "QS"
+    ],
+    "run_id": "04c4ffc5-3f6d-4b29-b956-0400b66314ae",
+    "work_items": [
+      {
+        "id": "2529730f-d785-4356-a685-583cff44db2b",
+        "title": "Nghiệm thu gói thầu phụ và khối lượng",
+        "status": "ready",
+        "run_node_id": "1b4e1e06-c40d-4ef8-ab22-3cf8188b8b2e",
+        "run_step_id": "55ec81f6-5268-4aaf-889a-b1299b83fac4"
+      }
+    ],
+    "form_id": "86535cf4-9104-4ede-acb1-48554178df1b"
+  },
+  "handover": {
+    "template_id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+    "node_ids": [
+      "8f026716-df61-48ca-813b-c0b1c83381bc",
+      "9e460a01-4da9-4395-a4c3-12631f393f14"
+    ],
+    "step_ids": [
+      "0412c30d-dbf1-4c77-8e6a-2fcd53fcb1d5",
+      "82cbd73e-f763-4ff5-99c1-447c4931576b",
+      "33bc22a4-aea7-40e1-b3f8-0117b5dc011f"
+    ],
+    "edge_id": "a21a9651-839c-4939-9b5d-10a80e6b0e37",
+    "published": true,
+    "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+    "member_id": "7c3ccfd3-0468-4773-b838-8a72b70756a2",
+    "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+    "pm_set": true,
+    "roles_covered": [
+      "Kế toán",
+      "PM",
+      "QA/QC"
+    ],
+    "run_id": "d56c563e-2adb-4c64-9b10-b1596c3af852",
+    "work_items": [
+      {
+        "id": "ed183028-5baf-4037-bd00-642784ee00b6",
+        "title": "Chốt gói nghiệm thu cuối",
+        "status": "ready",
+        "run_node_id": "e8ab37d3-ecbf-455f-bec0-9c97c5c04a56",
+        "run_step_id": "41e635d6-c679-43e9-914f-ee41edc7e7fc"
+      },
+      {
+        "id": "dddfd4f6-b69b-4f3c-9cbd-396328b9ec4c",
+        "title": "Hoàn tất bàn giao vật lý",
+        "status": "pending",
+        "run_node_id": "57dda30f-e780-4b82-9fc5-1c4f95ba3a22",
+        "run_step_id": "dc3e60f6-85a7-4cda-a752-43524066fd7e"
+      },
+      {
+        "id": "f3f906c4-7da6-426f-a79f-bd929b3fc4ea",
+        "title": "Xác nhận bàn giao hồ sơ kế toán",
+        "status": "pending",
+        "run_node_id": "57dda30f-e780-4b82-9fc5-1c4f95ba3a22",
+        "run_step_id": "71fffd71-9b62-47ed-8261-2caace170acd"
+      }
+    ],
+    "form_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+    "signature_id": "3d3b3d18-3b52-4c0a-abae-5618dbeddf72",
+    "pdf_export_id": "0aa5d7a2-5eee-4dc1-a4e5-db79eade3671",
+    "acceptance_id": "056e3830-c93a-4516-9d02-f7079495bef4",
+    "handover_id": "f423fea4-5f37-4672-bc59-afcf6e1ed312",
+    "documents": {
+      "as_built_documents": "79a51736-e6f5-4898-9bc2-cf34dfc5021b",
+      "operation_manuals": "c7ac2f20-2065-4d8b-b26e-0feea82f3f76",
+      "warranty_documents": "01f09285-96b7-4554-b03e-dc884dac361a",
+      "signed_handover_minutes": "edd89714-4f8a-431b-9b01-dcfe01a3d002"
+    }
+  }
+}

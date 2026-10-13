@@ -1,0 +1,39 @@
+{
+  "spreadsheetId": "1CriW5NVIc0HBr2YFkJZBQ2ZFj9piiQeA_fW4v4stT6U",
+  "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1CriW5NVIc0HBr2YFkJZBQ2ZFj9piiQeA_fW4v4stT6U/edit",
+  "properties": {
+    "title": "BM04 — Nghiệm thu tổng lỗi từ nút chi tiết — 09-10-2026",
+    "locale": "en_US",
+    "timeZone": "America/Los_Angeles"
+  },
+  "sheets": [
+    {
+      "properties": {
+        "sheetId": 1412500197,
+        "title": "2026-10-08_01",
+        "index": 0,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    },
+    {
+      "properties": {
+        "sheetId": 2102515497,
+        "title": "Hình ảnh",
+        "index": 1,
+        "sheetType": "GRID",
+        "gridProperties": {
+          "rowCount": 1000,
+          "columnCount": 26,
+          "rowGroupControlAfter": true,
+          "columnGroupControlAfter": true
+        }
+      }
+    }
+  ]
+}

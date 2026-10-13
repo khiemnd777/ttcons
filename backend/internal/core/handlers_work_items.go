@@ -347,7 +347,15 @@ func (h *Handler) AddWorkItemActivity(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GetSubcontractorReconciliation(c *fiber.Ctx) error {
-	reconciliation, err := h.service.SubcontractorReconciliation(c.Context(), c.Params("id"), actorID(c))
+	var revision []int
+	if value := c.Query("revision"); value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return validationError("Phiên bản đối soát không hợp lệ")
+		}
+		revision = []int{n}
+	}
+	reconciliation, err := h.service.SubcontractorReconciliation(c.Context(), c.Params("id"), actorID(c), revision...)
 	if err != nil {
 		return err
 	}
@@ -361,7 +369,7 @@ func (h *Handler) SaveSubcontractorReconciliation(c *fiber.Ctx) error {
 			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đối soát thầu phụ không hợp lệ")
 		}
 	}
-	reconciliation, err := h.service.SaveSubcontractorReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	reconciliation, err := h.service.SaveSubcontractorReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c), c.Get("If-Match"))
 	if err != nil {
 		return err
 	}
@@ -375,7 +383,7 @@ func (h *Handler) SubmitSubcontractorReconciliation(c *fiber.Ctx) error {
 			return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu đối soát thầu phụ không hợp lệ")
 		}
 	}
-	reconciliation, err := h.service.SubmitSubcontractorReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c))
+	reconciliation, err := h.service.SubmitSubcontractorReconciliation(c.Context(), c.Params("id"), req, actorID(c), actorName(c), c.Get("If-Match"))
 	if err != nil {
 		return err
 	}

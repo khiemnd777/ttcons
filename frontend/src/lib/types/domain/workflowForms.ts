@@ -342,6 +342,10 @@ export type SubcontractorReconciliationRecord = ProjectOperationsRecord & {
 
 export type SubcontractorReconciliationResponse = {
   available: boolean;
+  precondition?: string;
+  readonly?: boolean;
+  capabilities?: { can_write: boolean };
+  history?: Array<Pick<SubcontractorReconciliationRecord, 'id' | 'form_instance_id' | 'form_revision_no' | 'status' | 'updated_at' | 'submitted_at'>>;
   reason?: string;
   work_item_id?: string;
   project_id?: string;

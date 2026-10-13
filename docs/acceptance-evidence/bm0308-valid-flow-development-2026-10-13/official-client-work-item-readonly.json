@@ -1,0 +1,217 @@
+{
+  "activities": [
+    {
+      "activity_type": "created",
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "attachments": [],
+      "can_edit": false,
+      "can_withdraw": false,
+      "comment": "Đầu việc được tạo từ bước chạy quy trình",
+      "created_at": "2026-10-09T09:56:39Z",
+      "edited_at": null,
+      "edited_by": null,
+      "from_status": null,
+      "id": "abca1e57-5d46-4d3a-b616-6fbccb5f1e84",
+      "message_revision_no": 0,
+      "metadata_json": {
+        "source_type": "pipeline_run_step"
+      },
+      "parent_activity_id": null,
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "reactions": [],
+      "reply_count": 0,
+      "reply_to": null,
+      "scope_id": "2f10e39a-d2ee-412e-a343-36e3d0f8cee6",
+      "scope_type": "work_item",
+      "to_status": "pending",
+      "visibility": "project",
+      "withdrawn_at": null,
+      "withdrawn_by": null,
+      "work_item_id": "2f10e39a-d2ee-412e-a343-36e3d0f8cee6"
+    }
+  ],
+  "approval_request_id": null,
+  "assignee_account_deleted": false,
+  "assignee_name": null,
+  "assignee_staff_id": null,
+  "assignments": [
+    {
+      "assignment_type": "role",
+      "created_at": "2026-10-09T09:56:39Z",
+      "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "department": null,
+      "id": "a31c789f-3323-4eeb-93a0-3c19fd99aa66",
+      "role_display_name": null,
+      "role_id": null,
+      "role_name": "QS",
+      "staff_account_deleted": false,
+      "staff_id": null,
+      "staff_name": null,
+      "work_item_id": "2f10e39a-d2ee-412e-a343-36e3d0f8cee6"
+    }
+  ],
+  "automation_events": [],
+  "available_actions": [],
+  "blocked_at": null,
+  "blocked_reason": null,
+  "bm_gs_json": {},
+  "bm_gs_updated_at": null,
+  "bm_gs_updated_by": null,
+  "bm_gs_version": 0,
+  "business_source": {
+    "action_key": "source.subcontractor_acceptance_package_ready",
+    "checks": [
+      {
+        "key": "subcontractor_reconciliation",
+        "label": "Đối chiếu thầu phụ đã chốt",
+        "message": "Chốt checklist và khối lượng tại workspace Nghiệm thu.",
+        "ready": false,
+        "route": "/projects/c0acb592-b160-43c9-b8b2-370f386d4de0/acceptance",
+        "status": "blocked"
+      }
+    ],
+    "facts": {
+      "checks": [
+        {
+          "key": "subcontractor_reconciliation",
+          "label": "Đối chiếu thầu phụ đã chốt",
+          "message": "Chốt checklist và khối lượng tại workspace Nghiệm thu.",
+          "ready": false,
+          "route": "/projects/c0acb592-b160-43c9-b8b2-370f386d4de0/acceptance",
+          "status": "blocked"
+        }
+      ],
+      "label": "Gói nghiệm thu thầu phụ",
+      "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+      "route": "/projects/c0acb592-b160-43c9-b8b2-370f386d4de0/acceptance",
+      "submitted_reconciliations": 0
+    },
+    "label": "Gói nghiệm thu thầu phụ",
+    "message": "Đối chiếu checklist/khối lượng thầu phụ chưa được chốt",
+    "ready": false,
+    "route": "/projects/c0acb592-b160-43c9-b8b2-370f386d4de0/acceptance",
+    "status": "blocked",
+    "target_id": "",
+    "target_type": "subcontractor_reconciliation"
+  },
+  "can_act": false,
+  "can_decide": false,
+  "capabilities": {
+    "can_act": false,
+    "can_decide": false
+  },
+  "completed_at": null,
+  "completion_payload_json": {},
+  "completion_requirements": [
+    {
+      "key": "workflow_form",
+      "label": "Hồ sơ nghiệp vụ bắt buộc",
+      "required": true,
+      "status": "missing"
+    },
+    {
+      "key": "checklist",
+      "label": "Checklist của bước",
+      "required": true,
+      "status": "missing"
+    }
+  ],
+  "created_at": "2026-10-09T09:56:39Z",
+  "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "department": null,
+  "description": "QS tổng hợp checklist và khối lượng thầu phụ; trạng thái nguồn được kiểm tra trước khi chốt.",
+  "domain_action_key": "source.subcontractor_acceptance_package_ready",
+  "due_at": null,
+  "evidence": [],
+  "evidence_requirement_json": {
+    "checklist_required": true,
+    "document_required": false,
+    "form_required": true,
+    "form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+    "photo_required": false,
+    "required_permission": "acceptance.create"
+  },
+  "execution_target": {
+    "action_key": "source.subcontractor_acceptance_package_ready",
+    "action_label": "Mở nghiệm thu",
+    "completion_mode": "domain_then_form",
+    "fallback_route": "/projects/c0acb592-b160-43c9-b8b2-370f386d4de0/work-items/2f10e39a-d2ee-412e-a343-36e3d0f8cee6",
+    "kind": "mixed",
+    "route": "/projects/c0acb592-b160-43c9-b8b2-370f386d4de0/acceptance?task=2f10e39a-d2ee-412e-a343-36e3d0f8cee6",
+    "source_message": "Đối chiếu checklist/khối lượng thầu phụ chưa được chốt",
+    "source_ready": false,
+    "source_status": "blocked",
+    "target_id": "",
+    "target_type": "subcontractor_reconciliation",
+    "workspace": "acceptance"
+  },
+  "id": "2f10e39a-d2ee-412e-a343-36e3d0f8cee6",
+  "is_early_execution": false,
+  "pipeline_engine_version": 4,
+  "pipeline_run_id": "99f704fc-a392-46ce-866e-a5e53bb2a851",
+  "planned_start_at": null,
+  "priority": "normal",
+  "project_code": "DEV-REV10-20261009",
+  "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+  "project_name": "[Thử development] Workflow chính thức Rev10",
+  "readiness": "upcoming",
+  "required_permission_description": null,
+  "required_permission_name": "Tạo nghiệm thu",
+  "required_workflow_form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+  "role_ids": [
+    "QS"
+  ],
+  "run_node_business_code": "incoming_acceptance",
+  "run_node_id": "b3f5d8a3-e1d3-4d0a-a899-13ad86175dad",
+  "run_node_name": "Nghiệm thu Đầu Vào",
+  "run_node_order_index": 13,
+  "run_node_type": "incoming_acceptance",
+  "run_step_business_code": "incoming.subcontractor_package",
+  "run_step_id": "f264aeed-bdc2-4418-ab62-56393b2d3a92",
+  "run_step_name": "Nghiệm thu gói thầu phụ và khối lượng",
+  "run_step_order_index": 1,
+  "source_id": "f264aeed-bdc2-4418-ab62-56393b2d3a92",
+  "source_type": "pipeline_run_step",
+  "start_readiness": {
+    "can_bypass": false,
+    "can_start": false,
+    "requirements": [
+      {
+        "can_open": false,
+        "description": "Nhánh tiếp theo phụ thuộc điều kiện chưa được chốt",
+        "id": "route:7ce4c35f-36b7-40fe-9d31-9a593cdef395:b3f5d8a3-e1d3-4d0a-a899-13ad86175dad",
+        "label": "Chưa xác định được nhánh workflow dẫn đến công việc này",
+        "node_id": "b3f5d8a3-e1d3-4d0a-a899-13ad86175dad",
+        "node_label": "Nghiệm thu Đầu Vào",
+        "satisfied": false,
+        "status": "unresolved",
+        "type": "route"
+      }
+    ],
+    "snapshot_token": "ca717686f866bd28cc9568b5887715463b6f317e74d810dff1153293154adb63",
+    "state": "route_unresolved",
+    "unmet_count": 1
+  },
+  "started_at": null,
+  "status": "pending",
+  "surface_kind": "subcontractor_reconciliation",
+  "title": "Nghiệm thu gói thầu phụ và khối lượng",
+  "updated_at": "2026-10-09T09:56:39Z",
+  "updated_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "watcher_staff_ids": [],
+  "work_type": "acceptance_check",
+  "workflow_form_instance_id": "df2de63a-aeba-45ed-96fc-070284448eb1",
+  "workflow_form_required": true,
+  "workflow_form_revision": 0,
+  "workflow_form_status": "draft",
+  "workflow_form_submitted_at": null,
+  "workflow_form_template_code": "client_subcontractor_acceptance_package",
+  "workflow_form_template_id": "48000000-0000-0000-0000-000000000004",
+  "workflow_form_template_name": "Gói nghiệm thu thầu phụ Rev8",
+  "workflow_form_type": "checklist",
+  "workflow_form_version_id": "0845e4bc-a008-48bc-be5e-6d873dad8d43",
+  "workflow_form_version_no": 3,
+  "workflow_form_version_status": "published"
+}

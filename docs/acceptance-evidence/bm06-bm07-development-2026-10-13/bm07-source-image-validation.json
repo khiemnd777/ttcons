@@ -1,0 +1,50 @@
+[
+  {
+    "evidence_id": "8057abdc-e188-4605-b996-77f339d961a2",
+    "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+    "source_name": "[Synthetic] Gradient BM04/BM07",
+    "original_filename": "synthetic-gradient.png",
+    "bytes": 6069,
+    "sha256": "050f1fabbe6147ad938bbc2dd7a2847b3256bae03a62d6479568431077da3d0d",
+    "matches_stored_checksum": true,
+    "width": 1400,
+    "height": 900,
+    "format": "PNG",
+    "metadata": {
+      "location": "[Synthetic] Khu B — ô 04",
+      "photo_phase": "defect"
+    }
+  },
+  {
+    "evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+    "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+    "source_name": "[Synthetic] BM02 Lần 1",
+    "original_filename": "BM02-Lan-1.png",
+    "bytes": 15800,
+    "sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+    "matches_stored_checksum": true,
+    "width": 900,
+    "height": 560,
+    "format": "PNG",
+    "metadata": {
+      "location": "[Synthetic] Ô BM02",
+      "photo_phase": "during"
+    }
+  },
+  {
+    "evidence_id": "9fdb5b88-b61e-42a0-bac2-3f84946a1930",
+    "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+    "source_name": "[Synthetic] BM02 Lần 2",
+    "original_filename": "BM02-Lan-2.png",
+    "bytes": 15669,
+    "sha256": "0b3e93b13b0aedc4f5300f743e778886a5f944823e2387b4dc6e803fe92cd013",
+    "matches_stored_checksum": true,
+    "width": 900,
+    "height": 560,
+    "format": "PNG",
+    "metadata": {
+      "location": "[Synthetic] Ô BM02",
+      "photo_phase": "during"
+    }
+  }
+]

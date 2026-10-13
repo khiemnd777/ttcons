@@ -1,0 +1,253 @@
+[
+  {
+    "id": "d580dad1-317e-4617-9dd7-163c70ece63f",
+    "instance_id": "35416810-63ab-4175-8340-5be6e13bb51b",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "work_item_id": "4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "event_type": "created",
+    "from_status": null,
+    "to_status": "draft",
+    "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+    "metadata_json": {
+      "source": "start_pipeline"
+    },
+    "created_at": "2026-10-09T16:13:12.075537+00:00"
+  },
+  {
+    "id": "f37ea2f4-37f9-4879-b5d0-86f14818eb4a",
+    "instance_id": "35416810-63ab-4175-8340-5be6e13bb51b",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "work_item_id": "4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "event_type": "draft_saved",
+    "from_status": "draft",
+    "to_status": "draft",
+    "comment": null,
+    "metadata_json": {
+      "form_type": "daily_report",
+      "revision_no": 0,
+      "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f"
+    },
+    "created_at": "2026-10-09T16:15:54.96717+00:00"
+  },
+  {
+    "id": "e92786e2-8e66-434a-aebc-8104ed60321f",
+    "instance_id": "35416810-63ab-4175-8340-5be6e13bb51b",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "work_item_id": "4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "event_type": "submitted",
+    "from_status": "draft",
+    "to_status": "submitted",
+    "comment": null,
+    "metadata_json": {
+      "form_type": "daily_report",
+      "revision_no": 1,
+      "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+      "native_daily_sources": {
+        "version": 1,
+        "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+        "work_item_id": "4717be95-6d19-4c5e-972a-32fa825a0d8d",
+        "structured_json": {
+          "weather": "normal",
+          "blockers": [
+            {
+              "cause": "[Synthetic] Sắp xếp ô thử",
+              "owner": "PM synthetic",
+              "impact": "access",
+              "row_id": "049046b1-1ad7-451c-a00d-49eb552bc3dc",
+              "status": "Đang theo dõi synthetic",
+              "content": "[Synthetic] Lối thử còn vật liệu",
+              "severity": "medium",
+              "risk_code": "SYN-RR-02",
+              "target_date": "2026-10-10"
+            }
+          ],
+          "crew_items": [
+            {
+              "row_id": "00dcbec2-d0d1-420e-b9c8-efa1bb42999f",
+              "contact": "demo-only",
+              "crew_name": "[Synthetic] Tổ thử A",
+              "work_hours": 8,
+              "worker_count": 3,
+              "representative": "Đại diện synthetic"
+            }
+          ],
+          "report_date": "2026-10-09",
+          "reported_by": "PM synthetic",
+          "completed_items": [
+            {
+              "note": "[Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+              "unit": "m2",
+              "title": "[Synthetic] Hoàn thiện ô tường mẫu",
+              "result": "done",
+              "work_area": "[Synthetic] Khu A",
+              "evidence_id": "4aba9c27-3f28-47b8-99be-602fb9eb66fe",
+              "actual_quantity": 2
+            }
+          ],
+          "next_plan_items": [
+            {
+              "state": "Sẵn sàng",
+              "title": "[Synthetic] Chỉnh sửa ô tường mẫu",
+              "row_id": "8e48a7ac-27d4-428f-8589-2098b5da1be2",
+              "contact": "demo-only",
+              "due_date": "2026-10-10",
+              "location": "[Synthetic] Khu A — ô tường",
+              "priority": "normal",
+              "receiver": "Đại diện synthetic",
+              "owner_role": "PM",
+              "state_source": {
+                "status": "ready",
+                "source_id": "a3fc7b9e-feb1-4b0a-850e-9dc40194e8ef",
+                "source_type": "work_item"
+              },
+              "instruction_code": "SYN-GV-06",
+              "progress_percent": 0
+            }
+          ],
+          "construction_scope": "civil",
+          "material_usage_items": [
+            {
+              "unit": "viên",
+              "source": "other",
+              "quantity": 2,
+              "material_name": "[Synthetic] Gạch đã dùng"
+            }
+          ]
+        },
+        "form_instance_id": "35416810-63ab-4175-8340-5be6e13bb51b",
+        "form_revision_no": 1
+      }
+    },
+    "created_at": "2026-10-09T16:15:54.98209+00:00"
+  },
+  {
+    "id": "b258c5a4-2033-4a72-a31a-032c27a1bfea",
+    "instance_id": "35416810-63ab-4175-8340-5be6e13bb51b",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "work_item_id": "4717be95-6d19-4c5e-972a-32fa825a0d8d",
+    "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "event_type": "amended",
+    "from_status": "submitted",
+    "to_status": "submitted",
+    "comment": "[Synthetic] Thay PNG placeholder sai checksum bằng gradient hợp lệ; giữ bản nộp và ảnh cũ",
+    "metadata_json": {
+      "reason": "[Synthetic] Thay PNG placeholder sai checksum bằng gradient hợp lệ; giữ bản nộp và ảnh cũ",
+      "form_type": "daily_report",
+      "to_revision": 2,
+      "from_revision": 1,
+      "changed_fields": [
+        {
+          "after": [
+            {
+              "note": "[Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+              "unit": "m2",
+              "title": "[Synthetic] Hoàn thiện ô tường mẫu",
+              "result": "done",
+              "work_area": "[Synthetic] Khu A",
+              "evidence_id": "864d4247-3f3e-48be-97b7-5dafd16b6e9d",
+              "actual_quantity": 2
+            }
+          ],
+          "before": [
+            {
+              "note": "[Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+              "unit": "m2",
+              "title": "[Synthetic] Hoàn thiện ô tường mẫu",
+              "result": "done",
+              "work_area": "[Synthetic] Khu A",
+              "evidence_id": "4aba9c27-3f28-47b8-99be-602fb9eb66fe",
+              "actual_quantity": 2
+            }
+          ],
+          "field_key": "completed_items",
+          "field_type": "structured_list",
+          "field_label": "Đã làm",
+          "after_present": true,
+          "before_present": true
+        }
+      ],
+      "form_version_id": "9df7e476-a796-401c-ac6d-e5ad82fdc24f",
+      "native_daily_sources": {
+        "version": 1,
+        "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+        "work_item_id": "4717be95-6d19-4c5e-972a-32fa825a0d8d",
+        "structured_json": {
+          "weather": "normal",
+          "blockers": [
+            {
+              "cause": "[Synthetic] Sắp xếp ô thử",
+              "owner": "PM synthetic",
+              "impact": "access",
+              "row_id": "049046b1-1ad7-451c-a00d-49eb552bc3dc",
+              "status": "Đang theo dõi synthetic",
+              "content": "[Synthetic] Lối thử còn vật liệu",
+              "severity": "medium",
+              "risk_code": "SYN-RR-02",
+              "target_date": "2026-10-10"
+            }
+          ],
+          "crew_items": [
+            {
+              "row_id": "00dcbec2-d0d1-420e-b9c8-efa1bb42999f",
+              "contact": "demo-only",
+              "crew_name": "[Synthetic] Tổ thử A",
+              "work_hours": 8,
+              "worker_count": 3,
+              "representative": "Đại diện synthetic"
+            }
+          ],
+          "report_date": "2026-10-09",
+          "reported_by": "PM synthetic",
+          "completed_items": [
+            {
+              "note": "[Synthetic] Đã ghi nhận 2 m2, không phải KL nghiệm thu",
+              "unit": "m2",
+              "title": "[Synthetic] Hoàn thiện ô tường mẫu",
+              "result": "done",
+              "work_area": "[Synthetic] Khu A",
+              "evidence_id": "864d4247-3f3e-48be-97b7-5dafd16b6e9d",
+              "actual_quantity": 2
+            }
+          ],
+          "next_plan_items": [
+            {
+              "state": "Đang làm",
+              "title": "[Synthetic] Chỉnh sửa ô tường mẫu",
+              "row_id": "8e48a7ac-27d4-428f-8589-2098b5da1be2",
+              "contact": "demo-only",
+              "due_date": "2026-10-10",
+              "location": "[Synthetic] Khu A — ô tường",
+              "priority": "normal",
+              "receiver": "Đại diện synthetic",
+              "owner_role": "PM",
+              "state_source": {
+                "status": "in_progress",
+                "source_id": "a3fc7b9e-feb1-4b0a-850e-9dc40194e8ef",
+                "source_type": "work_item"
+              },
+              "instruction_code": "SYN-GV-06",
+              "progress_percent": 0
+            }
+          ],
+          "construction_scope": "civil",
+          "material_usage_items": [
+            {
+              "unit": "viên",
+              "source": "other",
+              "quantity": 2,
+              "material_name": "[Synthetic] Gạch đã dùng"
+            }
+          ]
+        },
+        "form_instance_id": "35416810-63ab-4175-8340-5be6e13bb51b",
+        "form_revision_no": 2
+      },
+      "downstream_reprocessed": false,
+      "workflow_form_instance_id": "35416810-63ab-4175-8340-5be6e13bb51b"
+    },
+    "created_at": "2026-10-09T16:51:20.471324+00:00"
+  }
+]

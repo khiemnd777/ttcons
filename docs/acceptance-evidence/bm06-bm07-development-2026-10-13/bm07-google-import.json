@@ -1,0 +1,20 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "success": true,
+    "converted": true,
+    "fileId": "1aDiTayUB-5mA-yiFRsdZgcdfckP_Ctt3oh73PFrdkE0",
+    "title": "BM07 — Sổ minh chứng 3 ảnh trong ô — Development 13-10-2026",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "url": "https://docs.google.com/spreadsheets/d/1aDiTayUB-5mA-yiFRsdZgcdfckP_Ctt3oh73PFrdkE0/edit?usp=drivesdk",
+    "spreadsheetId": "1aDiTayUB-5mA-yiFRsdZgcdfckP_Ctt3oh73PFrdkE0",
+    "parentId": null,
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1aDiTayUB-5mA-yiFRsdZgcdfckP_Ctt3oh73PFrdkE0"
+  },
+  "isError": false
+}

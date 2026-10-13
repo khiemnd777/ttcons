@@ -1,0 +1,303 @@
+{
+  "answers": {
+    "handoff_notes": "[Synthetic] Chỉ nghiệm thu kịch bản thử nội bộ.",
+    "handoff_title": "[Synthetic] Đợt kiểm tra ảnh thử",
+    "inspection_items": [
+      {
+        "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+        "evidence_required": true,
+        "location": "[Synthetic] Vùng thử Development",
+        "responsible_role": "Giám sát",
+        "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+      }
+    ]
+  },
+  "auto_advance_when_ready": false,
+  "available": true,
+  "capabilities": {
+    "can_add_confirmation": true,
+    "can_amend": true,
+    "can_delete_pdf": false,
+    "can_generate_pdf": true
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Correct test fixture schedule: internal check runs immediately, no 09:00 appointment; retain original revision and evidence gate.",
+      "created_at": "2026-10-13T00:32:06Z",
+      "event_type": "amended",
+      "from_status": "submitted",
+      "id": "90cef936-ad75-4d76-a9a1-91a6aeeb95b5",
+      "instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+      "metadata_json": {
+        "changed_fields": [
+          {
+            "after": [
+              {
+                "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+                "evidence_required": true,
+                "location": "[Synthetic] Vùng thử Development",
+                "responsible_role": "Giám sát",
+                "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+              }
+            ],
+            "after_present": true,
+            "before": [
+              {
+                "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+                "evidence_required": true,
+                "location": "[Synthetic] Vùng thử Development",
+                "responsible_role": "Giám sát",
+                "scheduled_date": "2026-10-13",
+                "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+              }
+            ],
+            "before_present": true,
+            "field_key": "inspection_items",
+            "field_label": "Hạng mục giám sát",
+            "field_type": "structured_list"
+          }
+        ],
+        "downstream_reprocessed": false,
+        "form_type": "checklist",
+        "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+        "from_revision": 1,
+        "reason": "[Synthetic] Correct test fixture schedule: internal check runs immediately, no 09:00 appointment; retain original revision and evidence gate.",
+        "to_revision": 2,
+        "workflow_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "submitted",
+      "work_item_id": "1d6e55cc-ee66-4f62-9d02-6f51b5cf60c3"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Chốt nguồn thử Development",
+      "created_at": "2026-10-13T00:30:17Z",
+      "event_type": "submitted",
+      "from_status": "draft",
+      "id": "d2c93b97-c660-42e8-8a1c-34923c5ad864",
+      "instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+      "metadata_json": {
+        "form_type": "checklist",
+        "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+        "revision_no": 1
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "submitted",
+      "work_item_id": "1d6e55cc-ee66-4f62-9d02-6f51b5cf60c3"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Canonical Development source capture",
+      "created_at": "2026-10-13T00:30:17Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "d81747d9-79c0-4f31-a0bc-cab273b6d087",
+      "instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+      "metadata_json": {
+        "form_type": "checklist",
+        "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "1d6e55cc-ee66-4f62-9d02-6f51b5cf60c3"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:56:15Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "2124a7aa-d66b-48b9-bc8f-e538c6320151",
+      "instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "1d6e55cc-ee66-4f62-9d02-6f51b5cf60c3"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "handoff_title",
+      "field_type": "text",
+      "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+      "help_text": "Ví dụ: Đợt thi công hoàn thiện tầng 12.",
+      "id": "ce8b6fe9-8676-4353-a25e-48c1f7da83ec",
+      "label": "Tên đợt bàn giao",
+      "options_json": [],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {
+        "max_length": 180,
+        "min_length": 3
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "inspection_items",
+      "field_type": "structured_list",
+      "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+      "help_text": "Mỗi dòng sẽ sinh đúng một đầu việc và một kiểm tra khi kích hoạt bàn giao.",
+      "id": "ed34433f-bd96-4577-b35f-dfea201bf412",
+      "label": "Hạng mục giám sát",
+      "options_json": [],
+      "order_index": 20,
+      "required": true,
+      "validation_json": {
+        "item_fields": [
+          {
+            "key": "title",
+            "label": "Nội dung kiểm tra",
+            "max_length": 180,
+            "min_length": 3,
+            "required": true,
+            "type": "text"
+          },
+          {
+            "key": "location",
+            "label": "Vị trí",
+            "max_length": 180,
+            "required": false,
+            "type": "text"
+          },
+          {
+            "key": "criteria",
+            "label": "Tiêu chí đạt",
+            "max_length": 1500,
+            "min_length": 3,
+            "required": true,
+            "type": "textarea"
+          },
+          {
+            "key": "scheduled_date",
+            "label": "Ngày dự kiến",
+            "required": false,
+            "type": "date"
+          },
+          {
+            "key": "responsible_role",
+            "label": "Vai trò giám sát",
+            "options": [
+              {
+                "label": "QA/QC",
+                "value": "QA/QC"
+              },
+              {
+                "label": "Giám sát",
+                "value": "Giám sát"
+              },
+              {
+                "label": "PM",
+                "value": "PM"
+              }
+            ],
+            "required": true,
+            "type": "select"
+          },
+          {
+            "key": "evidence_required",
+            "label": "Bắt buộc minh chứng",
+            "required": false,
+            "type": "checkbox"
+          }
+        ],
+        "max_items": 200,
+        "min_items": 1
+      },
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "handoff_notes",
+      "field_type": "textarea",
+      "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+      "help_text": null,
+      "id": "edaf7574-d2ab-41ac-83c4-e709e02dfc80",
+      "label": "Lưu ý bàn giao",
+      "options_json": [],
+      "order_index": 30,
+      "required": false,
+      "validation_json": {
+        "capture_mode": "optional",
+        "max_length": 3000
+      },
+      "visibility_condition_json": {}
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {
+      "handoff_notes": "[Synthetic] Chỉ nghiệm thu kịch bản thử nội bộ.",
+      "handoff_title": "[Synthetic] Đợt kiểm tra ảnh thử",
+      "inspection_items": [
+        {
+          "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+          "evidence_required": true,
+          "location": "[Synthetic] Vùng thử Development",
+          "responsible_role": "Giám sát",
+          "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+        }
+      ]
+    },
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:56:15Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 2,
+    "form_code": "client_construction_handoff_plan",
+    "form_description": "Lập danh sách hạng mục cần giám sát một lần để bàn giao sang không gian thi công.",
+    "form_name": "Kế hoạch giám sát và bàn giao thi công",
+    "form_template_id": "80000000-0000-0000-0000-000000000066",
+    "form_type": "checklist",
+    "form_version_id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+    "form_version_no": 2,
+    "form_version_status": "published",
+    "id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+    "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "PM"
+    ],
+    "run_node_id": "e42afc27-ca13-432d-9d93-b2f362a62f1c",
+    "run_step_id": "53ce3181-4c93-4ab8-8b61-7c8150f90af0",
+    "status": "submitted",
+    "submitted_at": "2026-10-13T00:30:17Z",
+    "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "template_step_id": "5d6a6585-6a94-47f9-b722-f5be512d6bdf",
+    "title": "Kích hoạt bàn giao thi công",
+    "updated_at": "2026-10-13T00:32:06Z",
+    "work_item_id": "1d6e55cc-ee66-4f62-9d02-6f51b5cf60c3",
+    "work_item_status": "completed",
+    "work_item_title": "Kích hoạt bàn giao thi công"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [],
+  "template": {
+    "code": "client_construction_handoff_plan",
+    "description": "Lập danh sách hạng mục cần giám sát một lần để bàn giao sang không gian thi công.",
+    "form_type": "checklist",
+    "id": "80000000-0000-0000-0000-000000000066",
+    "name": "Kế hoạch giám sát và bàn giao thi công"
+  },
+  "version": {
+    "id": "ceb5110d-79c9-4e95-8c04-5e59387f762f",
+    "status": "published",
+    "version_no": 2
+  }
+}

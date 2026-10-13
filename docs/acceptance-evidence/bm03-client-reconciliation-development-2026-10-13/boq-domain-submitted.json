@@ -1,0 +1,10 @@
+{
+  "action": "submit",
+  "from_status": "draft",
+  "from_statuses": [
+    "draft",
+    "revised"
+  ],
+  "item_count": 1,
+  "to_status": "submitted"
+}

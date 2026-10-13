@@ -1,0 +1,189 @@
+{
+  "answers": {
+    "client_boq_evidence": "62249b4d-2f84-49cd-a2cf-54be869e5b63",
+    "entry_route": "client_boq"
+  },
+  "auto_transition": {
+    "current_node_id": "e8965925-33ba-43b5-826e-9d6670b9a399",
+    "status": "advanced"
+  },
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Chốt nguồn thử Development",
+      "created_at": "2026-10-13T00:10:15Z",
+      "event_type": "submitted",
+      "from_status": "draft",
+      "id": "c93f1a1d-a85a-4fe9-be0f-560d02eb8dfd",
+      "instance_id": "6f827f3f-1d90-43b1-be45-4711ece9124b",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+        "revision_no": 1
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "submitted",
+      "work_item_id": "9d285b24-5b69-4e03-b039-398a207471f0"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Canonical Development source capture",
+      "created_at": "2026-10-13T00:10:15Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "cdfcd283-16ff-478d-b248-39f9d5dba61f",
+      "instance_id": "6f827f3f-1d90-43b1-be45-4711ece9124b",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "9d285b24-5b69-4e03-b039-398a207471f0"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "[Synthetic] Canonical Development source capture",
+      "created_at": "2026-10-13T00:09:41Z",
+      "event_type": "draft_saved",
+      "from_status": "draft",
+      "id": "543ca454-9826-4328-bc6a-fa9ab7758dd6",
+      "instance_id": "6f827f3f-1d90-43b1-be45-4711ece9124b",
+      "metadata_json": {
+        "form_type": "generic_submission",
+        "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+        "revision_no": 0
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "9d285b24-5b69-4e03-b039-398a207471f0"
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": "Biểu mẫu quy trình được tạo khi khởi động quy trình",
+      "created_at": "2026-10-12T23:56:15Z",
+      "event_type": "created",
+      "from_status": null,
+      "id": "c3acb6a6-5b5b-491b-8e21-c5081d5f56f9",
+      "instance_id": "6f827f3f-1d90-43b1-be45-4711ece9124b",
+      "metadata_json": {
+        "source": "start_pipeline"
+      },
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "to_status": "draft",
+      "work_item_id": "9d285b24-5b69-4e03-b039-398a207471f0"
+    }
+  ],
+  "fields": [
+    {
+      "field_key": "entry_route",
+      "field_type": "select",
+      "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+      "help_text": "Lựa chọn này được lưu trong hồ sơ workflow và Connector dùng trực tiếp để xác định node kế tiếp.",
+      "id": "064920eb-33bb-452e-9455-759a8d7299f0",
+      "label": "Điểm bắt đầu quy trình",
+      "options_json": [
+        {
+          "label": "Khảo sát trước báo giá",
+          "value": "survey_required"
+        },
+        {
+          "label": "Chủ đầu tư có sẵn BOQ · vào thẳng Báo giá",
+          "value": "client_boq"
+        }
+      ],
+      "order_index": 10,
+      "required": true,
+      "validation_json": {},
+      "visibility_condition_json": {}
+    },
+    {
+      "field_key": "client_boq_evidence",
+      "field_type": "evidence_reference",
+      "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+      "help_text": "Tải minh chứng trong sổ Minh chứng của đầu việc, sau đó chọn tệp tại đây.",
+      "id": "a7f56da1-5d3d-49ae-920c-ca712689b90e",
+      "label": "Hồ sơ BOQ của chủ đầu tư",
+      "options_json": [],
+      "order_index": 20,
+      "required": false,
+      "validation_json": {
+        "required_when": {
+          "field_key": "entry_route",
+          "operator": "equals",
+          "value": "client_boq"
+        }
+      },
+      "visibility_condition_json": {
+        "field_key": "entry_route",
+        "operator": "equals",
+        "value": "client_boq"
+      }
+    }
+  ],
+  "instance": {
+    "answers_snapshot_json": {
+      "client_boq_evidence": "62249b4d-2f84-49cd-a2cf-54be869e5b63",
+      "entry_route": "client_boq"
+    },
+    "bm_gs_json": {},
+    "bm_gs_updated_at": null,
+    "bm_gs_updated_by": null,
+    "bm_gs_version": 0,
+    "created_at": "2026-10-12T23:56:15Z",
+    "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "current_revision": 1,
+    "form_code": "client_project_intake_routing",
+    "form_description": "Xác nhận điểm bắt đầu; hồ sơ BOQ chỉ xuất hiện và bắt buộc khi người dùng chọn nhánh BOQ có sẵn.",
+    "form_name": "Tiếp nhận dự án và chọn luồng đầu vào",
+    "form_template_id": "45700000-0000-0000-0000-000000000001",
+    "form_type": "generic_submission",
+    "form_version_id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+    "form_version_no": 2,
+    "form_version_status": "published",
+    "id": "6f827f3f-1d90-43b1-be45-4711ece9124b",
+    "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+    "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+    "reopened_at": null,
+    "reopened_by": null,
+    "required_role_ids": [
+      "PM"
+    ],
+    "run_node_id": "e44b8dba-44a4-4bd4-9ff0-61280f5c9ffb",
+    "run_step_id": "9b016418-0f42-416f-af11-dff35aa3cb08",
+    "status": "submitted",
+    "submitted_at": "2026-10-13T00:10:15Z",
+    "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+    "template_step_id": "6e9c5e5b-603a-4070-be84-28729e15208a",
+    "title": "Xác nhận điểm bắt đầu",
+    "updated_at": "2026-10-13T00:10:15Z",
+    "work_item_id": "9d285b24-5b69-4e03-b039-398a207471f0",
+    "work_item_status": "in_progress",
+    "work_item_title": "Xác nhận điểm bắt đầu"
+  },
+  "pdf_confirmation_preferences": [],
+  "pdf_exports": [],
+  "seal_applications": [],
+  "signatures": [],
+  "template": {
+    "code": "client_project_intake_routing",
+    "description": "Xác nhận điểm bắt đầu; hồ sơ BOQ chỉ xuất hiện và bắt buộc khi người dùng chọn nhánh BOQ có sẵn.",
+    "form_type": "generic_submission",
+    "id": "45700000-0000-0000-0000-000000000001",
+    "name": "Tiếp nhận dự án và chọn luồng đầu vào"
+  },
+  "version": {
+    "id": "636ae263-5be7-4f2c-a52f-9c1beb877460",
+    "status": "published",
+    "version_no": 2
+  }
+}

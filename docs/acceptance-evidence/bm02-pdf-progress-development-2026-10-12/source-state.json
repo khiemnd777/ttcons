@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-10-12T10:36:45.093278+00:00",
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "file_count": 968,
+  "manifest_sha256": "fb82303bd2a8a0ea4fc46f3424c082c18030f6a90d66a03bc54ea7b3095bd011",
+  "changed_existing_files": [
+    "backend/internal/core/bm_gs_export_projection.go",
+    "backend/internal/core/work_report_pdf.go"
+  ],
+  "new_files": [
+    "backend/internal/core/work_report_pdf_progress_test.go"
+  ]
+}

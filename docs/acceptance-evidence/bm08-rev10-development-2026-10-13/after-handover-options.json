@@ -1,0 +1,12 @@
+{
+  "final_acceptances": [
+    {
+      "acceptance_date": "2026-10-13T00:00:00Z",
+      "client_representative": "[Synthetic] Đại diện CĐT UAT",
+      "contractor_representative": "Consflow Admin",
+      "id": "e6111f15-bbc2-4ff9-ab41-beda8337ac23",
+      "result": "pass",
+      "title": "[Synthetic] Nghiệm thu cuối BM08 Rev10"
+    }
+  ]
+}

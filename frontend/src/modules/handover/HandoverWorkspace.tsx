@@ -6,10 +6,11 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { dateText } from '../../lib/utils/format';
 import { checklistItemCodeLabel, checklistItemCodeTooltip, checklistSourceLabel, checklistSourceMode } from './handoverSourcePresentation';
 import type { ChecklistItem, HandoverDetail } from './handoverTypes';
+import { canAssessHandover, handoverConclusionLabel, physicalResultLabel } from './handoverAssessment';
 
 type WorkspaceTab = 'tasks' | 'checklist' | 'info';
 
-export function HandoverWorkspace({ detail, canVerify, canApprove, pending, onChecklist, onViewSource, onSubmit, onCheck, onComplete }: { detail: HandoverDetail; canVerify: boolean; canApprove: boolean; pending: boolean; onChecklist: (item: ChecklistItem) => void; onViewSource: (item: ChecklistItem) => void; onSubmit: () => void; onCheck: () => void; onComplete: () => void }) {
+export function HandoverWorkspace({ detail, canVerify, canApprove, pending, onChecklist, onViewSource, onSubmit, onCheck, onComplete, onAssessment, onHeaderAssessment, onAddItem }: { detail: HandoverDetail; canVerify: boolean; canApprove: boolean; pending: boolean; onChecklist: (item: ChecklistItem) => void; onViewSource: (item: ChecklistItem) => void; onSubmit: () => void; onCheck: () => void; onComplete: () => void; onAssessment?: (item: ChecklistItem) => void; onHeaderAssessment?: () => void; onAddItem?: () => void }) {
   const [tab, setTab] = useState<WorkspaceTab>('tasks');
   const snapshot = detail.readiness_snapshot_json ?? {};
   const blockers = snapshot.blockers ?? [];
@@ -33,6 +34,11 @@ export function HandoverWorkspace({ detail, canVerify, canApprove, pending, onCh
       </div>
     </div>
 
+    <div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-sm"><div><span className="text-slate-500">Giai đoạn bàn giao: </span><span className="font-semibold">{detail.handover_stage || 'Chưa xác định'}</span></div><div className="mt-1"><span className="text-slate-500">Kết luận bàn giao: </span>{handoverConclusionLabel(detail.handover_conclusion)}</div></div>
+      {canAssessHandover(detail.status, canVerify) && onHeaderAssessment ? <button type="button" disabled={pending} onClick={onHeaderAssessment} className="rounded-md border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50">Cập nhật đánh giá</button> : null}
+    </div>
+
     <div className="grid gap-3 border-b border-line p-4 sm:grid-cols-2 xl:grid-cols-4">
       <Metric label="Checklist" value={`${verified}/${detail.checklist_items.length}`} />
       <Metric label="Readiness" value={snapshot.ready ? 'Đạt' : detail.status === 'draft' ? 'Chưa kiểm tra' : 'Chưa đạt'} tone={snapshot.ready ? 'green' : blockers.length ? 'amber' : 'slate'} />
@@ -48,7 +54,7 @@ export function HandoverWorkspace({ detail, canVerify, canApprove, pending, onCh
 
     <div className="p-4 sm:p-5">
       {tab === 'tasks' ? <TaskPanel detail={detail} blockers={blockers} canVerify={canVerify} pending={pending} onCheck={onCheck} /> : null}
-      {tab === 'checklist' ? <div className="space-y-5">{groups.length ? groups.map(([category, items]) => <ChecklistGroup key={category} category={category} items={items} projectId={detail.project_id} handoverStatus={detail.status} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} />) : <div className="rounded-lg border border-dashed border-line p-8 text-center text-sm text-slate-500">Hồ sơ chưa có checklist.</div>}</div> : null}
+      {tab === 'checklist' ? <div className="space-y-5">{canAssessHandover(detail.status, canVerify) && onAddItem ? <div className="flex justify-end"><button type="button" disabled={pending} onClick={onAddItem} className="rounded-md border border-line px-3 py-2 text-sm font-semibold disabled:opacity-50">Thêm hạng mục bàn giao</button></div> : null}{groups.length ? groups.map(([category, items]) => <ChecklistGroup key={category} category={category} items={items} projectId={detail.project_id} handoverStatus={detail.status} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} onAssessment={onAssessment} />) : <div className="rounded-lg border border-dashed border-line p-8 text-center text-sm text-slate-500">Hồ sơ chưa có checklist.</div>}</div> : null}
       {tab === 'info' ? <PackageInfo detail={detail} /> : null}
     </div>
   </div>;
@@ -68,30 +74,39 @@ function TaskPanel({ detail, blockers, canVerify, pending, onCheck }: { detail: 
   return <div className="rounded-lg border border-dashed border-line p-8 text-center"><div className="font-semibold text-ink">Chưa có snapshot readiness</div><p className="mt-1 text-sm text-slate-500">Hoàn thiện checklist rồi gửi hồ sơ để bắt đầu kiểm tra.</p></div>;
 }
 
-function ChecklistGroup({ category, items, projectId, handoverStatus, canVerify, onChecklist, onViewSource }: { category: string; items: ChecklistItem[]; projectId: string; handoverStatus: string; canVerify: boolean; onChecklist: (item: ChecklistItem) => void; onViewSource: (item: ChecklistItem) => void }) {
+function ChecklistGroup({ category, items, projectId, handoverStatus, canVerify, onChecklist, onViewSource, onAssessment }: { category: string; items: ChecklistItem[]; projectId: string; handoverStatus: string; canVerify: boolean; onChecklist: (item: ChecklistItem) => void; onViewSource: (item: ChecklistItem) => void; onAssessment?: (item: ChecklistItem) => void }) {
   const verified = items.filter((item) => item.status === 'verified').length;
   return <section>
     <div className="mb-2 flex items-center justify-between gap-3"><h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{categoryLabel(category)}</h4><span className="text-xs font-semibold text-slate-600">{verified}/{items.length}</span></div>
-    <div className="consflow-table-viewport hidden rounded-lg border border-line md:block"><table className="min-w-[760px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Nội dung</th><th className="px-3 py-2">Nguồn xác minh</th><th className="px-3 py-2">Trạng thái</th></tr></thead><tbody className="divide-y divide-line">{items.map((item) => <ChecklistRow key={item.id} item={item} projectId={projectId} handoverStatus={handoverStatus} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} />)}</tbody></table></div>
-    <div className="space-y-2 md:hidden">{items.map((item) => <ChecklistMobileCard key={item.id} item={item} projectId={projectId} handoverStatus={handoverStatus} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} />)}</div>
+    <div className="consflow-table-viewport hidden rounded-lg border border-line md:block"><table className="min-w-[760px] w-full text-sm"><thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-3 py-2"><span className="sr-only">Thao tác</span></th><th className="px-3 py-2">Nội dung</th><th className="px-3 py-2">Nguồn xác minh</th><th className="px-3 py-2">Trạng thái</th></tr></thead><tbody className="divide-y divide-line">{items.map((item) => <ChecklistRow key={item.id} item={item} projectId={projectId} handoverStatus={handoverStatus} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} onAssessment={onAssessment} />)}</tbody></table></div>
+    <div className="space-y-2 md:hidden">{items.map((item) => <ChecklistMobileCard key={item.id} item={item} projectId={projectId} handoverStatus={handoverStatus} canVerify={canVerify} onChecklist={onChecklist} onViewSource={onViewSource} onAssessment={onAssessment} />)}</div>
   </section>;
 }
 
-type ChecklistActionProps = { item: ChecklistItem; projectId: string; handoverStatus: string; canVerify: boolean; onChecklist: (item: ChecklistItem) => void; onViewSource: (item: ChecklistItem) => void };
+type ChecklistActionProps = { item: ChecklistItem; projectId: string; handoverStatus: string; canVerify: boolean; onChecklist: (item: ChecklistItem) => void; onViewSource: (item: ChecklistItem) => void; onAssessment?: (item: ChecklistItem) => void };
 
 function ChecklistRow(props: ChecklistActionProps) {
   const { item, projectId } = props;
   const mode = checklistSourceMode(item);
-  return <tr><td className="px-3 py-3"><ChecklistAction {...props} /></td><td className="px-3 py-3"><div className="font-semibold text-ink">{item.title}</div><div className="text-xs text-slate-500" title={checklistItemCodeTooltip(item.item_code)}>{checklistItemCodeLabel(item.item_code)}{item.required ? ' · Bắt buộc' : ''}</div></td><td className="px-3 py-3"><div className="text-slate-700">{checklistSourceLabel(item, projectId)}</div><div className="mt-0.5 text-xs text-slate-400">{mode === 'automatic' ? 'Hệ thống tự đối chiếu' : mode === 'linked' ? 'Nguồn do người dùng liên kết' : 'Chưa liên kết nguồn'}</div></td><td className="px-3 py-3"><StatusBadge status={item.status} /></td></tr>;
+  return <tr><td className="px-3 py-3"><ChecklistAction {...props} /></td><td className="px-3 py-3"><div className="font-semibold text-ink">{item.title}</div><div className="text-xs text-slate-500" title={checklistItemCodeTooltip(item.item_code)}>{checklistItemCodeLabel(item.item_code)}{item.required ? ' · Bắt buộc' : ''}</div><PhysicalAssessment item={item} /></td><td className="px-3 py-3"><div className="text-slate-700">{checklistSourceLabel(item, projectId)}</div><div className="mt-0.5 text-xs text-slate-400">{mode === 'automatic' ? 'Hệ thống tự đối chiếu' : mode === 'linked' ? 'Nguồn do người dùng liên kết' : 'Chưa liên kết nguồn'}</div></td><td className="px-3 py-3"><StatusBadge status={item.status} /></td></tr>;
 }
 
 function ChecklistMobileCard(props: ChecklistActionProps) {
   const { item, projectId } = props;
   const mode = checklistSourceMode(item);
-  return <div className="rounded-lg border border-line p-3"><div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-ink">{item.title}</div><div className="mt-1 text-xs text-slate-500" title={checklistItemCodeTooltip(item.item_code)}>{checklistItemCodeLabel(item.item_code)}{item.required ? ' · Bắt buộc' : ''}</div></div><StatusBadge status={item.status} /></div><div className="mt-3 text-xs text-slate-600">Nguồn: {checklistSourceLabel(item, projectId)}</div><div className="mt-0.5 text-xs text-slate-400">{mode === 'automatic' ? 'Hệ thống tự đối chiếu' : mode === 'linked' ? 'Nguồn do người dùng liên kết' : 'Chưa liên kết nguồn'}</div><div className="mt-3"><ChecklistAction {...props} /></div></div>;
+  return <div className="rounded-lg border border-line p-3"><div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-ink">{item.title}</div><div className="mt-1 text-xs text-slate-500" title={checklistItemCodeTooltip(item.item_code)}>{checklistItemCodeLabel(item.item_code)}{item.required ? ' · Bắt buộc' : ''}</div></div><StatusBadge status={item.status} /></div><PhysicalAssessment item={item} /><div className="mt-3 text-xs text-slate-600">Nguồn: {checklistSourceLabel(item, projectId)}</div><div className="mt-0.5 text-xs text-slate-400">{mode === 'automatic' ? 'Hệ thống tự đối chiếu' : mode === 'linked' ? 'Nguồn do người dùng liên kết' : 'Chưa liên kết nguồn'}</div><div className="mt-3"><ChecklistAction {...props} /></div></div>;
 }
 
-function ChecklistAction({ item, handoverStatus, canVerify, onChecklist, onViewSource }: ChecklistActionProps) {
+function PhysicalAssessment({ item }: { item: ChecklistItem }) {
+  return <div className="mt-2 space-y-1 text-xs text-slate-600"><div>Kiểm tra thực tế: <span className={item.physical_result === 'fail' ? 'font-semibold text-red-700' : item.physical_result === 'pass' ? 'font-semibold text-emerald-700' : ''}>{physicalResultLabel(item.physical_result)}</span></div>{item.requirement ? <div className="whitespace-pre-wrap">Yêu cầu: {item.requirement}</div> : null}{item.defect ? <div className="whitespace-pre-wrap text-amber-800">Tồn tại: {item.defect}</div> : null}{item.due_date ? <div>Hạn xử lý: {dateText(item.due_date)}</div> : null}</div>;
+}
+
+function ChecklistAction(props: ChecklistActionProps) {
+  const { item, handoverStatus, canVerify, onAssessment } = props;
+  return <div className="flex flex-wrap gap-2">{canAssessHandover(handoverStatus, canVerify) && onAssessment ? <button type="button" className="rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-100" onClick={() => onAssessment(item)}>Đánh giá</button> : null}<ChecklistSourceAction {...props} /></div>;
+}
+
+function ChecklistSourceAction({ item, handoverStatus, canVerify, onChecklist, onViewSource }: ChecklistActionProps) {
   const mode = checklistSourceMode(item);
   if (mode === 'automatic' || mode === 'linked') return <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50" onClick={() => onViewSource(item)}><Eye className="h-3.5 w-3.5" />Xem nguồn</button>;
   if (canVerify && !['handed_over', 'cancelled', 'deleted'].includes(handoverStatus)) return <button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-100" onClick={() => onChecklist(item)}><FileCheck2 className="h-3.5 w-3.5" />Xác minh</button>;

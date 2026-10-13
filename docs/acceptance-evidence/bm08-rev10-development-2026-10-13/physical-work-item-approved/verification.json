@@ -1,0 +1,35 @@
+{
+  "assertions": {
+    "physical_was_in_progress": true,
+    "physical_completed_with_timestamp": true,
+    "own_run_step_completed": true,
+    "finance_ready_unstarted_uncompleted": true,
+    "finance_persisted_row_unchanged": true,
+    "run_and_node_rows_unchanged": true,
+    "run_remains_in_progress": true,
+    "handover_record_and_items_unchanged": true,
+    "handover_keeps_date_and_completion": true,
+    "only_authorized_work_item_and_step_changed": true,
+    "no_preexisting_row_lost": true,
+    "no_source_change": true,
+    "migration_count_unchanged": true,
+    "actual_export_file_unchanged": true
+  },
+  "passed": true,
+  "rows_checked": 2515,
+  "unchanged_rows": 2513,
+  "authorized_changes": [
+    {
+      "table": "pipeline_run_steps",
+      "id": "bc19a69d-8fc4-4f42-b0ce-b63c1af5d1c7"
+    },
+    {
+      "table": "work_items",
+      "id": "73e77a9e-7abd-4f2c-b768-c62e3fd31627"
+    }
+  ],
+  "source_files_checked": 976,
+  "run_step_status": "completed",
+  "completed_at": "2026-10-13T02:37:01Z",
+  "scope": "Explicit user-approved browser completion of only physical handover Work Item; accounting unstarted and uncompleted; BM08 dossier/history/date/file preserved; user visual review pending."
+}

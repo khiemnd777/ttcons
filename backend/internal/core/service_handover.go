@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 )
 
 func (s *Service) ProjectHandover(ctx context.Context, projectID string) ([]Record, error) {
@@ -51,6 +52,10 @@ func (s *Service) CreateHandover(ctx context.Context, projectID string, req Hand
 		}
 	}
 	notes := strings.TrimSpace(req.Notes)
+	handoverStage, err := nativeCaptureText(req.HandoverStage, "handover_stage", 160)
+	if err != nil {
+		return nil, err
+	}
 	if len([]rune(notes)) > 4000 {
 		return nil, validationError("Ghi chú bàn giao không được vượt quá 4000 ký tự")
 	}
@@ -58,6 +63,7 @@ func (s *Service) CreateHandover(ctx context.Context, projectID string, req Hand
 		"project_id": projectID, "handover_code": handoverCode, "status": "draft",
 		"final_acceptance_id": finalAcceptanceID, "workflow_form_instance_id": formInstanceID,
 		"handover_date": handoverDate, "client_representative": clientRepresentative,
+		"handover_stage":         handoverStage,
 		"company_representative": companyRepresentative, "documents_ready": false,
 		"warehouse_closed": false,
 		"notes":            notes, "created_by": actorID,
@@ -87,9 +93,32 @@ func (s *Service) UpdateHandoverChecklistItem(ctx context.Context, id string, re
 	if len([]rune(notes)) > 2000 {
 		return nil, validationError("Ghi chú checklist không được vượt quá 2000 ký tự")
 	}
-	return s.repo.UpdateHandoverChecklistItem(ctx, cleanID(id), Record{
-		"status": status, "evidence_id": evidenceID, "document_id": documentID, "notes": notes,
-	}, actorID, actorName)
+	body := Record{"status": status, "evidence_id": evidenceID, "document_id": documentID, "notes": notes}
+	for _, field := range []struct {
+		key   string
+		value *string
+		limit int
+	}{{"requirement", req.Requirement, 1000}, {"physical_result", req.PhysicalResult, 20}, {"defect", req.Defect, 1000}, {"due_date", req.DueDate, 10}} {
+		if field.value == nil {
+			continue
+		}
+		value, err := nativeCaptureText(*field.value, field.key, field.limit)
+		if err != nil {
+			return nil, err
+		}
+		body[field.key] = value
+	}
+	physicalResult := cleanText(body["physical_result"])
+	if physicalResult != "" && !statusIn(physicalResult, "pass", "fail", "not_assessed") {
+		return nil, validationError("Đánh giá thực tế bàn giao không hợp lệ", nil)
+	}
+	dueDate := cleanText(body["due_date"])
+	if dueDate != "" {
+		if _, err := time.Parse("2006-01-02", dueDate); err != nil {
+			return nil, validationError("Thời hạn xử lý cần ngày hợp lệ", nil)
+		}
+	}
+	return s.repo.UpdateHandoverChecklistItem(ctx, cleanID(id), body, actorID, actorName)
 }
 
 func (s *Service) CompleteHandover(ctx context.Context, id string, req ActionRequest, actorID, actorName string) (Record, error) {

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -464,9 +465,28 @@ func TestOutgoingAcceptanceSubmitLocksAndFeedsReworkAndHandover(t *testing.T) {
 			if manualItemIndex == 0 {
 				values = Record{"status": "verified", "document_id": linkedDocumentID}
 			}
-			if _, err := repo.UpdateHandoverChecklistItem(ctx, cleanID(raw["id"]), values, fixture.workerID, "Worker"); err != nil {
+			itemID := cleanID(raw["id"])
+			var before, after string
+			if err := db.QueryRowContext(ctx, `SELECT to_jsonb(item)::text FROM handover_checklist_items item WHERE id=$1`, itemID).Scan(&before); err != nil {
 				t.Fatal(err)
 			}
+			_, deniedErr := repo.UpdateHandoverChecklistItem(ctx, itemID, values, fixture.workerID, "Worker")
+			var denied StatusError
+			if !errors.As(deniedErr, &denied) || denied.Status != 403 {
+				t.Fatalf("worker without handover.verify got %v, want403", deniedErr)
+			}
+			if err := db.QueryRowContext(ctx, `SELECT to_jsonb(item)::text FROM handover_checklist_items item WHERE id=$1`, itemID).Scan(&after); err != nil {
+				t.Fatal(err)
+			}
+			if before != after {
+				t.Fatal("denied checklist verification mutated the record")
+			}
+			assertCount(t, db, `SELECT count(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type='handover_checklist_updated'`, 0, fixture.projectID, itemID)
+			if _, err := repo.UpdateHandoverChecklistItem(ctx, itemID, values, fixture.pmID, "PM"); err != nil {
+				t.Fatal(err)
+			}
+			assertCount(t, db, `SELECT count(*) FROM handover_checklist_items WHERE id=$1 AND status='verified' AND verified_by=$2 AND verified_at IS NOT NULL`, 1, itemID, fixture.pmID)
+			assertCount(t, db, `SELECT count(*) FROM audit_logs WHERE project_id=$1 AND target_id=$2 AND event_type='handover_checklist_updated' AND actor_id=$3`, 1, fixture.projectID, itemID, fixture.pmID)
 			manualItemIndex++
 		}
 	}

@@ -1,0 +1,20 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "success": true,
+    "converted": true,
+    "fileId": "1C-y-vcgJyDxT1JOH7tjRlKNq7O9lKV2Su5lpyEygS9M",
+    "title": "BM03 — Gói client sau sửa đối soát — kiểm tra file tải 13-10-2026",
+    "mimeType": "application/vnd.google-apps.spreadsheet",
+    "url": "https://docs.google.com/spreadsheets/d/1C-y-vcgJyDxT1JOH7tjRlKNq7O9lKV2Su5lpyEygS9M/edit?usp=drivesdk",
+    "spreadsheetId": "1C-y-vcgJyDxT1JOH7tjRlKNq7O9lKV2Su5lpyEygS9M",
+    "parentId": null,
+    "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1C-y-vcgJyDxT1JOH7tjRlKNq7O9lKV2Su5lpyEygS9M"
+  },
+  "isError": false
+}

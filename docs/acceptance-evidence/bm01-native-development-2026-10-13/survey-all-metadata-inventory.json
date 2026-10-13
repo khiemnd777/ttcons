@@ -1,0 +1,28 @@
+[
+  {
+    "form_id": "b3dd9bb4-20d7-450e-bf0e-6e85f29ee32b",
+    "project_id": "d2398f6e-83db-4171-a729-fc2e2e1557d2",
+    "project_code": "DEV-BM-REUSE-20261009",
+    "work_item_id": "8faf4204-8f57-4e86-888f-01b0edae0620",
+    "title": "BM01 — Khảo sát synthetic",
+    "form_code": "client_survey_work_package",
+    "version_no": 3,
+    "status": "draft",
+    "revision": 0,
+    "work_status": "in_progress",
+    "rows": 1
+  },
+  {
+    "form_id": "546a9962-77b4-4c3e-a0fe-7373a3190421",
+    "project_id": "c0acb592-b160-43c9-b8b2-370f386d4de0",
+    "project_code": "DEV-REV10-20261009",
+    "work_item_id": "d7996d1f-6089-46c4-b472-e302cfde3e21",
+    "title": "Ghi nhận gói khảo sát hiện trạng",
+    "form_code": "client_survey_work_package",
+    "version_no": 1,
+    "status": "draft",
+    "revision": 0,
+    "work_status": "pending",
+    "rows": 0
+  }
+]

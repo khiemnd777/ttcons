@@ -1,0 +1,107 @@
+{
+  "assertions": {
+    "date_saved_before_complete": true,
+    "date_preserved_through_complete": true,
+    "entered_date_differs_from_server_default": true,
+    "valid_own_final_acceptance": true,
+    "handover_ready_before_complete": true,
+    "handover_completed": true,
+    "six_required_verified": true,
+    "six_explicit_assessments": true,
+    "conclusion_preserved": true,
+    "history_unchanged_outside_authorized_runtime_sources": true,
+    "old_storage_files_unchanged": true,
+    "source_unchanged_no_build_needed": true,
+    "no_migration": true,
+    "physical_work_item_left_in_progress": true,
+    "accounting_not_started_or_completed": true,
+    "as_built_documents_exact_source": true,
+    "as_built_documents_same_project": true,
+    "operation_manuals_exact_source": true,
+    "operation_manuals_same_project": true,
+    "warranty_documents_exact_source": true,
+    "warranty_documents_same_project": true,
+    "signed_handover_minutes_exact_source": true,
+    "signed_handover_minutes_same_project": true,
+    "actual_download_byte_equal": true,
+    "zip_valid": true,
+    "worksheet_business_date": true,
+    "physical_assessments_not_verification_codes": true,
+    "no_fabricated_defect_deadline": true,
+    "client_header_columns_preserved": true,
+    "google_worksheet_date_preserved": true,
+    "google_all_values_match": true,
+    "google_no_effective_error": true
+  },
+  "passed": true,
+  "old_rows_checked": 2482,
+  "unexpected_old_row_changes": [],
+  "expected_canonical_source_changes": [
+    {
+      "table": "pipeline_run_nodes",
+      "id": "746724b1-60c1-418e-8710-3f41880eda1b"
+    },
+    {
+      "table": "pipeline_run_nodes",
+      "id": "a54562d9-983d-4e96-8c55-4b0b09dd8f2a"
+    },
+    {
+      "table": "pipeline_run_nodes",
+      "id": "b76905bf-6819-46fd-babe-a07c141341db"
+    },
+    {
+      "table": "pipeline_run_steps",
+      "id": "8471b294-4c88-4573-aaed-1f62a583daa4"
+    },
+    {
+      "table": "pipeline_run_steps",
+      "id": "a31ecff8-e57d-4bbe-90fd-d28385abd42b"
+    },
+    {
+      "table": "pipeline_run_steps",
+      "id": "bc19a69d-8fc4-4f42-b0ce-b63c1af5d1c7"
+    },
+    {
+      "table": "pipeline_runs",
+      "id": "d94e292e-7349-4d48-b741-0aa821241e68"
+    },
+    {
+      "table": "projects",
+      "id": "432115cb-bd5b-4fae-9edc-74ce031eacf3"
+    },
+    {
+      "table": "work_items",
+      "id": "4fad1dc4-13b5-46b8-982b-f07ee3d875c1"
+    },
+    {
+      "table": "work_items",
+      "id": "73e77a9e-7abd-4f2c-b768-c62e3fd31627"
+    },
+    {
+      "table": "work_items",
+      "id": "b6cdcf60-a200-4ecf-a306-53f25a110733"
+    },
+    {
+      "table": "work_items",
+      "id": "d787a8c0-cc4c-442e-bf36-6242f25d65ea"
+    },
+    {
+      "table": "workflow_form_instances",
+      "id": "0c091759-a7bf-43a7-8512-a8282f3eb64c"
+    },
+    {
+      "table": "workflow_form_instances",
+      "id": "b8c951f6-7634-4660-81d1-cdbf1b3885bb"
+    }
+  ],
+  "old_files_checked": 143,
+  "old_file_changes": [],
+  "source_files_checked": 976,
+  "source_changes": [],
+  "google_cells_checked": 192,
+  "google_populated_cells": 60,
+  "google_mismatches": [],
+  "google_errors": [],
+  "download_sha256": "846c3c8516bf96e3a6755577145863a666e16bbc0948df9c469cd18196844a53",
+  "scope": "Synthetic Admin full published Rev10 source path to handed_over BM08/date/export/Google; separate physical WI completion rejected by automatic approval review and remains in_progress, finance not completed, user UX acceptance pending."
+}

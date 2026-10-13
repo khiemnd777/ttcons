@@ -1,0 +1,13 @@
+{
+  "method": "Read-only cua_repl Playwright DOM getBoundingClientRect on the visible action row; no CSS or data mutation",
+  "viewport": {"width": 1280, "height": 720},
+  "table": {"x": 362, "y": 472.5, "width": 876, "height": 142, "right": 1238},
+  "actionCell": {"x": 362, "y": 509, "width": 208.1328125, "height": 105.5, "right": 570.1328125},
+  "actionGroup": {"x": 374, "y": 544, "width": 184.1328125, "height": 36, "right": 558.1328125},
+  "resolveButton": {"x": 450, "y": 544, "width": 144.4765625, "height": 36, "right": 594.4765625},
+  "titleButton": {"x": 582.1328125, "y": 521.5, "width": 158.234375, "height": 76, "right": 740.3671875},
+  "horizontalOverlapPixels": 12.34375,
+  "screenshot": "browser-list.jpg",
+  "finding": "P2: Gửi khắc phục overlaps the title in the Cần xử lý desktop action list",
+  "status": "Observed, not repaired; separate UI review/approval required"
+}

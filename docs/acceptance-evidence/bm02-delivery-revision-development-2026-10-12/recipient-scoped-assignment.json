@@ -1,0 +1,28 @@
+{
+  "user_id": "bc554766-1b43-425e-ab4a-295dd86060bd",
+  "user_status": "active",
+  "user_deleted": false,
+  "roles": [
+    {
+      "role_id": "20000000-0000-0000-0000-000000000003",
+      "role": "pm",
+      "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd"
+    }
+  ],
+  "staff": [
+    {
+      "id": "ac42059d-1adc-4a2f-9282-d13bf2bab4e6",
+      "status": "active"
+    }
+  ],
+  "memberships": [
+    {
+      "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+      "staff_id": "ac42059d-1adc-4a2f-9282-d13bf2bab4e6",
+      "role_ids": [
+        "PM"
+      ],
+      "active": true
+    }
+  ]
+}

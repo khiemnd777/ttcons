@@ -1,0 +1,144 @@
+{
+  "available": true,
+  "can_activate": true,
+  "candidates": [
+    {
+      "assigned_user_id": "",
+      "criteria": [
+        {
+          "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc",
+          "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+          "evidence_required": true
+        }
+      ],
+      "evidence_required": true,
+      "location": "[Synthetic] Vùng thử Development",
+      "responsible_role": "Giám sát",
+      "scheduled_at": "",
+      "source_field_key": "inspection_items",
+      "source_form_code": "client_construction_handoff_plan",
+      "source_item_index": 0,
+      "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+    }
+  ],
+  "handoffs": [
+    {
+      "activated_at": "2026-10-13T00:30:23Z",
+      "activated_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "activated_by_account_deleted": false,
+      "activated_by_name": "Consflow Admin",
+      "created_at": "2026-10-13T00:30:23Z",
+      "created_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "id": "7744a7ed-b16c-431e-a9e7-17e67937624c",
+      "items": [
+        {
+          "assigned_user_account_deleted": false,
+          "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+          "assigned_user_name": "Consflow Admin",
+          "check_result": null,
+          "check_status": "pending",
+          "created_at": "2026-10-13T00:30:23Z",
+          "criteria_jsonb": [
+            {
+              "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+              "evidence_required": true,
+              "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+            }
+          ],
+          "evidence_required": true,
+          "generated_check_id": "3fd9b56b-1d6d-47d8-a0bf-f4b8109912db",
+          "generated_work_item_id": "237de18b-d96f-4e13-812a-2c720a0d69d7",
+          "handoff_id": "7744a7ed-b16c-431e-a9e7-17e67937624c",
+          "id": "66f0e436-399c-4474-82a3-e1202b4a44db",
+          "location": "[Synthetic] Vùng thử Development",
+          "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+          "responsible_role_ids": [
+            "Giám sát"
+          ],
+          "scheduled_at": "2026-10-13T02:00:00Z",
+          "source_field_key": "inspection_items",
+          "source_item_index": 0,
+          "source_snapshot_jsonb": {
+            "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+            "criteria": [
+              {
+                "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+                "evidence_required": true,
+                "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+              }
+            ],
+            "evidence_required": true,
+            "location": "[Synthetic] Vùng thử Development",
+            "responsible_role": "Giám sát",
+            "scheduled_at": "2026-10-13T09:00:00+07:00",
+            "source_field_key": "inspection_items",
+            "source_item_index": 0,
+            "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+          },
+          "status": "activated",
+          "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc",
+          "updated_at": "2026-10-13T00:30:23Z",
+          "work_item_status": "ready"
+        }
+      ],
+      "notes": "[Synthetic] Activate exact submitted source; retain mandatory evidence.",
+      "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+      "project_id": "432115cb-bd5b-4fae-9edc-74ce031eacf3",
+      "revision_no": 1,
+      "source_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+      "source_form_revision_no": 1,
+      "source_node_name": "Kế hoạch thi công",
+      "source_run_node_id": "e42afc27-ca13-432d-9d93-b2f362a62f1c",
+      "source_snapshot_hash": "9bbdca2b84fb54d0f73b0f95c7d92deb88cde401d94e46bca568d061aae36771",
+      "source_snapshot_jsonb": {
+        "items": [
+          {
+            "assigned_user_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+            "criteria": [
+              {
+                "criteria": "[Synthetic] Ảnh thử phải hiển thị đủ bốn mốc màu góc và nhãn SYNTHETIC; không phải ảnh công trình.",
+                "evidence_required": true,
+                "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+              }
+            ],
+            "evidence_required": true,
+            "location": "[Synthetic] Vùng thử Development",
+            "responsible_role": "Giám sát",
+            "scheduled_at": "2026-10-13T09:00:00+07:00",
+            "source_field_key": "inspection_items",
+            "source_item_index": 0,
+            "title": "[Synthetic] Kiểm tra hiển thị ảnh bốn góc"
+          }
+        ],
+        "notes": "[Synthetic] Activate exact submitted source; retain mandatory evidence.",
+        "source_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+        "source_form_revision_no": 1,
+        "source_run_node_id": "e42afc27-ca13-432d-9d93-b2f362a62f1c",
+        "title": "[Synthetic] Đợt kiểm tra ảnh thử"
+      },
+      "status": "activated",
+      "target_node_name": "Thi công",
+      "target_run_node_id": "80c03fbe-9105-4469-9b6e-b36129911b19",
+      "title": "[Synthetic] Đợt kiểm tra ảnh thử",
+      "updated_at": "2026-10-13T00:30:23Z"
+    }
+  ],
+  "participants": [
+    {
+      "email": "admin@thuthiemcons.com",
+      "full_name": "Consflow Admin",
+      "id": "f5250196-91bb-4df6-9666-b318a7036b42"
+    }
+  ],
+  "pipeline_run_id": "d94e292e-7349-4d48-b741-0aa821241e68",
+  "source_form_instance_id": "3b36d907-e961-40cd-9edb-ef44c5a08b6d",
+  "source_form_revision_no": 2,
+  "source_node_name": "Thi công",
+  "source_node_status": "in_progress",
+  "source_node_type": "construction",
+  "source_run_node_id": "80c03fbe-9105-4469-9b6e-b36129911b19",
+  "suggested_title": "[Synthetic] Đợt kiểm tra ảnh thử",
+  "target_node_name": "Thi công",
+  "target_node_status": "in_progress",
+  "target_run_node_id": "80c03fbe-9105-4469-9b6e-b36129911b19"
+}

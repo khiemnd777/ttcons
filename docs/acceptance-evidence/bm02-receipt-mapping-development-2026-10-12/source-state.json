@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-10-12T07:07:46.359822+00:00",
+  "file_count": 963,
+  "changed_existing_files": [
+    "backend/internal/core/native_daily_source_reuse.go",
+    "backend/internal/core/native_daily_source_reuse_test.go",
+    "backend/internal/core/native_workflow_source_reuse.go"
+  ],
+  "new_files": [
+    "backend/internal/core/native_receipt_canonical_test.go"
+  ],
+  "manifest_sha256": "c15991c8ece89b0dc195541373ec34a2a2f67f7094fa53b2331982c626cea543"
+}

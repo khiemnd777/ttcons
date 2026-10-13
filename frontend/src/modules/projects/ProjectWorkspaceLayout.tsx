@@ -44,6 +44,7 @@ import {
   type ProjectWorkspaceGroup,
 } from './projectWorkspaceNavigation';
 import { ProjectTaskContext } from './ProjectTaskContext';
+import { UtilityDockLauncherHost } from '../utilities/UtilityDockLauncherHost';
 
 type ProjectWorkspaceOperations = ProjectOperationsResponse | ProjectOperationsSidebarResponse;
 
@@ -137,6 +138,9 @@ export function ProjectWorkspaceLayout() {
               </button>
             </div>
           </div>
+        </div>
+        <div className="flex justify-end border-t border-line px-4 py-2 sm:hidden">
+          <UtilityDockLauncherHost presentation="label" />
         </div>
       </header>
 

@@ -1,0 +1,31 @@
+(node:64060) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ requested historical revision selects exact snapshot and immutable evidence byte endpoint (2.14425ms)
+✔ invalid or absent requested revision never shows current content as substitute (0.191833ms)
+✔ ordinary report opens current revision; loading keeps historical content hidden (0.209041ms)
+✔ fetch failure retains retry and never exposes cached revision content (0.126709ms)
+✔ exact historical content renders saved native risk, plan, crew, arrival and assessment facts (3.824333ms)
+✔ historical workflow progress uses exact captured revision value without current or canonical fallback (5.902792ms)
+✔ historical native next-plan progress omits invalid legacy percentages without live fallback (3.700959ms)
+(node:64061) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ invalid native row details block parent save/upload and expose exact inline errors (87.659375ms)
+✔ create and edit submit existing canonical rows once with explicit clears and zero before parent upload (6.793625ms)
+✔ current daily native exports use exact saved report identity and hide absent source rows (4.267333ms)
+✔ current workflow progress uses captured authority and never displays canonical fallback zero or another value (40.755958ms)
+✔ current native next-plan progress omits invalid legacy values and preserves recorded zero (14.219708ms)
+(node:64062) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ journal card shows missing workflow progress without falling back to the synchronized header (5.871708ms)
+✔ journal card preserves captured zero, valid percentages and legacy value wrappers (0.54625ms)
+✔ manual journal reports retain canonical header authority including an actual saved zero (0.38925ms)
+✔ loading, error retry and empty create states remain available (0.892958ms)
+✔ view action retains the exact saved report and linked check/action badges (0.466708ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 282.079584

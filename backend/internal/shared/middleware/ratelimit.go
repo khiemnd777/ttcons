@@ -150,6 +150,9 @@ func ClassifyRequest(method, path string) RequestClass {
 	if strings.HasSuffix(path, "/export") || strings.HasSuffix(path, "/pdf") || strings.Contains(path, "/pdf-exports") {
 		return RequestClassExport
 	}
+	if method == fiber.MethodGet && strings.HasSuffix(path, "/export.xlsx") {
+		return RequestClassExport
+	}
 	return RequestClassGeneral
 }
 

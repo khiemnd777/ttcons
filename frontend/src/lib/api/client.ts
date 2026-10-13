@@ -242,18 +242,22 @@ function shouldRefresh(path: string, status: number, code?: string) {
 }
 
 export async function downloadBlob(path: string) {
-  return downloadBlobRequest(path, true);
+  return downloadBlobRequest(path, true, {});
 }
 
-async function downloadBlobRequest(path: string, allowRefresh: boolean) {
+export async function postDownloadBlob(path: string, body: unknown, onFilename?: (filename: string) => void) {
+  return downloadBlobRequest(path, true, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }, onFilename);
+}
+
+async function downloadBlobRequest(path: string, allowRefresh: boolean, init: RequestInit, onFilename?: (filename: string) => void) {
   const token = getToken();
-  const headers = new Headers();
+  const headers = new Headers(init.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const res = await fetch(`${API_URL}${path}`, { headers, credentials: 'include' });
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers, credentials: 'include' });
   if (!res.ok) {
     if (allowRefresh && res.status === 401) {
       const refreshedToken = await refreshAccessToken();
-      if (refreshedToken) return downloadBlobRequest(path, false);
+      if (refreshedToken) return downloadBlobRequest(path, false, init, onFilename);
     }
     const contentType = res.headers.get('Content-Type') ?? '';
     if (contentType.includes('application/json')) {
@@ -277,6 +281,12 @@ async function downloadBlobRequest(path: string, allowRefresh: boolean) {
       res.headers.get('X-Request-ID'),
     );
   }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const plain = disposition.match(/filename="([^"]+)"|filename=([^;]+)/i);
+  let filename = plain?.[1] ?? plain?.[2] ?? '';
+  if (encoded) { try { filename = decodeURIComponent(encoded); } catch { /* Use the plain filename when encoding is malformed. */ } }
+  if (filename) onFilename?.(filename.replace(/[\\/\x00-\x1f]/g, '_').trim());
   return res.blob();
 }
 

@@ -350,6 +350,7 @@ export type WorkflowFormCatalogItem = AnyRecord & {
   version_status: 'published' | string;
   published_at?: string;
   latest_published?: boolean;
+  default_eligible?: boolean;
   step_usage_count?: number;
   field_count?: number;
   required_field_keys?: string[];

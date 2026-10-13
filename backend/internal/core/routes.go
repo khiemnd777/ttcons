@@ -91,6 +91,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	registerFinanceRoutes(protected, h)
 	registerAdminRoutes(protected, h)
 	registerReportingRoutes(protected, h)
+	registerBMGSExportRoutes(protected, h)
 	registerSettingsRoutes(protected, h)
 
 	var closeOnce sync.Once

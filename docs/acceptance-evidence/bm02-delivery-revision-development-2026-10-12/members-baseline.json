@@ -1,0 +1,455 @@
+{
+  "capabilities": {
+    "can_manage": true,
+    "can_view_inactive": true
+  },
+  "items": [
+    {
+      "account_active": true,
+      "account_deleted": false,
+      "active": true,
+      "created_at": "2026-10-09T16:39:12Z",
+      "department": "Công nghệ",
+      "email": "admin@thuthiemcons.com",
+      "full_name": "Consflow Admin",
+      "global_roles": [
+        {
+          "display_name": "Admin",
+          "grants_pipeline_run": true,
+          "grants_project_member_manage": true,
+          "grants_project_view": true,
+          "id": "20000000-0000-0000-0000-000000000001",
+          "name": "admin",
+          "scope": "global"
+        }
+      ],
+      "id": "22dfe24c-6976-45e4-aed0-3ad84c81733b",
+      "is_project_manager": true,
+      "is_sample": false,
+      "notes": "[Synthetic] Nghiệm thu BM04",
+      "phone": null,
+      "position": "admin",
+      "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+      "project_roles": [],
+      "role_ids": [
+        "PM"
+      ],
+      "staff_id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+      "updated_at": "2026-10-09T16:39:12Z",
+      "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+    }
+  ],
+  "options": {
+    "access_roles": [
+      {
+        "description": "Phụ trách lập, luân chuyển, ký và lưu hồ sơ hợp đồng",
+        "display_name": "Bộ phận HĐ",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000017",
+        "name": "contract_officer",
+        "scope": "project"
+      },
+      {
+        "description": "Báo cáo thi công và hiện trường",
+        "display_name": "Giám sát",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000008",
+        "name": "supervisor",
+        "scope": "project"
+      },
+      {
+        "description": "Đối soát tài chính toàn công ty từ dữ liệu nguồn và xử lý nghiệp vụ Kế toán được phân quyền",
+        "display_name": "Kế toán",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000005",
+        "name": "accounting",
+        "scope": "project"
+      },
+      {
+        "description": "Phụ trách yêu cầu mua và nhà cung cấp",
+        "display_name": "Mua hàng",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000006",
+        "name": "procurement",
+        "scope": "project"
+      },
+      {
+        "description": "Quản trị kỹ thuật và thiết lập hệ thống",
+        "display_name": "Nhà phát triển",
+        "grants_pipeline_run": true,
+        "grants_project_member_manage": true,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000018",
+        "name": "developer",
+        "scope": "project"
+      },
+      {
+        "description": "Phụ trách rà soát pháp lý hợp đồng",
+        "display_name": "Pháp lý",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000016",
+        "name": "legal",
+        "scope": "project"
+      },
+      {
+        "description": "Theo dõi tiến độ toàn công ty, công việc và báo cáo Giám sát",
+        "display_name": "Phó Quản Lý",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000019",
+        "name": "deputy_manager",
+        "scope": "project"
+      },
+      {
+        "description": "Nghiệm thu và kiểm soát chất lượng",
+        "display_name": "QA/QC",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000009",
+        "name": "qa_qc",
+        "scope": "project"
+      },
+      {
+        "description": "Bóc tách khối lượng, BOQ và kiểm soát chi phí",
+        "display_name": "QS",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000004",
+        "name": "qs",
+        "scope": "project"
+      },
+      {
+        "description": "Quản lý công trình và pipeline",
+        "display_name": "Quản lý dự án",
+        "grants_pipeline_run": true,
+        "grants_project_member_manage": true,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000003",
+        "name": "pm",
+        "scope": "project"
+      },
+      {
+        "description": "Phụ trách phối hợp khách hàng, BOQ và hồ sơ thương mại",
+        "display_name": "Sale",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000015",
+        "name": "sales",
+        "scope": "project"
+      },
+      {
+        "description": "Phụ trách phương án và hồ sơ thiết kế",
+        "display_name": "Thiết kế",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000014",
+        "name": "design",
+        "scope": "project"
+      },
+      {
+        "description": "Đơn vị thực hiện theo gói thầu",
+        "display_name": "Thầu phụ",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000011",
+        "name": "subcontractor",
+        "scope": "project"
+      },
+      {
+        "description": "Nhập xuất tồn và vật tư dư",
+        "display_name": "Thủ kho",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000007",
+        "name": "warehouse",
+        "scope": "project"
+      },
+      {
+        "description": "Chỉ xem dữ liệu được phân quyền",
+        "display_name": "Viewer",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000013",
+        "name": "viewer",
+        "scope": "project"
+      },
+      {
+        "description": "Thực hiện công việc tại công trình",
+        "display_name": "Đội thi công",
+        "grants_pipeline_run": false,
+        "grants_project_member_manage": false,
+        "grants_project_view": true,
+        "id": "20000000-0000-0000-0000-000000000010",
+        "name": "construction_team",
+        "scope": "project"
+      }
+    ],
+    "role_labels": [
+      "Admin",
+      "Bộ phận HĐ",
+      "Giám sát",
+      "Giám đốc",
+      "Kế toán",
+      "Mua hàng",
+      "Nhà phát triển",
+      "Pháp lý",
+      "Phó Quản Lý",
+      "PM",
+      "QA/QC",
+      "QS",
+      "Quản lý dự án",
+      "Sale",
+      "Thiết kế",
+      "Thầu phụ",
+      "Thủ kho",
+      "Viewer",
+      "Đội thi công"
+    ],
+    "staff": [
+      {
+        "department": null,
+        "email": "cuongqlda@thuthiemcons.com",
+        "full_name": "Bùi Văn Cường",
+        "global_roles": [
+          {
+            "display_name": "Phó Quản Lý",
+            "grants_pipeline_run": false,
+            "grants_project_member_manage": false,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000019",
+            "name": "deputy_manager",
+            "scope": "global"
+          }
+        ],
+        "id": "17ec75d3-dff8-482e-a5e3-b2f5b26a3160",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "Phó Quản Lý",
+        "user_id": "38d890a5-9890-40a6-bfab-60774f9a2c0d"
+      },
+      {
+        "department": "Công nghệ",
+        "email": "admin@thuthiemcons.com",
+        "full_name": "Consflow Admin",
+        "global_roles": [
+          {
+            "display_name": "Admin",
+            "grants_pipeline_run": true,
+            "grants_project_member_manage": true,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000001",
+            "name": "admin",
+            "scope": "global"
+          }
+        ],
+        "id": "561e0b24-ab8b-423b-bce3-103bb29f3f0d",
+        "is_sample": false,
+        "member_active": true,
+        "member_id": "22dfe24c-6976-45e4-aed0-3ad84c81733b",
+        "position": "admin",
+        "user_id": "f5250196-91bb-4df6-9666-b318a7036b42"
+      },
+      {
+        "department": "Công nghệ",
+        "email": "khiemnd777@gmail.com",
+        "full_name": "Consflow Developer",
+        "global_roles": [
+          {
+            "display_name": "Nhà phát triển",
+            "grants_pipeline_run": true,
+            "grants_project_member_manage": true,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000018",
+            "name": "developer",
+            "scope": "global"
+          }
+        ],
+        "id": "ff5cb33b-c797-4721-a0f0-b993eaedfc0e",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "developer",
+        "user_id": "d7f8888b-385b-4589-b008-a06c04dcbd47"
+      },
+      {
+        "department": null,
+        "email": "giamsatthuthiem@gmail.com",
+        "full_name": "Giám sát Thủ Thiêm",
+        "global_roles": [
+          {
+            "display_name": "Giám sát",
+            "grants_pipeline_run": false,
+            "grants_project_member_manage": false,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000008",
+            "name": "supervisor",
+            "scope": "global"
+          }
+        ],
+        "id": "a7b969b2-d98c-45cf-a19d-7062820bd51e",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "Giám sát",
+        "user_id": "469bf6c9-0486-4f31-99da-e6fed1cc3570"
+      },
+      {
+        "department": null,
+        "email": "hoanganhthietke@thuthiemcons.com",
+        "full_name": "Hoàng Văn Anh",
+        "global_roles": [
+          {
+            "display_name": "Thiết kế",
+            "grants_pipeline_run": false,
+            "grants_project_member_manage": false,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000014",
+            "name": "design",
+            "scope": "global"
+          }
+        ],
+        "id": "5e7db1d2-fe70-4de9-b424-467476c1ecc8",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "Thiết kế",
+        "user_id": "eeef987a-b799-4b82-a859-82ad769299e6"
+      },
+      {
+        "department": null,
+        "email": "nganhuynh.act@thuthiemcons.com",
+        "full_name": "Huỳnh Chúc Kim Ngân",
+        "global_roles": [
+          {
+            "display_name": "Kế toán",
+            "grants_pipeline_run": false,
+            "grants_project_member_manage": false,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000005",
+            "name": "accounting",
+            "scope": "global"
+          }
+        ],
+        "id": "aad75993-57a5-4a61-acca-d523aec3eaf4",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "Kế toán",
+        "user_id": "420b9fdb-09ef-46d6-8252-7f441057d41b"
+      },
+      {
+        "department": null,
+        "email": "quanglethietke@thuthiemcons.com",
+        "full_name": "Lê Văn Quang",
+        "global_roles": [
+          {
+            "display_name": "Thiết kế",
+            "grants_pipeline_run": false,
+            "grants_project_member_manage": false,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000014",
+            "name": "design",
+            "scope": "global"
+          }
+        ],
+        "id": "6c52243e-0f0a-4ef2-aa9e-2ec0e33a1ce2",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "Thiết kế",
+        "user_id": "b38e8ce7-2c64-4f92-b2fa-951efb608a58"
+      },
+      {
+        "department": null,
+        "email": "nguyet.qlda@thuthiemcons.com",
+        "full_name": "Trần Thị Nguyệt",
+        "global_roles": [
+          {
+            "display_name": "Quản lý dự án",
+            "grants_pipeline_run": true,
+            "grants_project_member_manage": true,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000003",
+            "name": "pm",
+            "scope": "global"
+          }
+        ],
+        "id": "64111383-2a58-4c4d-81dc-278d6b16ea46",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "Quản lý dự án",
+        "user_id": "10e35a24-f836-4861-9dd9-3345ab639632"
+      },
+      {
+        "department": null,
+        "email": "tuan.tq@thuthiemcons.com",
+        "full_name": "Trịnh Quốc Tuấn",
+        "global_roles": [
+          {
+            "display_name": "Mua hàng",
+            "grants_pipeline_run": false,
+            "grants_project_member_manage": false,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000006",
+            "name": "procurement",
+            "scope": "global"
+          }
+        ],
+        "id": "fdd2d1cb-21c0-4361-8ec2-457ba3778479",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "Mua hàng",
+        "user_id": "9db9fd0d-bf8d-4f86-baf4-71c2dc18712d"
+      },
+      {
+        "department": null,
+        "email": "thaoqs@thuthiemcons.com",
+        "full_name": "Vũ Thị Thảo",
+        "global_roles": [
+          {
+            "display_name": "QS",
+            "grants_pipeline_run": false,
+            "grants_project_member_manage": false,
+            "grants_project_view": true,
+            "id": "20000000-0000-0000-0000-000000000004",
+            "name": "qs",
+            "scope": "global"
+          }
+        ],
+        "id": "db5971a9-6260-4329-9daf-4dc9a16b8e45",
+        "is_sample": false,
+        "member_active": false,
+        "member_id": null,
+        "position": "QS",
+        "user_id": "8a934a6f-8cfc-4d6e-8716-b2f1146021c1"
+      }
+    ]
+  },
+  "summary": {
+    "active": 1,
+    "departments": 1,
+    "inactive": 0,
+    "roles": 1
+  }
+}

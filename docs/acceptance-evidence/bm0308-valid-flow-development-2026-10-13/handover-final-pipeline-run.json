@@ -1,0 +1,326 @@
+{
+  "completed_at": null,
+  "completion_issues": [
+    {
+      "code": "RUN_STEP_INCOMPLETE",
+      "message": "Bước quy trình chưa hoàn tất",
+      "run_step_id": "dc3e60f6-85a7-4cda-a752-43524066fd7e",
+      "status": "pending",
+      "step_name": "Hoàn tất bàn giao vật lý"
+    },
+    {
+      "code": "RUN_STEP_INCOMPLETE",
+      "message": "Bước quy trình chưa hoàn tất",
+      "run_step_id": "71fffd71-9b62-47ed-8261-2caace170acd",
+      "status": "pending",
+      "step_name": "Xác nhận bàn giao hồ sơ kế toán"
+    },
+    {
+      "code": "WORK_ITEM_INCOMPLETE",
+      "message": "Đầu việc của bước quy trình chưa hoàn tất",
+      "status": "ready",
+      "title": "Hoàn tất bàn giao vật lý",
+      "work_item_id": "dddfd4f6-b69b-4f3c-9cbd-396328b9ec4c"
+    },
+    {
+      "code": "WORK_ITEM_INCOMPLETE",
+      "message": "Đầu việc của bước quy trình chưa hoàn tất",
+      "status": "ready",
+      "title": "Xác nhận bàn giao hồ sơ kế toán",
+      "work_item_id": "f3f906c4-7da6-426f-a79f-bd929b3fc4ea"
+    },
+    {
+      "code": "NODE_APPROVAL_REQUIRED",
+      "message": "Node chưa có phê duyệt đạt yêu cầu"
+    }
+  ],
+  "current_node_id": "57dda30f-e780-4b82-9fc5-1c4f95ba3a22",
+  "engine_version": 2,
+  "id": "d56c563e-2adb-4c64-9b10-b1596c3af852",
+  "nodes": [
+    {
+      "approval_policy_json": {},
+      "approval_rule": null,
+      "block_reason": null,
+      "business_code": "outgoing_acceptance",
+      "completed_at": "2026-10-12T23:21:33Z",
+      "description": "Một gói nghiệm thu cuối và đối chiếu chủ đầu tư; tài chính được theo dõi ngoài critical path.",
+      "exit_conditions": {
+        "text": "Nghiệm thu cuối và đối chiếu chủ đầu tư đã hoàn tất"
+      },
+      "fail_path": "rework",
+      "id": "e8ab37d3-ecbf-455f-bec0-9c97c5c04a56",
+      "name": "Nghiệm thu Đầu Ra",
+      "order_index": 1,
+      "permissions": [
+        "acceptance.view",
+        "acceptance.create",
+        "acceptance.approve",
+        "project_finance.view",
+        "project_finance.request_create"
+      ],
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "required_permission": "acceptance.approve",
+      "responsible_role_ids": [
+        "QA/QC"
+      ],
+      "run_id": "d56c563e-2adb-4c64-9b10-b1596c3af852",
+      "started_at": "2026-10-12T23:18:49Z",
+      "status": "completed",
+      "steps": [
+        {
+          "business_code": "outgoing.final_package",
+          "checklist_required": true,
+          "description": "QA/QC chốt đối chiếu chủ đầu tư và hồ sơ nghiệm thu cuối đạt.",
+          "document_required": false,
+          "domain_action_key": "source.final_acceptance_package_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": true,
+            "document_required": false,
+            "form_required": true,
+            "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+            "photo_required": false,
+            "required_permission": "acceptance.approve"
+          },
+          "form_required": true,
+          "form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+          "id": "41e635d6-c679-43e9-914f-ee41edc7e7fc",
+          "name": "Chốt gói nghiệm thu cuối",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+          "required_permission": "acceptance.approve",
+          "required_role_ids": [
+            "QA/QC"
+          ],
+          "required_workflow_form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+          "reviewed_at": null,
+          "run_node_id": "e8ab37d3-ecbf-455f-bec0-9c97c5c04a56",
+          "status": "completed",
+          "step_type": "acceptance_check",
+          "submitted_at": "2026-10-12T23:21:33Z",
+          "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+          "surface_kind": "owner_client_reconciliation",
+          "template_step_id": "0412c30d-dbf1-4c77-8e6a-2fcd53fcb1d5",
+          "work_item_id": "ed183028-5baf-4037-bd00-642784ee00b6",
+          "work_item_role_ids": [
+            "QA/QC"
+          ],
+          "work_item_status": "completed",
+          "work_item_title": "Chốt gói nghiệm thu cuối",
+          "workflow_form_instance_id": "8cc65195-7bbb-4333-ab16-d8c5dd1c5730",
+          "workflow_form_required": true,
+          "workflow_form_revision": 1,
+          "workflow_form_status": "submitted",
+          "workflow_form_submitted_at": "2026-10-12T23:20:20Z",
+          "workflow_form_template_code": "builtin_owner_client_checklist",
+          "workflow_form_template_id": "ae075c31-f6d3-4c37-a7a5-5b4ca4e78eb1",
+          "workflow_form_template_name": "Checklist chủ đầu tư",
+          "workflow_form_type": "checklist",
+          "workflow_form_version_id": "0646a055-2c3d-4409-9e3b-26ff10ad4896",
+          "workflow_form_version_no": 2,
+          "workflow_form_version_status": "published"
+        }
+      ],
+      "template_node_id": "8f026716-df61-48ca-813b-c0b1c83381bc",
+      "type": "acceptance"
+    },
+    {
+      "approval_policy_json": {
+        "comment_required": true,
+        "mode": "any",
+        "quorum": 1,
+        "requester_cannot_approve": true,
+        "roles": [
+          "Kế toán",
+          "PM",
+          "Giám đốc"
+        ],
+        "signature_required": false
+      },
+      "approval_rule": "Kế toán và Giám đốc xác nhận hồ sơ quản trị",
+      "block_reason": null,
+      "business_code": "handover_finance",
+      "completed_at": null,
+      "completion_issues": [
+        {
+          "code": "RUN_STEP_INCOMPLETE",
+          "message": "Bước quy trình chưa hoàn tất",
+          "run_step_id": "dc3e60f6-85a7-4cda-a752-43524066fd7e",
+          "status": "pending",
+          "step_name": "Hoàn tất bàn giao vật lý"
+        },
+        {
+          "code": "RUN_STEP_INCOMPLETE",
+          "message": "Bước quy trình chưa hoàn tất",
+          "run_step_id": "71fffd71-9b62-47ed-8261-2caace170acd",
+          "status": "pending",
+          "step_name": "Xác nhận bàn giao hồ sơ kế toán"
+        },
+        {
+          "code": "WORK_ITEM_INCOMPLETE",
+          "message": "Đầu việc của bước quy trình chưa hoàn tất",
+          "status": "ready",
+          "title": "Hoàn tất bàn giao vật lý",
+          "work_item_id": "dddfd4f6-b69b-4f3c-9cbd-396328b9ec4c"
+        },
+        {
+          "code": "WORK_ITEM_INCOMPLETE",
+          "message": "Đầu việc của bước quy trình chưa hoàn tất",
+          "status": "ready",
+          "title": "Xác nhận bàn giao hồ sơ kế toán",
+          "work_item_id": "f3f906c4-7da6-426f-a79f-bd929b3fc4ea"
+        },
+        {
+          "code": "NODE_APPROVAL_REQUIRED",
+          "message": "Node chưa có phê duyệt đạt yêu cầu"
+        }
+      ],
+      "description": "Bàn giao vật lý được hoàn tất độc lập; hồ sơ thương mại đủ điều kiện được bàn giao và Kế toán xác nhận tiếp nhận.",
+      "exit_conditions": {
+        "accounting_handoff_included": true,
+        "handover_included": true,
+        "separate_gates": true,
+        "text": "Bàn giao vật lý và bàn giao hồ sơ kế toán đã hoàn tất"
+      },
+      "fail_path": "none",
+      "id": "57dda30f-e780-4b82-9fc5-1c4f95ba3a22",
+      "name": "Bàn giao công trình và hồ sơ kế toán",
+      "order_index": 2,
+      "permissions": [
+        "handover.view",
+        "handover.approve",
+        "accounting_handoff.view",
+        "accounting_handoff.acknowledge"
+      ],
+      "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+      "required_permission": "handover.view",
+      "responsible_role_ids": [
+        "PM"
+      ],
+      "run_id": "d56c563e-2adb-4c64-9b10-b1596c3af852",
+      "started_at": "2026-10-12T23:21:33Z",
+      "status": "in_progress",
+      "steps": [
+        {
+          "business_code": "closure.handover",
+          "checklist_required": false,
+          "description": "PM hoàn tất hồ sơ bàn giao sau khi chất lượng, tồn tại và vật tư dư đã đóng; tài chính không chặn bước này.",
+          "document_required": false,
+          "domain_action_key": "source.handover_completed",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "handover.approve"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "dc3e60f6-85a7-4cda-a752-43524066fd7e",
+          "name": "Hoàn tất bàn giao vật lý",
+          "order_index": 1,
+          "photo_required": false,
+          "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+          "required_permission": "handover.approve",
+          "required_role_ids": [
+            "PM"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "57dda30f-e780-4b82-9fc5-1c4f95ba3a22",
+          "status": "pending",
+          "step_type": "handover_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "handover",
+          "template_step_id": "82cbd73e-f763-4ff5-99c1-447c4931576b",
+          "work_item_id": "dddfd4f6-b69b-4f3c-9cbd-396328b9ec4c",
+          "work_item_role_ids": [
+            "PM"
+          ],
+          "work_item_status": "ready",
+          "work_item_title": "Hoàn tất bàn giao vật lý",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        },
+        {
+          "business_code": "closure.finance",
+          "checklist_required": false,
+          "description": "Kế toán xác nhận đã tiếp nhận toàn bộ hồ sơ mua sắm và mốc thu đủ điều kiện; hạch toán, hóa đơn, thuế và thanh toán tiếp tục thực hiện trên MISA.",
+          "document_required": false,
+          "domain_action_key": "source.accounting_handoff_close_ready",
+          "evidence_count": 0,
+          "evidence_requirement_json": {
+            "checklist_required": false,
+            "document_required": false,
+            "form_required": false,
+            "form_version_id": "",
+            "photo_required": false,
+            "required_permission": "accounting_handoff.acknowledge"
+          },
+          "form_required": false,
+          "form_version_id": null,
+          "id": "71fffd71-9b62-47ed-8261-2caace170acd",
+          "name": "Xác nhận bàn giao hồ sơ kế toán",
+          "order_index": 2,
+          "photo_required": false,
+          "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+          "required_permission": "accounting_handoff.acknowledge",
+          "required_role_ids": [
+            "Kế toán"
+          ],
+          "required_workflow_form_version_id": null,
+          "reviewed_at": null,
+          "run_node_id": "57dda30f-e780-4b82-9fc5-1c4f95ba3a22",
+          "status": "pending",
+          "step_type": "accounting_check",
+          "submitted_at": null,
+          "submitted_by": null,
+          "surface_kind": "finance",
+          "template_step_id": "33bc22a4-aea7-40e1-b3f8-0117b5dc011f",
+          "work_item_id": "f3f906c4-7da6-426f-a79f-bd929b3fc4ea",
+          "work_item_role_ids": [
+            "Kế toán"
+          ],
+          "work_item_status": "ready",
+          "work_item_title": "Xác nhận bàn giao hồ sơ kế toán",
+          "workflow_form_instance_id": null,
+          "workflow_form_required": false,
+          "workflow_form_revision": null,
+          "workflow_form_status": null,
+          "workflow_form_submitted_at": null,
+          "workflow_form_template_code": null,
+          "workflow_form_template_id": null,
+          "workflow_form_template_name": null,
+          "workflow_form_type": null,
+          "workflow_form_version_id": null,
+          "workflow_form_version_no": null,
+          "workflow_form_version_status": null
+        }
+      ],
+      "template_node_id": "9e460a01-4da9-4395-a4c3-12631f393f14",
+      "type": "financial_closure"
+    }
+  ],
+  "project_id": "94f3512a-6625-40a8-a2ce-e3bf67619c66",
+  "project_name": "[Synthetic Development] BM08 nghiệm thu cuối và bàn giao",
+  "started_at": "2026-10-12T23:18:49Z",
+  "status": "in_progress",
+  "template_definition_hash": "97380f414445cfe65b93fcbe27877eb6da873b8b8ee6e6ce07d7a58f4f355e77",
+  "template_id": "bfaea287-a3e3-45a5-ba10-72786ed33e0b",
+  "template_name": "[Synthetic Development] BM08 nghiệm thu cuối và bàn giao"
+}

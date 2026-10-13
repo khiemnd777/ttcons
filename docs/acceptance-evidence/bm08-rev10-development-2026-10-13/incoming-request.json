@@ -1,0 +1,21 @@
+{
+  "work_item_id": "b6cdcf60-a200-4ecf-a306-53f25a110733",
+  "source_type": "supplier",
+  "supplier_partner_id": "26cda344-e3f3-42c7-818c-167d2ea802c4",
+  "received_at": "2026-10-13",
+  "delivery_reference": "UAT-BM08-REV10-20261013",
+  "comment": "[Synthetic] Explicit supplier receipt test source. No procurement-line/physical delivery/implicit stock claim.",
+  "items": [
+    {
+      "item_index": 0,
+      "material_name": "[Synthetic] Waterproof test floor",
+      "unit": "m2",
+      "delivered_quantity": 25,
+      "accepted_quantity": 25,
+      "rejected_quantity": 0,
+      "decision": "accepted",
+      "condition": "usable",
+      "comment": "[Synthetic] Explicit named test input; no invented BOQ material relation."
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "observed_at": "2026-10-12T03:18:28.893871+00:00",
+  "ui": "http://127.0.0.1:5173",
+  "api": "http://127.0.0.1:8081/api",
+  "containers": [
+    {
+      "name": "admin",
+      "image": "sha256:a5b9de8273c63be8d8a351451f1cdc5eb9f4942cf3c7cb19bdf06a6d5722ee28",
+      "created_at": "2026-10-12T02:41:09.938663179Z",
+      "started_at": "2026-10-12T02:41:16.649018668Z",
+      "status": "running",
+      "health": null
+    },
+    {
+      "name": "ttcons-backend-1",
+      "image": "sha256:30537ea8444f792226d69074c8b2207a9d9805324a7f82e225e781df5e132949",
+      "created_at": "2026-10-12T02:41:09.885006096Z",
+      "started_at": "2026-10-12T02:41:16.57997221Z",
+      "status": "running",
+      "health": null
+    },
+    {
+      "name": "ttcons-postgres-1",
+      "image": "sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f",
+      "created_at": "2026-10-12T02:41:09.801139054Z",
+      "started_at": "2026-10-12T02:41:10.861424888Z",
+      "status": "running",
+      "health": "healthy"
+    },
+    {
+      "name": "ttcons-redis-1",
+      "image": "sha256:7aec734b2bb298a1d769fd8729f13b8514a41bf90fcdd1f38ec52267fbaa8ee6",
+      "created_at": "2026-10-12T02:41:09.800322554Z",
+      "started_at": "2026-10-12T02:41:11.002022305Z",
+      "status": "running",
+      "health": "healthy"
+    },
+    {
+      "name": "ttcons-redis-cache-1",
+      "image": "sha256:7aec734b2bb298a1d769fd8729f13b8514a41bf90fcdd1f38ec52267fbaa8ee6",
+      "created_at": "2026-10-12T02:41:09.800629721Z",
+      "started_at": "2026-10-12T02:41:10.928290138Z",
+      "status": "running",
+      "health": "healthy"
+    }
+  ],
+  "ui_status": 200,
+  "api_health_status": 200,
+  "api_ready_status": 200,
+  "unregistered_root_probes": {
+    "/health": 404,
+    "/ready": 404
+  },
+  "api_health_url": "http://127.0.0.1:8081/api/health",
+  "api_ready_url": "http://127.0.0.1:8081/api/ready"
+}

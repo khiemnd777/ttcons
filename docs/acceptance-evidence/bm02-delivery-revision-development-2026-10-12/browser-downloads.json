@@ -1,0 +1,20 @@
+[
+  {
+    "revision": 1,
+    "phase": "before",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-1 (1).xlsx",
+    "file": "BM02-lan-1-truoc.xlsx"
+  },
+  {
+    "revision": 2,
+    "phase": "current",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-2.xlsx",
+    "file": "BM02-lan-2.xlsx"
+  },
+  {
+    "revision": 1,
+    "phase": "after",
+    "original": "/Users/khiemnguyen/Downloads/bao-cao-BM-GS-02-lan-1 (2).xlsx",
+    "file": "BM02-lan-1-sau.xlsx"
+  }
+]

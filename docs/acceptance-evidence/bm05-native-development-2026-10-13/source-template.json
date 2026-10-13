@@ -1,0 +1,11 @@
+{
+  "id": "e791144b-2322-457f-bc60-63c0f4febbb7",
+  "code": "client_site_risk_assessment",
+  "name": "Đánh giá rủi ro mặt bằng",
+  "description": "Checklist rủi ro hiện trạng, kỹ thuật, mặt bằng, an toàn, tiến độ và chi phí.",
+  "form_type": "checklist",
+  "status": "active",
+  "created_by": null,
+  "created_at": "2026-07-06T14:55:56.325136+00:00",
+  "updated_at": "2026-07-06T14:55:56.325136+00:00"
+}

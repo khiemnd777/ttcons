@@ -1,0 +1,10 @@
+{
+  "head": "75dc44707785d399ed2408959bf784928a544e96",
+  "source_files": 962,
+  "manifest_sha256": "1529289ef6e24d4cfce6fefdf681a0e83725870c1118a62c72d15d717f9ba219",
+  "changed_since_BM02": [
+    "frontend/src/modules/operations/OperationsPage.tsx",
+    "frontend/tests/constructionDailyTimelineProgress.test.ts"
+  ],
+  "captured_at": "2026-10-12T02:41:01.924708+00:00"
+}

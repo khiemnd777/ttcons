@@ -1,0 +1,245 @@
+{
+  "author_account_deleted": false,
+  "author_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "author_name": "Consflow Admin",
+  "bm_gs_evidence": [
+    {
+      "caption": "[Synthetic] Ảnh thử Lần 1 — không phải ảnh công trình",
+      "checksum_sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+      "created_at": "2026-10-12T03:08:26Z",
+      "description": null,
+      "evidence_type": "photo",
+      "file_size": 15800,
+      "file_url": null,
+      "id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+      "mime_type": "image/png",
+      "name": "[Synthetic] BM02 Lần 1",
+      "payload_json": {
+        "capture_metadata": {
+          "location": "[Synthetic] Ô BM02",
+          "photo_phase": "during"
+        },
+        "detected_mime_type": "image/png",
+        "original_filename": "BM02-Lan-1.png"
+      },
+      "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+      "status": "submitted",
+      "storage_key": "evidence/5020b7b5-d383-4504-967d-5e705c4ee2dd/2c969a28-945f-4abe-bf9a-8d44c722699d/49074d6b-a318-44dd-a324-234582646e2f.png",
+      "storage_provider": "local",
+      "title": "[Synthetic] BM02 Lần 1",
+      "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d"
+    }
+  ],
+  "capabilities": {
+    "can_acknowledge": false,
+    "can_discuss": true,
+    "can_request_changes": false
+  },
+  "created_at": "2026-10-12T03:08:26Z",
+  "current_revision_no": 1,
+  "delivery_source_changed": false,
+  "events": [
+    {
+      "actor_account_deleted": false,
+      "actor_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "actor_name": "Consflow Admin",
+      "comment": null,
+      "created_at": "2026-10-12T03:09:03Z",
+      "event_type": "submitted",
+      "id": "ab26332c-a8c4-4377-a615-68aa1617e3a9",
+      "metadata_json": {
+        "recipient_id": "bc554766-1b43-425e-ab4a-295dd86060bd"
+      },
+      "revision_no": 1
+    },
+    {
+      "actor_account_deleted": false,
+      "actor_id": "bc554766-1b43-425e-ab4a-295dd86060bd",
+      "actor_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+      "comment": "[Synthetic] Yêu cầu thử: đổi nội dung sang Lần 2 và dùng ảnh thử màu xanh. Giữ lịch sử Lần 1.",
+      "created_at": "2026-10-12T03:10:13Z",
+      "event_type": "needs_changes",
+      "id": "2ec4b321-7ed2-42f8-8c6b-c689060b98b2",
+      "metadata_json": {},
+      "revision_no": 1
+    }
+  ],
+  "id": "257da527-beb9-4b02-8a90-dba13ac3b282",
+  "is_supervisor_report": false,
+  "issues_summary": "[Synthetic] NỘI DUNG LẦN 1 — Giữ nguyên nội dung và ảnh khi xem lại lần gửi cũ.",
+  "manpower_summary": "[Synthetic] Tổ thử BM02 · 3 người · 8 giờ",
+  "material_usage_summary": null,
+  "photos": [
+    "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b"
+  ],
+  "primary_evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+  "progress_percent": 25,
+  "project_address": "[Synthetic] Khu B — dữ liệu nghiệm thu biểu mẫu",
+  "project_code": "DEV-BM04-REUSE-20261009",
+  "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+  "project_name": "[Synthetic Development] BM04 source location",
+  "read_receipts": [],
+  "recipient_account_deleted": false,
+  "recipient_id": "bc554766-1b43-425e-ab4a-295dd86060bd",
+  "recipient_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+  "report_date": "2026-10-12T00:00:00Z",
+  "report_delivery_eligible": true,
+  "reported_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+  "review_comment": "[Synthetic] Yêu cầu thử: đổi nội dung sang Lần 2 và dùng ảnh thử màu xanh. Giữ lịch sử Lần 1.",
+  "reviewed_at": "2026-10-12T03:10:13Z",
+  "reviewed_by": "bc554766-1b43-425e-ab4a-295dd86060bd",
+  "reviewed_by_account_deleted": false,
+  "reviewed_by_name": "[Synthetic] BM02 người nhận — 2026-10-12",
+  "revisions": [
+    {
+      "comment": null,
+      "evidence_ids": [
+        "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b"
+      ],
+      "evidence_records": [
+        {
+          "caption": "[Synthetic] Ảnh thử Lần 1 — không phải ảnh công trình",
+          "checksum_sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+          "created_at": "2026-10-12T03:08:26Z",
+          "description": null,
+          "evidence_type": "photo",
+          "file_size": 15800,
+          "file_url": null,
+          "id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+          "mime_type": "image/png",
+          "name": "[Synthetic] BM02 Lần 1",
+          "payload_json": {
+            "capture_metadata": {
+              "location": "[Synthetic] Ô BM02",
+              "photo_phase": "during"
+            },
+            "detected_mime_type": "image/png",
+            "original_filename": "BM02-Lan-1.png"
+          },
+          "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+          "status": "submitted",
+          "storage_key": "evidence/5020b7b5-d383-4504-967d-5e705c4ee2dd/2c969a28-945f-4abe-bf9a-8d44c722699d/49074d6b-a318-44dd-a324-234582646e2f.png",
+          "storage_provider": "local",
+          "title": "[Synthetic] BM02 Lần 1",
+          "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d"
+        }
+      ],
+      "id": "27254c55-98de-4a20-afaf-7dddf83e91c8",
+      "revision_no": 1,
+      "snapshot_json": {
+        "address": "[Synthetic] Khu B — dữ liệu nghiệm thu biểu mẫu",
+        "author_id": "f5250196-91bb-4df6-9666-b318a7036b42",
+        "author_name": "Consflow Admin",
+        "bm_gs_evidence": [
+          {
+            "caption": "[Synthetic] Ảnh thử Lần 1 — không phải ảnh công trình",
+            "checksum_sha256": "2de800032249c00e4474796229969677f086e4164d3ea5714d5342ec64792144",
+            "created_at": "2026-10-12T03:08:26Z",
+            "description": null,
+            "evidence_type": "photo",
+            "file_size": 15800,
+            "file_url": null,
+            "id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+            "mime_type": "image/png",
+            "name": "[Synthetic] BM02 Lần 1",
+            "payload_json": {
+              "capture_metadata": {
+                "location": "[Synthetic] Ô BM02",
+                "photo_phase": "during"
+              },
+              "detected_mime_type": "image/png",
+              "original_filename": "BM02-Lan-1.png"
+            },
+            "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+            "status": "submitted",
+            "storage_key": "evidence/5020b7b5-d383-4504-967d-5e705c4ee2dd/2c969a28-945f-4abe-bf9a-8d44c722699d/49074d6b-a318-44dd-a324-234582646e2f.png",
+            "storage_provider": "local",
+            "title": "[Synthetic] BM02 Lần 1",
+            "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d"
+          }
+        ],
+        "issues_summary": "[Synthetic] NỘI DUNG LẦN 1 — Giữ nguyên nội dung và ảnh khi xem lại lần gửi cũ.",
+        "manpower_summary": "[Synthetic] Tổ thử BM02 · 3 người · 8 giờ",
+        "material_usage_summary": null,
+        "photos": [
+          "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b"
+        ],
+        "primary_evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+        "progress_percent": 25,
+        "project_code": "DEV-BM04-REUSE-20261009",
+        "project_id": "5020b7b5-d383-4504-967d-5e705c4ee2dd",
+        "project_name": "[Synthetic Development] BM04 source location",
+        "report_date": "2026-10-12T00:00:00Z",
+        "report_type": "construction_daily",
+        "source_id": "257da527-beb9-4b02-8a90-dba13ac3b282",
+        "source_kind": "operation_daily_report",
+        "structured_json": {
+          "blockers": [],
+          "completed_items": [
+            {
+              "result": "done",
+              "title": "[Synthetic] LẦN 1 — Kiểm tra bề mặt ô BM02"
+            }
+          ],
+          "crew_items": [
+            {
+              "crew_name": "[Synthetic] Tổ thử BM02",
+              "note": "[Synthetic] Lần 1",
+              "row_id": "940695ec-e8b5-4b8d-8751-8823bb52de90",
+              "work_hours": 8,
+              "worker_count": 3
+            }
+          ],
+          "material_arrival_items": [],
+          "material_usage_items": [],
+          "next_plan_items": [],
+          "site_photo_evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+          "supervision_assessments": []
+        },
+        "weather": "[Synthetic] Nắng — Lần 1",
+        "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+        "work_item_title": "[Synthetic] Kiểm tra bề mặt và xử lý lỗi",
+        "work_summary": "Đã làm:\n[Synthetic] LẦN 1 — Kiểm tra bề mặt ô BM02\n\nĐang làm:\n\n\nSẽ làm:\n",
+        "workflow_form_instance_id": ""
+      },
+      "snapshot_sha256": "b9006547ae54b475a46423ced5db9cfa7a857bd909babf99de08778c3d649349",
+      "submitted_at": "2026-10-12T03:09:03Z",
+      "submitted_by": "f5250196-91bb-4df6-9666-b318a7036b42",
+      "submitted_by_account_deleted": false,
+      "submitted_by_name": "Consflow Admin"
+    }
+  ],
+  "source_id": "257da527-beb9-4b02-8a90-dba13ac3b282",
+  "status": "needs_changes",
+  "structured_json": {
+    "blockers": [],
+    "completed_items": [
+      {
+        "result": "done",
+        "title": "[Synthetic] LẦN 1 — Kiểm tra bề mặt ô BM02"
+      }
+    ],
+    "crew_items": [
+      {
+        "crew_name": "[Synthetic] Tổ thử BM02",
+        "note": "[Synthetic] Lần 1",
+        "row_id": "940695ec-e8b5-4b8d-8751-8823bb52de90",
+        "work_hours": 8,
+        "worker_count": 3
+      }
+    ],
+    "material_arrival_items": [],
+    "material_usage_items": [],
+    "next_plan_items": [],
+    "site_photo_evidence_id": "dd9e5c97-a54d-43ea-8ea4-e380788b6a1b",
+    "supervision_assessments": []
+  },
+  "submitted_at": "2026-10-12T03:09:03Z",
+  "viewer_acknowledged": false,
+  "weather": "[Synthetic] Nắng — Lần 1",
+  "work_item_id": "2c969a28-945f-4abe-bf9a-8d44c722699d",
+  "work_item_title": "[Synthetic] Kiểm tra bề mặt và xử lý lỗi",
+  "work_report_id": "7a22a2d6-86a1-41b3-b08f-af5aaed9ceec",
+  "work_summary": "Đã làm:\n[Synthetic] LẦN 1 — Kiểm tra bề mặt ô BM02\n\nĐang làm:\n\n\nSẽ làm:\n",
+  "workflow_form_instance_id": null
+}

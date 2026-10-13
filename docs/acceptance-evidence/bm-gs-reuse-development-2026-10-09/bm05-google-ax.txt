@@ -1,0 +1,475 @@
+Browser tab: 334096846, Title: "BM05 Development — Xuất báo cáo — 09-10-2026 - Google Sheets", URL: "https://docs.google.com/spreadsheets/d/1l9t96idkkfi-ZZW-J_WOM62AopB0ywV7KlfXK_kbIKw/edit?gid=224692890".
+1 AXWebArea BM05 Development — Xuất báo cáo — 09-10-2026 - Google Sheets, URL: docs.google.com/spreadsheets/d/1l9t96idkkfi-ZZW-J_WOM62AopB0ywV7KlfXK_kbIKw/edit?gid=224692890
+	2 container
+		3 container Description: Menu bar, ID: docs-chrome
+			4 container docs-header
+				5 link Description: Sheets home, Value: docs.google.com/spreadsheets/u/0/?authuser=0&usp=sheets_web, ID: docs-branding-logo-link
+				6 container docs-titlebar-container
+					7 container BM05 Development — Xuất báo cáo — 09-10-2026
+						8 container docs-title-widget
+							9 text BM05 Development — Xuất báo cáo — 09-10-2026
+					10 container
+						11 container docs-titlebar-share-client-button
+							12 button (disabled)   Share
+								13 text Share
+							14 button Description: Quick sharing actions, ID: scb-quick-actions-menu-button
+						15 pop up button (collapsed) Description: Google Account: Khiêm Nguyễn (khiemnd777@gmail.com), Secondary Actions: Expand
+			16 container docs-bars
+				17 container docs-menubars
+					18 menu bar docs-menubar
+						19 File, ID: docs-file-menu
+						20 Edit, ID: docs-edit-menu
+						21 View, ID: docs-view-menu
+						22 Insert, ID: docs-insert-menu
+						23 Format, ID: docs-format-menu
+						24 Data, ID: w183
+						25 Tools, ID: docs-tools-menu
+						26 Extensions, ID: docs-extensions-menu
+						27 Help, ID: docs-help-menu
+				28 container docs-toolbar-wrapper
+					29 container docs-primary-toolbars
+						30 container
+							31 text field (settable)
+						32 container Description: Main, ID: docs-toolbar
+							33 button (disabled) $, ID: t-num-fmt-currency
+								34 text $
+							35 button (disabled) %, ID: t-num-fmt-percent
+								36 text %
+							37 button (disabled) 123, ID: t-num-fmt-other
+								38 text 123
+					39 container Description: Mode and view, ID: docs-side-toolbar
+			40 container Side panel
+			41 container docs-additional-bars
+				42 image Loading...
+		43 container docs-editor
+			44 container 224692890-grid-container
+				45 table
+					46 row
+						47 cell 224692890C0
+							48 text A
+						49 cell 224692890C1
+							50 text B
+						51 cell 224692890C2
+							52 text C
+						53 cell 224692890C3
+							54 text D
+						55 cell 224692890C4
+							56 text E
+						57 cell 224692890C5
+							58 text F
+						59 cell 224692890C6
+							60 text G
+						61 cell 224692890C7
+							62 text H
+						63 cell 224692890C8
+							64 text I
+						65 cell 224692890C9
+							66 text J
+						67 cell 224692890C10
+							68 text K
+						69 cell 224692890C11
+							70 text L
+						71 cell 224692890C12
+							72 text M
+						73 cell 224692890C13
+							74 text N
+						75 cell 224692890C14
+							76 text O
+						77 cell 224692890C15
+							78 text P
+						79 cell 224692890C16
+							80 text Q
+						81 cell 224692890C17
+							82 text R
+						83 cell 224692890C18
+							84 text S
+						85 cell 224692890C19
+							86 text T
+						87 cell 224692890C20
+							88 text U
+						89 cell 224692890C21
+							90 text V
+						91 cell 224692890C22
+							92 text W
+						93 cell 224692890C23
+							94 text X
+						95 cell 224692890C24
+							96 text Y
+						97 cell 224692890C25
+							98 text Z
+					99 row
+						100 cell 224692890R0
+							101 text 1
+						102 cell
+							103 text CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM
+					104 row
+						105 cell 224692890R1
+							106 text 2
+						107 cell
+							108 text THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-05)
+					109 row
+						110 cell 224692890R2
+							111 text 3
+						112 cell
+							113 text SỔ QUẢN LÝ VẤN ĐỀ, RỦI RO VÀ PHÁT SINH
+					114 row
+						115 cell 224692890R3
+							116 text 4
+					117 row
+						118 cell 224692890R4
+							119 text 5
+						120 cell
+							121 text Dự án:
+						122 cell
+							123 text [DEV-BM-REUSE-20261009] [Synthetic Development] Nghiệm thu nguồn BM01/02/04/05/06
+					124 row
+						125 cell 224692890R5
+							126 text 6
+					127 row
+						128 cell 224692890R6
+							129 text 7
+						130 cell
+							131 text STT
+						132 cell
+							133 text MÃ SỰ VIỆC
+						134 cell
+							135 text NGÀY PHÁT HIỆN
+						136 cell
+							137 text MÔ TẢ VẤN ĐỀ / PHÁT SINH
+						138 cell
+							139 text NGUYÊN NHÂN
+						140 cell
+							141 text ẢNH HƯỞNG
+						142 cell
+							143 text MỨC ĐỘ RỦI RO
+						144 cell
+							145 text ĐỀ XUẤT HƯỚNG XỬ LÝ
+						146 cell
+							147 text NGƯỜI PHỤ TRÁCH
+						148 cell
+							149 text THỜI HẠN
+						150 cell
+							151 text TRẠNG THÁI
+					152 row
+						153 cell 224692890R7
+							154 text 8
+						155 cell
+							156 text 1
+						157 cell
+							158 text SYN-RR-05
+						159 cell
+							160 text 2026-10-09
+						161 cell
+							162 text [Synthetic] Lối tiếp cận bị giới hạn trong ô thử
+						163 cell
+							164 text [Synthetic] Vật liệu đặt sai khu thử
+						165 cell
+							166 text [Synthetic] Chậm tiếp cận ô thử
+						167 cell
+							168 text Trung bình
+						169 cell
+							170 text [Synthetic] Bố trí lối tạm
+						171 cell
+							172 text PM synthetic
+						173 cell
+							174 text 2026-10-10
+						175 cell
+							176 text Đang theo dõi synthetic
+					177 row
+						178 cell 224692890R8
+							179 text 9
+					180 row
+						181 cell 224692890R9
+							182 text 10
+					183 row
+						184 cell 224692890R10
+							185 text 11
+					186 row
+						187 cell 224692890R11
+							188 text 12
+						189 cell
+							190 text GIÁM SÁT CÔNG TRÌNH
+						191 cell
+							192 text PHÒNG QS / BỘ PHẬN LIÊN QUAN
+						193 cell
+							194 text QUẢN LÝ DỰ ÁN (PM)
+					195 row
+						196 cell 224692890R12
+							197 text 13
+						198 cell
+							199 text (Ký & ghi rõ họ tên)
+						200 cell
+							201 text (Ký & ghi rõ họ tên)
+						202 cell
+							203 text (Ký & ghi rõ họ tên)
+					204 row
+						205 cell 224692890R13
+							206 text 14
+					207 row
+						208 cell 224692890R14
+							209 text 15
+					210 row
+						211 cell 224692890R15
+							212 text 16
+					213 row
+						214 cell 224692890R16
+							215 text 17
+					216 row
+						217 cell 224692890R17
+							218 text 18
+					219 row
+						220 cell 224692890R18
+							221 text 19
+					222 row
+						223 cell 224692890R19
+							224 text 20
+					225 row
+						226 cell 224692890R20
+							227 text 21
+					228 row
+						229 cell 224692890R21
+							230 text 22
+					231 row
+						232 cell 224692890R22
+							233 text 23
+					234 row
+						235 cell 224692890R23
+							236 text 24
+					237 row
+						238 cell 224692890R24
+							239 text 25
+					240 row
+						241 cell 224692890R25
+							242 text 26
+					243 row
+						244 cell 224692890R26
+							245 text 27
+					246 row
+						247 cell 224692890R27
+							248 text 28
+					249 row
+						250 cell 224692890R28
+							251 text 29
+					252 row
+						253 cell 224692890R29
+							254 text 30
+					255 row
+						256 cell 224692890R30
+							257 text 31
+					258 row
+						259 cell 224692890R31
+							260 text 32
+					261 row
+						262 cell 224692890R32
+							263 text 33
+					264 row
+						265 cell 224692890R33
+							266 text 34
+					267 row
+						268 cell 224692890R34
+							269 text 35
+					270 row
+						271 cell 224692890R35
+							272 text 36
+					273 row
+						274 cell 224692890R36
+							275 text 37
+					276 row
+						277 cell 224692890R37
+							278 text 38
+					279 row
+						280 cell 224692890R38
+							281 text 39
+					282 row
+						283 cell 224692890R39
+							284 text 40
+					285 row
+						286 cell 224692890R40
+							287 text 41
+					288 row
+						289 cell 224692890R41
+							290 text 42
+					291 row
+						292 cell 224692890R42
+							293 text 43
+					294 row
+						295 cell 224692890R43
+							296 text 44
+					297 row
+						298 cell 224692890R44
+							299 text 45
+					300 row
+						301 cell 224692890R45
+							302 text 46
+					303 row
+						304 cell 224692890R46
+							305 text 47
+					306 row
+						307 cell 224692890R47
+							308 text 48
+					309 row
+						310 cell 224692890R48
+							311 text 49
+					312 row
+						313 cell 224692890R49
+							314 text 50
+					315 row
+						316 cell 224692890R50
+							317 text 51
+					318 row
+						319 cell 224692890R51
+							320 text 52
+					321 row
+						322 cell 224692890R52
+							323 text 53
+					324 row
+						325 cell 224692890R53
+							326 text 54
+					327 row
+						328 cell 224692890R54
+							329 text 55
+					330 row
+						331 cell 224692890R55
+							332 text 56
+					333 row
+						334 cell 224692890R56
+							335 text 57
+					336 row
+						337 cell 224692890R57
+							338 text 58
+					339 row
+						340 cell 224692890R58
+							341 text 59
+					342 row
+						343 cell 224692890R59
+							344 text 60
+					345 row
+						346 cell 224692890R60
+							347 text 61
+					348 row
+						349 cell 224692890R61
+							350 text 62
+					351 row
+						352 cell 224692890R62
+							353 text 63
+					354 row
+						355 cell 224692890R63
+							356 text 64
+					357 row
+						358 cell 224692890R64
+							359 text 65
+					360 row
+						361 cell 224692890R65
+							362 text 66
+					363 row
+						364 cell 224692890R66
+							365 text 67
+					366 row
+						367 cell 224692890R67
+							368 text 68
+					369 row
+						370 cell 224692890R68
+							371 text 69
+					372 row
+						373 cell 224692890R69
+							374 text 70
+					375 row
+						376 cell 224692890R70
+							377 text 71
+					378 row
+						379 cell 224692890R71
+							380 text 72
+					381 row
+						382 cell 224692890R72
+							383 text 73
+					384 row
+						385 cell 224692890R73
+							386 text 74
+					387 row
+						388 cell 224692890R74
+							389 text 75
+					390 row
+						391 cell 224692890R75
+							392 text 76
+					393 row
+						394 cell 224692890R76
+							395 text 77
+					396 row
+						397 cell 224692890R77
+							398 text 78
+					399 row
+						400 cell 224692890R78
+							401 text 79
+					402 row
+						403 cell 224692890R79
+							404 text 80
+					405 row
+						406 cell 224692890R80
+							407 text 81
+					408 row
+						409 cell 224692890R81
+							410 text 82
+					411 row
+						412 cell 224692890R82
+							413 text 83
+					414 row
+						415 cell 224692890R83
+							416 text 84
+					417 row
+						418 cell 224692890R84
+							419 text 85
+					420 row
+						421 cell 224692890R85
+							422 text 86
+					423 row
+						424 cell 224692890R86
+							425 text 87
+					426 row
+						427 cell 224692890R87
+							428 text 88
+					429 row
+						430 cell 224692890R88
+							431 text 89
+					432 row
+						433 cell 224692890R89
+							434 text 90
+					435 row
+						436 cell 224692890R90
+							437 text 91
+					438 row
+						439 cell 224692890R91
+							440 text 92
+					441 row
+						442 cell 224692890R92
+							443 text 93
+					444 row
+						445 cell 224692890R93
+							446 text 94
+					447 row
+						448 cell 224692890R94
+							449 text 95
+					450 row
+						451 cell 224692890R95
+							452 text 96
+					453 row
+						454 cell 224692890R96
+							455 text 97
+					456 row
+						457 cell 224692890R97
+							458 text 98
+					459 row
+						460 cell 224692890R98
+							461 text 99
+					462 row
+						463 cell 224692890R99
+							464 text 100
+			465 container Sheet tab bar
+				466 container
+					467 container Add Sheet
+					468 container All Sheets
+					469 container Canvas menu
+				470 container
+					471 container
+						472 text BM-GS-05-dde65884_01
+
+The focused UI element is 1 AXWebArea BM05 Development — Xuất báo cáo — 09-10-2026 - Google Sheets, URL: docs.google.com/spreadsheets/d/1l9t96idkkfi-ZZW-J_WOM62AopB0ywV7KlfXK_kbIKw/edit?gid=224692890

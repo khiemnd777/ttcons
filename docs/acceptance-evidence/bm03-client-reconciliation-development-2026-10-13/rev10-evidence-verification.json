@@ -1,0 +1,66 @@
+{
+  "assertions": {
+    "r1_ledger_unchanged_after_r2_and_completion": true,
+    "history_readonly": true,
+    "distinct_submitted_revision_ledgers": true,
+    "same_source_identity": true,
+    "r1_ready_after_submit": true,
+    "r2_not_ready_before_own_submit": true,
+    "r2_ready_after_submit": true,
+    "client_completed": true,
+    "closed_current_readonly": true,
+    "commercial_confirmation_independent": true,
+    "physical_snapshot_independent": true,
+    "independent_quantity_items_unchanged": true,
+    "current_source_matches_built": true,
+    "r1_download_copy_byte_equal": true,
+    "r1_zip_valid": true,
+    "r1_one_embedded_image": true,
+    "r1_image_aspect_and_corners": true,
+    "r1_physical_numeric_unit": true,
+    "r1_report_number": true,
+    "r2_download_copy_byte_equal": true,
+    "r2_zip_valid": true,
+    "r2_one_embedded_image": true,
+    "r2_image_aspect_and_corners": true,
+    "r2_physical_numeric_unit": true,
+    "r2_report_number": true,
+    "same_image_bytes_r1_r2": true,
+    "google_source_values_equal": true,
+    "google_no_effective_errors": true
+  },
+  "source_files_checked": 976,
+  "google_cells_checked": 900,
+  "google_mismatches": [],
+  "google_errors": [],
+  "files": [
+    {
+      "revision": "r1",
+      "download": "/Users/khiemnguyen/Downloads/BM-GS-03 (13).xlsx",
+      "copy": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm03-client-reconciliation-development-2026-10-13/BM03-Rev10-R1.xlsx",
+      "sha256": "613c351ac91c8786ee93dbdf69d1e191ad11a70c2ee878ad6e2baa2c18c32ed9",
+      "media_sha256": "aa1cf046ba0f4bdffaf655c05670ee5a549de41fe57dd803baf5a2e14d155afe",
+      "image_dimensions": [
+        960,
+        640
+      ],
+      "populated_cells": 61,
+      "google_url": "https://docs.google.com/spreadsheets/d/1ptpkllrh0k5_w0AVifCWY2AZtNLt8iQ2EMIT8oW7Yug/edit"
+    },
+    {
+      "revision": "r2",
+      "download": "/Users/khiemnguyen/Downloads/BM-GS-03 (14).xlsx",
+      "copy": "/Users/khiemnguyen/Works/ttcons/ttcons/docs/acceptance-evidence/bm03-client-reconciliation-development-2026-10-13/BM03-Rev10-R2.xlsx",
+      "sha256": "7c80ff4b7e97d65a85c1bc2607d85d2ac28d03dae47b8943ab10a4659006c4e1",
+      "media_sha256": "aa1cf046ba0f4bdffaf655c05670ee5a549de41fe57dd803baf5a2e14d155afe",
+      "image_dimensions": [
+        960,
+        640
+      ],
+      "populated_cells": 61,
+      "google_url": "https://docs.google.com/spreadsheets/d/1EEhBGBJpKIe6GACYKBLTCGOZQKAdbP3_7lqOaiESuyI/edit"
+    }
+  ],
+  "scope": "Synthetic Development full published engine4 Rev10 upstream to own client BM03 completion; Admin test actor. No whole-project/finance/legal/site-quality or user UX acceptance.",
+  "passed": true
+}

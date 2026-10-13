@@ -1,0 +1,65 @@
+{
+  "actual_download": "/Users/khiemnguyen/Downloads/BM-GS-07 (3).xlsx",
+  "sha256": "c0782ea449b1364810594177654ac13301fccdc8519abcd2cd953aa190b75da2",
+  "bytes": 86319,
+  "sheets": [
+    {
+      "part": "xl/worksheets/sheet8.xml",
+      "drawing": "xl/drawings/drawing1.xml",
+      "image_count": 4,
+      "header_F7": "TÊN FILE ÂNH THAM CHIẾU"
+    }
+  ],
+  "images": [
+    {
+      "cell": "F8",
+      "media": "xl/media/image1.png",
+      "media_sha256": "d9b79bec0cd450e3d9a8425b9cbb421711e6b12b65e25aeaaba8f707f4920bb3",
+      "extent_px": [
+        168.0,
+        94.49994750656168
+      ],
+      "row_height_pt": 114.0,
+      "column_width": 24.0,
+      "alt": "synthetic-duplicate-name.png • 5e9822c7-36bb-43f9-af2f-b2b3ca048f1b • evidence:5e9822c7-36bb-43f9-af2f-b2b3ca048f1b:0:5e9822c7-36bb-43f9-af2f-b2b3ca048f1b"
+    },
+    {
+      "cell": "F9",
+      "media": "xl/media/image2.png",
+      "media_sha256": "7d9ca57e23f548a35b47a2955bbf619b58b1b5993668ce37e07b79dd939e9e2a",
+      "extent_px": [
+        168.0,
+        298.6666666666667
+      ],
+      "row_height_pt": 228.5,
+      "column_width": 24.0,
+      "alt": "synthetic-duplicate-name.png • 4c00ee36-f0b4-4890-90ee-8d30bdc837b6 • evidence:4c00ee36-f0b4-4890-90ee-8d30bdc837b6:0:4c00ee36-f0b4-4890-90ee-8d30bdc837b6"
+    },
+    {
+      "cell": "F10",
+      "media": "xl/media/image3.png",
+      "media_sha256": "a5c359bece95aacfc94352e8541ae0fd90e928833cdbdc2799c7c46fe027fd73",
+      "extent_px": [
+        168.0,
+        168.0
+      ],
+      "row_height_pt": 130.5,
+      "column_width": 24.0,
+      "alt": "synthetic-SQUARE.png • c27d5f38-127d-4f0e-b3c6-56b8176a475e • evidence:c27d5f38-127d-4f0e-b3c6-56b8176a475e:0:c27d5f38-127d-4f0e-b3c6-56b8176a475e"
+    },
+    {
+      "cell": "F11",
+      "media": "xl/media/image4.png",
+      "media_sha256": "a2f4ea689e17aaae391d8f53f2004f81e214695487fca2c439254ddce9fb3b0b",
+      "extent_px": [
+        87.08587926509186,
+        314.0
+      ],
+      "row_height_pt": 240.0,
+      "column_width": 24.0,
+      "alt": "synthetic-TALL.png • 6c9cfa96-63f4-456f-ae5b-ea29472903dc • evidence:6c9cfa96-63f4-456f-ae5b-ea29472903dc:0:6c9cfa96-63f4-456f-ae5b-ea29472903dc"
+    }
+  ],
+  "stored_error_cells": [],
+  "baseline_media_preserved": true
+}

@@ -1,0 +1,18 @@
+{
+  "database": "consflow",
+  "migration_count": 157,
+  "projects": 5,
+  "forms": 20,
+  "preexisting_revision_hashes": [
+    {
+      "id": "27254c55-98de-4a20-afaf-7dddf83e91c8",
+      "snapshot_sha256": "b9006547ae54b475a46423ced5db9cfa7a857bd909babf99de08778c3d649349",
+      "row_md5": "ef5b234b9ec1c49c6f872221c35ae339"
+    },
+    {
+      "id": "d67ba75e-a4f3-4456-add3-2546e7aa061f",
+      "snapshot_sha256": "5ebcaf9d6f9ea7c6903938b70babdbab1ffa1dbb4dd359f546d795894637de59",
+      "row_md5": "1c9d0061b832fd4b368737465a8b957d"
+    }
+  ]
+}

@@ -1,0 +1,801 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Action completed."
+    }
+  ],
+  "structuredContent": {
+    "spreadsheetId": "1ptpkllrh0k5_w0AVifCWY2AZtNLt8iQ2EMIT8oW7Yug",
+    "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/1ptpkllrh0k5_w0AVifCWY2AZtNLt8iQ2EMIT8oW7Yug/edit",
+    "properties": {
+      "title": "BM03 Rev10 — Phiên bản R1 từ nút Xuất báo cáo — UAT 13-10-2026",
+      "locale": "en_US",
+      "timeZone": "America/Los_Angeles"
+    },
+    "sheets": [
+      {
+        "properties": {
+          "sheetId": 1417937305,
+          "title": "2026-10-13_01",
+          "index": 0,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM",
+                    "userEnteredValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "CÔNG TY TNHH ĐẦU TƯ XÂY DỰNG THỦ THIÊM"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)",
+                    "userEnteredValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "THỦ THIÊM CONSTRUCTION • BỘ BIỂU MẪU GIÁM SÁT CÔNG TRÌNH (BM-GS-03)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG",
+                    "userEnteredValue": {
+                      "stringValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "BIÊN BẢN NGHIỆM THU NỘI BỘ CHẤT LƯỢNG & KHỐI LƯỢNG"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "Số biên bản:",
+                    "userEnteredValue": {
+                      "stringValue": "Số biên bản:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Số biên bản:"
+                    }
+                  },
+                  {
+                    "formattedValue": "UAT-BM03-REV10-20261013-R1",
+                    "userEnteredValue": {
+                      "stringValue": "UAT-BM03-REV10-20261013-R1"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "UAT-BM03-REV10-20261013-R1"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "Ngày nghiệm thu:",
+                    "userEnteredValue": {
+                      "stringValue": "Ngày nghiệm thu:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ngày nghiệm thu:"
+                    }
+                  },
+                  {
+                    "formattedValue": "2026-10-13",
+                    "userEnteredValue": {
+                      "stringValue": "2026-10-13"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "2026-10-13"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Hạng mục nghiệm thu:",
+                    "userEnteredValue": {
+                      "stringValue": "Hạng mục nghiệm thu:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Hạng mục nghiệm thu:"
+                    }
+                  },
+                  {
+                    "formattedValue": "Sàn",
+                    "userEnteredValue": {
+                      "stringValue": "Sàn"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Sàn"
+                    }
+                  },
+                  {},
+                  {},
+                  {
+                    "formattedValue": "Thầu phụ thi công:",
+                    "userEnteredValue": {
+                      "stringValue": "Thầu phụ thi công:"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Thầu phụ thi công:"
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Tổ chống thấm UAT",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Tổ chống thấm UAT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Tổ chống thấm UAT"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "STT",
+                    "userEnteredValue": {
+                      "stringValue": "STT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "STT"
+                    }
+                  },
+                  {
+                    "formattedValue": "NỘI DUNG NGHỊỆM THU",
+                    "userEnteredValue": {
+                      "stringValue": "NỘI DUNG NGHỊỆM THU"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "NỘI DUNG NGHỊỆM THU"
+                    }
+                  },
+                  {
+                    "formattedValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU",
+                    "userEnteredValue": {
+                      "stringValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "TIÊU CHUẨN / BẢN VẼ ĐỐI CHIẾU"
+                    }
+                  },
+                  {
+                    "formattedValue": "YÊU CẦU KỸ THUẬT",
+                    "userEnteredValue": {
+                      "stringValue": "YÊU CẦU KỸ THUẬT"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "YÊU CẦU KỸ THUẬT"
+                    }
+                  },
+                  {
+                    "formattedValue": "KL THIẾT KẾ",
+                    "userEnteredValue": {
+                      "stringValue": "KL THIẾT KẾ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "KL THIẾT KẾ"
+                    }
+                  },
+                  {
+                    "formattedValue": "KL THỰC TẾ",
+                    "userEnteredValue": {
+                      "stringValue": "KL THỰC TẾ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "KL THỰC TẾ"
+                    }
+                  },
+                  {
+                    "formattedValue": "KẾT QUẢ & ĐÁNH GIÁ",
+                    "userEnteredValue": {
+                      "stringValue": "KẾT QUẢ & ĐÁNH GIÁ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "KẾT QUẢ & ĐÁNH GIÁ"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "1",
+                    "userEnteredValue": {
+                      "numberValue": 1
+                    },
+                    "effectiveValue": {
+                      "numberValue": 1
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Bề mặt sàn trước chống thấm",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Bề mặt sàn trước chống thấm"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Bề mặt sàn trước chống thấm"
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Quy trình thử S-01 • [Synthetic] KT-WC-02 RevA",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Quy trình thử S-01 • [Synthetic] KT-WC-02 RevA"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Quy trình thử S-01 • [Synthetic] KT-WC-02 RevA"
+                    }
+                  },
+                  {
+                    "formattedValue": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử",
+                    "userEnteredValue": {
+                      "stringValue": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Sàn sạch; góc chân tường xử lý theo bản vẽ thử"
+                    }
+                  },
+                  {
+                    "formattedValue": "25 m2",
+                    "userEnteredValue": {
+                      "numberValue": 25
+                    },
+                    "effectiveValue": {
+                      "numberValue": 25
+                    },
+                    "userEnteredFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    },
+                    "effectiveFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "24.8 m2",
+                    "userEnteredValue": {
+                      "numberValue": 24.8
+                    },
+                    "effectiveValue": {
+                      "numberValue": 24.8
+                    },
+                    "userEnteredFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0.0 \"m2\""
+                      }
+                    },
+                    "effectiveFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0.0 \"m2\""
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "Đạt · [Synthetic] Đạt yêu cầu bề mặt tại vùng thử",
+                    "userEnteredValue": {
+                      "stringValue": "Đạt · [Synthetic] Đạt yêu cầu bề mặt tại vùng thử"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Đạt · [Synthetic] Đạt yêu cầu bề mặt tại vùng thử"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "2",
+                    "userEnteredValue": {
+                      "numberValue": 2
+                    },
+                    "effectiveValue": {
+                      "numberValue": 2
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Thử nước chống thấm 24 giờ",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Thử nước chống thấm 24 giờ"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Thử nước chống thấm 24 giờ"
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Quy trình thử S-02 • [Synthetic] KT-WC-03 RevB",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Quy trình thử S-02 • [Synthetic] KT-WC-03 RevB"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Quy trình thử S-02 • [Synthetic] KT-WC-03 RevB"
+                    }
+                  },
+                  {
+                    "formattedValue": "Ngâm nước thử 50 mm trong 24 giờ; không rò",
+                    "userEnteredValue": {
+                      "stringValue": "Ngâm nước thử 50 mm trong 24 giờ; không rò"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ngâm nước thử 50 mm trong 24 giờ; không rò"
+                    }
+                  },
+                  {
+                    "formattedValue": "25 m2",
+                    "userEnteredValue": {
+                      "numberValue": 25
+                    },
+                    "effectiveValue": {
+                      "numberValue": 25
+                    },
+                    "userEnteredFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    },
+                    "effectiveFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "25 m2",
+                    "userEnteredValue": {
+                      "numberValue": 25
+                    },
+                    "effectiveValue": {
+                      "numberValue": 25
+                    },
+                    "userEnteredFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    },
+                    "effectiveFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "Đạt · [Synthetic] Không phát hiện rò trong mẫu kiểm tra",
+                    "userEnteredValue": {
+                      "stringValue": "Đạt · [Synthetic] Không phát hiện rò trong mẫu kiểm tra"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Đạt · [Synthetic] Không phát hiện rò trong mẫu kiểm tra"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "3",
+                    "userEnteredValue": {
+                      "numberValue": 3
+                    },
+                    "effectiveValue": {
+                      "numberValue": 3
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Độ dốc và lát gạch sàn",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Độ dốc và lát gạch sàn"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Độ dốc và lát gạch sàn"
+                    }
+                  },
+                  {
+                    "formattedValue": "[Synthetic] Mẫu duyệt MAT-03 • [Synthetic] KT-WC-04 RevC",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Mẫu duyệt MAT-03 • [Synthetic] KT-WC-04 RevC"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Mẫu duyệt MAT-03 • [Synthetic] KT-WC-04 RevC"
+                    }
+                  },
+                  {
+                    "formattedValue": "Độ dốc thử 1.5-2%; ron không quá 1 mm",
+                    "userEnteredValue": {
+                      "stringValue": "Độ dốc thử 1.5-2%; ron không quá 1 mm"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Độ dốc thử 1.5-2%; ron không quá 1 mm"
+                    }
+                  },
+                  {
+                    "formattedValue": "25 m2",
+                    "userEnteredValue": {
+                      "numberValue": 25
+                    },
+                    "effectiveValue": {
+                      "numberValue": 25
+                    },
+                    "userEnteredFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    },
+                    "effectiveFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0 \"m2\""
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "24.6 m2",
+                    "userEnteredValue": {
+                      "numberValue": 24.6
+                    },
+                    "effectiveValue": {
+                      "numberValue": 24.6
+                    },
+                    "userEnteredFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0.0 \"m2\""
+                      }
+                    },
+                    "effectiveFormat": {
+                      "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "0.0 \"m2\""
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "Đạt · [Synthetic] Đạt yêu cầu đo tại mẫu thử",
+                    "userEnteredValue": {
+                      "stringValue": "Đạt · [Synthetic] Đạt yêu cầu đo tại mẫu thử"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Đạt · [Synthetic] Đạt yêu cầu đo tại mẫu thử"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "KẾT LUẬN NGHIỆM THU: [ X ] ĐỒNG Ý NGHIỆM THU  |  [   ] CẦN SỬA CHỮA TỒN TẠI",
+                    "userEnteredValue": {
+                      "stringValue": "KẾT LUẬN NGHIỆM THU: [ X ] ĐỒNG Ý NGHIỆM THU  |  [   ] CẦN SỬA CHỮA TỒN TẠI"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "KẾT LUẬN NGHIỆM THU: [ X ] ĐỒNG Ý NGHIỆM THU  |  [   ] CẦN SỬA CHỮA TỒN TẠI"
+                    }
+                  }
+                ]
+              },
+              {},
+              {
+                "values": [
+                  {
+                    "formattedValue": "Thông tin đối soát nguồn (không phải khối lượng đo thực tế)",
+                    "userEnteredValue": {
+                      "stringValue": "Thông tin đối soát nguồn (không phải khối lượng đo thực tế)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Thông tin đối soát nguồn (không phải khối lượng đo thực tế)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Bề mặt sàn trước chống thấm · Khối lượng đề nghị: 23 · Khối lượng xác nhận đối soát: 23 · Ghi chú đo: [Synthetic] Đo theo sơ đồ ô thử",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Bề mặt sàn trước chống thấm · Khối lượng đề nghị: 23 · Khối lượng xác nhận đối soát: 23 · Ghi chú đo: [Synthetic] Đo theo sơ đồ ô thử"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Bề mặt sàn trước chống thấm · Khối lượng đề nghị: 23 · Khối lượng xác nhận đối soát: 23 · Ghi chú đo: [Synthetic] Đo theo sơ đồ ô thử"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Thử nước chống thấm 24 giờ · Khối lượng đề nghị: 20 · Khối lượng xác nhận đối soát: 20",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Thử nước chống thấm 24 giờ · Khối lượng đề nghị: 20 · Khối lượng xác nhận đối soát: 20"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Thử nước chống thấm 24 giờ · Khối lượng đề nghị: 20 · Khối lượng xác nhận đối soát: 20"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Độ dốc và lát gạch sàn · Khối lượng đề nghị: 21 · Khối lượng xác nhận đối soát: 21",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Độ dốc và lát gạch sàn · Khối lượng đề nghị: 21 · Khối lượng xác nhận đối soát: 21"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Độ dốc và lát gạch sàn · Khối lượng đề nghị: 21 · Khối lượng xác nhận đối soát: 21"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)",
+                    "userEnteredValue": {
+                      "stringValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Trạng thái checklist và phản hồi đối soát nguồn (không thay thế đánh giá chất lượng)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Bề mặt sàn trước chống thấm · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Bề mặt sàn trước chống thấm · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Bề mặt sàn trước chống thấm · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Thử nước chống thấm 24 giờ · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Thử nước chống thấm 24 giờ · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Thử nước chống thấm 24 giờ · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Độ dốc và lát gạch sàn · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Độ dốc và lát gạch sàn · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Độ dốc và lát gạch sàn · Trạng thái checklist: Đã thực hiện · Phản hồi đối soát: Chấp nhận"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Đại diện thầu phụ đã ghi nhận",
+                    "userEnteredValue": {
+                      "stringValue": "Đại diện thầu phụ đã ghi nhận"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Đại diện thầu phụ đã ghi nhận"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Đại diện tổ thử",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Đại diện tổ thử"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Đại diện tổ thử"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Khu vực thi công",
+                    "userEnteredValue": {
+                      "stringValue": "Khu vực thi công"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Khu vực thi công"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] WC tầng 1 - Khu thử",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] WC tầng 1 - Khu thử"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] WC tầng 1 - Khu thử"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Ghi chú checklist",
+                    "userEnteredValue": {
+                      "stringValue": "Ghi chú checklist"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "Ghi chú checklist"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] Rev10 R1; dữ liệu thử nội bộ, không phải nghiệm thu công trình thật.",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] Rev10 R1; dữ liệu thử nội bộ, không phải nghiệm thu công trình thật."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] Rev10 R1; dữ liệu thử nội bộ, không phải nghiệm thu công trình thật."
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "GIÁM SÁT CÔNG TRÌNH",
+                    "userEnteredValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "GIÁM SÁT CÔNG TRÌNH"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "ĐẠI DIỆN THẦU PHỤ (24/7)",
+                    "userEnteredValue": {
+                      "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "ĐẠI DIỆN THẦU PHỤ (24/7)"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "QUẢN LÝ DỰ ÁN (PM)",
+                    "userEnteredValue": {
+                      "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "QUẢN LÝ DỰ ÁN (PM)"
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  },
+                  {},
+                  {
+                    "formattedValue": "(Ký & ghi rõ họ tên)",
+                    "userEnteredValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    },
+                    "effectiveValue": {
+                      "stringValue": "(Ký & ghi rõ họ tên)"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "properties": {
+          "sheetId": 2077407484,
+          "title": "Hình ảnh",
+          "index": 1,
+          "sheetType": "GRID",
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 26,
+            "rowGroupControlAfter": true,
+            "columnGroupControlAfter": true
+          }
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "[Synthetic] BM03 ảnh nguồn nghiệm thu • 99d24495-827c-42b6-b575-dea587da6b52\nChecklist nhà thầu phụ · f5dbac7f-86f4-4b16-a0a1-80092e8592db\n\n[Synthetic] Internal BM03 image test, not physical construction evidence.",
+                    "userEnteredValue": {
+                      "stringValue": "[Synthetic] BM03 ảnh nguồn nghiệm thu • 99d24495-827c-42b6-b575-dea587da6b52\nChecklist nhà thầu phụ · f5dbac7f-86f4-4b16-a0a1-80092e8592db\n\n[Synthetic] Internal BM03 image test, not physical construction evidence."
+                    },
+                    "effectiveValue": {
+                      "stringValue": "[Synthetic] BM03 ảnh nguồn nghiệm thu • 99d24495-827c-42b6-b575-dea587da6b52\nChecklist nhà thầu phụ · f5dbac7f-86f4-4b16-a0a1-80092e8592db\n\n[Synthetic] Internal BM03 image test, not physical construction evidence."
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "isError": false
+}

@@ -1,5 +1,9 @@
 # Materials Warehouse Domain Map
 
+## Native Report Arrival Reuse — 2026-10-09
+
+- `native_daily_source_reuse.go` is a bounded reporting read contract over `incoming_acceptance_records/items`, not a stock action. Updated approved BM02 scope is project/received business date; receipt/report owners remain distinct. Canonical project source-view permission plus each nonnull parent/effective item Work Item's same-project visibility applies before the visible200 bound. Genuine ownerless receipts are eligible under project permission; malformed nonnull owners fail closed. Only submitted receipts contribute name/unit/delivered quantity/item comment and header/item/owner provenance. Accepted quantity, supplier/origin/specification and usage remain distinct. Limit200 is explicit overflow, never truncation. Default empty capture lists allow reuse; nonempty manual capture wins. Workflow Submit/Amend freezes facts in that exact form revision and workflow delivery consumes those facts; manual reports freeze at send. Old or missing historical facts never receive live supplementation.
+
 ## Current Accounting Retirement Boundary — V150/V151
 
 - accounting_reconciliation.go/AccountingOperationsDialog own read-only source/evidence references; source matching never moves/values stock or creates internal financial records.

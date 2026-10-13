@@ -103,13 +103,14 @@ function workflowFormTypeForStep(stepType: string) {
 }
 
 export function defaultWorkflowFormVersionForStep(stepType: string, catalog: WorkflowFormCatalogItem[], nodeType?: string, stepName = '') {
+  const defaults = catalog.filter((form) => form.default_eligible !== false);
   const preferredCode = preferredWorkflowFormCodeForStep(stepType, nodeType, stepName);
   if (preferredCode) {
-    const preferred = catalog.find((form) => form.template_code === preferredCode);
+    const preferred = defaults.find((form) => form.template_code === preferredCode);
     if (preferred) return preferred.version_id;
   }
   const formType = workflowFormTypeForStep(stepType);
-  return catalog.find((form) => form.form_type === formType)?.version_id ?? catalog.find((form) => form.form_type === 'generic_submission')?.version_id ?? catalog[0]?.version_id ?? '';
+  return defaults.find((form) => form.form_type === formType)?.version_id ?? defaults.find((form) => form.form_type === 'generic_submission')?.version_id ?? defaults[0]?.version_id ?? '';
 }
 
 function preferredWorkflowFormCodeForStep(stepType: string, nodeType?: string, stepName = '') {
