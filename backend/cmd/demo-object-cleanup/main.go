@@ -104,23 +104,26 @@ func readManifest(reader io.Reader) ([]string, error) {
 	keys := make([]string, 0, 23)
 	scanner := bufio.NewScanner(io.LimitReader(reader, 32<<10))
 	for scanner.Scan() {
-		key := scanner.Text()
+		parts := strings.SplitN(scanner.Text(), "\t", 2)
+		if len(parts) != 2 {
+			return nil, errors.New("object manifest row does not name its archive family")
+		}
+		family, key := parts[0], parts[1]
 		if key == "" || strings.TrimSpace(key) != key || strings.ContainsRune(key, '\x00') ||
 			strings.HasPrefix(key, "/") || path.Clean(key) != key || seen[key] {
 			return nil, errors.New("object manifest contains an invalid or duplicate key")
 		}
-		prefix := strings.SplitN(key, "/", 2)[0]
-		if prefix != "evidence" && prefix != "workflow-form-pdfs" && prefix != "workflow-signatures" {
-			return nil, errors.New("object manifest contains an unexpected key family")
+		if family != "evidence_records" && family != "workflow_form_pdf_exports" && family != "workflow_form_signatures" {
+			return nil, errors.New("object manifest contains an unexpected archive family")
 		}
 		seen[key] = true
-		counts[prefix]++
+		counts[family]++
 		keys = append(keys, key)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, errors.New("cannot read object manifest")
 	}
-	if len(keys) != 23 || counts["evidence"] != 13 || counts["workflow-form-pdfs"] != 9 || counts["workflow-signatures"] != 1 {
+	if len(keys) != 23 || counts["evidence_records"] != 13 || counts["workflow_form_pdf_exports"] != 9 || counts["workflow_form_signatures"] != 1 {
 		return nil, errors.New("object manifest does not match the restored V145 archive inventory")
 	}
 	return keys, nil

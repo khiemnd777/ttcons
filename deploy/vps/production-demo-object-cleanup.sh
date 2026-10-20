@@ -60,11 +60,13 @@ archive_created=1
 "${compose[@]}" exec -T postgres sh -ec \
   'exec psql -X -A -t -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1"' \
   sh "$archive_db" > "$workdir/keys" <<'SQL'
-SELECT storage_key FROM evidence_records WHERE storage_provider='s3' AND storage_key IS NOT NULL
+SELECT 'evidence_records' || E'\t' || storage_key
+FROM evidence_records WHERE storage_provider='s3' AND storage_key IS NOT NULL
 UNION ALL
-SELECT storage_key FROM workflow_form_pdf_exports WHERE storage_provider='s3' AND storage_key IS NOT NULL
+SELECT 'workflow_form_pdf_exports' || E'\t' || storage_key
+FROM workflow_form_pdf_exports WHERE storage_provider='s3' AND storage_key IS NOT NULL
 UNION ALL
-SELECT visual_storage_key FROM workflow_form_signatures
+SELECT 'workflow_form_signatures' || E'\t' || visual_storage_key FROM workflow_form_signatures
 WHERE visual_storage_provider='s3' AND visual_storage_key IS NOT NULL
 ORDER BY 1;
 SQL
