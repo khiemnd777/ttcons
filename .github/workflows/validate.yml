@@ -67,7 +67,7 @@ jobs:
         # CI deliberately bypasses the local-env Makefile export layer so unset
         # config remains truly unset in config tests. DB-backed packages share
         # one disposable PostgreSQL service and therefore run serially.
-        run: go test -p 1 ./...
+        run: go test -timeout 30m -p 1 ./...
 
       - name: Test release tag validator
         run: bash scripts/test-release-tag.sh
