@@ -30,9 +30,9 @@ export function VerifyRecoveryEmailPage() {
   }, [refreshUser, token, user]);
 
   return (
-    <AuthCard title="Xác minh email khôi phục" description="Xác nhận địa chỉ dùng để nhận hướng dẫn khi anh/chị quên mật khẩu.">
+    <AuthCard title="Xác minh email khôi phục" description="Xác nhận địa chỉ liên hệ bổ sung cho quá trình khôi phục tài khoản.">
       {state === 'loading' ? <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800" role="status">Đang xác minh email...</div> : null}
-      {state === 'success' ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800" role="status">Email khôi phục đã được xác minh và có thể dùng cho quy trình quên mật khẩu.</div> : null}
+      {state === 'success' ? <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800" role="status">Email liên hệ đã được xác minh. Developer vẫn phải xác minh danh tính trước khi cấp liên kết.</div> : null}
       {state === 'error' ? <div className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-800" role="alert">{message}</div> : null}
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <Link className="rounded-md bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-blue-700" to="/login">Đăng nhập</Link>

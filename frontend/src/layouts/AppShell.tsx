@@ -76,6 +76,7 @@ const navGroups: NavGroup[] = [
       { to: '/warehouse?tab=materials', label: 'Vật tư', icon: PackageCheck, permissions: ['material.view'], excludePermissions: ['warehouse.view'] },
       { to: '/warehouse', label: 'Kho vật tư', icon: Warehouse, permissions: ['warehouse.view'] },
       { to: '/staff', label: 'Nhân sự', icon: Users, permissions: ['staff.view'], excludePermissions: ['project.reconciliation.view'] },
+      { to: '/recovery-requests', label: 'Yêu cầu khôi phục', icon: ShieldCheck, permissions: ['account_recovery.manage'] },
       { to: '/roles', label: 'Vai trò', icon: ShieldCheck, permissions: ['role.view'], excludePermissions: ['project.reconciliation.view'] },
       { to: '/audit', label: 'Audit nghiệp vụ', icon: FileClock, permissions: ['audit.view'], excludePermissions: ['project.reconciliation.view'] },
       { to: '/event-logs', label: 'Nhật ký sự kiện', icon: Bug, permissions: ['event_log.view'], excludePermissions: ['project.reconciliation.view'] },

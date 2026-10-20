@@ -3,6 +3,10 @@ package core
 import "github.com/gofiber/fiber/v2"
 
 func registerAdminRoutes(protected fiber.Router, h *Handler) {
+	protected.Get("/account-recovery/requests", h.ListDeveloperRecoveryRequests)
+	protected.Get("/account-recovery/requests/:id", h.GetDeveloperRecoveryRequest)
+	protected.Post("/account-recovery/requests/:id/issue", h.IssueDeveloperRecoveryLink)
+	protected.Post("/account-recovery/requests/:id/reject", h.RejectDeveloperRecoveryRequest)
 	protected.Get("/staff", h.ListStaff)
 	protected.Post("/staff", h.CreateStaff)
 	protected.Post("/staff/imports/preview", h.PreviewStaffAccountImport)

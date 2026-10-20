@@ -32,7 +32,7 @@ test('staff edit dialog exposes permission-gated direct account security fields'
   assert.match(page, /Hiện tại: \$\{record\.recovery_email_masked\} · Đã xác minh/);
   assert.match(page, /name: 'recovery_email'[\s\S]*?defaultValue: ''/);
   assert.doesNotMatch(page, /defaultValue:\s*record\.recovery_email_masked/);
-  assert.match(page, /Email mới được xác minh ngay, không gửi email xác nhận/);
+  assert.match(page, /Email mới được xác minh ngay/);
   assert.match(page, /Nhân sự chưa liên kết tài khoản đăng nhập/);
   assert.match(page, /await queryClient\.invalidateQueries\(\{ queryKey: \['staff'\] \}\)/);
   assert.match(simpleForm, /'email' \| 'password'/);

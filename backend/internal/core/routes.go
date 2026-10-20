@@ -31,7 +31,7 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	} else if recoverySender != nil {
 		log.Printf("level=info component=account_recovery operation=configure status=ready provider=smtp")
 	}
-	service.ConfigureAccountRecovery(recoverySender != nil, recoverySender, cfg.FrontendOrigin, cfg.AuthRecoveryTokenTTL, cfg.AuthRecoveryVerifyTTL)
+	service.ConfigureAccountRecovery(cfg.AuthRecoveryEnabled, recoverySender, cfg.FrontendOrigin, cfg.AuthRecoveryTokenTTL, cfg.AuthRecoveryVerifyTTL)
 	service.ConfigureActivityStreaming(redisClient, cfg.SSEBrokerChannel, cfg.RedisOperationTimeout, cfg.SSEMaxConnections, cfg.SSEMaxConnectionsPerIP, cfg.SSEMaxConnectionsPerActor, cfg.SSEVisibilityTimeout, cfg.SSEMaxConnectionLifetime)
 	service.ConfigureProjectExplorerCache(redisCacheClient, ProjectExplorerCacheConfig{
 		Mode:             cfg.ProjectExplorerCacheMode,

@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { z } from 'zod';
 import { post } from '../../lib/api/client';
 import { useToast } from '../../components/ToastProvider';
@@ -25,11 +25,11 @@ export function ForgotPasswordPage() {
   });
 
   return (
-    <AuthCard title="Quên mật khẩu" description="Nhập email đăng nhập. Nếu tài khoản đã có email khôi phục hợp lệ, hệ thống sẽ gửi hướng dẫn đến địa chỉ đó.">
+    <AuthCard title="Quên mật khẩu" description="Gửi yêu cầu để bộ phận hỗ trợ xác minh danh tính và cung cấp liên kết đặt lại mật khẩu.">
       {submitted ? (
         <div className="space-y-4">
           <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800" role="status">
-            Nếu tài khoản có email khôi phục hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi trong ít phút.
+            Nếu tài khoản hợp lệ, bộ phận hỗ trợ sẽ xem xét yêu cầu khôi phục.
           </div>
           <button type="button" className="w-full rounded-md border border-line px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => { setSubmitted(false); requestReset.reset(); }}>
             Gửi lại yêu cầu
@@ -46,8 +46,8 @@ export function ForgotPasswordPage() {
             {form.formState.errors.email ? <span id="forgot-email-error" role="alert" className="mt-1 block text-xs font-medium text-rose-600">{form.formState.errors.email.message}</span> : null}
           </label>
           <button disabled={requestReset.isPending} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-            <Mail className="h-4 w-4" />
-            {requestReset.isPending ? 'Đang gửi...' : 'Gửi hướng dẫn khôi phục'}
+            <KeyRound className="h-4 w-4" />
+            {requestReset.isPending ? 'Đang gửi...' : 'Gửi yêu cầu khôi phục'}
           </button>
           {requestReset.isError ? <p className="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">Không kết nối được dịch vụ khôi phục. Vui lòng thử lại.</p> : null}
         </form>

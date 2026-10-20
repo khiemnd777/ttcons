@@ -158,7 +158,7 @@ export function StaffPage() {
       defaultValue: '',
       fullWidth: true,
       placeholder: 'Không bắt buộc',
-      helperText: 'Nếu nhập, email này được xác minh ngay để nhân sự có thể khôi phục tài khoản.',
+      helperText: 'Email liên hệ bổ sung cho quá trình xác minh yêu cầu khôi phục. Developer vẫn phải xác minh danh tính trước khi cấp liên kết.',
       validate: validateOptionalRecoveryEmail,
     },
   ];
@@ -390,12 +390,12 @@ function StaffMobileCard({ row, actions }: { row: StaffRow; actions: ReactNode }
 
 function recoveryEmailHelperText(record: StaffRow) {
   if (record.recovery_email_masked) {
-    return `Hiện tại: ${record.recovery_email_masked} · Đã xác minh. Để trống để giữ nguyên. Email mới được xác minh ngay, không gửi email xác nhận.`;
+    return `Hiện tại: ${record.recovery_email_masked} · Đã xác minh. Đây là email liên hệ bổ sung cho Developer. Để trống để giữ nguyên.`;
   }
   if (record.has_recovery_email) {
-    return 'Đã thiết lập email khôi phục. Để trống để giữ nguyên. Email mới được xác minh ngay, không gửi email xác nhận.';
+    return 'Đã thiết lập email liên hệ bổ sung cho Developer. Để trống để giữ nguyên.';
   }
-  return 'Chưa thiết lập email khôi phục. Email mới được xác minh ngay, không gửi email xác nhận.';
+  return 'Chưa có email liên hệ bổ sung cho Developer. Email mới được xác minh ngay.';
 }
 
 function validateOptionalPassword(value: unknown) {

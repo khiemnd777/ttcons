@@ -1,5 +1,9 @@
 # Consflow Root-Cause Triage Map
 
+## Developer-assisted password recovery — 2026-10-20
+
+- If a public request returns accepted but Developer sees no queue row, inspect `account_recovery_requests` eligibility/cooldown, migration V159, and `CreateDeveloperRecoveryRequest`; generic public success cannot prove persistence. If the row exists but the bell does not update, inspect `notification_events`/`notification_outbox`, `account.recovery_requested` catalog, global Developer grant and `notification_platform.go` pending-state projection. If issue or reset fails, check current global Developer role, request status, configured `FRONTEND_ORIGIN`, token purpose/hash/expiry/target email and account status; never log or display raw token or password. First searches: `account.recovery_requested|account_recovery_requests|DeveloperRecoveryAllowed|IssueDeveloperRecoveryLink|ResetPasswordWithToken`.
+
 ## Pipeline Builder false Form-version warnings — 2026-10-20
 
 - If `Kiểm tra` reports a pinned Form as unpublished/inactive while publish succeeds, compare `WorkflowFormCatalog` selection filtering with `GetTemplateDetail.pinned_workflow_forms` and `TemplatePublishFormIssues`. Read `PipelineBuilderPage.tsx::workflowFormsForTemplate` and `NodeInspectorPanel.tsx::workflowFormOptions`; only active/published pins qualify, and hidden pins must not enter new selections. First search: `pinned_workflow_forms|workflowFormsForTemplate|workflowFormOptions|buildValidationIssues|TemplatePublishFormIssues`.

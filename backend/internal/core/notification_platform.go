@@ -431,6 +431,15 @@ func loadNotificationProjection(ctx context.Context, tx *sql.Tx, eventID string)
 func (s *Service) resolveNotificationRecipients(ctx context.Context, tx *sql.Tx, projection notificationProjection) ([]string, error) {
 	switch projection.AudiencePolicyKey {
 	case "explicit_users":
+		if projection.EventKey == "account.recovery_requested" {
+			var status string
+			if err := tx.QueryRowContext(ctx, `SELECT status FROM account_recovery_requests WHERE id=$1::uuid`, projection.AggregateID).Scan(&status); err != nil {
+				return nil, err
+			}
+			if status != "pending" {
+				return []string{}, nil
+			}
+		}
 		if boolValue(projection.Audience["require_pending_approval"]) {
 			approvalRequestID := cleanID(projection.Audience["approval_request_id"])
 			if !validActivityUUID(approvalRequestID) {

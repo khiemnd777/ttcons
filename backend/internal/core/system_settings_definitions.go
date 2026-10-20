@@ -46,7 +46,7 @@ func buildSystemSettingDefinitions() []systemSettingDefinition {
 		enumSetting("AUTH_REFRESH_COOKIE_SAME_SITE", "authentication", "SameSite của refresh cookie", "Chính sách SameSite áp dụng cho refresh cookie.", []SystemSettingOption{
 			{Value: "Lax", Label: "Lax"}, {Value: "Strict", Label: "Strict"}, {Value: "None", Label: "None"},
 		}, true),
-		booleanSetting("AUTH_RECOVERY_ENABLED", "authentication", "Bật khôi phục tài khoản", "Cho phép luồng quên mật khẩu qua email khôi phục.", true),
+		booleanSetting("AUTH_RECOVERY_ENABLED", "authentication", "Bật xác minh email liên hệ", "Cho phép xác minh email liên hệ bổ sung qua SMTP.", true),
 		durationSetting("AUTH_RECOVERY_TOKEN_TTL", "authentication", "Thời hạn token đặt lại mật khẩu", "Thời gian token đặt lại mật khẩu còn hiệu lực.", false, true),
 		durationSetting("AUTH_RECOVERY_VERIFY_TTL", "authentication", "Thời hạn xác minh email", "Thời gian token xác minh email khôi phục còn hiệu lực.", false, true),
 

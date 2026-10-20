@@ -148,104 +148,50 @@ func (r *Repository) RemoveRecoveryEmail(ctx context.Context, userID, actorName,
 	return tx.Commit()
 }
 
-func (r *Repository) FindRecoveryAccountByLoginEmail(ctx context.Context, loginEmail string) (Record, error) {
-	return r.QueryOne(ctx, `
-		SELECT account.id::text,account.full_name,account.recovery_email
-		FROM users account
-		WHERE account.email=$1 AND account.status='active'
-		  AND account.recovery_email IS NOT NULL
-		  AND account.recovery_email_verified_at IS NOT NULL
-		  AND NOT EXISTS (
-			SELECT 1 FROM user_roles assignment
-			JOIN roles role ON role.id=assignment.role_id
-			WHERE assignment.user_id=account.id AND role.external_only
-		  )
-	`, loginEmail)
-}
-
-func (r *Repository) CreatePasswordResetToken(ctx context.Context, userID, tokenHash, targetEmail string, expiresAt time.Time) (bool, error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, err
-	}
-	defer tx.Rollback()
-	if err := cleanupAuthEmailTokensTx(ctx, tx); err != nil {
-		return false, err
-	}
-
-	var lockedEmail string
-	if err := tx.QueryRowContext(ctx, `
-		SELECT account.recovery_email
-		FROM users account
-		WHERE account.id=$1 AND account.status='active'
-		  AND account.recovery_email=$2 AND account.recovery_email_verified_at IS NOT NULL
-		  AND NOT EXISTS (
-			SELECT 1 FROM user_roles assignment
-			JOIN roles role ON role.id=assignment.role_id
-			WHERE assignment.user_id=account.id AND role.external_only
-		  )
-		FOR UPDATE OF account
-	`, userID, targetEmail).Scan(&lockedEmail); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, nil
-		}
-		return false, err
-	}
-	var coolingDown bool
-	if err := tx.QueryRowContext(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM auth_email_tokens
-			WHERE user_id=$1 AND purpose=$2 AND created_at > now()-interval '60 seconds'
-			  AND consumed_at IS NULL AND invalidated_at IS NULL AND expires_at > now()
-		)
-	`, userID, passwordResetPurpose).Scan(&coolingDown); err != nil {
-		return false, err
-	}
-	if coolingDown {
-		return false, nil
-	}
-	if _, err := tx.ExecContext(ctx, `
-		UPDATE auth_email_tokens SET invalidated_at=now()
-		WHERE user_id=$1 AND purpose=$2 AND consumed_at IS NULL AND invalidated_at IS NULL
-	`, userID, passwordResetPurpose); err != nil {
-		return false, err
-	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO auth_email_tokens (user_id,purpose,token_hash,target_email,expires_at)
-		VALUES ($1,$2,$3,$4,$5)
-	`, userID, passwordResetPurpose, tokenHash, targetEmail, expiresAt); err != nil {
-		return false, err
-	}
-	if err := tx.Commit(); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
 func (r *Repository) ResetPasswordWithToken(ctx context.Context, tokenHash, passwordHash, passwordValue string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	var developerRequestID sql.NullString
+	if err := tx.QueryRowContext(ctx, `
+		SELECT recovery_request_id::text FROM auth_email_tokens
+		WHERE token_hash=$1 AND purpose=$2
+	`, tokenHash, developerPasswordResetPurpose).Scan(&developerRequestID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if developerRequestID.Valid {
+		var status string
+		if err := tx.QueryRowContext(ctx, `
+			SELECT status FROM account_recovery_requests WHERE id=$1::uuid FOR UPDATE
+		`, developerRequestID.String).Scan(&status); err != nil {
+			return err
+		}
+		if status != "issued" {
+			return sql.ErrNoRows
+		}
+	}
 
-	var tokenID, userID, fullName, currentPasswordHash string
+	var tokenID, userID, fullName, currentPasswordHash, purpose string
 	err = tx.QueryRowContext(ctx, `
-		SELECT token.id::text,account.id::text,account.full_name,account.password_hash
+		SELECT token.id::text,account.id::text,account.full_name,account.password_hash,token.purpose
 		FROM auth_email_tokens token
 		JOIN users account ON account.id=token.user_id
-		WHERE token.token_hash=$1 AND token.purpose=$2
+		WHERE token.token_hash=$1 AND token.purpose IN ($2,$3)
 		  AND token.consumed_at IS NULL AND token.invalidated_at IS NULL
 		  AND token.expires_at > now() AND account.status='active'
-		  AND account.recovery_email=token.target_email
-		  AND account.recovery_email_verified_at IS NOT NULL
+		  AND ((token.purpose=$2 AND account.recovery_email=token.target_email
+		        AND account.recovery_email_verified_at IS NOT NULL)
+		       OR (token.purpose=$3 AND token.recovery_request_id=NULLIF($4,'')::uuid
+		           AND account.email=token.target_email AND NOT account.is_sample))
 		  AND NOT EXISTS (
 			SELECT 1 FROM user_roles assignment
 			JOIN roles role ON role.id=assignment.role_id
 			WHERE assignment.user_id=account.id AND role.external_only
 		  )
 		FOR UPDATE OF token,account
-	`, tokenHash, passwordResetPurpose).Scan(&tokenID, &userID, &fullName, &currentPasswordHash)
+	`, tokenHash, passwordResetPurpose, developerPasswordResetPurpose, developerRequestID.String).Scan(&tokenID, &userID, &fullName, &currentPasswordHash, &purpose)
 	if err != nil {
 		return err
 	}
@@ -264,14 +210,24 @@ func (r *Repository) ResetPasswordWithToken(ctx context.Context, tokenHash, pass
 	if _, err := tx.ExecContext(ctx, `UPDATE auth_email_tokens SET consumed_at=now() WHERE id=$1`, tokenID); err != nil {
 		return err
 	}
+	if purpose == developerPasswordResetPurpose {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE account_recovery_requests SET status='completed',completed_at=now() WHERE id=$1::uuid AND status='issued'
+		`, developerRequestID.String); err != nil {
+			return err
+		}
+		if err := resolveDeveloperRecoveryNotificationsTx(ctx, tx, developerRequestID.String); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE auth_email_tokens SET invalidated_at=now()
 		WHERE user_id=$1 AND id<>$2 AND consumed_at IS NULL AND invalidated_at IS NULL
 	`, userID, tokenID); err != nil {
 		return err
 	}
-	if err := addAuditTx(ctx, tx, "", userID, fullName, "user_password_reset", "user_account", userID, "Người dùng đặt lại mật khẩu bằng email khôi phục", Record{
-		"session_revoked": true,
+	if err := addAuditTx(ctx, tx, "", userID, fullName, "user_password_reset", "user_account", userID, "Người dùng đặt lại mật khẩu bằng liên kết khôi phục", Record{
+		"session_revoked": true, "purpose": purpose,
 	}); err != nil {
 		return err
 	}

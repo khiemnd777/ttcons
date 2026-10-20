@@ -326,14 +326,23 @@ func TestRecoveryEmailAndPasswordResetLifecycle(t *testing.T) {
 	loginEmail := "recovery-login-" + userID[:8] + "@test.local"
 	firstRecoveryEmail := "recovery-one-" + userID[:8] + "@example.com"
 	nextRecoveryEmail := "recovery-two-" + userID[:8] + "@example.com"
+	developerID := newID()
+	developerEmail := "recovery-developer-" + developerID[:8] + "@test.local"
 
 	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM notification_events WHERE aggregate_type='account_recovery_request' AND aggregate_id IN (SELECT id FROM account_recovery_requests WHERE user_id=$1)`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM account_recovery_requests WHERE user_id=$1`, userID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM auth_email_tokens WHERE user_id=$1`, userID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM auth_sessions WHERE user_id=$1`, userID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1`, userID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM audit_logs WHERE actor_id=$1`, developerID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM user_roles WHERE user_id=$1`, developerID)
+		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, developerID)
 		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, userID)
 	})
 	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:old-secret','Recovery User','active')`, userID, loginEmail)
+	mustExec(t, db, `INSERT INTO users (id,email,password_hash,full_name,status) VALUES ($1,$2,'demo:developer','Recovery Developer','active')`, developerID, developerEmail)
+	mustExec(t, db, `INSERT INTO user_roles (user_id,role_id) SELECT $1,id FROM roles WHERE name='developer' AND system_role`, developerID)
 	staleTokenHash := hashSessionToken("stale-recovery-token-fixture")
 	mustExec(t, db, `
 		INSERT INTO auth_email_tokens (user_id,purpose,token_hash,target_email,expires_at,consumed_at,created_at)
@@ -383,16 +392,38 @@ func TestRecoveryEmailAndPasswordResetLifecycle(t *testing.T) {
 	if _, err := service.Login(ctx, LoginRequest{Email: loginEmail, Password: "old-secret"}, "recovery-test", "127.0.0.1"); err != nil {
 		t.Fatal(err)
 	}
-	unknownResult := service.ForgotPassword(ctx, ForgotPasswordRequest{Email: "unknown@example.com"})
-	knownResult := service.ForgotPassword(ctx, ForgotPasswordRequest{Email: loginEmail})
+	unknownResult, err := service.ForgotPassword(ctx, ForgotPasswordRequest{Email: "unknown@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	knownResult, err := service.ForgotPassword(ctx, ForgotPasswordRequest{Email: loginEmail})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if fmt.Sprint(unknownResult["message"]) != fmt.Sprint(knownResult["message"]) || unknownResult["accepted"] != knownResult["accepted"] {
 		t.Fatal("forgot-password response enumerates account availability")
 	}
-	resetMessage := receiveMail(t, sender.messages)
-	if resetMessage.To != nextRecoveryEmail {
-		t.Fatalf("reset recipient=%q, want verified recovery email", resetMessage.To)
+	assertCount(t, db, `SELECT COUNT(*) FROM account_recovery_requests WHERE user_id=$1 AND status='pending'`, 1, userID)
+	select {
+	case <-sender.messages:
+		t.Fatal("forgot-password sent an automatic reset email")
+	default:
 	}
-	resetToken := tokenFromMail(t, resetMessage)
+	var requestID string
+	if err := db.QueryRowContext(ctx, `SELECT id::text FROM account_recovery_requests WHERE user_id=$1`, userID).Scan(&requestID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.IssueDeveloperRecoveryLink(ctx, requestID, userID, "Recovery User"); err == nil {
+		t.Fatal("ordinary user issued a recovery link")
+	}
+	issued, err := service.IssueDeveloperRecoveryLink(ctx, requestID, developerID, "Recovery Developer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resetToken := strings.TrimPrefix(fmt.Sprint(issued["link"]), "https://workflow.test/reset-password#token=")
+	if resetToken == fmt.Sprint(issued["link"]) {
+		t.Fatal("reset link missing token fragment")
+	}
 	if _, err := service.ResetPassword(ctx, ResetPasswordRequest{Token: resetToken, NewPassword: "old-secret", NewPasswordConfirmation: "old-secret"}); err == nil {
 		t.Fatal("recovery reset accepted the current password")
 	}

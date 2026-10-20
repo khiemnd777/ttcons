@@ -50,6 +50,18 @@ test('profile presents only masked recovery email state and requires current pas
 
 test('forgot-password success copy does not reveal account availability', async () => {
   const forgot = await source('../src/modules/auth/ForgotPasswordPage.tsx');
-  assert.match(forgot, /Nếu tài khoản có email khôi phục hợp lệ/);
+  assert.match(forgot, /Nếu tài khoản hợp lệ, bộ phận hỗ trợ sẽ xem xét yêu cầu khôi phục/);
   assert.doesNotMatch(forgot, /không tồn tại|không tìm thấy tài khoản/i);
+});
+
+test('developer recovery queue is permission gated and uses the shared detail dialog', async () => {
+  const router = await source('../src/app/router.tsx');
+  const shell = await source('../src/layouts/AppShell.tsx');
+  const queue = await source('../src/modules/auth/RecoveryRequestsPage.tsx');
+  assert.match(router, /path: '\/recovery-requests', element: guarded\(<RecoveryRequestsPage \/>, \['account_recovery\.manage'\]\)/);
+  assert.match(shell, /to: '\/recovery-requests', label: 'Yêu cầu khôi phục'/);
+  assert.match(queue, /<Dialog open=\{Boolean\(selectedID\)\}/);
+  assert.match(queue, /\/account-recovery\/requests\/\$\{selectedID\}\/issue`, \{\}/);
+  assert.doesNotMatch(queue, /Cách đã xác minh danh tính|verification_method/);
+  assert.match(queue, /setIssuedLink\(null\)/);
 });

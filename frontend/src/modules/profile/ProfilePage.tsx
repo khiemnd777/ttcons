@@ -365,7 +365,7 @@ export function ProfilePage() {
                 {user.recovery_email_available && user.recovery_email_verified ? <p className="mt-1 break-words text-sm text-emerald-700">Đã xác minh · {user.recovery_email_masked}</p> : null}
                 {user.recovery_email_available && !user.recovery_email_verified && !user.pending_recovery_email_masked ? <p className="mt-1 text-sm text-slate-500">Chưa thiết lập</p> : null}
                 {user.recovery_email_available && user.pending_recovery_email_masked ? <p className="mt-1 break-words text-sm text-amber-700">Đang chờ xác minh · {user.pending_recovery_email_masked}</p> : null}
-                {user.recovery_email_available && user.recovery_email_verified && user.pending_recovery_email_masked ? <p className="mt-1 text-xs leading-5 text-slate-500">Địa chỉ đã xác minh hiện tại vẫn dùng được cho đến khi địa chỉ mới được xác minh.</p> : null}
+                {user.recovery_email_available && user.recovery_email_verified && user.pending_recovery_email_masked ? <p className="mt-1 text-xs leading-5 text-slate-500">Địa chỉ đã xác minh hiện tại vẫn hiển thị cho Developer khi xử lý yêu cầu.</p> : null}
               </div>
               {user.recovery_email_available ? (
                 <div className="flex shrink-0 flex-wrap gap-2">
@@ -563,14 +563,14 @@ export function ProfilePage() {
             registration={recoveryForm.register('current_password')}
             error={recoveryForm.formState.errors.current_password?.message}
           />
-          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm leading-5 text-blue-800">Email đăng nhập của tài khoản không thay đổi. Chỉ email khôi phục đã xác minh mới nhận được liên kết quên mật khẩu.</p>
+          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm leading-5 text-blue-800">Email đăng nhập không thay đổi. Email này chỉ là thông tin liên hệ bổ sung; yêu cầu quên mật khẩu do Developer xác minh và xử lý.</p>
         </form>
       </Dialog>
 
       <Dialog
         open={removeRecoveryOpen}
         title="Gỡ email khôi phục"
-        description="Sau khi gỡ, tài khoản sẽ không thể dùng quy trình quên mật khẩu cho đến khi xác minh một email khôi phục mới."
+        description="Sau khi gỡ, Developer sẽ không thấy email liên hệ bổ sung khi xử lý yêu cầu khôi phục. Tài khoản vẫn có thể gửi yêu cầu."
         onClose={() => { if (!removeRecoveryEmail.isPending) setRemoveRecoveryOpen(false); }}
         footer={(
           <div className="flex justify-end gap-2">

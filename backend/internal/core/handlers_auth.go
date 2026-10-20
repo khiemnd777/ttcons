@@ -141,7 +141,11 @@ func (h *Handler) ForgotPassword(c *fiber.Ctx) error {
 	if err := json.Unmarshal(c.Body(), &req); err != nil {
 		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Dữ liệu yêu cầu khôi phục không hợp lệ")
 	}
-	return response.OK(c, h.service.ForgotPassword(c.Context(), req), forgotPasswordAcceptedMessage)
+	result, err := h.service.ForgotPassword(c.Context(), req)
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result, forgotPasswordAcceptedMessage)
 }
 
 func (h *Handler) ResetPassword(c *fiber.Ctx) error {

@@ -1,5 +1,9 @@
 # Consflow Frontend UI And Utility Map
 
+## Developer-assisted password recovery — 2026-10-20
+
+- `modules/auth/ForgotPasswordPage.tsx` now requests Developer review and keeps a generic success state. `modules/auth/RecoveryRequestsPage.tsx` owns the status-filtered queue rendered through shared `DataTable` with labeled columns, `Xem` actions, mobile cards, and separate backend-owned paging; do not enable table-local search/sort/paging over one server page. It retains shared `Dialog` detail, direct issue/reject actions without a verification-method field, one-response link display and copy, and a reminder to deliver through a trusted channel; `app/router.tsx` and `layouts/AppShell.tsx` gate its route/menu on `account_recovery.manage`. The existing notification bell/inbox links to `/recovery-requests?request=<id>`; `ResetPasswordPage.tsx` and shared `PasswordInput` remain the user reset owner. `ProfilePage.tsx`, `StaffPage.tsx` and `VerifyRecoveryEmailPage.tsx` describe optional verified email as contact context rather than automatic reset delivery. Shared `AuthCard`, `Dialog`, `ToastProvider` and API client are reused. First searches: `RecoveryRequestsPage|DataTable|/recovery-requests|account_recovery.manage|Gửi yêu cầu khôi phục|IssueDeveloperRecoveryLink`.
+
 ## Pipeline Builder pinned Form display — 2026-10-20
 
 - `PipelineBuilderPage.tsx` merges the new `PipelineTemplate.pinned_workflow_forms` response with `/workflow-form-templates` only for validation, existing-pin display and condition-field metadata. `pipelineBuilderDomain.ts::workflowFormsForTemplate` marks catalog-hidden valid pins `selectable=false`; `workflowFormOptions` leaves them in the selector only when already selected. New defaults still read the original selection catalog. `NodeInspectorPanel.tsx` uses the merged metadata and filtered options. Regression: `pipelineFormDefaults.test.ts`.

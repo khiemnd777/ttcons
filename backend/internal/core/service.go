@@ -32,7 +32,6 @@ type Service struct {
 	recoveryVerifyTTL           time.Duration
 	frontendOrigin              string
 	mailSender                  mailer.Sender
-	recoveryDeliverySlots       chan struct{}
 }
 
 func NewService(repo *Repository, jwtSecret string) *Service {
@@ -51,7 +50,6 @@ func NewService(repo *Repository, jwtSecret string) *Service {
 		refreshCookieSameSite:       defaultRefreshCookieSameSite,
 		recoveryTokenTTL:            15 * time.Minute,
 		recoveryVerifyTTL:           24 * time.Hour,
-		recoveryDeliverySlots:       make(chan struct{}, 16),
 	}
 }
 

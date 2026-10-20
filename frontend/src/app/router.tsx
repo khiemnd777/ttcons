@@ -16,6 +16,7 @@ const ProjectWorkspaceLayout = lazy(() => import('../modules/projects/ProjectWor
 const MyWorkPage = lazy(() => import('../modules/my-work/MyWorkPage').then(({ MyWorkPage }) => ({ default: MyWorkPage })));
 const ProfilePage = lazy(() => import('../modules/profile/ProfilePage').then(({ ProfilePage }) => ({ default: ProfilePage })));
 const ForgotPasswordPage = lazy(() => import('../modules/auth/ForgotPasswordPage').then(({ ForgotPasswordPage }) => ({ default: ForgotPasswordPage })));
+const RecoveryRequestsPage = lazy(() => import('../modules/auth/RecoveryRequestsPage').then(({ RecoveryRequestsPage }) => ({ default: RecoveryRequestsPage })));
 const ResetPasswordPage = lazy(() => import('../modules/auth/ResetPasswordPage').then(({ ResetPasswordPage }) => ({ default: ResetPasswordPage })));
 const VerifyRecoveryEmailPage = lazy(() => import('../modules/auth/VerifyRecoveryEmailPage').then(({ VerifyRecoveryEmailPage }) => ({ default: VerifyRecoveryEmailPage })));
 const InitialPasswordChangePage = lazy(() => import('../modules/auth/InitialPasswordChangePage').then(({ InitialPasswordChangePage }) => ({ default: InitialPasswordChangePage })));
@@ -148,6 +149,7 @@ export const router = createBrowserRouter([
       { path: '/core-data/input', element: guarded(<CoreDataPage key="partner-input" group="input" />, ['catalog.view']) },
       { path: '/core-data/output', element: guarded(<CoreDataPage key="partner-output" group="output" />, ['catalog.view']) },
       { path: '/staff', element: guarded(<StaffPage />, ['staff.view'], false, ['project.reconciliation.view']) },
+      { path: '/recovery-requests', element: guarded(<RecoveryRequestsPage />, ['account_recovery.manage']) },
       { path: '/roles', element: guarded(<RolesPage />, ['role.view'], false, ['project.reconciliation.view']) },
       { path: '/permissions', element: guarded(<PermissionsPage />, ['permission.view'], false, ['project.reconciliation.view']) },
       { path: '/audit', element: guarded(<AuditPage />, ['audit.view'], false, ['project.reconciliation.view']) },
