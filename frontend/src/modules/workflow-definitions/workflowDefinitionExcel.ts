@@ -39,8 +39,10 @@ export async function parseWorkflowDefinitionImportFile(file: File, sourceFormat
     const finish = () => worker.terminate();
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       finish();
-      if (event.data.type === 'parsed') resolve(event.data);
-      else reject(new Error(event.data.message));
+      if (event.data.type === 'parsed') {
+        const { type: _messageType, ...payload } = event.data;
+        resolve(payload);
+      } else reject(new Error(event.data.message));
     };
     worker.onerror = () => {
       finish();

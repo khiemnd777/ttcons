@@ -35,6 +35,35 @@ test('workflow definition import is preview-bound, idempotent and draft-only in 
   assert.match(dialog, /JSON \(\.json\)/);
 });
 
+test('workflow definition parser removes the worker envelope before building import requests', async () => {
+  const { parseWorkflowDefinitionImportFile } = await import('../src/modules/workflow-definitions/workflowDefinitionExcel.ts');
+  const originalWorker = globalThis.Worker;
+  class ParsedWorker {
+    onmessage: ((event: MessageEvent) => void) | null = null;
+    onerror: (() => void) | null = null;
+    terminate() {}
+    postMessage(message: { sourceFormat: 'xlsx' | 'json' }) {
+      queueMicrotask(() => this.onmessage?.({ data: {
+        type: 'parsed', scope: 'pipeline', workbook_version: '1', package_version: '1', source_format: message.sourceFormat,
+        pipelines: [], pipeline_nodes: [], pipeline_steps: [], pipeline_edges: [],
+        form_templates: [], form_versions: [], form_fields: [],
+      } } as MessageEvent));
+    }
+  }
+  globalThis.Worker = ParsedWorker as unknown as typeof Worker;
+  try {
+    for (const format of ['xlsx', 'json'] as const) {
+      const file = { name: `definition.${format}`, size: 1, arrayBuffer: async () => new ArrayBuffer(1) } as File;
+      const payload = await parseWorkflowDefinitionImportFile(file, format);
+      assert.equal(Object.hasOwn(payload, 'type'), false);
+      assert.equal(payload.source_format, format);
+      assert.equal(payload.scope, 'pipeline');
+    }
+  } finally {
+    globalThis.Worker = originalWorker;
+  }
+});
+
 test('Pipeline and Form screens align data actions with dedicated permissions', async () => {
   const pipeline = await source('../src/modules/pipeline-builder/PipelineBuilderPage.tsx');
   const forms = await source('../src/modules/workflow-forms/WorkflowFormsPage.tsx');
