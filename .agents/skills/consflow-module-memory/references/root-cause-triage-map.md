@@ -3,6 +3,7 @@
 ## Developer-assisted password recovery — 2026-10-20
 
 - If a public request returns accepted but Developer sees no queue row, inspect `account_recovery_requests` eligibility/cooldown, migration V159, and `CreateDeveloperRecoveryRequest`; generic public success cannot prove persistence. If the row exists but the bell does not update, inspect `notification_events`/`notification_outbox`, `account.recovery_requested` catalog, global Developer grant and `notification_platform.go` pending-state projection. If issue or reset fails, check current global Developer role, request status, configured `FRONTEND_ORIGIN`, token purpose/hash/expiry/target email and account status; never log or display raw token or password. First searches: `account.recovery_requested|account_recovery_requests|DeveloperRecoveryAllowed|IssueDeveloperRecoveryLink|ResetPasswordWithToken`.
+- If CI fails `TestRunCreatesOneAuditedAdminAndThenNoOps` or `TestProductionRBACCatalogSupportsFreshDatabaseWithoutSeed` after a new reserved permission migration, compare V159's exclusive role grant/trigger with the Admin exception sets in `bootstrapadmin.activeAdminRoleID` and the fresh-catalog test. Do not give the reserved permission to Admin or bypass bootstrap; confirm exclusive Developer grant and rerun DB-backed tests before release.
 
 ## Pipeline Builder false Form-version warnings — 2026-10-20
 
