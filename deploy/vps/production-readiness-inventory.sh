@@ -42,6 +42,26 @@ JOIN roles role ON role.id=assignment.role_id AND role.name='developer' AND role
 WHERE account.status='active';
 SELECT 'sample_user_count=' || count(*) FROM users WHERE is_sample;
 SELECT 'non_sample_user_count=' || count(*) FROM users WHERE NOT is_sample;
+SELECT 'protected_admin_developer_identity_count=' || count(*) FROM users account
+WHERE account.status='active' AND EXISTS (
+  SELECT 1 FROM staff person WHERE person.user_id=account.id AND person.status='active'
+) AND EXISTS (
+  SELECT 1 FROM user_roles assignment JOIN roles role ON role.id=assignment.role_id
+  WHERE assignment.user_id=account.id AND assignment.project_id IS NULL
+    AND role.system_role AND role.name IN ('admin','developer')
+);
+SELECT 'required_grant=' || expected.role_name || ':' || expected.permission_key || ':' || count(grant_row.permission_id)
+FROM (VALUES
+  ('developer','staff.import'),
+  ('developer','sample_data.create'),
+  ('developer','workflow_definition.import'),
+  ('admin','workflow_definition.import')
+) AS expected(role_name,permission_key)
+LEFT JOIN roles role ON role.name=expected.role_name AND role.system_role
+LEFT JOIN permissions permission ON permission.key=expected.permission_key
+LEFT JOIN role_permissions grant_row ON grant_row.role_id=role.id AND grant_row.permission_id=permission.id
+GROUP BY expected.role_name,expected.permission_key
+ORDER BY expected.role_name,expected.permission_key;
 SELECT 'project_approval_count=' || count(*) FROM approval_requests WHERE project_id IS NOT NULL;
 SELECT 'global_approval_count=' || count(*) FROM approval_requests WHERE project_id IS NULL;
 SELECT 'retired_activity_scope_count=' || count(*) FROM work_item_activities
@@ -81,6 +101,47 @@ BEGIN
     ELSE
       EXECUTE format('SELECT count(*) FROM public.%I',table_name) INTO row_count;
       RAISE NOTICE 'table_count=%:%',table_name,row_count;
+    END IF;
+  END LOOP;
+END $$;
+DO $$
+DECLARE
+  dependency record;
+  target_rows bigint;
+BEGIN
+  FOR dependency IN
+    SELECT fk.conrelid::regclass AS child_table, col.attname AS child_column,
+           fk.confrelid::regclass AS parent_table, fk.confdeltype AS delete_action
+    FROM pg_constraint fk
+    JOIN pg_attribute col ON col.attrelid=fk.conrelid AND col.attnum=fk.conkey[1]
+    WHERE fk.contype='f' AND cardinality(fk.conkey)=1
+      AND fk.confrelid IN ('public.users'::regclass,'public.staff'::regclass)
+    ORDER BY parent_table,child_table,child_column
+  LOOP
+    IF dependency.parent_table='public.users'::regclass THEN
+      EXECUTE format($query$
+        SELECT count(*) FROM %s child JOIN users target ON child.%I=target.id
+        WHERE NOT (target.status='active'
+          AND EXISTS (SELECT 1 FROM staff person WHERE person.user_id=target.id AND person.status='active')
+          AND EXISTS (SELECT 1 FROM user_roles assignment JOIN roles role ON role.id=assignment.role_id
+            WHERE assignment.user_id=target.id AND assignment.project_id IS NULL
+              AND role.system_role AND role.name IN ('admin','developer')))
+      $query$,dependency.child_table,dependency.child_column) INTO target_rows;
+    ELSE
+      EXECUTE format($query$
+        SELECT count(*) FROM %s child JOIN staff person ON child.%I=person.id
+        LEFT JOIN users target ON target.id=person.user_id
+        WHERE target.id IS NULL OR NOT (target.status='active'
+          AND person.status='active'
+          AND EXISTS (SELECT 1 FROM user_roles assignment JOIN roles role ON role.id=assignment.role_id
+            WHERE assignment.user_id=target.id AND assignment.project_id IS NULL
+              AND role.system_role AND role.name IN ('admin','developer')))
+      $query$,dependency.child_table,dependency.child_column) INTO target_rows;
+    END IF;
+    IF target_rows>0 OR dependency.delete_action<>'c' THEN
+      RAISE NOTICE 'identity_reference=%:%:%:action=%:target_rows=%',
+        dependency.parent_table,dependency.child_table,dependency.child_column,
+        dependency.delete_action,target_rows;
     END IF;
   END LOOP;
 END $$;
