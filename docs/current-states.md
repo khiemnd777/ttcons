@@ -1,5 +1,14 @@
 # Current States
 
+## Nested vertical scroll chaining — active 2026-10-20
+
+**Target:** Let ordinary inner scroll areas move first, then pass continued vertical scrolling to the next scrollable parent at their boundary. Preserve modal background locking and pipeline diagram zoom.
+
+**Will be done:** Verify shared table/grid and mobile dialog scroll behavior with focused non-browser checks. Browser interaction acceptance remains separate and requires explicit authorization.
+
+**Done:** Removed vertical overscroll containment from shared table/grid viewports and mobile fullscreen dialog bodies. Kept horizontal structured-list containment and the diagram's Ctrl/Meta-wheel zoom behavior. `git diff --check` and `cd frontend && npm run build` passed on this working tree. Browser fixture using the current `index.css` verified inner-first scrolling and transfer to the parent at both vertical boundaries. The local API stack was stopped and the real app redirected to login, so authenticated screen and mobile modal UAT remain open; UX acceptance is not established.
+
+
 ## Production release and data transition — active 2026-10-20
 
 **Target:** Prepare the demo-only production database for guarded migrations, release the approved Consflow source, then complete readiness checks for staff import, Workflow Pipeline v10 import, and sample data. Release tags follow `make release` automatic allocation. Cleanup requires an exact deletion manifest before execution.

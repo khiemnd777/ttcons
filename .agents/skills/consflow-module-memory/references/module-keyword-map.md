@@ -1,5 +1,9 @@
 # Consflow Module Keyword Map
 
+## Nested vertical scroll chaining — 2026-10-20
+
+- Keywords: scroll chaining, nested scroll, overscroll, inner table scroll. Frontend shared owners: `frontend/src/index.css::consflow-table-viewport/consflow-grid-viewport` and `frontend/src/components/dialog.css::dialog-mobile-fullscreen .dialog-body`; `frontend/src/components/Dialog.tsx` supplies the scrollable body. Native vertical chaining applies after the inner boundary. The modal backdrop and pipeline diagram wheel zoom are separate behaviors; horizontal `structured-list-scroll` containment stays scoped to the x axis. First searches: `overscroll-behavior|consflow-table-viewport|consflow-grid-viewport|dialog-body|handleNativeWheel`.
+
 ## Pipeline Builder pinned Form validation — 2026-10-20
 
 - Keywords: Pipeline v10 `Kiểm tra`, 14 false Workflow Form warnings, hidden `operational_capture_v3` pins. Owner: `repository_pipeline.go::GetTemplateDetail` supplies active/published `pinned_workflow_forms`; `PipelineBuilderPage.tsx` merges these with the selection catalog for validation and condition-field metadata; `NodeInspectorPanel.tsx` shows an already pinned hidden version without offering it as a new choice. `pipelineBuilderDomain.ts::workflowFormsForTemplate/workflowFormOptions` owns that distinction. First searches: `pinned_workflow_forms|workflowFormsForTemplate|workflowFormOptions|buildValidationIssues|WorkflowFormCatalog|TemplatePublishFormIssues`.

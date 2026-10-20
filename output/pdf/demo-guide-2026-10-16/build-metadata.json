@@ -1,0 +1,162 @@
+{
+  "edition": "16.10.2026",
+  "pages": 129,
+  "build_passes": 2,
+  "headings": [
+    {
+      "rank": 1,
+      "title": "Lộ trình một công trình từ đầu đến bàn giao",
+      "page": 1
+    },
+    {
+      "rank": 2,
+      "title": "1. Cách dùng tài liệu",
+      "page": 4
+    },
+    {
+      "rank": 3,
+      "title": "1.1. Tra cứu nhanh tám biểu mẫu và nguyên tắc xuất",
+      "page": 5
+    },
+    {
+      "rank": 2,
+      "title": "2. Đăng nhập và đổi mật khẩu lần đầu",
+      "page": 6
+    },
+    {
+      "rank": 2,
+      "title": "3. Tạo công trình mới - ba bước",
+      "page": 9
+    },
+    {
+      "rank": 2,
+      "title": "4. Đọc Quy trình trong chi tiết công trình",
+      "page": 12
+    },
+    {
+      "rank": 3,
+      "title": "4.1. Ma trận điều phối theo Giai đoạn",
+      "page": 14
+    },
+    {
+      "rank": 2,
+      "title": "5. Trao đổi là bàn điều phối hằng ngày",
+      "page": 15
+    },
+    {
+      "rank": 3,
+      "title": "5.1. Ví dụ đã ghi nhận trên công trình Rev9 tại màn Trao đổi",
+      "page": 18
+    },
+    {
+      "rank": 3,
+      "title": "5.2. Nội dung trao đổi khi phát sinh việc ở các Giai đoạn tiếp theo",
+      "page": 46
+    },
+    {
+      "rank": 2,
+      "title": "6. Xử lý việc ưu tiên và lặp cho đến hết nhánh Quy trình",
+      "page": 46
+    },
+    {
+      "rank": 3,
+      "title": "6.1. Các Gói công việc trong mẫu bản 9",
+      "page": 50
+    },
+    {
+      "rank": 3,
+      "title": "6.2. Khảo sát/đo hiện trạng: xuất BM-GS-01",
+      "page": 51
+    },
+    {
+      "rank": 3,
+      "title": "6.3. Rủi ro khảo sát/thi công: xuất BM-GS-05",
+      "page": 54
+    },
+    {
+      "rank": 3,
+      "title": "6.4. Minh chứng của Đầu việc: xuất BM-GS-07",
+      "page": 57
+    },
+    {
+      "rank": 3,
+      "title": "6.5. BOQ có thiết kế: bản vẽ, khối lượng và giá",
+      "page": 59
+    },
+    {
+      "rank": 3,
+      "title": "6.6. Hợp đồng chủ đầu tư và hợp đồng đầu vào",
+      "page": 66
+    },
+    {
+      "rank": 3,
+      "title": "6.7. Mua sắm: từ BOQ, báo giá tới hàng đã nhận",
+      "page": 79
+    },
+    {
+      "rank": 3,
+      "title": "6.8. Lấy vật tư: kiểm kho trước, mua phần còn thiếu",
+      "page": 88
+    },
+    {
+      "rank": 2,
+      "title": "7. Rà soát lại và phê duyệt: nói đúng tầng quyết định",
+      "page": 92
+    },
+    {
+      "rank": 2,
+      "title": "8. Thi công: Nhật ký › Kiểm tra › Cần xử lý",
+      "page": 93
+    },
+    {
+      "rank": 3,
+      "title": "8.1. Báo cáo ngày: xuất BM-GS-02 từ hồ sơ đang làm",
+      "page": 98
+    },
+    {
+      "rank": 3,
+      "title": "8.2. Báo cáo đã gửi: xuất đúng lần gửi cũ của BM-GS-02",
+      "page": 104
+    },
+    {
+      "rank": 3,
+      "title": "8.3. Cần xử lý: xuất BM-GS-04 từ danh sách và chi tiết",
+      "page": 107
+    },
+    {
+      "rank": 3,
+      "title": "8.4. Kế hoạch/chỉ dẫn hiện trường: xuất BM-GS-06",
+      "page": 111
+    },
+    {
+      "rank": 2,
+      "title": "9. Nghiệm thu: từ kết quả hiện trường đến biên bản",
+      "page": 114
+    },
+    {
+      "rank": 3,
+      "title": "9.1. Gói nghiệm thu thầu phụ: xuất BM-GS-03",
+      "page": 117
+    },
+    {
+      "rank": 2,
+      "title": "10. Bàn giao: xác nhận công trình đã đủ điều kiện",
+      "page": 120
+    },
+    {
+      "rank": 3,
+      "title": "10.1. Hồ sơ bàn giao: xuất BM-GS-08",
+      "page": 123
+    },
+    {
+      "rank": 2,
+      "title": "11. Bàn giao kế toán: chuyển hồ sơ nguồn và xác nhận tiếp nhận",
+      "page": 126
+    },
+    {
+      "rank": 2,
+      "title": "12. Câu hỏi thường gặp",
+      "page": 129
+    }
+  ]
+}

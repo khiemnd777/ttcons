@@ -1,0 +1,132 @@
+[
+  {
+    "image": "images/bmgs/bm01-button.jpg",
+    "source": "docs/acceptance-evidence/bm01-native-development-2026-10-13/browser-source-desktop.jpg",
+    "sha256": "ec4afc7bfb351ba48088a94d7b6653ab29e9e5f84383753a5316825e0c846c4b"
+  },
+  {
+    "image": "images/bmgs/bm01-result.jpg",
+    "source": "docs/acceptance-evidence/bm01-native-development-2026-10-13/google-main-100pct.jpg",
+    "sha256": "b0b6006decca83e6357bc843e1ab853bc8afe90a3e73074e17d709be56f2fdb1"
+  },
+  {
+    "image": "images/bmgs/bm05-button.jpg",
+    "source": "docs/acceptance-evidence/bm05-native-development-2026-10-13/header-fix/browser-source-desktop.jpg",
+    "sha256": "47dd4e41af2f9fe3ea15f8a975ca17edc23f9256e46c448dfa24ef4e35d5590f"
+  },
+  {
+    "image": "images/bmgs/bm05-result.jpg",
+    "source": "docs/acceptance-evidence/bm05-native-development-2026-10-13/header-fix/google-main-100pct.jpg",
+    "sha256": "1e6ec4e4b2444dbdcb36c779796bb442086aa528bd108e9197dc1b65bbf64aab"
+  },
+  {
+    "image": "images/bmgs/bm07-button.jpg",
+    "source": "docs/acceptance-evidence/bm06-bm07-development-2026-10-13/bm07-source-button.jpg",
+    "sha256": "4b11106bdda3fa97569c0e8e1e4df0eddc1159a96f5780cc0df53f57edc27945"
+  },
+  {
+    "image": "images/bmgs/bm07-result.jpg",
+    "source": "docs/acceptance-evidence/bm06-bm07-development-2026-10-13/bm07-google-main.jpg",
+    "sha256": "139eb7cc649eb32681e9e6933cea11b37c00025b0f41df5caca035df7ee8f0b5"
+  },
+  {
+    "image": "images/bmgs/bm02-list.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/01-journal-mua.jpg",
+    "sha256": "21461f4cfcce69067bade29803f745aeb9ddd239c44e8aeeee6ad2ec0d2eb935"
+  },
+  {
+    "image": "images/bmgs/bm02-detail.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/02-current-report-mua.jpg",
+    "sha256": "3b24e7299338c4fc1246c555010411a48468d5273691174693d4db6c02282817"
+  },
+  {
+    "image": "images/bmgs/bm02-form.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/03-form-export.jpg",
+    "sha256": "8c6fc17e0d3c23164ec62f430bb9dc01e1a95689b8d643490b53c56c5b947d21"
+  },
+  {
+    "image": "images/bmgs/bm02-old.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/06-delivery1-nang-nong.jpg",
+    "sha256": "86ca9bd99a0a2109e149648607867a5da09425e536cf54a747e40c1ac4b4e91a"
+  },
+  {
+    "image": "images/bmgs/bm02-main.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/18-google-old1-main.jpg",
+    "sha256": "294f694b13d166f6ce693d0938c50a21fff9cf40118c18b7b16222e524e72e92"
+  },
+  {
+    "image": "images/bmgs/bm02-material.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/11-google-delivery3-material.jpg",
+    "sha256": "af308478db84fc308f5c1427fa815a13bacb60eb5ebc137c69c3b02d76c27d8e"
+  },
+  {
+    "image": "images/bmgs/bm02-photos.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/21-google-old1-photo.jpg",
+    "sha256": "d3f240af2b89d16deebb3cecc659a9580c61db4f2e21014d9f07f59ae8a2c54d"
+  },
+  {
+    "image": "images/bmgs/bm06-form.jpg",
+    "source": "docs/acceptance-evidence/bm06-bm07-development-2026-10-13/bm06-form-button.jpg",
+    "sha256": "6a2a8b24de5ff1c5123df9c2436951febfd84f9084bf206f15620f5814469ae0"
+  },
+  {
+    "image": "images/bmgs/bm06-detail.jpg",
+    "source": "docs/acceptance-evidence/bm06-bm07-development-2026-10-13/bm06-daily-button.jpg",
+    "sha256": "cefb2d8b91d539e724ee52e71fe17c49c1ab73a61ec65efc275fb625e5a798f0"
+  },
+  {
+    "image": "images/bmgs/bm06-result.jpg",
+    "source": "docs/acceptance-evidence/bm06-bm07-development-2026-10-13/bm06-form-google-main.jpg",
+    "sha256": "585b3c16fc14f3733ff571da1ed8312e4a0dfd9b4094ebc5f3e302748503c98d"
+  },
+  {
+    "image": "images/bmgs/bm04-list.jpg",
+    "source": "docs/acceptance-evidence/bm04-list-detail-development-2026-10-13/action-column-fix/desktop-1440.jpg",
+    "sha256": "7e013991650eeea73fbec9382bb5aaf802f40a50d58d7d2751c5e6910796b9cd"
+  },
+  {
+    "image": "images/bmgs/bm04-detail.jpg",
+    "source": "docs/acceptance-evidence/bm04-list-detail-development-2026-10-13/action-column-fix/detail-export.jpg",
+    "sha256": "779b0723419b233d5baaf4d7f064ca964ea6ef0ad55823aff01632bb062c331a"
+  },
+  {
+    "image": "images/bmgs/bm04-result.jpg",
+    "source": "docs/acceptance-evidence/bm04-list-detail-development-2026-10-13/google-list.jpg",
+    "sha256": "95b47052eb14136dfc7c6f9136f4fa680aa1170a3ba7340b7cf312c6bcef0565"
+  },
+  {
+    "image": "images/bmgs/bm03-button.jpg",
+    "source": "docs/acceptance-evidence/bm03-client-reconciliation-development-2026-10-13/rev10-client-completed-export-button.jpg",
+    "sha256": "57bc45135e040927240502a4a5c4d3662a7274c4a24ca75372947c6c939ee05b"
+  },
+  {
+    "image": "images/bmgs/bm03-result.jpg",
+    "source": "docs/acceptance-evidence/bm03-client-reconciliation-development-2026-10-13/rev10-google-r2-report.jpg",
+    "sha256": "82e8cfc26d209d651d71734be6ceffc9d344d91c832759699f4786330129c520"
+  },
+  {
+    "image": "images/bmgs/bm03-footer.jpg",
+    "source": "docs/acceptance-evidence/bm03-client-reconciliation-development-2026-10-13/rev10-google-r2-footer.jpg",
+    "sha256": "2836912c28aa773762cfae52392a5db270d850feeafb2a57caf5cfd091a339f3"
+  },
+  {
+    "image": "images/bmgs/bm08-button.jpg",
+    "source": "docs/acceptance-evidence/bm08-rev10-development-2026-10-13/bm08-completed-export-button.jpg",
+    "sha256": "28a06a9f80fd6bd41ff67aba1406b2dcdbc6cc2df150880caba6c10d0d684191"
+  },
+  {
+    "image": "images/bmgs/bm08-result.jpg",
+    "source": "docs/acceptance-evidence/bm08-rev10-development-2026-10-13/bm08-google-top.jpg",
+    "sha256": "a2beaf83436d7ebfc3038dbffbc63e722a8a7ea752119a8b1bc216e1b224d300"
+  },
+  {
+    "image": "images/bmgs/bm08-footer.jpg",
+    "source": "docs/acceptance-evidence/bm08-rev10-development-2026-10-13/bm08-google-footer.jpg",
+    "sha256": "df2996c407dea5d26c0672797ac0f67b1cfc8a070c57553c70af61fb7d422f03"
+  },
+  {
+    "image": "images/bmgs/bm02-current-main.jpg",
+    "source": "docs/acceptance-evidence/bm02-weather-development-2026-10-12/10-google-delivery3-main.jpg",
+    "sha256": "0de22c901a0b6bc7b6bd9f268a602c355ef07b00202fb0d58d78291aacc6567c"
+  }
+]

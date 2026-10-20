@@ -1,0 +1,13 @@
+{
+  "source_sha256": "5efcfc6b43c6bef600ec303557a8b89098820de5c6303e20ba1581f3bdc4f377",
+  "pdf_sha256": "eefc1c9e514589bece8e2063e202f05bd0c3d93c9ba9e279057a0864fc291d53",
+  "pdf_pages": 129,
+  "contents_entries": 31,
+  "image_references": 95,
+  "embedded_images": 95,
+  "acceptance_images": 26,
+  "geometry_issues": [],
+  "checks": 715,
+  "passed": 715,
+  "failures": []
+}

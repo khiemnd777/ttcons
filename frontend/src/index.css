@@ -35,7 +35,6 @@ button, input, select, textarea {
 .consflow-grid-viewport {
   max-height: min(64dvh, 42rem);
   overflow: auto;
-  overscroll-behavior: contain;
 }
 
 .consflow-table-viewport > table > thead {
