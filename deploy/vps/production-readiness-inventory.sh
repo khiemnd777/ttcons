@@ -40,6 +40,16 @@ JOIN staff person ON person.user_id=account.id AND person.status='active'
 JOIN user_roles assignment ON assignment.user_id=account.id AND assignment.project_id IS NULL
 JOIN roles role ON role.id=assignment.role_id AND role.name='developer' AND role.system_role
 WHERE account.status='active';
+SELECT 'sample_user_count=' || count(*) FROM users WHERE is_sample;
+SELECT 'non_sample_user_count=' || count(*) FROM users WHERE NOT is_sample;
+SELECT 'project_approval_count=' || count(*) FROM approval_requests WHERE project_id IS NOT NULL;
+SELECT 'global_approval_count=' || count(*) FROM approval_requests WHERE project_id IS NULL;
+SELECT 'retired_activity_scope_count=' || count(*) FROM work_item_activities
+WHERE scope_type IN ('accounting_budget','payable','receivable','payment');
+SELECT 'nondefault_accounting_book_count=' || count(*) FROM accounting_books
+WHERE id<>'73000000-0000-0000-0000-000000000001'::uuid OR book_code<>'CONSFLOW-TT200';
+SELECT 'closed_accounting_period_count=' || count(*) FROM accounting_periods WHERE status<>'open';
+SELECT 'closed_tax_period_count=' || count(*) FROM tax_periods WHERE status<>'open';
 DO $$
 DECLARE
   table_name text;
@@ -104,6 +114,30 @@ BEGIN
         dependency.child_table,dependency.conname,dependency.delete_action,
         row_count,dependency.definition;
     END IF;
+  END LOOP;
+END $$;
+DO $$
+DECLARE
+  dependency record;
+  row_count bigint;
+BEGIN
+  FOR dependency IN
+    WITH RECURSIVE dependent_tables AS (
+      SELECT unnest(ARRAY[
+        'public.workflow_form_signatures'::regclass,
+        'public.workflow_form_pdf_exports'::regclass
+      ]) AS child
+      UNION
+      SELECT constraint_name.conrelid
+      FROM dependent_tables chain
+      JOIN pg_constraint constraint_name ON constraint_name.contype='f'
+        AND constraint_name.confrelid=chain.child
+    )
+    SELECT DISTINCT child::regclass AS table_name FROM dependent_tables
+    ORDER BY table_name
+  LOOP
+    EXECUTE format('SELECT count(*) FROM %s',dependency.table_name) INTO row_count;
+    RAISE NOTICE 'immutable_export_truncate_dependency=%:rows=%',dependency.table_name,row_count;
   END LOOP;
 END $$;
 COMMIT;
