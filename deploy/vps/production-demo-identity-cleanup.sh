@@ -142,7 +142,9 @@ BEGIN
      OR (SELECT count(*) FROM event_logs) <> 4
      OR (SELECT count(*) FROM staff_account_imports) <> 1
      OR (SELECT count(*) FROM notification_actor_revisions) <> 8
-     OR (SELECT count(*) FROM project_explorer_invalidation_outbox) <> 42 THEN
+     OR (SELECT count(*) FROM project_explorer_invalidation_outbox) <> 42
+     OR (SELECT count(*) FROM user_roles assignment
+         WHERE NOT EXISTS (SELECT 1 FROM protected_users p WHERE p.id=assignment.user_id)) <> 28 THEN
     RAISE EXCEPTION 'Identity cleanup transaction guard changed';
   END IF;
   FOR dependency IN
@@ -173,6 +175,10 @@ DELETE FROM auth_sessions;
 DELETE FROM staff_account_imports;
 DELETE FROM notification_actor_revisions;
 DELETE FROM staff person WHERE NOT EXISTS (SELECT 1 FROM protected_staff p WHERE p.id=person.id);
+-- Delete role assignments while their users still exist: the cache revision
+-- trigger writes an actor-version row and requires the parent user.
+DELETE FROM user_roles assignment
+WHERE NOT EXISTS (SELECT 1 FROM protected_users p WHERE p.id=assignment.user_id);
 DELETE FROM users account WHERE NOT EXISTS (SELECT 1 FROM protected_users p WHERE p.id=account.id);
 DELETE FROM project_explorer_invalidation_outbox;
 DO $$
@@ -184,6 +190,7 @@ BEGIN
      OR (SELECT count(*) FROM notification_actor_revisions) <> 0
      OR (SELECT count(*) FROM project_explorer_invalidation_outbox) <> 0
      OR (SELECT count(*) FROM project_explorer_actor_versions) <> 3
+     OR (SELECT count(*) FROM user_roles) <> 6
      OR (SELECT count(*) FROM pipeline_templates) <> 10
      OR (SELECT count(*) FROM workflow_form_templates) <> 59
      OR (SELECT count(*) FROM workflow_form_versions) <> 145 THEN
