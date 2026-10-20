@@ -20,26 +20,28 @@ compose=(docker compose --project-name consflow-prod --env-file /opt/consflow/sh
 restart_services() {
   result=$?
   trap - EXIT
-  if ! "${compose[@]}" up -d --no-deps backend admin; then
+  if ! "${compose[@]}" start backend admin; then
     echo 'Could not restart the original production services' >&2
     exit 1
   fi
   exit "$result"
 }
 
-"${compose[@]}" stop -t 30 admin backend
-trap restart_services EXIT
-
 # Keep a restricted database archive before the destructive step.
 umask 077
 backup_dir=/opt/consflow/shared/backups
 install -d -m 0700 "$backup_dir"
 backup_file="$backup_dir/pre-demo-cleanup-v145-$(date -u +%Y%m%dT%H%M%SZ).dump"
+echo 'backup_archive=starting'
 "${compose[@]}" exec -T postgres sh -ec \
-  'exec pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > "$backup_file"
+  'exec pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < /dev/null > "$backup_file"
+echo 'backup_archive=dump_written'
 test -s "$backup_file"
 "${compose[@]}" exec -T postgres pg_restore --list < "$backup_file" > /dev/null
-echo "verified_backup=$backup_file"
+echo "backup_archive=catalog_readable:$backup_file"
+
+trap restart_services EXIT
+"${compose[@]}" stop -t 30 admin backend
 
 "${compose[@]}" exec -T postgres sh -ec \
   'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
