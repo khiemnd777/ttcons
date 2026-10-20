@@ -22,7 +22,7 @@ printf 'release_tag=%s\n' "$release_tag"
 # Queries return counts and migration fingerprints only. They never export records or credentials.
 "${compose[@]}" exec -T postgres sh -ec 'exec psql -X -A -t -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
 BEGIN TRANSACTION READ ONLY;
-SET LOCAL statement_timeout = '30s';
+SET LOCAL statement_timeout = '60s';
 SET LOCAL lock_timeout = '2s';
 SELECT 'database_bytes=' || pg_database_size(current_database());
 SELECT 'migration_count=' || count(*) FROM schema_migrations;
@@ -71,6 +71,38 @@ BEGIN
     ELSE
       EXECUTE format('SELECT count(*) FROM public.%I',table_name) INTO row_count;
       RAISE NOTICE 'table_count=%:%',table_name,row_count;
+    END IF;
+  END LOOP;
+END $$;
+DO $$
+DECLARE
+  table_name text;
+  row_count bigint;
+  dependency record;
+BEGIN
+  FOR table_name IN
+    SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename
+  LOOP
+    EXECUTE format('SELECT count(*) FROM public.%I',table_name) INTO row_count;
+    IF row_count > 0 THEN
+      RAISE NOTICE 'nonempty_table=%:%',table_name,row_count;
+    END IF;
+  END LOOP;
+
+  FOR dependency IN
+    SELECT constraint_name.conname, constraint_name.conrelid::regclass AS child_table,
+           constraint_name.confdeltype AS delete_action,
+           pg_get_constraintdef(constraint_name.oid) AS definition
+    FROM pg_constraint constraint_name
+    WHERE constraint_name.contype='f'
+      AND constraint_name.confrelid='public.projects'::regclass
+    ORDER BY constraint_name.conrelid::regclass::text,constraint_name.conname
+  LOOP
+    EXECUTE format('SELECT count(*) FROM %s',dependency.child_table) INTO row_count;
+    IF dependency.delete_action <> 'c' OR row_count > 0 THEN
+      RAISE NOTICE 'project_reference=%:%:action=%:child_rows=%:definition=%',
+        dependency.child_table,dependency.conname,dependency.delete_action,
+        row_count,dependency.definition;
     END IF;
   END LOOP;
 END $$;
