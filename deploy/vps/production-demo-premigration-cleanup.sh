@@ -72,6 +72,8 @@ BEGIN
   END IF;
   SELECT count(*) INTO actual FROM sample_data_generations;
   IF actual<>2 THEN RAISE EXCEPTION 'Sample generation count changed'; END IF;
+  SELECT count(*) INTO actual FROM work_items;
+  IF actual<>63 THEN RAISE EXCEPTION 'Work Item count changed'; END IF;
   SELECT count(*) INTO actual FROM workflow_form_signatures;
   IF actual<>10 THEN RAISE EXCEPTION 'Signature count changed'; END IF;
   SELECT count(*) INTO actual FROM workflow_form_pdf_exports;
@@ -107,6 +109,23 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- Delete Work Items before their approval requests. Any other populated
+  -- NO ACTION/RESTRICT child would make this order unsafe.
+  FOR dependency IN
+    SELECT fk.conrelid::regclass AS table_name
+    FROM pg_constraint fk
+    WHERE fk.contype='f' AND fk.confdeltype IN ('a','r')
+      AND fk.confrelid IN ('public.work_items'::regclass,'public.approval_requests'::regclass)
+      AND fk.conrelid<>'public.work_items'::regclass
+  LOOP
+    EXECUTE format('LOCK TABLE %s IN ACCESS EXCLUSIVE MODE',dependency.table_name);
+    EXECUTE format('SELECT count(*) FROM %s',dependency.table_name) INTO actual;
+    IF actual<>0 THEN
+      RAISE EXCEPTION 'Non-cascading Work Item/approval dependency % contains % rows',
+        dependency.table_name,actual;
+    END IF;
+  END LOOP;
+
   FOREACH guarded_table IN ARRAY ARRAY[
     'accounting_budgets','payables','receivables','payments','input_invoices',
     'output_invoices','payment_allocations','receipt_allocations',
@@ -134,6 +153,7 @@ BEGIN
 END $$;
 
 TRUNCATE workflow_form_signatures, workflow_form_pdf_exports CASCADE;
+DELETE FROM work_items;
 DELETE FROM approval_requests WHERE project_id IS NOT NULL;
 DELETE FROM sample_data_generations;
 DELETE FROM projects;
@@ -142,6 +162,7 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM projects)
     OR EXISTS (SELECT 1 FROM pipeline_runs)
+    OR EXISTS (SELECT 1 FROM work_items)
     OR EXISTS (SELECT 1 FROM sample_data_generations)
     OR EXISTS (SELECT 1 FROM workflow_form_signatures)
     OR EXISTS (SELECT 1 FROM workflow_form_pdf_exports)
