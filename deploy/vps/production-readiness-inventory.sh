@@ -66,10 +66,6 @@ SELECT 'project_approval_count=' || count(*) FROM approval_requests WHERE projec
 SELECT 'global_approval_count=' || count(*) FROM approval_requests WHERE project_id IS NULL;
 SELECT 'retired_activity_scope_count=' || count(*) FROM work_item_activities
 WHERE scope_type IN ('accounting_budget','payable','receivable','payment');
-SELECT 'nondefault_accounting_book_count=' || count(*) FROM accounting_books
-WHERE id<>'73000000-0000-0000-0000-000000000001'::uuid OR book_code<>'CONSFLOW-TT200';
-SELECT 'closed_accounting_period_count=' || count(*) FROM accounting_periods WHERE status<>'open';
-SELECT 'closed_tax_period_count=' || count(*) FROM tax_periods WHERE status<>'open';
 DO $$
 DECLARE
   table_name text;
