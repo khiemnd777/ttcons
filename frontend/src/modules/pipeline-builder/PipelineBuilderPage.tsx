@@ -45,6 +45,7 @@ import {
   validBusinessCode,
   validEdgePriority,
   workflowFormRequiredForStepType,
+  workflowFormsForTemplate,
 } from './pipelineBuilderDomain';
 
 type NodePreset = {
@@ -158,6 +159,10 @@ export function PipelineBuilderPage() {
     () => (Array.isArray(template.data?.edges) ? [...template.data.edges] : []),
     [template.data?.edges],
   );
+  const availableWorkflowForms = useMemo(
+    () => workflowFormsForTemplate(workflowForms.data ?? [], template.data?.pinned_workflow_forms ?? []),
+    [template.data?.pinned_workflow_forms, workflowForms.data],
+  );
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
   const selectedConnector = selectedConnectorId ? rawEdges.find((edge) => String(edge.id) === selectedConnectorId) : undefined;
@@ -177,7 +182,7 @@ export function PipelineBuilderPage() {
     const sourceNode = nodeById.get(String(selectedConnector.from_node_id));
     const versionIds = new Set((sourceNode?.steps ?? []).map((step: Record<string, any>) => String(step.form_version_id ?? '')).filter(Boolean));
     const seen = new Set<string>();
-    return (workflowForms.data ?? []).flatMap((form) => {
+    return availableWorkflowForms.flatMap((form) => {
       if (!versionIds.has(String(form.version_id))) return [];
       return (form.fields ?? []).flatMap((field) => {
         if (seen.has(field.field_key)) return [];
@@ -185,13 +190,13 @@ export function PipelineBuilderPage() {
         return [{ label: `${field.label} (${field.field_key})`, value: field.field_key }];
       });
     });
-  }, [nodeById, selectedConnector, workflowForms.data]);
+  }, [availableWorkflowForms, nodeById, selectedConnector]);
   const answerValueOptionsByFieldKey = useMemo(() => {
     if (!selectedConnector) return {};
     const sourceNode = nodeById.get(String(selectedConnector.from_node_id));
     const versionIds = new Set((sourceNode?.steps ?? []).map((step: Record<string, any>) => String(step.form_version_id ?? '')).filter(Boolean));
     const optionsByFieldKey: Record<string, Array<{ label: string; value: string }>> = {};
-    (workflowForms.data ?? []).forEach((form) => {
+    availableWorkflowForms.forEach((form) => {
       if (!versionIds.has(String(form.version_id))) return;
       (form.fields ?? []).forEach((field) => {
         const options = Array.isArray(field.options_json) ? field.options_json : [];
@@ -202,7 +207,7 @@ export function PipelineBuilderPage() {
       });
     });
     return optionsByFieldKey;
-  }, [nodeById, selectedConnector, workflowForms.data]);
+  }, [availableWorkflowForms, nodeById, selectedConnector]);
   const selectedConnectorSource = selectedConnector ? nodeById.get(String(selectedConnector.from_node_id)) : undefined;
   const selectedConnectorTarget = selectedConnector ? nodeById.get(String(selectedConnector.to_node_id)) : undefined;
   const detailsNode = detailsNodeId ? nodeById.get(detailsNodeId) : undefined;
@@ -228,8 +233,8 @@ export function PipelineBuilderPage() {
     [permissions.data],
   );
   const workflowFormVersionIds = useMemo(
-    () => new Set((workflowForms.data ?? []).map((form) => String(form.version_id)).filter(Boolean)),
-    [workflowForms.data],
+    () => new Set(availableWorkflowForms.map((form) => String(form.version_id)).filter(Boolean)),
+    [availableWorkflowForms],
   );
 
   useEffect(() => {
@@ -1023,7 +1028,7 @@ export function PipelineBuilderPage() {
               updateStepPending={updateStep.isPending}
               deleteStepPending={deleteStep.isPending}
               reorderStepPending={reorderStep.isPending}
-              workflowForms={workflowForms.data ?? []}
+              workflowForms={availableWorkflowForms}
               workflowFormsLoading={workflowForms.isLoading}
               workflowFormsError={workflowForms.isError}
               onChangeField={(field, value) => {

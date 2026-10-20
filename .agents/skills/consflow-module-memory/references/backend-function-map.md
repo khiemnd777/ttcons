@@ -1,5 +1,9 @@
 # Consflow Backend Function Map
 
+## Pipeline detail pinned Form metadata — 2026-10-20
+
+- `repository_pipeline.go::GetTemplateDetail` adds `pinned_workflow_forms` using published versions of active Form templates referenced by that exact Pipeline revision. It reuses `workflowFormVersionDetailSQL` to include fields used by condition editing. The selection catalog still excludes unmarked `operational_capture_v3` versions; publish validation still uses `TemplatePublishFormIssues`. Regression: `TestPipelineDetailIncludesValidPinnedFormHiddenFromSelectionCatalog`.
+
 ## Shared Strict Workflow Checkbox Validation — 2026-10-13
 
 - service_workflow_form_validation.go::normalizeWorkflowCheckboxValue is reused by top-level and nested normalization. Present nonboolean values reject before empty-value handling. structuredValueEmpty retains optional false, skips optional missing/null, and treats required false as missing. Existing structured-list required checks apply on draft and submit; top-level required checks apply on submit. Invalid types reject on both. workflow_form_defaults.go::applyConstructionHandoffEvidencePolicy clones rows when forcing absent/null/false to true and leaves wrong types intact for rejection. Existing form revision/history and activation evidence policy remain unchanged. Regression workflow_checkbox_validation_test.go uses isolated canonical draft/submit and source hash checks; no migration or new captured field.

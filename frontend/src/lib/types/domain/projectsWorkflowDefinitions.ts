@@ -336,6 +336,7 @@ export type PipelineTemplate = AnyRecord & {
   node_count?: number;
   nodes?: PipelineNode[];
   edges?: PipelineTemplateEdge[];
+  pinned_workflow_forms?: WorkflowFormCatalogItem[];
 };
 
 export type WorkflowFormCatalogItem = AnyRecord & {
@@ -351,6 +352,7 @@ export type WorkflowFormCatalogItem = AnyRecord & {
   published_at?: string;
   latest_published?: boolean;
   default_eligible?: boolean;
+  selectable?: boolean;
   step_usage_count?: number;
   field_count?: number;
   required_field_keys?: string[];

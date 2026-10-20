@@ -113,6 +113,17 @@ export function defaultWorkflowFormVersionForStep(stepType: string, catalog: Wor
   return defaults.find((form) => form.form_type === formType)?.version_id ?? defaults.find((form) => form.form_type === 'generic_submission')?.version_id ?? defaults[0]?.version_id ?? '';
 }
 
+export function workflowFormOptions(forms: WorkflowFormCatalogItem[], selectedVersionId: string) {
+  return forms.filter((form) => form.selectable !== false || form.version_id === selectedVersionId);
+}
+
+export function workflowFormsForTemplate(catalog: WorkflowFormCatalogItem[], pinned: WorkflowFormCatalogItem[]) {
+  const catalogIds = new Set(catalog.map((form) => String(form.version_id)));
+  return [...catalog, ...pinned
+    .filter((form) => !catalogIds.has(String(form.version_id)))
+    .map((form) => ({ ...form, selectable: false }))];
+}
+
 function preferredWorkflowFormCodeForStep(stepType: string, nodeType?: string, stepName = '') {
   const normalizedName = normalizedSearchText(stepName);
   if (stepType === 'daily_report') {

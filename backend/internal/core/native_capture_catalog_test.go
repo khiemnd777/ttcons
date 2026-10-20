@@ -7,6 +7,55 @@ import (
 	"testing"
 )
 
+func TestPipelineDetailIncludesValidPinnedFormHiddenFromSelectionCatalog(t *testing.T) {
+	db := openIsolatedCoreTestDB(t, "pinned_form_detail_", nil)
+	ctx := context.Background()
+	repo := NewRepository(db)
+	service := NewService(repo, "test-secret")
+	row, err := repo.QueryOne(ctx, `
+		SELECT v.id AS version_id FROM workflow_form_versions v
+		JOIN workflow_form_templates t ON t.id=v.template_id
+		WHERE v.status='published' AND t.status='active'
+		  AND v.schema_json->>'variant'='operational_capture_v3'
+		  AND COALESCE(v.schema_json->>'native_capture_revision','')<>'1'
+		  AND COALESCE(v.schema_json->>'native_field_capture_revision','')<>'1'
+		  AND COALESCE(v.schema_json->>'native_risk_assignment_revision','')<>'1'
+		LIMIT 1
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	versionID := cleanID(row["version_id"])
+	template, err := service.CreateTemplate(ctx, Record{"name": "Pinned form detail", "nodes": []any{map[string]any{"name": "Stage", "type": "task", "responsible_role_ids": []string{"PM"}}}}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	templateID := cleanID(template["id"])
+	nodes := template["nodes"].([]Record)
+	if _, err = service.CreateTemplateStep(ctx, Record{"node_id": nodes[0]["id"], "name": "Pinned form", "step_type": "task", "required_role_ids": []string{"PM"}, "form_required": true, "form_version_id": versionID}); err != nil {
+		t.Fatal(err)
+	}
+	detail, err := repo.GetTemplateDetail(ctx, templateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pinned := detail["pinned_workflow_forms"].([]Record)
+	if len(pinned) != 1 || cleanID(pinned[0]["version_id"]) != versionID {
+		t.Fatalf("pinned forms = %#v, want only %s", pinned, versionID)
+	}
+	if cleanText(pinned[0]["version_status"]) != "published" || cleanText(pinned[0]["template_status"]) != "active" {
+		t.Fatalf("pinned form lost status: %#v", pinned[0])
+	}
+	mustExec(t, db, `UPDATE workflow_form_templates SET status='archived' WHERE id=(SELECT template_id FROM workflow_form_versions WHERE id=$1)`, versionID)
+	detail, err = repo.GetTemplateDetail(ctx, templateID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if archived := detail["pinned_workflow_forms"].([]Record); len(archived) != 0 {
+		t.Fatalf("archived form still marked valid: %#v", archived)
+	}
+}
+
 func TestNativeCaptureCatalogExplicitPipelineSelectionPreservesLegacyPins(t *testing.T) {
 	db := openIsolatedCoreTestDB(t, "native_catalog_", nil)
 	ctx := context.Background()

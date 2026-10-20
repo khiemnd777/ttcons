@@ -1,8 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { defaultWorkflowFormVersionForStep } from '../src/modules/pipeline-builder/pipelineBuilderDomain.ts';
+import { buildValidationIssues, defaultWorkflowFormVersionForStep, workflowFormOptions, workflowFormsForTemplate } from '../src/modules/pipeline-builder/pipelineBuilderDomain.ts';
 
 const catalogItem = (versionId: string, values: any = {}) => ({template_id: 'template', template_code: 'builtin_construction_daily_report', template_name: 'Report', template_status: 'active', form_type: 'daily_report', version_id: versionId, version_no: 3, version_status: 'published', ...values});
+
+test('a valid pinned form hidden from new choices passes Pipeline validation and remains visible only on its own step', () => {
+  const catalog = [catalogItem('selectable')];
+  const pinned = catalogItem('hidden-pin', {fields: [{field_key: 'decision', label: 'Decision'}]});
+  const forms = workflowFormsForTemplate(catalog, [pinned]);
+  assert.deepEqual(forms.map((form) => form.version_id), ['selectable', 'hidden-pin']);
+  assert.deepEqual(workflowFormOptions(forms, '').map((form) => form.version_id), ['selectable']);
+  assert.deepEqual(workflowFormOptions(forms, 'hidden-pin').map((form) => form.version_id), ['selectable', 'hidden-pin']);
+  const nodes = [{id: 'node-1', name: 'Stage', steps: [{id: 'step-1', name: 'Pinned form', form_required: true, form_version_id: 'hidden-pin'}]}];
+  const issues = buildValidationIssues(nodes as any, [], [], new Set(forms.map((form) => form.version_id)), true);
+  assert.equal(issues.some((issue) => issue.includes('workflow form')), false, issues.join('; '));
+  const invalid = buildValidationIssues(nodes as any, [], [], new Set(catalog.map((form) => form.version_id)), true);
+  assert.equal(invalid.some((issue) => issue.includes('workflow form chưa published')), true);
+});
 
 test('default form chooses compatible preferred version while native version remains explicitly available', () => {
   const native = catalogItem('native-v3', {default_eligible: false});

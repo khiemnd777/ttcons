@@ -1,5 +1,9 @@
 # Consflow Module Keyword Map
 
+## Pipeline Builder pinned Form validation — 2026-10-20
+
+- Keywords: Pipeline v10 `Kiểm tra`, 14 false Workflow Form warnings, hidden `operational_capture_v3` pins. Owner: `repository_pipeline.go::GetTemplateDetail` supplies active/published `pinned_workflow_forms`; `PipelineBuilderPage.tsx` merges these with the selection catalog for validation and condition-field metadata; `NodeInspectorPanel.tsx` shows an already pinned hidden version without offering it as a new choice. `pipelineBuilderDomain.ts::workflowFormsForTemplate/workflowFormOptions` owns that distinction. First searches: `pinned_workflow_forms|workflowFormsForTemplate|workflowFormOptions|buildValidationIssues|WorkflowFormCatalog|TemplatePublishFormIssues`.
+
 ## Structured Checkbox Validation — 2026-10-13
 
 - Workflow form draft/submit checkbox validation belongs to service_workflow_form_validation.go::normalizeWorkflowCheckboxValue/structuredValueEmpty/normalizeStructuredFieldValue. Strict boolean types apply at top level and inside structured lists; optional false is retained, missing/null optional values skip, and required false/missing rejects on submit. Nonboolean values reject rather than disappearing. Exact client_construction_handoff_plan defaults in workflow_form_defaults.go keep mandatory evidence true for missing/null/false without coercing invalid types. No field/schema/UI/history change. Tests workflow_checkbox_validation_test.go cover actual isolated draft/submit persistence; handoff activation and generated-check evidence gates remain authoritative.

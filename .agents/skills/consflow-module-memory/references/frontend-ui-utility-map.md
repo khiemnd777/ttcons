@@ -1,5 +1,9 @@
 # Consflow Frontend UI And Utility Map
 
+## Pipeline Builder pinned Form display — 2026-10-20
+
+- `PipelineBuilderPage.tsx` merges the new `PipelineTemplate.pinned_workflow_forms` response with `/workflow-form-templates` only for validation, existing-pin display and condition-field metadata. `pipelineBuilderDomain.ts::workflowFormsForTemplate` marks catalog-hidden valid pins `selectable=false`; `workflowFormOptions` leaves them in the selector only when already selected. New defaults still read the original selection catalog. `NodeInspectorPanel.tsx` uses the merged metadata and filtered options. Regression: `pipelineFormDefaults.test.ts`.
+
 ## Existing Contract App-Sign Modal Uses Rev10 Source — 2026-10-13
 
 - ContractsPage.tsx existing source-signing modal/signature dialog keeps its controls and permissions. ContractDetail signing_forms now includes only the valid current canonical execution-package source alongside legacy App-sign through shared backend predicate; no FE control/field or history rewrite. Submitted/pinned same-source identity is backend-owned; empty valid-source options stay empty rather than accepting another project/form. Browser verification is separate.

@@ -38,8 +38,22 @@ func (r *Repository) GetTemplateDetail(ctx context.Context, id string) (Record, 
 		`, node["id"])
 		node["steps"] = steps
 	}
+	// Existing pins can be valid even when hidden from the catalog for new selections.
+	pinnedForms, err := r.Query(ctx, workflowFormVersionDetailSQL(`
+		WHERE v.id IN (
+			SELECT DISTINCT pts.form_version_id
+			FROM pipeline_template_steps pts
+			JOIN pipeline_template_nodes n ON n.id=pts.node_id
+			WHERE n.template_id=$1 AND pts.form_version_id IS NOT NULL
+		)
+		AND v.status='published' AND t.status='active'
+	`), id)
+	if err != nil {
+		return nil, err
+	}
 	template["nodes"] = nodes
 	template["edges"] = edges
+	template["pinned_workflow_forms"] = pinnedForms
 	return template, nil
 }
 

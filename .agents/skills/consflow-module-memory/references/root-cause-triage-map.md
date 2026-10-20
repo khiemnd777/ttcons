@@ -1,5 +1,9 @@
 # Consflow Root-Cause Triage Map
 
+## Pipeline Builder false Form-version warnings — 2026-10-20
+
+- If `Kiểm tra` reports a pinned Form as unpublished/inactive while publish succeeds, compare `WorkflowFormCatalog` selection filtering with `GetTemplateDetail.pinned_workflow_forms` and `TemplatePublishFormIssues`. Read `PipelineBuilderPage.tsx::workflowFormsForTemplate` and `NodeInspectorPanel.tsx::workflowFormOptions`; only active/published pins qualify, and hidden pins must not enter new selections. First search: `pinned_workflow_forms|workflowFormsForTemplate|workflowFormOptions|buildValidationIssues|TemplatePublishFormIssues`.
+
 ## BM05/BM06/BM07 Project Name Wraps Into A Tall Header — 2026-10-13
 
 - Keywords BM05/B5:K5/BM06/B5:J5/BM07/B5:G5/tên dự án xuống nhiều dòng/row5height169.35/project header. Inspect original client B5 merge/width/wrap, `bm_gs_workbook.go::bmgsPopulate` and `bmgsFitRowText`. Original B columns are narrow table columns; writing full project code/name into unmerged B5 then forcing wrap/fit uses only that width, leaving the remaining header area empty and producing a tall header before Google import.

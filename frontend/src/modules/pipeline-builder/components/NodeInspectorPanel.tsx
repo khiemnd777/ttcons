@@ -4,6 +4,7 @@ import { ChevronDown, GripVertical, Pencil, Plus, Save, Trash2, X } from 'lucide
 import { Dialog } from '../../../components/Dialog';
 import { EnumChip } from '../../../components/EnumChip';
 import type { PipelineNode, WorkflowFormCatalogItem } from '../../../lib/types/domain';
+import { workflowFormOptions } from '../pipelineBuilderDomain';
 import { pipelineActorRoleChoices, roleSummary } from '../../../lib/utils/roles';
 import { enumOptions, nodeTypeValues } from '../../../lib/utils/status';
 import { useValidationNavigation } from '../../../lib/utils/formValidationNavigation';
@@ -608,9 +609,9 @@ function WorkflowFormSelect({
           onChange={(event) => onChange(event.target.value)}
         >
           <option value="">{workflowFormEmptyLabel({ required, loading, error, hasForms: forms.length > 0 })}</option>
-          {forms.map((form) => (
+          {workflowFormOptions(forms, value).map((form) => (
             <option key={form.version_id} value={form.version_id}>
-              {formOptionLabel(form)}
+              {formOptionLabel(form)}{form.selectable === false ? ' · Đã gắn' : ''}
             </option>
           ))}
         </select>
