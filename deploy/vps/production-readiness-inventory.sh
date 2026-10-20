@@ -62,6 +62,48 @@ LEFT JOIN permissions permission ON permission.key=expected.permission_key
 LEFT JOIN role_permissions grant_row ON grant_row.role_id=role.id AND grant_row.permission_id=permission.id
 GROUP BY expected.role_name,expected.permission_key
 ORDER BY expected.role_name,expected.permission_key;
+SELECT 'pipeline_status_version=' || status || ':' || version || ':' || count(*)
+FROM pipeline_templates GROUP BY status,version ORDER BY status,version;
+WITH expected(ref) AS (VALUES
+  ('builtin_construction_daily_report@v2'),('builtin_owner_client_checklist@v2'),
+  ('client_boq_owner_submission@v3'),('client_construction_execution_plan@v1'),
+  ('client_construction_handoff_plan@v2'),('client_design_branch_decision@v3'),
+  ('client_design_delivery_package@v1'),('client_design_to_qs_handoff@v3'),
+  ('client_hardcopy_dispatch@v3'),('client_material_incoming_acceptance_summary@v3'),
+  ('client_project_intake_routing@v2'),('client_site_survey_minutes@v3'),
+  ('client_subcontractor_acceptance_package@v3'),('client_survey_work_package@v1')
+)
+SELECT 'local_v10_form_ref=' || expected.ref || ':' ||
+  CASE WHEN EXISTS (
+    SELECT 1 FROM workflow_form_templates template
+    JOIN workflow_form_versions version ON version.template_id=template.id
+    WHERE lower(template.code)||'@v'||version.version_no=expected.ref
+      AND template.status='active' AND version.status='published'
+  ) THEN 'published' ELSE 'missing' END
+FROM expected ORDER BY expected.ref;
+WITH expected(key) AS (VALUES
+  ('acceptance.approve'),('acceptance.create'),('acceptance.view'),
+  ('accounting.budget_view'),('accounting_handoff.acknowledge'),('accounting_handoff.view'),
+  ('boq.approve'),('boq.update'),('boq.view'),('construction.handoff.manage'),
+  ('contract.approve'),('contract.create'),('contract.dispatch'),('contract.review'),
+  ('contract.scan_manage'),('contract.sign'),('contract.view'),('handover.approve'),
+  ('handover.view'),('operation.issue_create'),('operation.report'),('operation.view'),
+  ('pipeline.view'),('planning.edit'),('procurement.approve'),('procurement.create'),
+  ('procurement.view'),('project.update'),('project.view'),
+  ('project_finance.cost_create'),('project_finance.request_create'),('project_finance.view')
+)
+SELECT 'local_v10_permission=' || expected.key || ':' ||
+  CASE WHEN permission.id IS NOT NULL THEN 'present' ELSE 'missing' END
+FROM expected LEFT JOIN permissions permission ON permission.key=expected.key ORDER BY expected.key;
+WITH expected(name) AS (VALUES
+  ('accounting'),('contract_officer'),('design'),('pm'),
+  ('procurement'),('qa_qc'),('qs'),('supervisor')
+)
+SELECT 'local_v10_role=' || expected.name || ':' ||
+  CASE WHEN role.id IS NULL THEN 'missing'
+       WHEN role.external_only THEN 'external_only'
+       ELSE 'assignable' END
+FROM expected LEFT JOIN roles role ON role.name=expected.name ORDER BY expected.name;
 SELECT 'project_approval_count=' || count(*) FROM approval_requests WHERE project_id IS NOT NULL;
 SELECT 'global_approval_count=' || count(*) FROM approval_requests WHERE project_id IS NULL;
 SELECT 'retired_activity_scope_count=' || count(*) FROM work_item_activities
