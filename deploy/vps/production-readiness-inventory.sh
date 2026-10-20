@@ -115,6 +115,27 @@ BEGIN
         row_count,dependency.definition;
     END IF;
   END LOOP;
+
+  FOR dependency IN
+    SELECT constraint_name.conname, constraint_name.conrelid::regclass AS child_table,
+           constraint_name.confrelid::regclass AS parent_table,
+           constraint_name.confdeltype AS delete_action,
+           pg_get_constraintdef(constraint_name.oid) AS definition
+    FROM pg_constraint constraint_name
+    WHERE constraint_name.contype='f'
+      AND constraint_name.confrelid IN (
+        'public.approval_requests'::regclass,
+        'public.work_items'::regclass
+      )
+    ORDER BY parent_table,child_table,constraint_name.conname
+  LOOP
+    EXECUTE format('SELECT count(*) FROM %s',dependency.child_table) INTO row_count;
+    IF dependency.delete_action <> 'c' OR row_count > 0 THEN
+      RAISE NOTICE 'cleanup_reference=%:%:%:action=%:child_rows=%:definition=%',
+        dependency.parent_table,dependency.child_table,dependency.conname,
+        dependency.delete_action,row_count,dependency.definition;
+    END IF;
+  END LOOP;
 END $$;
 DO $$
 DECLARE

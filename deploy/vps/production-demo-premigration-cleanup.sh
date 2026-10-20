@@ -20,7 +20,10 @@ compose=(docker compose --project-name consflow-prod --env-file /opt/consflow/sh
 restart_services() {
   result=$?
   trap - EXIT
-  if ! "${compose[@]}" start backend admin; then
+  backend_container="$("${compose[@]}" ps --all --quiet backend)"
+  admin_container="$("${compose[@]}" ps --all --quiet admin)"
+  if [[ -z "$backend_container" || -z "$admin_container" ]] \
+    || ! docker start "$backend_container" "$admin_container"; then
     echo 'Could not restart the original production services' >&2
     exit 1
   fi
