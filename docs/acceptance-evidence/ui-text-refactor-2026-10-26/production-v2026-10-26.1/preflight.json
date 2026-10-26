@@ -1,0 +1,22 @@
+{
+  "checked_at_utc": "2026-10-26T08:38:35.582895+00:00",
+  "release_commit": "d0b36fa5b3c6ca97a27caf5dcd214f76dd91120a",
+  "tag": "v2026-10-26.1",
+  "vps_read_only": [
+    "CURRENT_RELEASE=/opt/consflow/releases/v2026-10-20.20",
+    "RELEASE_TAG=v2026-10-20.20",
+    "BACKEND_IMAGE=ghcr.io/khiemnd777/ttcons-backend@sha256:fe8407e9be50a774dd72518ebff2c733fbe43789abda3ff71d32a862c83ec4b7",
+    "ADMIN_IMAGE=ghcr.io/khiemnd777/ttcons-admin@sha256:3be82dbc3bfd6656d5911fe71d5ba72d61bb730be6aa67c21dd1d1faee0c0ddb",
+    "160"
+  ],
+  "public_checks": {
+    "/gateway-health": 204,
+    "/api/health": 200,
+    "/api/ready": 200
+  },
+  "dns_a": [
+    "160.30.113.13"
+  ],
+  "dns_aaaa": [],
+  "tls_validation": "System curl; TLS verification enabled"
+}

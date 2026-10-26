@@ -1,0 +1,439 @@
+{
+  "conclusion": "success",
+  "createdAt": "2026-10-26T08:36:00Z",
+  "headBranch": "v2026-10-26.1",
+  "headSha": "d0b36fa5b3c6ca97a27caf5dcd214f76dd91120a",
+  "jobs": [
+    {
+      "completedAt": "2026-10-26T08:36:27Z",
+      "conclusion": "success",
+      "databaseId": 121473475453,
+      "name": "Validate release tag",
+      "startedAt": "2026-10-26T08:36:03Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-26T08:36:05Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-26T08:36:04Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:36:24Z",
+          "conclusion": "success",
+          "name": "Checkout tag history",
+          "number": 2,
+          "startedAt": "2026-10-26T08:36:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:36:24Z",
+          "conclusion": "success",
+          "name": "Validate tag and main ancestry",
+          "number": 3,
+          "startedAt": "2026-10-26T08:36:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:36:24Z",
+          "conclusion": "success",
+          "name": "Post Checkout tag history",
+          "number": 6,
+          "startedAt": "2026-10-26T08:36:24Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:36:24Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 7,
+          "startedAt": "2026-10-26T08:36:24Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/khiemnd777/ttcons/actions/runs/40293383665/job/121473475453"
+    },
+    {
+      "completedAt": "2026-10-26T08:53:26Z",
+      "conclusion": "success",
+      "databaseId": 121473655607,
+      "name": "validate / Validate",
+      "startedAt": "2026-10-26T08:36:30Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-26T08:36:32Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-26T08:36:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:36:48Z",
+          "conclusion": "success",
+          "name": "Initialize containers",
+          "number": 2,
+          "startedAt": "2026-10-26T08:36:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:36:55Z",
+          "conclusion": "success",
+          "name": "Checkout",
+          "number": 3,
+          "startedAt": "2026-10-26T08:36:48Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:37:07Z",
+          "conclusion": "success",
+          "name": "Set up Go",
+          "number": 4,
+          "startedAt": "2026-10-26T08:36:55Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:37:10Z",
+          "conclusion": "success",
+          "name": "Set up Node",
+          "number": 5,
+          "startedAt": "2026-10-26T08:37:07Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:37:11Z",
+          "conclusion": "success",
+          "name": "Check backend format",
+          "number": 6,
+          "startedAt": "2026-10-26T08:37:10Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:37:28Z",
+          "conclusion": "success",
+          "name": "Check migrations",
+          "number": 7,
+          "startedAt": "2026-10-26T08:37:11Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:51:20Z",
+          "conclusion": "success",
+          "name": "Test backend",
+          "number": 8,
+          "startedAt": "2026-10-26T08:37:28Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:51:20Z",
+          "conclusion": "success",
+          "name": "Test release tag validator",
+          "number": 9,
+          "startedAt": "2026-10-26T08:51:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:51:22Z",
+          "conclusion": "success",
+          "name": "Test production operator tooling",
+          "number": 10,
+          "startedAt": "2026-10-26T08:51:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:51:29Z",
+          "conclusion": "success",
+          "name": "Install frontend dependencies",
+          "number": 11,
+          "startedAt": "2026-10-26T08:51:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:51:43Z",
+          "conclusion": "success",
+          "name": "Test frontend",
+          "number": 12,
+          "startedAt": "2026-10-26T08:51:29Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:52:21Z",
+          "conclusion": "success",
+          "name": "Build frontend",
+          "number": 13,
+          "startedAt": "2026-10-26T08:51:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:16Z",
+          "conclusion": "success",
+          "name": "Build and validate production Caddy gateway image",
+          "number": 14,
+          "startedAt": "2026-10-26T08:52:21Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:17Z",
+          "conclusion": "success",
+          "name": "Check frontend bundle budget",
+          "number": 15,
+          "startedAt": "2026-10-26T08:53:16Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:17Z",
+          "conclusion": "success",
+          "name": "Check whitespace",
+          "number": 16,
+          "startedAt": "2026-10-26T08:53:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:18Z",
+          "conclusion": "success",
+          "name": "Post Set up Node",
+          "number": 29,
+          "startedAt": "2026-10-26T08:53:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:23Z",
+          "conclusion": "success",
+          "name": "Post Set up Go",
+          "number": 30,
+          "startedAt": "2026-10-26T08:53:18Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:23Z",
+          "conclusion": "success",
+          "name": "Post Checkout",
+          "number": 31,
+          "startedAt": "2026-10-26T08:53:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:24Z",
+          "conclusion": "success",
+          "name": "Stop containers",
+          "number": 32,
+          "startedAt": "2026-10-26T08:53:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:24Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 33,
+          "startedAt": "2026-10-26T08:53:24Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/khiemnd777/ttcons/actions/runs/40293383665/job/121473655607"
+    },
+    {
+      "completedAt": "2026-10-26T08:56:00Z",
+      "conclusion": "success",
+      "databaseId": 121480204769,
+      "name": "Build immutable images",
+      "startedAt": "2026-10-26T08:53:30Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-26T08:53:32Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-26T08:53:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:40Z",
+          "conclusion": "success",
+          "name": "Checkout validated commit",
+          "number": 2,
+          "startedAt": "2026-10-26T08:53:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:40Z",
+          "conclusion": "success",
+          "name": "Resolve lowercase GHCR names",
+          "number": 3,
+          "startedAt": "2026-10-26T08:53:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:42Z",
+          "conclusion": "success",
+          "name": "Log in to GHCR",
+          "number": 4,
+          "startedAt": "2026-10-26T08:53:40Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:53:50Z",
+          "conclusion": "success",
+          "name": "Set up Docker Buildx",
+          "number": 5,
+          "startedAt": "2026-10-26T08:53:42Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:54:53Z",
+          "conclusion": "success",
+          "name": "Build and push backend",
+          "number": 6,
+          "startedAt": "2026-10-26T08:53:50Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:49Z",
+          "conclusion": "success",
+          "name": "Build and push admin",
+          "number": 7,
+          "startedAt": "2026-10-26T08:54:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:49Z",
+          "conclusion": "success",
+          "name": "Export digest-pinned references",
+          "number": 8,
+          "startedAt": "2026-10-26T08:55:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:51Z",
+          "conclusion": "success",
+          "name": "Post Build and push admin",
+          "number": 12,
+          "startedAt": "2026-10-26T08:55:49Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:53Z",
+          "conclusion": "success",
+          "name": "Post Build and push backend",
+          "number": 13,
+          "startedAt": "2026-10-26T08:55:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:57Z",
+          "conclusion": "success",
+          "name": "Post Set up Docker Buildx",
+          "number": 14,
+          "startedAt": "2026-10-26T08:55:53Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:57Z",
+          "conclusion": "success",
+          "name": "Post Log in to GHCR",
+          "number": 15,
+          "startedAt": "2026-10-26T08:55:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:58Z",
+          "conclusion": "success",
+          "name": "Post Checkout validated commit",
+          "number": 16,
+          "startedAt": "2026-10-26T08:55:57Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:55:58Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 17,
+          "startedAt": "2026-10-26T08:55:58Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/khiemnd777/ttcons/actions/runs/40293383665/job/121480204769"
+    },
+    {
+      "completedAt": "2026-10-26T08:57:21Z",
+      "conclusion": "success",
+      "databaseId": 121481209237,
+      "name": "Deploy VPS production",
+      "startedAt": "2026-10-26T08:56:05Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-26T08:56:06Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-26T08:56:05Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:56:12Z",
+          "conclusion": "success",
+          "name": "Checkout validated commit",
+          "number": 2,
+          "startedAt": "2026-10-26T08:56:06Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:56:12Z",
+          "conclusion": "success",
+          "name": "Configure pinned SSH host",
+          "number": 3,
+          "startedAt": "2026-10-26T08:56:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:56:27Z",
+          "conclusion": "success",
+          "name": "Upload release bundle",
+          "number": 4,
+          "startedAt": "2026-10-26T08:56:12Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:57:17Z",
+          "conclusion": "success",
+          "name": "Run fail-closed production deployment",
+          "number": 5,
+          "startedAt": "2026-10-26T08:56:27Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:57:20Z",
+          "conclusion": "success",
+          "name": "Verify public HTTPS",
+          "number": 6,
+          "startedAt": "2026-10-26T08:57:17Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:57:20Z",
+          "conclusion": "success",
+          "name": "Post Checkout validated commit",
+          "number": 12,
+          "startedAt": "2026-10-26T08:57:20Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-26T08:57:20Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 13,
+          "startedAt": "2026-10-26T08:57:20Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/khiemnd777/ttcons/actions/runs/40293383665/job/121481209237"
+    }
+  ],
+  "status": "completed",
+  "updatedAt": "2026-10-26T08:57:22Z",
+  "url": "https://github.com/khiemnd777/ttcons/actions/runs/40293383665"
+}

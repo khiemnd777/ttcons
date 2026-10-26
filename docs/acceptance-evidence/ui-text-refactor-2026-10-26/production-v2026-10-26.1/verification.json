@@ -1,0 +1,36 @@
+{
+  "checked_at_utc": "2026-10-26T08:57:55.700374+00:00",
+  "status": "PRODUCTION_DEPLOYMENT_VERIFIED",
+  "tag": "v2026-10-26.1",
+  "source_commit": "d0b36fa5b3c6ca97a27caf5dcd214f76dd91120a",
+  "workflow_run": "https://github.com/khiemnd777/ttcons/actions/runs/40293383665",
+  "vps_read_only": [
+    "CURRENT_RELEASE=/opt/consflow/releases/v2026-10-26.1",
+    "RELEASE_TAG=v2026-10-26.1",
+    "BACKEND_IMAGE=ghcr.io/khiemnd777/ttcons-backend@sha256:71b99ac8559885e9107408ce83f6be72c664c9eb4c38bfaa1c2dd3479b7ff25e",
+    "ADMIN_IMAGE=ghcr.io/khiemnd777/ttcons-admin@sha256:bcb767384513c6a2d0c53557e77fd462a732ee3f0ab32aa370eeb85ad79cdb13",
+    "SERVICE=backend REVISION=d0b36fa5b3c6ca97a27caf5dcd214f76dd91120a VERSION=v2026-10-26.1 HEALTH=healthy",
+    "SERVICE=admin REVISION=d0b36fa5b3c6ca97a27caf5dcd214f76dd91120a VERSION=v2026-10-26.1 HEALTH=healthy",
+    "MIGRATIONS=160"
+  ],
+  "public_http_status": {
+    "/gateway-health": 204,
+    "/api/health": 200,
+    "/api/ready": 200,
+    "/login": 200
+  },
+  "frontend_entry": "/assets/index-Si_HA7RC.js",
+  "frontend_entry_sha256": "d886e62cc3f99e2900a22132d6194ad3525cd0797b8a83a3b92edc4f2ae4be3a",
+  "notification_chunk": "/assets/NotificationsPage-BgI0AMcA.js",
+  "notification_chunk_sha256": "9713e102c739cad192f7e18d2f5b26c38762aa8971998878df0fde2941821c8f",
+  "new_notification_copy_present": true,
+  "tls_and_ssh_verification": "Enabled; pinned SSH host, system curl TLS trust",
+  "database_migrations_before": 160,
+  "database_migrations_after": 160,
+  "scope": "Release/current symlink, exact OCI commit/version labels, healthy services, public HTTPS and delivered new frontend chunk",
+  "limits": [
+    "Không chạy browser hoặc đăng nhập production trong lượt deploy",
+    "Chưa gọi catalog có xác thực trên production; không dùng credentials bootstrap để smoke nghiệp vụ",
+    "Không ghi dữ liệu nghiệp vụ production"
+  ]
+}

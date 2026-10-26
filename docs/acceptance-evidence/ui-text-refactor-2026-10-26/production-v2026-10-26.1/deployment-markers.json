@@ -1,0 +1,6 @@
+{
+  "selected_deploy_output": [
+    "Deploy VPS production\tRun fail-closed production deployment\t2026-10-26T08:56:58.7704427Z 2026/10/26 08:58:31 migrations applied=0 skipped=160",
+    "Deploy VPS production\tRun fail-closed production deployment\t2026-10-26T08:57:17.9943712Z deployed release v2026-10-26.1"
+  ]
+}

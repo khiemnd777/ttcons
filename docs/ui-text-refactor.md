@@ -66,11 +66,19 @@ Catalog local thật200 với83events,21bật,6nhóm hiện tại đều bắt b
 
 Lượt browser đồng thời chạm auth rate-limit bị loại khỏi kết luận. Recheck chạy tuần tự, giãn baseline load; không hạ bảo vệ. Ba ca Event Logs dùng locator công trình cố định không tồn tại trong facet được thay bằng recheck chọn option API thật. Receipt thô vẫn giữ; summary dùng kết quả hợp lệ mới nhất theo từng ca.
 
-**Trạng thái:** IMPLEMENTED / TECHNICALLY VERIFIED LOCAL. Chưa có nghiệm thu của người dùng đại diện hoặc điện thoại vật lý; chưa đo tốc độ, camera, mọi Form/validation hoặc luồng ghi nghiệp vụ. Không commit/push/deploy. Video trước khắc phục là lịch sử; bản TechNote4 sau khắc phục ở `output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/`.
+**Trạng thái local trước phát hành:** IMPLEMENTED / TECHNICALLY VERIFIED LOCAL. Chưa có nghiệm thu của người dùng đại diện hoặc điện thoại vật lý; chưa đo tốc độ, camera, mọi Form/validation hoặc luồng ghi nghiệp vụ. Thời điểm đó chưa commit/push/deploy. Video trước khắc phục là lịch sử; bản TechNote4 sau khắc phục ở `output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/`.
+
+## Phát hành production — v2026-10-26.1
+
+Người dùng đã giao commit/push/deploy sau nghiệm thu local. Source release `d0b36fa5b3c6ca97a27caf5dcd214f76dd91120a`, tag `v2026-10-26.1`; [workflow40293383665](https://github.com/khiemnd777/ttcons/actions/runs/40293383665) SUCCESS. Full backend tests với PostgreSQL/Redis, frontend tests/build, bundle budget và build hai image bất biến đều PASS. Bản clone sạch tạm được dùng để đáp ứng release-tag guard, giữ các tài liệu khác đang dở ngoài commit.
+
+Đã xác minh production lúc15:57 ngày26-10 (giờ Việt Nam): current symlink đúng release; OCI commit/version của cả backend/admin khớp; hai service healthy; gateway204, health200, ready200, login200. Entry frontend và chunk NotificationsPage mới tải qua HTTPS, có error/empty copy mới. DB giữ160migration trước/sau; không thêm migration hoặc thay Workflow/Pipeline. Receipt/hash/image refs tại `docs/acceptance-evidence/ui-text-refactor-2026-10-26/production-v2026-10-26.1/verification.json` và workflow.json.
+
+Phạm vi smoke production chỉ đọc runtime/HTTP, không chạy browser hoặc đăng nhập, không ghi nghiệp vụ. Chưa gọi catalog có xác thực trên production. Kết quả triển khai không thay thế nghiệm thu nghiệp vụ bằng người dùng đại diện. Không cập nhật mapping thêm trong lượt phát hành vì không đổi source/owner/contracts hoặc workflow triển khai.
 
 ## Bước tiếp theo
 
 **Nghiệm thu local chạy lại ngày26-10 theo yêu cầu người dùng:** hai bộ chạy tuần tự trên cùng fingerprint source/tests và build không đổi.56 ca PASS,0 FAIL/BLOCKED/CHECK_REQUIRED/NOT_RUN trong registry,0 JavaScript pageerror;14 đối chiếu Pipeline/Form và guard112file+12vùng PASS. Preview HTML khớp artifact build; backend image và guide DB160migrations không đổi. Receipt mới tại `docs/acceptance-evidence/ui-text-refactor-2026-10-26/acceptance-local-20261026/summary.json`. Đây là LOCAL_UAT_PASS_AGENT; các giới hạn fixtures/thiết bị thật/người dùng đại diện vẫn giữ. Không sửa source hoặc chạy lại build/tests vì fingerprint đã đối chiếu không đổi; mapping không cần cập nhật trong lượt nghiệm thu này.
 
 1. Người dùng đại diện nghiệm thu bản local và xác nhận phạm vi còn cần thử trên thiết bị thật.
-2. Sau review source và nghiệm thu phù hợp, người dùng có thể giao commit; push/deploy cần phạm vi riêng.
+2. Người dùng kiểm tra nhanh catalog và ba trang mobile trên production sau đăng nhập; ghi riêng bất kỳ phát hiện mới trước khi sửa.
