@@ -1,0 +1,1 @@
+Chưa có điện thoại vật lý hoặc người dùng đại diện. Chưa chạy toàn bộ backend tests; chưa commit, push hoặc triển khai production.

@@ -96,7 +96,6 @@ export function MeetingMinutesPage() {
     <>
       <PageHeader
         title="Biên bản họp"
-        description="Theo dõi biên bản họp từ biểu mẫu quy trình đang chạy, đầu việc và liên kết công trình/quy trình."
         actions={
           <button
             className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -174,7 +173,7 @@ export function MeetingMinutesPage() {
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard icon={<FileText className="h-5 w-5" />} label="Biên bản" value={metrics.total} sub={`${metrics.needsSubmit} cần gửi`} />
         <MetricCard icon={<Users className="h-5 w-5" />} label="Người tham dự" value={metrics.attendees} sub={`${metrics.submitted} đã gửi`} />
-        <MetricCard icon={<CheckSquare className="h-5 w-5" />} label="Quyết định" value={metrics.decisions} sub="dòng quyết định" />
+        <MetricCard icon={<CheckSquare className="h-5 w-5" />} label="Quyết định" value={metrics.decisions} />
         <MetricCard icon={<CalendarDays className="h-5 w-5" />} label="Đầu việc" value={metrics.actionItems} sub={`${metrics.generatedItems} đầu việc đã sinh`} />
       </div>
 
@@ -256,7 +255,7 @@ export function MeetingMinutesPage() {
   );
 }
 
-function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: string; value: number; sub: string }) {
+function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: string; value: number; sub?: string }) {
   return (
     <div className="rounded-lg border border-line bg-white p-4 shadow-panel">
       <div className="flex items-center justify-between gap-3">
@@ -266,7 +265,7 @@ function MetricCard({ icon, label, value, sub }: { icon: ReactNode; label: strin
         </div>
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700">{icon}</div>
       </div>
-      <p className="mt-2 text-xs text-slate-500">{sub}</p>
+      {sub ? <p className="mt-2 text-xs text-slate-500">{sub}</p> : null}
     </div>
   );
 }

@@ -1,0 +1,668 @@
+[
+  {
+    "route": "/audit",
+    "before": {
+      "viewport": 390,
+      "documentWidth": 820,
+      "elements": [
+        {
+          "tag": "SELECT",
+          "classes": "h-10 rounded-md border border-line bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100",
+          "text": "Tất cả công trìnhDEMO-DONE-261022032003-F3D6A673 · Công trình mẫu đã hoàn thành ",
+          "width": 787,
+          "right": 820,
+          "scroll": 785,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "clip"
+        }
+      ]
+    },
+    "afterExperiment": {
+      "viewport": 390,
+      "documentWidth": 390
+    }
+  },
+  {
+    "route": "/event-logs",
+    "before": {
+      "viewport": 390,
+      "documentWidth": 814,
+      "elements": [
+        {
+          "tag": "SELECT",
+          "classes": "h-10 rounded-md border border-line bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100",
+          "text": "Tất cả công trìnhDEMO-PLAN-261022034503-55B561CB · Công trình mẫu đang lập kế ho",
+          "width": 781,
+          "right": 814,
+          "scroll": 779,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "clip"
+        }
+      ]
+    },
+    "afterExperiment": {
+      "viewport": 390,
+      "documentWidth": 390
+    }
+  },
+  {
+    "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/discussion",
+    "before": {
+      "viewport": 390,
+      "documentWidth": 540,
+      "elements": [
+        {
+          "tag": "DIV",
+          "classes": "space-y-3 xl:col-start-2 xl:row-start-1",
+          "text": "Bước tiếp theoNghiệm thu Đầu VàoSẵn sàngNghiệm thu gói thầu phụ và khối lượngPhụ",
+          "width": 524.234375,
+          "right": 540.234375,
+          "scroll": 524,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SECTION",
+          "classes": "rounded-lg border border-blue-200 bg-white p-3 shadow-panel",
+          "text": "Bước tiếp theoNghiệm thu Đầu VàoSẵn sàngNghiệm thu gói thầu phụ và khối lượngPhụ",
+          "width": 524.234375,
+          "right": 540.234375,
+          "scroll": 522,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex items-center gap-2",
+          "text": "Bước tiếp theo",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "P",
+          "classes": "mt-2 truncate text-xs font-semibold text-blue-700",
+          "text": "Nghiệm thu Đầu Vào",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "hidden"
+        },
+        {
+          "tag": "DIV",
+          "classes": "mt-2",
+          "text": "Sẵn sàng",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "H3",
+          "classes": "mt-3 break-words text-sm font-semibold leading-5 text-ink",
+          "text": "Nghiệm thu gói thầu phụ và khối lượng",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DL",
+          "classes": "mt-2 space-y-1 text-xs leading-5 text-slate-600",
+          "text": "Phụ trách:QSHạn:—",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex gap-1",
+          "text": "Phụ trách:QS",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex gap-1",
+          "text": "Hạn:—",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700",
+          "text": "Xử lý việc ưu tiên",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "inline-flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "mt-2 inline-flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50",
+          "text": "Trao đổi về việc này",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "inline-flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SECTION",
+          "classes": "rounded-lg border border-line bg-white p-3 shadow-panel",
+          "text": "Việc của tôi0Chưa có việc cần xử lý.Xem tất cả việc",
+          "width": 524.234375,
+          "right": 540.234375,
+          "scroll": 522,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "flex w-full items-center gap-2 text-left font-semibold text-ink xl:cursor-default",
+          "text": "Việc của tôi0",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SPAN",
+          "classes": "flex-1",
+          "text": "Việc của tôi",
+          "width": 417.046875,
+          "right": 470.046875,
+          "scroll": 417,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SPAN",
+          "classes": "rounded bg-blue-50 px-2 text-sm text-blue-700",
+          "text": "0",
+          "width": 25.1875,
+          "right": 503.234375,
+          "scroll": 25,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "svg",
+          "classes": {},
+          "text": "",
+          "width": 16,
+          "right": 527.234375,
+          "scroll": 16,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "hidden"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 8,
+          "right": 523.234375,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex gap-2 overflow-x-auto pb-1 xl:hidden",
+          "text": "Chưa đọc0Nhắc đến tôi0Câu hỏi mở0Điểm chặn1Sắp đến hạn0",
+          "width": 524.234375,
+          "right": 540.234375,
+          "scroll": 719,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "auto"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "inline-flex min-w-fit items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold border-line bg-white text-slate-600",
+          "text": "Câu hỏi mở0",
+          "width": 137.140625,
+          "right": 442.484375,
+          "scroll": 135,
+          "minWidth": "fit-content",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SPAN",
+          "classes": "rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-600",
+          "text": "0",
+          "width": 19.40625,
+          "right": 429.484375,
+          "scroll": 19,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "inline-flex min-w-fit items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold border-line bg-white text-slate-600",
+          "text": "Điểm chặn1",
+          "width": 131.90625,
+          "right": 582.390625,
+          "scroll": 130,
+          "minWidth": "fit-content",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "svg",
+          "classes": {},
+          "text": "",
+          "width": 14,
+          "right": 477.484375,
+          "scroll": 14,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "hidden"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 9.33331298828125,
+          "right": 475.1510314941406,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 0.005828857421875,
+          "right": 470.4902038574219,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SPAN",
+          "classes": "rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-600",
+          "text": "1",
+          "width": 17.53125,
+          "right": 569.390625,
+          "scroll": 18,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "inline-flex min-w-fit items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold border-line bg-white text-slate-600",
+          "text": "Sắp đến hạn0",
+          "width": 144.34375,
+          "right": 734.734375,
+          "scroll": 142,
+          "minWidth": "fit-content",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "svg",
+          "classes": {},
+          "text": "",
+          "width": 14,
+          "right": 617.390625,
+          "scroll": 14,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "hidden"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 2.0206298828125,
+          "right": 611.4009399414062,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 1.1666259765625,
+          "right": 616.2239379882812,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 10.499755859375,
+          "right": 615.6408081054688,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 1.1666259765625,
+          "right": 605.7239379882812,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SPAN",
+          "classes": "rounded bg-white px-1.5 py-0.5 text-[11px] text-slate-600",
+          "text": "0",
+          "width": 19.40625,
+          "right": 721.734375,
+          "scroll": 19,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SECTION",
+          "classes": "min-w-0 rounded-lg border border-line bg-white shadow-panel xl:col-start-1 xl:row-start-1 xl:row-span-2",
+          "text": "Thảo luận16Quyết định0Nhật ký hệ thống43Bộ lọcĐã đến đầu cuộc thảo luận22-10-202",
+          "width": 524.234375,
+          "right": 540.234375,
+          "scroll": 522,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "border-b border-line p-3",
+          "text": "Thảo luận16Quyết định0Nhật ký hệ thống43Bộ lọc",
+          "width": 522.234375,
+          "right": 539.234375,
+          "scroll": 522,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between",
+          "text": "Thảo luận16Quyết định0Nhật ký hệ thống43Bộ lọc",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex gap-1 overflow-x-auto",
+          "text": "Thảo luận16Quyết định0Nhật ký hệ thống43",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "auto",
+          "display": "flex",
+          "overflow": "auto"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "inline-flex min-w-fit items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50",
+          "text": "Nhật ký hệ thống43",
+          "width": 160.953125,
+          "right": 419.578125,
+          "scroll": 161,
+          "minWidth": "fit-content",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SPAN",
+          "classes": "text-xs text-slate-400",
+          "text": "43",
+          "width": 15.9375,
+          "right": 407.578125,
+          "scroll": 16,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex items-center gap-2",
+          "text": "Bộ lọc",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "auto",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "LABEL",
+          "classes": "relative min-w-0 flex-1 lg:w-64",
+          "text": "",
+          "width": 426.234375,
+          "right": 455.234375,
+          "scroll": 426,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "INPUT",
+          "classes": "w-full rounded-md border border-line bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100",
+          "text": "",
+          "width": 426.234375,
+          "right": 455.234375,
+          "scroll": 424,
+          "minWidth": "0px",
+          "display": "inline-block",
+          "overflow": "clip"
+        },
+        {
+          "tag": "BUTTON",
+          "classes": "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold border-line text-slate-600 hover:bg-slate-50",
+          "text": "Bộ lọc",
+          "width": 64,
+          "right": 527.234375,
+          "scroll": 62,
+          "minWidth": "auto",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "svg",
+          "classes": {},
+          "text": "",
+          "width": 16,
+          "right": 492.234375,
+          "scroll": 16,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "hidden"
+        },
+        {
+          "tag": "polygon",
+          "classes": {},
+          "text": "",
+          "width": 13.33331298828125,
+          "right": 490.9010314941406,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "svg",
+          "classes": {},
+          "text": "",
+          "width": 14,
+          "right": 514.234375,
+          "scroll": 14,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "hidden"
+        },
+        {
+          "tag": "path",
+          "classes": {},
+          "text": "",
+          "width": 7,
+          "right": 510.734375,
+          "scroll": 0,
+          "minWidth": "0px",
+          "display": "inline",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "flex min-h-[520px] flex-col bg-slate-50/70",
+          "text": "Đã đến đầu cuộc thảo luận22-10-2026DÁQuản lý dự án10:24 22-10-2026Cập nhật công ",
+          "width": 522.234375,
+          "right": 539.234375,
+          "scroll": 522,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "relative flex-1",
+          "text": "Đã đến đầu cuộc thảo luận22-10-2026DÁQuản lý dự án10:24 22-10-2026Cập nhật công ",
+          "width": 522.234375,
+          "right": 539.234375,
+          "scroll": 522,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "h-[min(64vh,680px)] min-h-[420px] overflow-y-auto px-3 py-4 sm:px-5",
+          "text": "Đã đến đầu cuộc thảo luận22-10-2026DÁQuản lý dự án10:24 22-10-2026Cập nhật công ",
+          "width": 522.234375,
+          "right": 539.234375,
+          "scroll": 522,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "auto"
+        },
+        {
+          "tag": "P",
+          "classes": "mb-4 text-center text-xs text-slate-400",
+          "text": "Đã đến đầu cuộc thảo luận",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "space-y-5",
+          "text": "22-10-2026DÁQuản lý dự án10:24 22-10-2026Cập nhật công việcHồ sơ công việc · Lần",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "",
+          "text": "22-10-2026DÁQuản lý dự án10:24 22-10-2026Cập nhật công việcHồ sơ công việc · Lần",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "mb-4 flex items-center gap-3",
+          "text": "22-10-2026",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "flex",
+          "overflow": "visible"
+        },
+        {
+          "tag": "SPAN",
+          "classes": "h-px flex-1 bg-slate-200",
+          "text": "",
+          "width": 193.921875,
+          "right": 527.234375,
+          "scroll": 194,
+          "minWidth": "auto",
+          "display": "block",
+          "overflow": "visible"
+        },
+        {
+          "tag": "DIV",
+          "classes": "space-y-1.5",
+          "text": "DÁQuản lý dự án10:24 22-10-2026Cập nhật công việcHồ sơ công việc · Lần chốt 1Kíc",
+          "width": 498.234375,
+          "right": 527.234375,
+          "scroll": 498,
+          "minWidth": "0px",
+          "display": "block",
+          "overflow": "visible"
+        }
+      ]
+    },
+    "afterExperiment": {
+      "viewport": 390,
+      "documentWidth": 390
+    }
+  }
+]

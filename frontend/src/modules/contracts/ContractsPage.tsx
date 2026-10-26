@@ -335,7 +335,6 @@ export function ContractsPage() {
       <Dialog open={variationLinkError} title="Phát sinh không khả dụng" onClose={dismissLinkedVariation} manageFocus><p role="alert">Không tìm thấy phát sinh trong hợp đồng đã chọn hoặc anh không có quyền truy cập.</p></Dialog>
       <PageHeader
         title="Hợp đồng"
-        description="Theo dõi giá trị, ký duyệt, thanh toán, phụ lục và khoản giữ lại của công trình."
         actions={(
           <>
             <ProjectBackLink projectId={id} />

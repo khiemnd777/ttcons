@@ -6,6 +6,7 @@ import { CurrencyText } from '../../components/CurrencyText';
 import { DataTable, type Column } from '../../components/DataTable';
 import { EmptyState } from '../../components/EmptyState';
 import { PageHeader } from '../../components/PageHeader';
+import { ContextHelp } from '../../components/ContextHelp';
 import { ProjectBackLink } from '../../components/ProjectBackLink';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useToast } from '../../components/ToastProvider';
@@ -161,16 +162,15 @@ export function AccountingHandoffPage({ global = false }: { global?: boolean }) 
       {detail ? <AccountingHandoffDetailDialog key={`${projectId}:${detail.source_id}`} target={{ project_id: projectId, source_type: detail.source_type, source_id: detail.source_id }} taskId={taskId} onClose={() => setDetail(null)} /> : null}
       <PageHeader
         title="Hồ sơ bàn giao kế toán"
-        description="Theo dõi hồ sơ nghiệp vụ từ Mua sắm và Hợp đồng đến lúc Kế toán tiếp nhận. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA."
         horizontalFrom={global ? 'xl' : 'md'}
-        actions={global ? (
+        actions={<><ContextHelp label="Phạm vi hồ sơ bàn giao kế toán">Consflow ghi nhận bàn giao và tiếp nhận hồ sơ. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA.</ContextHelp>{global ? (
           <section className="w-full min-w-0 border-t border-line pt-4 xl:w-[36rem] xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình bàn giao kế toán">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <AsyncProjectPicker value={draftProjectId} onChange={setDraftProjectId} endpoint="/project-finance/projects" queryKey="accounting-handoff-project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} />
               <ProjectScopeActions applying={workspace.isFetching} applyDisabled={!draftProjectId || draftProjectId === projectId} resetDisabled={workspace.isFetching || (!draftProjectId && !projectId)} onApply={applyProjectScope} onReset={resetProjectScope} />
             </div>
           </section>
-        ) : id ? <ProjectBackLink /> : undefined}
+        ) : id ? <ProjectBackLink /> : undefined}</>}
       />
 
       {!projectId ? <EmptyState title="Chọn công trình để xem hồ sơ bàn giao kế toán." /> : <>
@@ -213,7 +213,7 @@ function AccountingHandoffEmptyActions({ projectId, canViewProcurement, canViewC
   const linkClass = 'inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 sm:w-auto';
   return (
     <section className="w-full max-w-2xl text-left" aria-label="Hướng dẫn tạo hồ sơ nguồn bàn giao kế toán">
-      <p className="text-sm leading-6 text-slate-600">Hồ sơ sẽ tự xuất hiện tại đây sau khi nghiệp vụ nguồn đạt điều kiện tối thiểu:</p>
+      <p className="text-sm leading-6 text-slate-600">Hồ sơ được tạo từ nguồn đủ điều kiện:</p>
       <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-600">
         <li>• Yêu cầu mua đã được duyệt hoặc đặt hàng tại Mua sắm.</li>
         <li>• Mốc hợp đồng chủ đầu tư đã được kích hoạt hoặc đủ điều kiện thu.</li>
@@ -226,7 +226,6 @@ function AccountingHandoffEmptyActions({ projectId, canViewProcurement, canViewC
       ) : (
         <p className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-center text-xs text-slate-500">Tài khoản hiện tại chưa có quyền mở Mua sắm hoặc Hợp đồng.</p>
       )}
-      <p className="mt-3 text-center text-xs text-slate-500">Không cần tạo hồ sơ kế toán thủ công trên Consflow.</p>
     </section>
   );
 }

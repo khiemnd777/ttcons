@@ -1,0 +1,27 @@
+{
+  "baseline": "fba39cdcf72a2d6714d5eac3d15eba8cdf4014c9",
+  "checked_at": "2026-10-26T08:06:23.107Z",
+  "node": "v23.11.0",
+  "protected_files": 112,
+  "protected_regions": 12,
+  "regions": {
+    "frontend/src/modules/projects/ProjectDetailPage.tsx": [
+      "ProjectWorkflowWorkspace",
+      "WorkflowEmptyState",
+      "WorkflowExecutionSummary",
+      "WorkflowSummaryMetric",
+      "WorkflowStageRail",
+      "WorkflowWorkPanel",
+      "WorkflowWorkTableRow",
+      "WorkflowWorkMobileCard"
+    ],
+    "frontend/src/modules/my-work/MyWorkPage.tsx": [
+      "WorkflowActionCard",
+      "NextQueuePanel",
+      "ProjectStartupActionCard",
+      "ProjectStartupNextPanel"
+    ]
+  },
+  "problems": [],
+  "source_test_sha256": "f111335a9f1653f738fc581bd30e042efcb5637aed1221c954e7622873e01fb9"
+}

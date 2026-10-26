@@ -1,0 +1,149 @@
+
+> consflow-frontend@0.1.0 build
+> tsc --noEmit -p tsconfig.json && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1961 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                           0.56 kB │ gzip:   0.35 kB
+dist/assets/evidenceSpreadsheet.worker-CY2pSkA0.js      260.03 kB
+dist/assets/staffImport.worker-CtvR6Sha.js              260.18 kB
+dist/assets/projectExcel.worker-DdqRO6BZ.js             264.05 kB
+dist/assets/workflowDefinitionExcel.worker-u54TLkrQ.js  270.54 kB
+dist/assets/MyWorkPage-Duzm4azR.css                       0.52 kB │ gzip:   0.22 kB
+dist/assets/evidenceUploadApi-BXdJQV4e.css                0.92 kB │ gzip:   0.34 kB
+dist/assets/OperationsPage-DqQciTxT.css                   1.81 kB │ gzip:   0.65 kB
+dist/assets/index-_lS8EwzC.css                           91.88 kB │ gzip:  16.26 kB
+dist/assets/CurrencyText-DYaWrjQo.js                      0.17 kB │ gzip:   0.16 kB
+dist/assets/FormDrawer-OwKb0bIt.js                        0.22 kB │ gzip:   0.18 kB
+dist/assets/_commonjs-dynamic-modules-TDtrdbi3.js         0.24 kB │ gzip:   0.19 kB
+dist/assets/SampleDataBadge-DNJGEAji.js                   0.28 kB │ gzip:   0.25 kB
+dist/assets/chevron-left-CWuVwO1Y.js                      0.30 kB │ gzip:   0.25 kB
+dist/assets/recoveryToken-DWICspri.js                     0.32 kB │ gzip:   0.23 kB
+dist/assets/arrow-left-dKysUzJ2.js                        0.33 kB │ gzip:   0.27 kB
+dist/assets/circle-dot-8gNE5-9K.js                        0.35 kB │ gzip:   0.25 kB
+dist/assets/clock-3-BEehFdEB.js                           0.35 kB │ gzip:   0.27 kB
+dist/assets/circle-play-DzwnSS96.js                       0.36 kB │ gzip:   0.28 kB
+dist/assets/list-filter-Co4_lkW1.js                       0.36 kB │ gzip:   0.28 kB
+dist/assets/rotate-ccw-ChCAXh5V.js                        0.37 kB │ gzip:   0.29 kB
+dist/assets/ellipsis-vkWNMG24.js                          0.39 kB │ gzip:   0.27 kB
+dist/assets/ProjectBackLink-BWy_vKo-.js                   0.39 kB │ gzip:   0.31 kB
+dist/assets/copy-CCgpzxjQ.js                              0.40 kB │ gzip:   0.31 kB
+dist/assets/projectOperationsDomain-DOCaff3A.js           0.40 kB │ gzip:   0.23 kB
+dist/assets/history-KK_oZNrP.js                           0.41 kB │ gzip:   0.30 kB
+dist/assets/settings-2-h4pqEfqa.js                        0.42 kB │ gzip:   0.30 kB
+dist/assets/file-check-2-DSj81tLS.js                      0.42 kB │ gzip:   0.30 kB
+dist/assets/upload-BiyC5bh2.js                            0.43 kB │ gzip:   0.32 kB
+dist/assets/message-square-warning-BMlSL0ZD.js            0.43 kB │ gzip:   0.31 kB
+dist/assets/wrench-CRvmJ5X_.js                            0.43 kB │ gzip:   0.31 kB
+dist/assets/download-B3mZJHfk.js                          0.43 kB │ gzip:   0.32 kB
+dist/assets/pencil-CgURdEHY.js                            0.45 kB │ gzip:   0.33 kB
+dist/assets/file-plus-2-CmHasqVf.js                       0.45 kB │ gzip:   0.31 kB
+dist/assets/shopping-cart-CIpNtcI1.js                     0.46 kB │ gzip:   0.33 kB
+dist/assets/list-todo-CyZECQ4a.js                         0.47 kB │ gzip:   0.32 kB
+dist/assets/RecordFormDialog-BuAjLfYq.js                  0.48 kB │ gzip:   0.29 kB
+dist/assets/git-pull-request-arrow-BNKUQb0S.js            0.49 kB │ gzip:   0.34 kB
+dist/assets/save-Cb3kj1cG.js                              0.50 kB │ gzip:   0.33 kB
+dist/assets/bmgsSourceNavigation-XGTr0pve.js              0.50 kB │ gzip:   0.34 kB
+dist/assets/scroll-text-PtSd0dt9.js                       0.52 kB │ gzip:   0.33 kB
+dist/assets/key-round-Oo2LRV-g.js                         0.52 kB │ gzip:   0.36 kB
+dist/assets/trash-2-CGpWzydr.js                           0.53 kB │ gzip:   0.35 kB
+dist/assets/IconAction-B-sLKxZ6.js                        0.53 kB │ gzip:   0.35 kB
+dist/assets/file-json-myPfJ3oy.js                         0.58 kB │ gzip:   0.34 kB
+dist/assets/ListSection-CyVAqGCy.js                       0.64 kB │ gzip:   0.36 kB
+dist/assets/IdentityReferenceLabel-BgSRToED.js            0.64 kB │ gzip:   0.42 kB
+dist/assets/StatCard-B87LPcIg.js                          0.65 kB │ gzip:   0.35 kB
+dist/assets/calendar-days-CMpoXn4M.js                     0.66 kB │ gzip:   0.37 kB
+dist/assets/RowActions-gUR49xDr.js                        0.68 kB │ gzip:   0.37 kB
+dist/assets/SelectionCheckbox-Cuhhccd0.js                 0.72 kB │ gzip:   0.49 kB
+dist/assets/sliders-horizontal-CaXbvXPQ.js                0.75 kB │ gzip:   0.37 kB
+dist/assets/NativeExcelExportButton-u3axuFqS.js           0.81 kB │ gzip:   0.57 kB
+dist/assets/workItemMutationContext-D9NgXEPi.js           0.81 kB │ gzip:   0.43 kB
+dist/assets/PlanningRecordContext-DQ5C2cu5.js             0.88 kB │ gzip:   0.53 kB
+dist/assets/PermissionsPage-BoEmhbqx.js                   0.88 kB │ gzip:   0.57 kB
+dist/assets/partnerUtils-JlcKuRI0.js                      0.93 kB │ gzip:   0.55 kB
+dist/assets/boxes-DF7OlJhU.js                             1.02 kB │ gzip:   0.50 kB
+dist/assets/BulkSelectionBar-BbITvPSt.js                  1.04 kB │ gzip:   0.58 kB
+dist/assets/ProjectScopeActions-CS_GjgBG.js               1.08 kB │ gzip:   0.55 kB
+dist/assets/PageHeader-FQuQUa50.js                        1.08 kB │ gzip:   0.57 kB
+dist/assets/FilterBar-R9KpNDDn.js                         1.09 kB │ gzip:   0.58 kB
+dist/assets/WorkspaceTabs-C_3jSUpq.js                     1.18 kB │ gzip:   0.62 kB
+dist/assets/password-DKY36wUt.js                          1.26 kB │ gzip:   0.83 kB
+dist/assets/bmgsExport-BO08q-fg.js                        1.29 kB │ gzip:   0.69 kB
+dist/assets/WorkItemDetailPage-DKjcuQyW.js                1.31 kB │ gzip:   0.75 kB
+dist/assets/ProcurementSnapshot-uikwB7pV.js               1.43 kB │ gzip:   0.80 kB
+dist/assets/ContextHelp-Cgn7Z8GQ.js                       1.50 kB │ gzip:   0.81 kB
+dist/assets/reportRegistry-BdcbRplk.js                    1.60 kB │ gzip:   0.72 kB
+dist/assets/discussionWorkDomain-se58YVwX.js              1.67 kB │ gzip:   0.88 kB
+dist/assets/VerifyRecoveryEmailPage-CYAnkrhb.js           1.82 kB │ gzip:   0.94 kB
+dist/assets/SealAssetPreview-BC7SQPML.js                  1.89 kB │ gzip:   1.01 kB
+dist/assets/useRecordDeepLink-CvuXIFMV.js                 1.96 kB │ gzip:   1.14 kB
+dist/assets/ForgotPasswordPage-BdPrBzde.js                2.82 kB │ gzip:   1.38 kB
+dist/assets/InitialPasswordChangePage-ojkltATK.js         3.31 kB │ gzip:   1.51 kB
+dist/assets/RecordSourcePage-Bqr56Axu.js                  3.32 kB │ gzip:   1.67 kB
+dist/assets/DiscussionWorkDialog-DpytOXj_.js              3.94 kB │ gzip:   1.98 kB
+dist/assets/CurrencyInput-B6YRJTw8.js                     4.09 kB │ gzip:   1.80 kB
+dist/assets/ResetPasswordPage-CwIQB4xW.js                 4.15 kB │ gzip:   1.81 kB
+dist/assets/ApprovalPanel-DkLizzjr.js                     5.09 kB │ gzip:   2.12 kB
+dist/assets/ProcurementDetail-CkS1yMj0.js                 5.52 kB │ gzip:   2.17 kB
+dist/assets/AsyncProjectPicker-QJKjJiYt.js                7.07 kB │ gzip:   2.64 kB
+dist/assets/EnumChip-CS8L_zbh.js                          7.14 kB │ gzip:   1.35 kB
+dist/assets/projectWorkspaceNavigation-Dli62vKE.js        7.53 kB │ gzip:   2.41 kB
+dist/assets/ReportsPage-BYN8NcjE.js                       7.86 kB │ gzip:   3.19 kB
+dist/assets/RecoveryRequestsPage-BwQmaS2D.js              8.05 kB │ gzip:   2.66 kB
+dist/assets/RolesPage-Djppd_ck.js                         8.28 kB │ gzip:   3.12 kB
+dist/assets/OperationalReportPanel-C2vrz8Su.js            8.45 kB │ gzip:   2.58 kB
+dist/assets/CoreDataPage-DNcKOUvw.js                      9.32 kB │ gzip:   3.47 kB
+dist/assets/BulkDeleteDialog-BlKQk-XK.js                  9.57 kB │ gzip:   3.43 kB
+dist/assets/SimpleForm-CReeaUsk.js                        9.89 kB │ gzip:   3.64 kB
+dist/assets/ProjectUpdatesDialog-QRbg0Rtx.js             10.41 kB │ gzip:   3.79 kB
+dist/assets/ProjectFinancePage-BA_FfJVv.js               10.74 kB │ gzip:   4.30 kB
+dist/assets/DataTable-fwqblpNt.js                        10.86 kB │ gzip:   3.74 kB
+dist/assets/PlanningDailyReportsPage-P_E5I5Ts.js         12.30 kB │ gzip:   4.04 kB
+dist/assets/ProcurementDialog-Bj3XsM2p.js                12.51 kB │ gzip:   4.64 kB
+dist/assets/ReworkPage--l8udGkB.js                       12.57 kB │ gzip:   3.63 kB
+dist/assets/ProcurementPage-jSIqE9eh.js                  12.68 kB │ gzip:   4.64 kB
+dist/assets/constructionReportViewModel-CyHQWvZs.js      12.98 kB │ gzip:   5.00 kB
+dist/assets/workItemDetailDomain-DqqzmAWA.js             12.99 kB │ gzip:   4.23 kB
+dist/assets/NotificationsPage-BSMYztmu.js                12.99 kB │ gzip:   4.31 kB
+dist/assets/SignatureCaptureDialog-B8acNULf.js           13.58 kB │ gzip:   4.93 kB
+dist/assets/WorkReportsPage-tZqLsLLT.js                  13.75 kB │ gzip:   4.70 kB
+dist/assets/PreparationPage-DT486JLg.js                  13.93 kB │ gzip:   4.91 kB
+dist/assets/ProjectWorkspaceLayout-DD_biOHq.js           14.02 kB │ gzip:   4.86 kB
+dist/assets/AuditPage-DSaB_jSv.js                        14.07 kB │ gzip:   4.47 kB
+dist/assets/WorkflowDefinitionExportDialog-BmRWcIBV.js   14.12 kB │ gzip:   4.74 kB
+dist/assets/MeetingMinutesPage-DBeuE-gq.js               14.16 kB │ gzip:   4.31 kB
+dist/assets/PlanningChecklistsPage-tQDeutqY.js           14.68 kB │ gzip:   4.27 kB
+dist/assets/EventLogsPage-B9zZ5r0w.js                    15.93 kB │ gzip:   4.92 kB
+dist/assets/ProjectProgressPage-kJIzSMMF.js              18.56 kB │ gzip:   6.12 kB
+dist/assets/DashboardPage-BYqVyc3I.js                    21.32 kB │ gzip:   6.86 kB
+dist/assets/ProfilePage-DmNTf0MH.js                      25.51 kB │ gzip:   6.62 kB
+dist/assets/evidenceUploadApi-F_URuUru.js                25.74 kB │ gzip:   8.66 kB
+dist/assets/WorkReportReviewDialog-F1JPs7_G.js           26.49 kB │ gzip:   7.85 kB
+dist/assets/AcceptancePage-DUhikIQF.js                   29.60 kB │ gzip:   8.01 kB
+dist/assets/ProjectStartupWizard-BNKye4a1.js             33.22 kB │ gzip:   9.26 kB
+dist/assets/AccountingHandoffDetailDialog-6srUecca.js    35.12 kB │ gzip:  10.82 kB
+dist/assets/HandoverPage-BCGc9PRL.js                     38.03 kB │ gzip:  10.29 kB
+dist/assets/AcceptanceEditor-DHZ9GQwT.js                 41.26 kB │ gzip:  11.06 kB
+dist/assets/WorkflowFormsPage-tYGHKZ8y.js                44.51 kB │ gzip:  11.51 kB
+dist/assets/StaffPage-B4K2b3oD.js                        44.77 kB │ gzip:  12.30 kB
+dist/assets/ProjectsPage-Btg_39mb.js                     45.65 kB │ gzip:  12.57 kB
+dist/assets/ProjectDiscussionPage-BYW0JF4K.js            48.19 kB │ gzip:  13.11 kB
+dist/assets/ContractsPage-DmfmLnlp.js                    49.28 kB │ gzip:  13.41 kB
+dist/assets/PlanningPage-B8RXxFzi.js                     53.06 kB │ gzip:  13.39 kB
+dist/assets/SettingsPage-D4V1kj7v.js                     54.42 kB │ gzip:  13.77 kB
+dist/assets/WarehousePage-QbJTQHZO.js                    64.88 kB │ gzip:  15.77 kB
+dist/assets/BOQPage-CgDYwGIA.js                          67.02 kB │ gzip:  15.83 kB
+dist/assets/ProjectDetailPage-5BbYkg34.js                82.42 kB │ gzip:  19.41 kB
+dist/assets/MyWorkPage-CgU2MGI_.js                       87.12 kB │ gzip:  22.24 kB
+dist/assets/WorkflowFormPanel-BCJaUJO9.js               107.47 kB │ gzip:  27.53 kB
+dist/assets/PipelineBuilderPage-C0BuSTs_.js             117.99 kB │ gzip:  34.00 kB
+dist/assets/docx-preview-CV_GzUIV.js                    174.38 kB │ gzip:  51.38 kB
+dist/assets/OperationsPage-B8ruUS4I.js                  187.82 kB │ gzip:  45.68 kB
+dist/assets/WorkItemDetailDialog-BoI1C7fU.js            199.69 kB │ gzip:  44.99 kB
+dist/assets/xlsx.mini.min-CLSQQXmZ.js                   258.52 kB │ gzip:  83.92 kB
+dist/assets/vendor-runtime-DxRA-KU3.js                  281.35 kB │ gzip:  90.40 kB
+dist/assets/index-CV9bQlH7.js                           428.74 kB │ gzip: 117.01 kB
+✓ built in 4.33s

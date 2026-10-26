@@ -119,7 +119,7 @@ export function ProjectImportDialog({ open, onClose, onSuccess, onError }: {
     <Dialog
       open={open}
       title="Import công trình"
-      description="Kiểm tra Pipeline, Form/Fields và toàn bộ dữ liệu trước khi tạo nguyên tử các master Công trình."
+      description="Kiểm tra dữ liệu trước khi tạo công trình."
       size="xl"
       onClose={close}
       footer={(

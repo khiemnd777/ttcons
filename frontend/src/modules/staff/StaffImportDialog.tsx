@@ -94,7 +94,6 @@ export function StaffImportDialog({ open, roles, rolesLoading, rolesError, onClo
     <Dialog
       open={open}
       title="Import tài khoản nhân sự"
-      description="Tải Excel/CSV, kiểm tra toàn bộ danh sách rồi tạo nguyên tử nhân sự, tài khoản và một vai trò hệ thống."
       size="xl"
       onClose={close}
       footer={(
@@ -124,7 +123,7 @@ export function StaffImportDialog({ open, roles, rolesLoading, rolesError, onClo
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-ink">1. Chuẩn bị tệp</h3>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Giữ nguyên 8 cột mẫu. role_code lấy từ sheet roles hiện hành.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Giữ nguyên 8 cột; chọn role_code từ sheet roles.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={rolesLoading || Boolean(rolesError)} onClick={() => void downloadTemplate('xlsx')}><Download className="h-4 w-4" />Mẫu Excel</button>

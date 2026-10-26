@@ -1,0 +1,1316 @@
+{
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "dashboard",
+      "route": "/dashboard",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Dashboard tổng hợp",
+          "Toàn cảnh công trình",
+          "Hoạt động công trình",
+          "23-10-2026",
+          "22-10-2026",
+          "Báo cáo chuyên sâu",
+          "Công trình & tiến độ",
+          "Mua sắm",
+          "Vật tư / Kho",
+          "Nhân sự"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-dashboard.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "my-work",
+      "route": "/my-work",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-my-work.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "progress",
+      "route": "/progress",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Tiến trình công trình",
+          "Chưa khởi động",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Thực hành Kho - dữ liệu giả định",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Khảo sát",
+          "Thực hành A · Ốp lát tầng 1",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Thiết kế",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Dự toán & Hợp đồng",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Kế hoạch",
+          "Thi công",
+          "Nghiệm thu",
+          "Bàn giao & Kế toán",
+          "Hoàn tất"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-progress.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "projects",
+      "route": "/projects",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Công trình"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-projects.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "project-overview",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Tổng quan · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Nghiệm thu Đầu Vào",
+          "Năm việc cần chú ý nhất"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-project-overview.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "preparation",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/preparation",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ chuẩn bị",
+          "Revision hồ sơ thiết kế",
+          "Hồ sơ trong kế hoạch"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-preparation.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "planning",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/planning",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Kế hoạch công việc",
+          "Bàn giao hạng mục giám sát",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Hàng đợi công việc",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Nghiệm thu vật tư đầu vào",
+          "Nghiệm thu Đầu Vào"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-planning.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "planning-daily",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-planning-daily.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "meeting-minutes",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-meeting-minutes.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "planning-checklists",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-planning-checklists.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "boq",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-boq.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "procurement",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-procurement.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "procurement-scoped",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-procurement-scoped.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "contracts",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-contracts.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "warehouse",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-warehouse.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "operations",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-operations.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "checks",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-checks.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "actions",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-actions.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "rework",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-rework.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "acceptance",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-acceptance.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "handover",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-handover.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "accounting",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-accounting.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "partners-input",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-partners-input.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "partners-output",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-partners-output.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "staff",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-staff.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "roles",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-roles.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "permissions",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-permissions.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "audit",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-audit.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "event-logs",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-event-logs.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "statistics",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-statistics.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "reports",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-reports.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "notifications",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-notifications.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "profile",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-profile.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "settings",
+      "route": "/login",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-settings.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-edit-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Chỉnh sửa thông tin', exact: true })\u001b[22m\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-profile-edit-dialog-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-avatar-help",
+      "helpText": "Ảnh được chuẩn hóa và lưu trong kho bảo vệ.",
+      "openScreenshot": "desktop-help-Vcchlunhidin.png",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.getAttribute: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Về cách lưu ảnh đại diện', exact: true })\u001b[22m\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-profile-avatar-help-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-password-dialog",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 268,
+          "bottom": 732,
+          "width": 576
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Đổi mật khẩu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-profile-password-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "statistics-help",
+      "helpText": "Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.",
+      "openScreenshot": "desktop-help-CchtnhvphmviCngtrnhtin.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-statistics-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "accounting-help",
+      "helpText": "Consflow ghi nhận bàn giao và tiếp nhận hồ sơ. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA.",
+      "openScreenshot": "desktop-help-Phmvihsbngiaokton.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ bàn giao kế toán"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-accounting-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "rework-help",
+      "helpText": "Sửa lỗi trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ.",
+      "openScreenshot": "desktop-help-Phnbitsalivlpkhochli.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-rework-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "notifications-dialog",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 378,
+          "bottom": 622,
+          "width": 576
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-notifications-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "staff-import-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Import', exact: true })\u001b[22m\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Nhân sự"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-staff-import-dialog-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "staff-create-dialog",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 88.5,
+          "bottom": 911.5,
+          "width": 800
+        },
+        "heading": [
+          "Nhân sự",
+          "Tạo nhân sự",
+          "Thông tin nhân sự",
+          "Tài khoản đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-staff-create-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "settings-seal-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Error: strict mode violation: getByRole('button', { name: /Thêm.*con dấu/ }) resolved to 2 elements:\n    1) <button type=\"button\" class=\"inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700\">…</button> aka getByRole('button', { name: 'Thêm con dấu', exact: true })\n    2) <button class=\"rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white\">Thêm con dấu đầu tiên</button> aka getByRole('button', { name: 'Thêm con dấu đầu tiên' })\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-settings-seal-dialog-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "project-discussion-rail",
+      "railCount": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-project-discussion-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-pipeline-builder",
+      "currentScreenshot": "desktop-protected-pipeline-builder-current.png",
+      "baselineScreenshot": "desktop-protected-pipeline-builder-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Thư viện node",
+        "Workflow",
+        "Tiếp nhận dự án",
+        "Khảo sát",
+        "Họp báo cáo khảo sát",
+        "Thiết kế",
+        "BOQ (Không thiết kế)",
+        "BOQ (Có thiết kế)",
+        "Chốt Hợp đồng với chủ đầu tư",
+        "Bóc tách và lấy giá đầu vào",
+        "Đàm phán giá",
+        "Hợp đồng và tạm ứng đầu vào",
+        "Kế hoạch thi công",
+        "Thi công",
+        "Nghiệm thu Đầu Vào",
+        "Nghiệm thu Đầu Ra",
+        "Kết thúc: Bàn giao + Tài chính công trình"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thư viện node",
+          "Workflow",
+          "Tiếp nhận dự án",
+          "Khảo sát",
+          "Họp báo cáo khảo sát",
+          "Thiết kế",
+          "BOQ (Không thiết kế)",
+          "BOQ (Có thiết kế)",
+          "Chốt Hợp đồng với chủ đầu tư",
+          "Bóc tách và lấy giá đầu vào",
+          "Đàm phán giá",
+          "Hợp đồng và tạm ứng đầu vào",
+          "Kế hoạch thi công",
+          "Thi công",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu Đầu Ra",
+          "Kết thúc: Bàn giao + Tài chính công trình"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-pipeline-builder.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-workflow-forms",
+      "currentScreenshot": "desktop-protected-workflow-forms-current.png",
+      "baselineScreenshot": "desktop-protected-workflow-forms-baseline.png",
+      "sameVisibleText": false,
+      "baselineHeading": [
+        "Đăng nhập"
+      ],
+      "status": "CHECK_REQUIRED",
+      "error": "protected visible text differs from baseline; inspect screenshots",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-workflow-forms-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-project-pipeline",
+      "currentScreenshot": "desktop-protected-project-pipeline-current.png",
+      "baselineScreenshot": "desktop-protected-project-pipeline-baseline.png",
+      "sameVisibleText": false,
+      "baselineHeading": [
+        "Đăng nhập"
+      ],
+      "status": "CHECK_REQUIRED",
+      "error": "protected visible text differs from baseline; inspect screenshots",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-project-pipeline-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-embedded-form",
+      "currentScreenshot": "desktop-protected-embedded-form-current.png",
+      "baselineScreenshot": "desktop-protected-embedded-form-baseline.png",
+      "sameVisibleText": false,
+      "baselineHeading": [
+        "Đăng nhập"
+      ],
+      "status": "CHECK_REQUIRED",
+      "error": "protected visible text differs from baseline; inspect screenshots",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-embedded-form-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "status": "CHECK_REQUIRED",
+      "error": "page.waitForURL: Target page, context or browser has been closed\n=========================== logs ===========================\nwaiting for navigation to \"**/my-work\" until \"load\"\n============================================================"
+    },
+    {
+      "view": "mobile",
+      "name": "dashboard",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "my-work",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "progress",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "projects",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "project-overview",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "preparation",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "planning",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "planning-daily",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "meeting-minutes",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "planning-checklists",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "boq",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "procurement",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "procurement-scoped",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "contracts",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "warehouse",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "operations",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "checks",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "actions",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "rework",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "acceptance",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "handover",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "accounting",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "partners-input",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "partners-output",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "staff",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "roles",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "permissions",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "audit",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "event-logs",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "statistics",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "reports",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "notifications",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "profile",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "settings",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-edit-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-avatar-help",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-password-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "statistics-help",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "accounting-help",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "rework-help",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "notifications-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "staff-import-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "staff-create-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "settings-seal-dialog",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "project-discussion-rail",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-pipeline-builder",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-workflow-forms",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-project-pipeline",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-embedded-form",
+      "status": "CHECK_REQUIRED",
+      "error": "page.goto: Target page, context or browser has been closed"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "desktop",
+      "name": "pipeline-builder",
+      "sameVisibleText": true,
+      "current": "desktop-protected-pipeline-builder-current.png",
+      "baseline": "desktop-protected-pipeline-builder-baseline.png"
+    },
+    {
+      "view": "desktop",
+      "name": "workflow-forms",
+      "sameVisibleText": false,
+      "current": "desktop-protected-workflow-forms-current.png",
+      "baseline": "desktop-protected-workflow-forms-baseline.png"
+    },
+    {
+      "view": "desktop",
+      "name": "project-pipeline",
+      "sameVisibleText": false,
+      "current": "desktop-protected-project-pipeline-current.png",
+      "baseline": "desktop-protected-project-pipeline-baseline.png"
+    },
+    {
+      "view": "desktop",
+      "name": "embedded-form",
+      "sameVisibleText": false,
+      "current": "desktop-protected-embedded-form-current.png",
+      "baseline": "desktop-protected-embedded-form-baseline.png"
+    }
+  ],
+  "runner_error": "browserContext.close: Target page, context or browser has been closed\nBrowser logs:\n\n<launching> /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --user-data-dir=/var/folders/7t/gbb3_2zs03gdt6zk2l2cbrv80000gn/T/playwright_chromiumdev_profile-Pu2daA --remote-debugging-pipe --no-startup-window\n<launched> pid=91443\n[pid=91443][err] Trying to load the allocator multiple times. This is *not* supported.\n[pid=91443][err] [91449:10679971:1026/101316.943024:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101316.943253:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101316.944649:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101316.944695:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101316.945672:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101316.945717:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101316.946101:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101316.946161:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101316.946264:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101316.946307:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101317.044064:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101317.044122:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101517.686915:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101517.686997:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101517.758857:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101517.758928:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101521.304044:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101521.304106:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101521.349401:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101521.349459:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101524.649939:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101524.650079:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101524.743800:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101524.743870:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101528.000199:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101528.000264:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101528.043470:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101528.043584:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91443:10679969:1026/101529.722099:ERROR:base/process/process_mac.cc:45] task_policy_set TASK_CATEGORY_POLICY: (os/kern) invalid argument (4)\n[pid=91443][err] [91443:10679969:1026/101529.722118:ERROR:base/process/process_mac.cc:90] task_policy_set TASK_SUPPRESSION_POLICY: (os/kern) invalid argument (4)\n[pid=91443][err] [91449:10679971:1026/101529.778034:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101529.778102:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101529.779299:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101529.779352:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101529.780003:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101529.780050:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101529.780155:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101529.780202:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101529.780292:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101529.780336:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10679971:1026/101529.867243:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443][err] [91449:10680047:1026/101529.867307:ERROR:ui/display/mac/cv_display_link_mac.mm:188] CVDisplayLinkCreateWithCGDisplay failed. CVReturn: -6670\n[pid=91443] <gracefully close start>"
+}

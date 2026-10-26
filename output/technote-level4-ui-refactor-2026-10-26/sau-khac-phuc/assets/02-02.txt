@@ -1,0 +1,1 @@
+Bản sửa giới hạn filter và grid tại trang. Không che phần tràn bằng cách ẩn dữ liệu hoặc sửa bên trong Pipeline.

@@ -376,8 +376,8 @@ function ActivityThreadContent({
   return (
     <OpenDiscussionWork.Provider value={setOpenWorkItemId}>
     <div className="space-y-3">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="space-y-3 xl:col-start-2 xl:row-start-1">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="min-w-0 space-y-3 xl:col-start-2 xl:row-start-1">
           {workflowAction ? (
             <DiscussionWorkflowActionCard
               projectId={projectId}

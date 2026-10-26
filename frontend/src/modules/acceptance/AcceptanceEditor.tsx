@@ -208,7 +208,7 @@ export function AcceptanceEditor({
       <section data-validation-key="work_item_id" className="scroll-mt-24 rounded-lg border border-line bg-white p-4">
         <div className="mb-4 flex items-start gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-blue-50 text-blue-700"><FileText className="h-4 w-4" /></span>
-          <div><h3 className="text-sm font-semibold text-ink">Thông tin biên bản</h3><p className="mt-1 text-xs leading-5 text-slate-500">Xác định phạm vi nghiệm thu trước khi lập các tiêu chí kiểm tra.</p></div>
+          <div><h3 className="text-sm font-semibold text-ink">Thông tin biên bản</h3></div>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {draft.work_item_id ? (
@@ -257,7 +257,7 @@ export function AcceptanceEditor({
           <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60" disabled={disabled} onClick={addLine}><Plus className="h-4 w-4" /> Thêm tiêu chí</button>
         </div>
 
-        {!draft.checklist.length ? <div data-validation-key="checklist" tabIndex={-1} className="scroll-mt-24 p-5 outline-none"><EmptyState title="Chưa có tiêu chí nghiệm thu" /><p className="mt-2 text-center text-sm text-slate-500">Thêm tiêu chí đầu tiên để bắt đầu lập checklist.</p><div className="mt-3 flex justify-center"><button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={addLine}><Plus className="h-4 w-4" /> Thêm tiêu chí đầu tiên</button></div></div> : (
+        {!draft.checklist.length ? <div data-validation-key="checklist" tabIndex={-1} className="scroll-mt-24 p-5 outline-none"><EmptyState title="Chưa có tiêu chí nghiệm thu" /><div className="mt-3 flex justify-center"><button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={addLine}><Plus className="h-4 w-4" /> Thêm tiêu chí đầu tiên</button></div></div> : (
           <div className="grid min-h-[520px] lg:grid-cols-[310px_minmax(0,1fr)]">
             <aside className="border-b border-line bg-slate-50/70 lg:border-b-0 lg:border-r">
               <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Danh sách · {draft.checklist.length}</div>
@@ -308,7 +308,7 @@ export function AcceptanceEditor({
 
                 <section data-validation-key={`${selectedLine.key}.evidence`} className="scroll-mt-24 space-y-3 rounded-lg border border-line p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div><h5 className="flex items-center gap-2 text-sm font-semibold text-ink"><ImageIcon className="h-4 w-4 text-blue-600" /> Hình ảnh / minh chứng</h5><p className="mt-1 text-xs leading-5 text-slate-500">Chụp ảnh, chọn tệp mới hoặc dùng hồ sơ đã có trong công trình.</p></div>
+                    <div><h5 className="flex items-center gap-2 text-sm font-semibold text-ink"><ImageIcon className="h-4 w-4 text-blue-600" /> Hình ảnh / minh chứng</h5></div>
                     <span className={clsx('w-fit rounded-md px-2 py-1 text-xs font-semibold', selectedEvidenceCount >= 10 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600')}>{selectedEvidenceCount}/10</span>
                   </div>
 

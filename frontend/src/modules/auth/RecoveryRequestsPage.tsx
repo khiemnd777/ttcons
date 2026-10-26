@@ -81,7 +81,7 @@ export function RecoveryRequestsPage() {
 
   const request = detail.data;
   return <div className="space-y-4 p-4 sm:p-6">
-    <PageHeader title="Yêu cầu khôi phục" description="Xem yêu cầu và cấp liên kết đặt lại mật khẩu. Chỉ Developer hệ thống được xử lý." />
+    <PageHeader title="Yêu cầu khôi phục" description="Chỉ Developer hệ thống được xử lý." />
     <div className="flex flex-wrap gap-2" aria-label="Trạng thái yêu cầu">
       {statuses.map((item) => <button key={item.value} type="button" aria-pressed={status === item.value} className={`rounded-md px-3 py-2 text-sm font-semibold ${status === item.value ? 'bg-blue-600 text-white' : 'border border-line bg-white text-slate-700'}`} onClick={() => selectStatus(item.value)}>{item.label}</button>)}
     </div>
@@ -107,7 +107,7 @@ export function RecoveryRequestsPage() {
       </article>}
     />
     {list.data ? <div className="flex items-center justify-end gap-3 text-sm"><button type="button" disabled={page === 0} className="rounded-md border border-line px-3 py-2 disabled:opacity-40" onClick={() => setPage((value) => value - 1)}>Trước</button><span>Trang {page + 1}</span><button type="button" disabled={!list.data.has_more} className="rounded-md border border-line px-3 py-2 disabled:opacity-40" onClick={() => setPage((value) => value + 1)}>Tiếp</button></div> : null}
-    <Dialog open={Boolean(selectedID)} title="Yêu cầu khôi phục mật khẩu" description="Xem yêu cầu và cấp liên kết tạm." onClose={() => { if (!issue.isPending && !reject.isPending) closeDetail(); }}>
+    <Dialog open={Boolean(selectedID)} title="Yêu cầu khôi phục mật khẩu" onClose={() => { if (!issue.isPending && !reject.isPending) closeDetail(); }}>
       {detail.isLoading ? <p className="text-sm text-slate-600">Đang tải chi tiết...</p> : null}
       {detail.isError ? <div className="space-y-2 text-sm text-rose-700"><p>Không tải được chi tiết yêu cầu.</p><button type="button" className="font-semibold underline" onClick={() => detail.refetch()}>Thử lại</button></div> : null}
       {request ? <div className="space-y-4 text-sm">

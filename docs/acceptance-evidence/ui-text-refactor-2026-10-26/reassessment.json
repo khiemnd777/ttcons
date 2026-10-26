@@ -1,0 +1,55 @@
+{
+  "checked_at_utc": "2026-10-26T05:40:06Z",
+  "scope": "Đánh giá lại bằng chứng browser đã lưu, source hiện tại, GET local và SQL READ ONLY; không chạy browser mới hoặc sửa ứng dụng",
+  "baseline": "fba39cdcf72a2d6714d5eac3d15eba8cdf4014c9",
+  "source_test_sha256": "8a1cd72fb268ba252380169c795606d969eecdd2a081aaf8d2ded65e64182e87",
+  "environment": {
+    "backend_image": "sha256:7e1f8a8df43c3dbfcbfa8ebbc3efa8e5afc1990beffb9867b2e70f557f32694f",
+    "database": "consflow_guide_20261022",
+    "migration_count": 160,
+    "migration_run": false,
+    "new_frontend_build": false,
+    "new_browser_run": false
+  },
+  "mobile": {
+    "reassessed_severity": "P2",
+    "previous_severity": "P1",
+    "failed_cases": 4,
+    "distinct_affected_pages": 3,
+    "baseline_matches_current": true,
+    "measurements": {"viewport": 390, "audit": 820, "event_logs": 814, "discussion": 540},
+    "root_cause_status": "Tràn ngang đã xác minh; CSS nguyên nhân cụ thể chưa được chứng minh bằng geometry từng element",
+    "css_hypotheses": [
+      "AuditPage fieldClass/select công trình giữ intrinsic width từ option dài",
+      "EventLogsPage fieldClass/select endpoint hoặc công trình chưa giới hạn chiều rộng mobile",
+      "ActivityThread grid auto-min sizing và rail/attention strip chưa co được trên mobile"
+    ]
+  },
+  "notifications": {
+    "severity": "P2",
+    "catalog_get_status": 500,
+    "preferences_get_status": 200,
+    "catalog_rows": 83,
+    "enabled_catalog_rows": 21,
+    "catalog_sql_valid": true,
+    "root_cause_status": "VERIFIED",
+    "root_cause": "repository_notifications.go::NotificationCatalog scan permissions_any TEXT[] trực tiếp vào []string qua pgx database/sql; driver trả string",
+    "server_event_log_error": "sql: Scan error on column index 10, name \"permissions_any\": unsupported Scan, storing driver.Value type string into type *[]string",
+    "read_only_same_driver_probe_error": "sql: Scan error on column index 0, name \"permissions_any\": unsupported Scan, storing driver.Value type string into type *[]string",
+    "frontend_error_presentation": "VERIFIED: catalog.data ?? [] và chỉ truyền mảng vào dialog nên lỗi catalog thành trạng thái rỗng",
+    "empty_save_risk": "Source xác nhận mutation không gửi PUT khi categories rỗng nhưng vẫn resolve và gọi onSuccess; chưa bấm Lưu trong browser",
+    "introduced_by_refactor": false,
+    "uat_preferences": "BLOCKED bởi lỗi sản phẩm đã xác định; không phải thiếu môi trường chưa rõ nguyên nhân"
+  },
+  "remaining_copy": {
+    "severity": "P3",
+    "profile": "Hai mô tả thẻ lặp tiêu đề còn sót",
+    "report_dialogs": "Hai đoạn chỉ dẫn cần phân biệt hướng dẫn thao tác với tagline; rút gọn là đề xuất, không phải lỗi chức năng",
+    "app_shell": "Tagline chỉ hiện desktop; xóa toàn cục sẽ ảnh hưởng shell Workflow Form. Không phải nguyên nhân overflow mobile",
+    "preserve": "Cảnh báo Xác nhận đã xem không phải nghiệm thu/khối lượng/hoàn thành đầu việc"
+  },
+  "protected_boundary_recheck": {"status": "PASS", "files": 112, "regions": 12, "problems": []},
+  "acceptance": "NOT UX ACCEPTED",
+  "untested": ["Thiết bị mobile vật lý", "Người dùng đại diện", "Luồng ghi dữ liệu và mọi validation/biến thể Form", "Geometry element và thử CSS để chốt nguyên nhân overflow"],
+  "mapping_maintenance": "Không sửa source, owner hoặc contracts; không cần cập nhật mapping trong lượt đánh giá lại"
+}

@@ -6,6 +6,7 @@ import clsx from 'clsx';
 import { get } from '../../lib/api/client';
 import { dateTimeText as auditDateTime } from '../../lib/utils/format';
 import { PageHeader } from '../../components/PageHeader';
+import { IconAction } from '../../components/IconAction';
 import { Timeline } from '../../components/Timeline';
 import { DataTable } from '../../components/DataTable';
 import { EnumChip } from '../../components/EnumChip';
@@ -23,7 +24,7 @@ import { enumLabel } from '../../lib/utils/status';
 type ViewMode = 'list' | 'timeline';
 type DatePreset = 'all' | '7' | '30' | '90' | 'custom';
 
-const fieldClass = 'h-10 rounded-md border border-line bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100';
+const fieldClass = 'h-10 w-full min-w-0 max-w-full rounded-md border border-line bg-white px-3 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 sm:w-auto';
 
 export function AuditPage({ scoped = false }: { scoped?: boolean }) {
   const { id } = useParams();
@@ -92,21 +93,15 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
     <>
       <PageHeader
         title={scoped ? 'Audit công trình' : 'Audit toàn hệ thống'}
-        description={scoped
-          ? 'Tra cứu ai đã thao tác, thời điểm, đối tượng và dữ liệu chi tiết của thay đổi trong công trình.'
-          : 'Tra cứu lịch sử thao tác trên các công trình thuộc phạm vi anh có quyền xem.'}
         actions={(
           <>
             {scoped && id ? <ProjectBackLink projectId={id} /> : null}
-            <button
-              className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+            <IconAction
+              label="Làm mới audit"
               disabled={logs.isFetching}
               onClick={() => void logs.refetch()}
-              type="button"
-            >
-              <RefreshCw className={clsx('h-4 w-4', logs.isFetching && 'animate-spin')} />
-              Làm mới
-            </button>
+              icon={<RefreshCw className={clsx('h-4 w-4', logs.isFetching && 'animate-spin')} />}
+            />
           </>
         )}
       />
@@ -182,7 +177,6 @@ export function AuditPage({ scoped = false }: { scoped?: boolean }) {
             <div className="flex flex-col gap-3 rounded-md border border-rose-100 bg-rose-50 p-4 text-sm text-rose-700 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-semibold">Không tải được dữ liệu audit</p>
-                <p className="mt-1 text-xs">Vui lòng thử tải lại dữ liệu.</p>
               </div>
               <button className="rounded-md border border-rose-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-rose-100" onClick={() => void logs.refetch()} type="button">Thử lại</button>
             </div>

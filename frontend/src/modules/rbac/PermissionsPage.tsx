@@ -7,7 +7,7 @@ export function PermissionsPage() {
   const permissions = useQuery({ queryKey: ['permissions'], queryFn: () => get<Record<string, any>[]>('/permissions') });
   return (
     <>
-      <PageHeader title="Phân quyền" description="Permission matrix cho project, pipeline, BOQ, mua sắm, kho, thi công, nghiệm thu, kế toán và hệ thống." />
+      <PageHeader title="Phân quyền" />
       <DataTable
         rows={permissions.data ?? []}
         loading={permissions.isLoading}

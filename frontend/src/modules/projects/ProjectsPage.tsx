@@ -227,7 +227,6 @@ export function ProjectsPage() {
     <>
       <PageHeader
         title="Công trình"
-        description="Chọn công trình trước, sau đó mở cây nghiệp vụ bên trong công trình."
         horizontalFrom="xl"
         actions={
           <>
@@ -610,7 +609,6 @@ function ProjectQuickDashboard({ project }: { project: Project }) {
         <ProjectQuickMetric
           label="Tiến độ"
           value={`${progress}%`}
-          sub="Tiến độ tổng thể"
           icon={<CircleDot className="h-4 w-4" />}
           tone="blue"
           progress={progress}
@@ -618,14 +616,12 @@ function ProjectQuickDashboard({ project }: { project: Project }) {
         <ProjectQuickMetric
           label="Vướng mắc"
           value={openIssues}
-          sub={openIssues > 0 ? 'Cần xử lý' : 'Không có'}
           icon={<AlertTriangle className="h-4 w-4" />}
           tone={openIssues > 0 ? 'rose' : 'slate'}
         />
         <ProjectQuickMetric
           label="Chờ phê duyệt"
           value={pendingApprovals}
-          sub={pendingApprovals > 0 ? 'Đang chờ' : 'Không có'}
           icon={<CheckCircle2 className="h-4 w-4" />}
           tone={pendingApprovals > 0 ? 'amber' : 'slate'}
         />
@@ -660,7 +656,7 @@ function ProjectQuickMetric({
 }: {
   label: string;
   value: ReactNode;
-  sub: string;
+  sub?: string;
   icon: ReactNode;
   tone: ProjectQuickMetricTone;
   progress?: number;
@@ -678,7 +674,7 @@ function ProjectQuickMetric({
           <div className={`h-full rounded-full ${toneClasses.progress}`} style={{ width: `${progress}%` }} />
         </div>
       ) : null}
-      <p className="mt-2 truncate text-xs text-slate-500">{sub}</p>
+      {sub ? <p className="mt-2 truncate text-xs text-slate-500">{sub}</p> : null}
     </div>
   );
 }
@@ -865,10 +861,9 @@ function ProjectFolderRow({ project, folder }: { project: Project; folder: Proje
         <Folder className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-700">{folder.explorerLabel ?? folder.label}</p>
-          <p className="mt-0.5 truncate text-xs text-slate-500">{folder.description}</p>
         </div>
       </div>
-      <span className="text-right text-xs font-semibold text-blue-700">Mở</span>
+      <ChevronRight className="h-4 w-4 text-blue-700" aria-hidden="true" />
     </Link>
   );
 }

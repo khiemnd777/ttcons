@@ -1,0 +1,634 @@
+{
+  "created_at": "2026-10-26T03:21:40.054Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "REVIEW_REQUIRED",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "staff-import-dialog",
+      "evidence_dir": "browser-extended",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.fill: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-staff-import-dialog-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "settings-seal-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 328,
+          "bottom": 692,
+          "width": 576
+        },
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu",
+          "Thêm tài nguyên con dấu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-settings-seal-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "project-import-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 160,
+          "right": 1280,
+          "top": 243,
+          "bottom": 757,
+          "width": 1120
+        },
+        "heading": [
+          "Công trình",
+          "Import công trình",
+          "1. Chuẩn bị file từ mẫu hiện hành"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-project-import-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "project-export-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 223,
+          "bottom": 777,
+          "width": 800
+        },
+        "heading": [
+          "Công trình",
+          "Xuất công trình"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-project-export-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "boq-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 219.5,
+          "bottom": 780.5,
+          "width": 800
+        },
+        "heading": [
+          "Dự toán & báo giá",
+          "Thêm dòng dự toán"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-boq-create-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "acceptance-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 16,
+          "right": 1424,
+          "top": 16,
+          "bottom": 984,
+          "width": 1408
+        },
+        "heading": [
+          "Nghiệm thu",
+          "Nghiệm thu hoàn thành công trình mẫu",
+          "Checklist nghiệm thu",
+          "Ghi chú biên bản",
+          "Tạo biên bản nghiệm thu",
+          "Thông tin biên bản",
+          "Tiêu chí nghiệm thu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-acceptance-create-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "rework-create-dialog",
+      "evidence_dir": "browser-extended",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Error: strict mode violation: getByRole('button', { name: 'Sửa lỗi', exact: true }) resolved to 2 elements:\n    1) <button class=\"inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50\">…</button> aka getByRole('button', { name: 'Sửa lỗi' }).nth(1)\n    2) <button type=\"button\" class=\"inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700\">…</button> aka getByRole('button', { name: 'Sửa lỗi' }).nth(2)\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-rework-create-dialog-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "report-review-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1441,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 26,
+          "bottom": 994,
+          "width": 1320
+        },
+        "heading": [
+          "Báo cáo",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Duyệt báo cáo thi công · 23-10-2026",
+          "Đã xem · Lần 2",
+          "Công việc trong ngày",
+          "Minh chứng hiện trường · 1",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Bản gửi"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-report-review-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "report-detail-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 16,
+          "bottom": 984,
+          "width": 1320
+        },
+        "heading": [
+          "Thi công",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 1",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "Chi tiết báo cáo thi công",
+          "Công việc trong ngày",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Minh chứng · 1",
+          "Nguồn báo cáo",
+          "Chuỗi liên quan",
+          "Kiểm tra & xử lý"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-report-detail-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-pipeline-builder",
+      "evidence_dir": "browser-extended",
+      "currentScreenshot": "desktop-protected-pipeline-builder-current.png",
+      "baselineScreenshot": "desktop-protected-pipeline-builder-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Thư viện node",
+        "Workflow",
+        "Tiếp nhận dự án",
+        "Khảo sát",
+        "Họp báo cáo khảo sát",
+        "Thiết kế",
+        "BOQ (Không thiết kế)",
+        "BOQ (Có thiết kế)",
+        "Chốt Hợp đồng với chủ đầu tư",
+        "Bóc tách và lấy giá đầu vào",
+        "Đàm phán giá",
+        "Hợp đồng và tạm ứng đầu vào",
+        "Kế hoạch thi công",
+        "Thi công",
+        "Nghiệm thu Đầu Vào",
+        "Nghiệm thu Đầu Ra",
+        "Kết thúc: Bàn giao + Tài chính công trình"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thư viện node",
+          "Workflow",
+          "Tiếp nhận dự án",
+          "Khảo sát",
+          "Họp báo cáo khảo sát",
+          "Thiết kế",
+          "BOQ (Không thiết kế)",
+          "BOQ (Có thiết kế)",
+          "Chốt Hợp đồng với chủ đầu tư",
+          "Bóc tách và lấy giá đầu vào",
+          "Đàm phán giá",
+          "Hợp đồng và tạm ứng đầu vào",
+          "Kế hoạch thi công",
+          "Thi công",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu Đầu Ra",
+          "Kết thúc: Bàn giao + Tài chính công trình"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-pipeline-builder.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "staff-import-dialog",
+      "evidence_dir": "browser-extended",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.fill: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[name=\"email\"]')\u001b[22m\n",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-staff-import-dialog-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "settings-seal-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 242,
+          "bottom": 622,
+          "width": 358
+        },
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu",
+          "Thêm tài nguyên con dấu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-settings-seal-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "project-import-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 102,
+          "bottom": 742,
+          "width": 358
+        },
+        "heading": [
+          "Công trình",
+          "Import công trình",
+          "1. Chuẩn bị file từ mẫu hiện hành"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-project-import-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "project-export-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 69,
+          "bottom": 775,
+          "width": 358
+        },
+        "heading": [
+          "Công trình",
+          "Xuất công trình"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-project-export-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "boq-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 18.5,
+          "bottom": 825.5,
+          "width": 358
+        },
+        "heading": [
+          "Dự toán & báo giá",
+          "Thêm dòng dự toán"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-boq-create-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "acceptance-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "bottom": 828,
+          "width": 358
+        },
+        "heading": [
+          "Nghiệm thu",
+          "Nghiệm thu hoàn thành công trình mẫu",
+          "Checklist nghiệm thu",
+          "Ghi chú biên bản",
+          "Tạo biên bản nghiệm thu",
+          "Thông tin biên bản",
+          "Tiêu chí nghiệm thu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-acceptance-create-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "rework-create-dialog",
+      "evidence_dir": "browser-extended",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Error: strict mode violation: getByRole('button', { name: 'Sửa lỗi', exact: true }) resolved to 2 elements:\n    1) <button class=\"inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50\">…</button> aka getByRole('button', { name: 'Sửa lỗi' }).nth(1)\n    2) <button type=\"button\" class=\"inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700\">…</button> aka getByRole('button', { name: 'Sửa lỗi' }).nth(2)\n",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-rework-create-dialog-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "report-review-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 26,
+          "bottom": 838,
+          "width": 358
+        },
+        "heading": [
+          "Báo cáo",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Duyệt báo cáo thi công · 23-10-2026",
+          "Đã xem · Lần 2",
+          "Công việc trong ngày",
+          "Minh chứng hiện trường · 1",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Bản gửi"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-report-review-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "report-detail-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "bottom": 828,
+          "width": 358
+        },
+        "heading": [
+          "Thi công",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 1",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "Chi tiết báo cáo thi công",
+          "Công việc trong ngày",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Minh chứng · 1",
+          "Nguồn báo cáo",
+          "Chuỗi liên quan",
+          "Kiểm tra & xử lý"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-report-detail-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-pipeline-builder",
+      "evidence_dir": "browser-extended",
+      "currentScreenshot": "mobile-protected-pipeline-builder-current.png",
+      "baselineScreenshot": "mobile-protected-pipeline-builder-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Thư viện node",
+        "Workflow",
+        "Tiếp nhận dự án",
+        "Khảo sát",
+        "Họp báo cáo khảo sát",
+        "Thiết kế",
+        "BOQ (Không thiết kế)",
+        "BOQ (Có thiết kế)",
+        "Chốt Hợp đồng với chủ đầu tư",
+        "Bóc tách và lấy giá đầu vào",
+        "Đàm phán giá",
+        "Hợp đồng và tạm ứng đầu vào",
+        "Kế hoạch thi công",
+        "Thi công",
+        "Nghiệm thu Đầu Vào",
+        "Nghiệm thu Đầu Ra",
+        "Kết thúc: Bàn giao + Tài chính công trình"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thư viện node",
+          "Workflow",
+          "Tiếp nhận dự án",
+          "Khảo sát",
+          "Họp báo cáo khảo sát",
+          "Thiết kế",
+          "BOQ (Không thiết kế)",
+          "BOQ (Có thiết kế)",
+          "Chốt Hợp đồng với chủ đầu tư",
+          "Bóc tách và lấy giá đầu vào",
+          "Đàm phán giá",
+          "Hợp đồng và tạm ứng đầu vào",
+          "Kế hoạch thi công",
+          "Thi công",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu Đầu Ra",
+          "Kết thúc: Bàn giao + Tài chính công trình"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-protected-pipeline-builder.png",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "desktop",
+      "name": "pipeline-builder",
+      "sameVisibleText": true,
+      "current": "desktop-protected-pipeline-builder-current.png",
+      "baseline": "desktop-protected-pipeline-builder-baseline.png"
+    },
+    {
+      "view": "mobile",
+      "name": "pipeline-builder",
+      "sameVisibleText": true,
+      "current": "mobile-protected-pipeline-builder-current.png",
+      "baseline": "mobile-protected-pipeline-builder-baseline.png"
+    }
+  ]
+}

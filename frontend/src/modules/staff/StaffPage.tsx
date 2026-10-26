@@ -132,8 +132,8 @@ export function StaffPage() {
     { name: 'full_name', label: 'Họ tên', defaultValue: record?.full_name ?? '', required: true },
     { name: 'email', label: 'Email đăng nhập', type: 'email' as const, defaultValue: record?.email ?? '', required: true },
     { name: 'phone', label: 'Điện thoại', defaultValue: record?.phone ?? '' },
-    { name: 'department', label: 'Phòng ban', defaultValue: record?.department ?? '', placeholder: 'Không bắt buộc', helperText: 'Dùng cho phân công công việc theo phòng ban.' },
-    { name: 'position', label: 'Chức vụ', defaultValue: record?.position ?? '', placeholder: 'Không bắt buộc', helperText: 'Chỉ là chức danh hồ sơ, không cấp quyền hệ thống.' },
+    { name: 'department', label: 'Phòng ban', defaultValue: record?.department ?? '', placeholder: 'Không bắt buộc' },
+    { name: 'position', label: 'Chức vụ', defaultValue: record?.position ?? '', placeholder: 'Không bắt buộc', helperText: 'Không cấp quyền hệ thống.' },
     { name: 'status', label: 'Trạng thái', type: 'select' as const, defaultValue: record?.status ?? 'active', required: true, options: enumOptions('status', ['active', 'inactive']) },
   ];
 
@@ -219,7 +219,6 @@ export function StaffPage() {
     <>
       <PageHeader
         title="Nhân sự"
-        description="Quản lý nhân sự, phòng ban, chức vụ, trạng thái hoạt động và phân công vào công trình theo role."
         actions={(canCreate || canImport) ? (
           <>
             {canImport ? <button className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" />Import</button> : null}
@@ -287,7 +286,7 @@ export function StaffPage() {
       <Dialog
         open={open}
         title="Tạo nhân sự"
-        description="Tạo đồng thời hồ sơ nhân sự và tài khoản đăng nhập. Vai trò được gán riêng sau khi tạo."
+        description="Vai trò được gán sau khi tạo tài khoản."
         size="lg"
         onClose={() => setOpen(false)}
       >

@@ -1,0 +1,1 @@
+Mười bốn đối chiếu browser cho cùng nội dung nhìn thấy với baseline trước refactor.

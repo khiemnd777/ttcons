@@ -78,7 +78,7 @@ export function AcceptanceEvidencePicker({
     <Dialog
       open={open}
       title="Chọn từ hồ sơ công trình"
-      description={workItemId ? 'Chỉ hiển thị minh chứng thuộc nguồn công việc của biên bản.' : 'Tìm và chọn minh chứng đã có trong công trình.'}
+      description={workItemId ? 'Chỉ hiển thị minh chứng thuộc nguồn công việc của biên bản.' : undefined}
       size="xl"
       onClose={onClose}
       footer={(

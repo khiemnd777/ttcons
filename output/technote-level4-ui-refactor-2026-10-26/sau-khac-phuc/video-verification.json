@@ -1,0 +1,12 @@
+{
+  "audio_tracks": 1,
+  "bytes": 4378415,
+  "duration_seconds": 85.75,
+  "height": 720,
+  "output": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/TechNote-Level4-Sau-khac-phuc.mp4",
+  "video_tracks": 1,
+  "width": 1280,
+  "sha256": "c8c61a3c64dbfd3446948ce18c27d21847a8798f5b1bf5d8eb179ee6dfd29a44",
+  "audio_validation": "10/10 segments non-silent; audio-verification.json",
+  "visual_review": "3 decoded MP4 frames inspected"
+}

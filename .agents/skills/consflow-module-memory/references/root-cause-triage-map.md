@@ -1,5 +1,11 @@
 # Consflow Root-Cause Triage Map
 
+## Catalog notification 500, empty preferences and mobile overflow — 2026-10-26
+
+- Catalog 500 with `unsupported Scan ... string into type *[]string`: inspect `repository_notifications.go::NotificationCatalog`, `permissions_any` and pgx database/sql decoding. The confirmed failure is a valid TEXT[] SQL result scanned directly into []string; use the existing JSON array projection pattern. Catalog errors must reach `NotificationPreferencesDialog`; an empty successful result is a distinct state. Check mutation guards, changed groups, partial-save baseline reconciliation and error reset on reopen.
+- Audit/Event Logs `documentWidth` 820/814 at configured viewport390: confirmed long project select intrinsic widths787/781; temporary DOM min/max constraints restored390. Inspect the page-local `fieldClass`, not shared DataTable or record labels. Discussion540/390: confirmed implicit auto-sized mobile grid/rail; explicit minmax(0,1fr) and shrinkable host restored390 without changing Pipeline internals. Use configured browser viewport as denominator, not `window.innerWidth`, which Chrome can expand.
+- Browser suites share auth/SSE budgets. Run sequentially and space baseline page loads; classify redirected login pages as invalid verification, never PASS or product layout failure. Do not loosen rate limits to make UAT pass.
+
 ## Developer-assisted password recovery — 2026-10-20
 
 - If a public request returns accepted but Developer sees no queue row, inspect `account_recovery_requests` eligibility/cooldown, migration V159, and `CreateDeveloperRecoveryRequest`; generic public success cannot prove persistence. If the row exists but the bell does not update, inspect `notification_events`/`notification_outbox`, `account.recovery_requested` catalog, global Developer grant and `notification_platform.go` pending-state projection. If issue or reset fails, check current global Developer role, request status, configured `FRONTEND_ORIGIN`, token purpose/hash/expiry/target email and account status; never log or display raw token or password. First searches: `account.recovery_requested|account_recovery_requests|DeveloperRecoveryAllowed|IssueDeveloperRecoveryLink|ResetPasswordWithToken`.

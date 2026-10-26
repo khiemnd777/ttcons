@@ -1,0 +1,412 @@
+{
+  "created_at": "2026-10-26T03:19:53.389Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "REVIEW_REQUIRED",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-avatar-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Ảnh được chuẩn hóa và lưu trong kho bảo vệ.",
+      "openScreenshot": "desktop-help-Vcchlunhidin.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 496,
+          "right": 944,
+          "top": 298,
+          "bottom": 702,
+          "width": 448
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Cập nhật ảnh đại diện"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-profile-avatar-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-password-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 268,
+          "bottom": 732,
+          "width": 576
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Đổi mật khẩu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-profile-password-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "statistics-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.",
+      "openScreenshot": "desktop-help-CchtnhvphmviCngtrnhtin.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-statistics-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "staff-import-dialog",
+      "evidence_dir": "browser-recheck",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Import', exact: true })\u001b[22m\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Nhân sự"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-staff-import-dialog-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "staff-create-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 88.5,
+          "bottom": 911.5,
+          "width": 800
+        },
+        "heading": [
+          "Nhân sự",
+          "Tạo nhân sự",
+          "Thông tin nhân sự",
+          "Tài khoản đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-staff-create-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "settings-seal-dialog",
+      "evidence_dir": "browser-recheck",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Error: strict mode violation: getByRole('button', { name: /Thêm.*con dấu/ }) resolved to 2 elements:\n    1) <button type=\"button\" class=\"inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700\">…</button> aka getByRole('button', { name: 'Thêm con dấu', exact: true })\n    2) <button class=\"rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white\">Thêm con dấu đầu tiên</button> aka getByRole('button', { name: 'Thêm con dấu đầu tiên' })\n",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-settings-seal-dialog-check.png"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-embedded-form",
+      "evidence_dir": "browser-recheck",
+      "currentScreenshot": "desktop-protected-embedded-form-current.png",
+      "baselineScreenshot": "desktop-protected-embedded-form-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Xác nhận điểm bắt đầu",
+        "Không có điều kiện đang chặn",
+        "Xác nhận điểm bắt đầu",
+        "1 hồ sơ minh chứng",
+        "Hồ sơ đã chốt · Có thể chỉnh sửa"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Xác nhận điểm bắt đầu",
+          "Không có điều kiện đang chặn",
+          "Xác nhận điểm bắt đầu",
+          "1 hồ sơ minh chứng",
+          "Hồ sơ đã chốt · Có thể chỉnh sửa"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-embedded-form.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-avatar-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Ảnh được chuẩn hóa và lưu trong kho bảo vệ.",
+      "openScreenshot": "mobile-help-Vcchlunhidin.png",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 212,
+          "bottom": 632,
+          "width": 358
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Cập nhật ảnh đại diện"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-profile-avatar-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-password-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 170,
+          "bottom": 674,
+          "width": 358
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Đổi mật khẩu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-profile-password-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "statistics-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.",
+      "openScreenshot": "mobile-help-CchtnhvphmviCngtrnhtin.png",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-statistics-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "staff-import-dialog",
+      "evidence_dir": "browser-recheck",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Import', exact: true })\u001b[22m\n",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Nhân sự"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-staff-import-dialog-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "staff-create-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "bottom": 828,
+          "width": 358
+        },
+        "heading": [
+          "Nhân sự",
+          "Tạo nhân sự",
+          "Thông tin nhân sự",
+          "Tài khoản đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-staff-create-dialog.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "settings-seal-dialog",
+      "evidence_dir": "browser-recheck",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.click: Error: strict mode violation: getByRole('button', { name: /Thêm.*con dấu/ }) resolved to 2 elements:\n    1) <button type=\"button\" class=\"inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700\">…</button> aka getByRole('button', { name: 'Thêm con dấu', exact: true })\n    2) <button class=\"rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white\">Thêm con dấu đầu tiên</button> aka getByRole('button', { name: 'Thêm con dấu đầu tiên' })\n",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-settings-seal-dialog-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-embedded-form",
+      "evidence_dir": "browser-recheck",
+      "currentScreenshot": "mobile-protected-embedded-form-current.png",
+      "baselineScreenshot": "mobile-protected-embedded-form-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Xác nhận điểm bắt đầu",
+        "Không có điều kiện đang chặn",
+        "Xác nhận điểm bắt đầu",
+        "1 hồ sơ minh chứng",
+        "Hồ sơ đã chốt · Có thể chỉnh sửa"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Xác nhận điểm bắt đầu",
+          "Không có điều kiện đang chặn",
+          "Xác nhận điểm bắt đầu",
+          "1 hồ sơ minh chứng",
+          "Hồ sơ đã chốt · Có thể chỉnh sửa"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-protected-embedded-form.png",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "desktop",
+      "name": "embedded-form",
+      "sameVisibleText": true,
+      "current": "desktop-protected-embedded-form-current.png",
+      "baseline": "desktop-protected-embedded-form-baseline.png"
+    },
+    {
+      "view": "mobile",
+      "name": "embedded-form",
+      "sameVisibleText": true,
+      "current": "mobile-protected-embedded-form-current.png",
+      "baseline": "mobile-protected-embedded-form-baseline.png"
+    }
+  ]
+}

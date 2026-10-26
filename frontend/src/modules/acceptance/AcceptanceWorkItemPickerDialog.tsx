@@ -55,7 +55,6 @@ export function AcceptanceWorkItemPickerDialog({
     <Dialog
       open={open}
       title="Chọn nơi lưu minh chứng"
-      description="Ảnh và tệp mới cần gắn với một công việc để truy vết và kiểm soát quyền truy cập."
       size="lg"
       onClose={onClose}
       footer={(

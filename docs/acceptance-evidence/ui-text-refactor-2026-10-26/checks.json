@@ -1,0 +1,138 @@
+{
+  "task": "Dọn text giao diện ngoài Pipeline và Workflow Form",
+  "approval": "Duyệt proposal này, triển khai theo ba đợt. Giữ nguyên Pipeline và Workflow Form, kể cả các component nhúng.",
+  "environment": {
+    "scope": "local working tree",
+    "branch": "main",
+    "node": "v23.11.0",
+    "browser": "NOT_RUN",
+    "ux": "NOT UX ACCEPTED",
+    "database": "Không truy cập hoặc thay đổi",
+    "migration": "Không chạy",
+    "deployment": "NOT_RUN",
+    "commit_push": "NOT_RUN"
+  },
+  "checks": {
+    "tests": {
+      "command": "cd frontend && npm test",
+      "status": "PASS",
+      "tests": 617,
+      "pass": 617,
+      "fail": 0,
+      "finished_at_utc": "2026-10-26T03:01:59.318660+00:00",
+      "scope": "Node controlled hooks/event targets + React SSR; không browser"
+    },
+    "build": {
+      "command": "cd frontend && npm run build",
+      "status": "PASS",
+      "finished_at_utc": "2026-10-26T02:58:31.172749+00:00",
+      "scope": "TypeScript noEmit + Vite production build",
+      "vite_seconds": 4.29
+    },
+    "bundle_budget": {
+      "command": "cd frontend && npm run check:bundle-budget",
+      "status": "PASS",
+      "chunks": 133,
+      "raw_limit_kb": 500,
+      "gzip_limit_kib": 250
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "status": "PASS"
+    },
+    "boundary": {
+      "command": "node docs/acceptance-evidence/ui-text-refactor-2026-10-26/verify-boundary.mjs",
+      "status": "PASS",
+      "baseline": "fba39cdcf72a2d6714d5eac3d15eba8cdf4014c9",
+      "checked_at": "2026-10-26T03:01:59.510Z",
+      "node": "v23.11.0",
+      "protected_files": 112,
+      "protected_regions": 12,
+      "regions": {
+        "frontend/src/modules/projects/ProjectDetailPage.tsx": [
+          "ProjectWorkflowWorkspace",
+          "WorkflowEmptyState",
+          "WorkflowExecutionSummary",
+          "WorkflowSummaryMetric",
+          "WorkflowStageRail",
+          "WorkflowWorkPanel",
+          "WorkflowWorkTableRow",
+          "WorkflowWorkMobileCard"
+        ],
+        "frontend/src/modules/my-work/MyWorkPage.tsx": [
+          "WorkflowActionCard",
+          "NextQueuePanel",
+          "ProjectStartupActionCard",
+          "ProjectStartupNextPanel"
+        ]
+      },
+      "problems": [],
+      "source_test_sha256": "8a1cd72fb268ba252380169c795606d969eecdd2a081aaf8d2ded65e64182e87"
+    }
+  },
+  "modified_sources": [
+    "frontend/src/modules/_shared/RecordSourcePage.tsx",
+    "frontend/src/modules/acceptance/AcceptanceEditor.tsx",
+    "frontend/src/modules/acceptance/AcceptanceEvidencePicker.tsx",
+    "frontend/src/modules/acceptance/AcceptancePage.tsx",
+    "frontend/src/modules/acceptance/AcceptanceWorkItemPickerDialog.tsx",
+    "frontend/src/modules/audit/AuditPage.tsx",
+    "frontend/src/modules/auth/AuthCard.tsx",
+    "frontend/src/modules/auth/ForgotPasswordPage.tsx",
+    "frontend/src/modules/auth/InitialPasswordChangePage.tsx",
+    "frontend/src/modules/auth/LoginPage.tsx",
+    "frontend/src/modules/auth/RecoveryRequestsPage.tsx",
+    "frontend/src/modules/boq/BOQPage.tsx",
+    "frontend/src/modules/contracts/ContractsPage.tsx",
+    "frontend/src/modules/core-data/CoreDataPage.tsx",
+    "frontend/src/modules/dashboard/DashboardPage.tsx",
+    "frontend/src/modules/event-logs/EventLogsPage.tsx",
+    "frontend/src/modules/handover/HandoverPage.tsx",
+    "frontend/src/modules/meeting-minutes/MeetingMinutesPage.tsx",
+    "frontend/src/modules/my-work/MyWorkPage.tsx",
+    "frontend/src/modules/notifications/NotificationsPage.tsx",
+    "frontend/src/modules/operations/ConstructionActionDialogs.tsx",
+    "frontend/src/modules/operations/ConstructionCheckDialogs.tsx",
+    "frontend/src/modules/operations/ConstructionReportDetailDialog.tsx",
+    "frontend/src/modules/operations/ConstructionReportLinkedComposer.tsx",
+    "frontend/src/modules/operations/OperationsPage.tsx",
+    "frontend/src/modules/planning-checklists/PlanningChecklistsPage.tsx",
+    "frontend/src/modules/planning-daily-reports/PlanningDailyReportsPage.tsx",
+    "frontend/src/modules/planning/PreparationPage.tsx",
+    "frontend/src/modules/procurement/ProcurementPage.tsx",
+    "frontend/src/modules/profile/ProfilePage.tsx",
+    "frontend/src/modules/project-finance/AccountingHandoffDetailDialog.tsx",
+    "frontend/src/modules/project-finance/AccountingHandoffPage.tsx",
+    "frontend/src/modules/projects/ProjectDetailPage.tsx",
+    "frontend/src/modules/projects/ProjectExportDialog.tsx",
+    "frontend/src/modules/projects/ProjectImportDialog.tsx",
+    "frontend/src/modules/projects/ProjectProgressPage.tsx",
+    "frontend/src/modules/projects/ProjectsPage.tsx",
+    "frontend/src/modules/quality/QualityPage.tsx",
+    "frontend/src/modules/rbac/PermissionsPage.tsx",
+    "frontend/src/modules/rbac/RolesPage.tsx",
+    "frontend/src/modules/reports/ReportsPage.tsx",
+    "frontend/src/modules/rework/ReworkPage.tsx",
+    "frontend/src/modules/settings/SettingsPage.tsx",
+    "frontend/src/modules/staff/StaffImportDialog.tsx",
+    "frontend/src/modules/staff/StaffPage.tsx",
+    "frontend/src/modules/warehouse/WarehousePage.tsx",
+    "frontend/src/modules/work-items/DiscussionWorkRail.tsx",
+    "frontend/src/modules/work-reports/WorkReportReviewDialog.tsx",
+    "frontend/src/modules/work-reports/WorkReportsPage.tsx"
+  ],
+  "new_sources": [
+    "frontend/src/components/ContextHelp.tsx",
+    "frontend/src/components/IconAction.tsx"
+  ],
+  "review": {
+    "mode": "Ba agent read-only + team leader tích hợp",
+    "resolved": [
+      "Giữ tiêu chí chọn loại yêu cầu trong dialog Rework",
+      "Bỏ giới hạn 42% dư của custom Báo cáo header",
+      "Giữ Pipeline/Form embedded và shared defaults"
+    ],
+    "remaining": "Browser/responsive/touch/keyboard propagation thực tế chưa chạy; native title không chứng minh tooltip touch."
+  },
+  "preexisting_changes": "Giữ nguyên các thay đổi tài liệu và output có trước task."
+}

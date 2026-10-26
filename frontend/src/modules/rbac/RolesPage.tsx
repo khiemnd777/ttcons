@@ -84,7 +84,6 @@ export function RolesPage() {
     <>
       <PageHeader
         title="Vai trò"
-        description="Role hệ thống và role theo công trình; pipeline node gán theo role thay vì gán cứng người."
         actions={canCreate ? <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Role</button> : null}
       />
       <DataTable

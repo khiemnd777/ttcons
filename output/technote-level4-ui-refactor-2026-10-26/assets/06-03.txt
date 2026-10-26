@@ -1,0 +1,1 @@
+Các điểm này mới được ghi nhận trong UAT; chưa sửa thêm source ứng dụng.

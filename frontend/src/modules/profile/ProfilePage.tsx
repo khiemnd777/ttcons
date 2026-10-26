@@ -7,6 +7,7 @@ import { BriefcaseBusiness, Building2, ImagePlus, KeyRound, Loader2, Mail, Penci
 import { z } from 'zod';
 import { Dialog } from '../../components/Dialog';
 import { PageHeader } from '../../components/PageHeader';
+import { ContextHelp } from '../../components/ContextHelp';
 import { PasswordInput } from '../../components/PasswordInput';
 import { UserAvatar } from '../../components/UserAvatar';
 import { useToast } from '../../components/ToastProvider';
@@ -294,7 +295,7 @@ export function ProfilePage() {
 
   return (
     <>
-      <PageHeader title="Hồ sơ cá nhân" description="Quản lý thông tin tài khoản và bảo mật của chính bạn." />
+      <PageHeader title="Hồ sơ cá nhân" />
 
       <section className="mb-4 flex flex-col gap-4 rounded-lg border border-line bg-white p-5 sm:flex-row sm:items-center">
         <UserAvatar user={user} size="lg" decorative />
@@ -319,7 +320,6 @@ export function ProfilePage() {
                 <UserRound className="h-5 w-5 text-blue-600" />
                 <h2 className="text-base font-semibold text-ink">Thông tin cá nhân</h2>
               </div>
-              <p className="mt-1 text-sm text-slate-500">Thông tin liên hệ và hồ sơ công việc hiện tại.</p>
             </div>
             <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={openProfile}>
               <Pencil className="h-4 w-4" />
@@ -343,7 +343,6 @@ export function ProfilePage() {
                 <KeyRound className="h-5 w-5 text-blue-600" />
                 <h2 className="text-base font-semibold text-ink">Bảo mật</h2>
               </div>
-              <p className="mt-1 text-sm text-slate-500">Kiểm soát mật khẩu và phiên đăng nhập.</p>
             </div>
             <button type="button" className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" onClick={openPassword}>
               <KeyRound className="h-4 w-4" />
@@ -390,7 +389,6 @@ export function ProfilePage() {
       <Dialog
         open={profileOpen}
         title="Chỉnh sửa thông tin"
-        description="Cập nhật thông tin tài khoản và liên hệ cá nhân."
         onClose={() => { if (!updateProfile.isPending) setProfileOpen(false); }}
         footer={(
           <div className="flex justify-end gap-2">
@@ -433,7 +431,6 @@ export function ProfilePage() {
       <Dialog
         open={avatarOpen}
         title="Cập nhật ảnh đại diện"
-        description="Chọn ảnh PNG, JPG hoặc WebP. Hệ thống chuẩn hóa và lưu ảnh trong kho bảo vệ."
         size="sm"
         onClose={() => {
           if (updateAvatar.isPending) return;
@@ -466,7 +463,10 @@ export function ProfilePage() {
             {avatarPreview ? <img className="h-24 w-24 rounded-full border border-line object-cover" src={avatarPreview} alt="Xem trước ảnh đại diện mới" /> : <UserAvatar user={user} size="xl" decorative />}
           </div>
           <div className={`rounded-lg border-2 border-dashed p-4 text-center ${avatarError ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-slate-50'}`}>
-            <p className="text-sm font-semibold text-ink">Chọn ảnh đại diện</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <p className="text-sm font-semibold text-ink">Chọn ảnh đại diện</p>
+              <ContextHelp label="Về cách lưu ảnh đại diện">Ảnh được chuẩn hóa và lưu trong kho bảo vệ.</ContextHelp>
+            </div>
             <p className="mt-1 text-xs text-slate-500">PNG, JPG hoặc WebP · tối đa 2 MB · ảnh được hiển thị dạng tròn.</p>
             <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
               <Upload className="h-4 w-4" /> Chọn ảnh
@@ -485,7 +485,6 @@ export function ProfilePage() {
       <Dialog
         open={passwordOpen}
         title="Đổi mật khẩu"
-        description="Xác nhận mật khẩu hiện tại trước khi đặt mật khẩu mới."
         onClose={() => { if (!changePassword.isPending) setPasswordOpen(false); }}
         footer={(
           <div className="flex justify-end gap-2">

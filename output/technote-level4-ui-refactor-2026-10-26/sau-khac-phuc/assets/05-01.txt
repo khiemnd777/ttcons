@@ -1,0 +1,1 @@
+Copy lặp ở Profile và đầu báo cáo đã bỏ. Cảnh báo nghiệp vụ, nguồn và lần gửi vẫn giữ nguyên.

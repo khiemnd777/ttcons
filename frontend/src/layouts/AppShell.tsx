@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { matchPath, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -265,7 +265,7 @@ export function AppShell() {
                 <Menu className="h-5 w-5" />
               </button>
               <BrandHomeLink compact className="lg:hidden" />
-              <p className="hidden text-sm font-medium text-ink lg:block">Bắt đầu từ việc ưu tiên, luôn rõ Công trình › Giai đoạn › Gói công việc</p>
+              {matchPath('/workflow-forms', location.pathname) ? <p className="hidden text-sm font-medium text-ink lg:block">Bắt đầu từ việc ưu tiên, luôn rõ Công trình › Giai đoạn › Gói công việc</p> : null}
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <NotificationPanel summary={indicators.notifications.data} />

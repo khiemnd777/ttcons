@@ -1,0 +1,50 @@
+[
+  {
+    "chapter": 1,
+    "title": "Kết quả kiểm tra giao diện",
+    "start": 0.0,
+    "end": 25.333333333333332
+  },
+  {
+    "chapter": 2,
+    "title": "Desktop: trang, bảng và dialog",
+    "start": 25.333333333333332,
+    "end": 46.75
+  },
+  {
+    "chapter": 3,
+    "title": "Mobile: phát hiện tràn ngang",
+    "start": 46.75,
+    "end": 73.75
+  },
+  {
+    "chapter": 4,
+    "title": "Trợ giúp: mở, đóng và focus",
+    "start": 73.75,
+    "end": 97.66666666666667
+  },
+  {
+    "chapter": 5,
+    "title": "Pipeline và Workflow Form giữ nguyên",
+    "start": 97.66666666666667,
+    "end": 123.75000000000001
+  },
+  {
+    "chapter": 6,
+    "title": "Còn copy tĩnh cần dọn tiếp",
+    "start": 123.75000000000001,
+    "end": 146.5
+  },
+  {
+    "chapter": 7,
+    "title": "Dialog thông báo: API local trả 500",
+    "start": 146.5,
+    "end": 167.83333333333331
+  },
+  {
+    "chapter": 8,
+    "title": "Điểm chốt và bước tiếp theo",
+    "start": 167.83333333333331,
+    "end": 195.49999999999997
+  }
+]

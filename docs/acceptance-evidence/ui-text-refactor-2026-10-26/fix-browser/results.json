@@ -1,0 +1,244 @@
+{
+  "results": [
+    {
+      "name": "desktop-real-notification-catalog",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "groups": 6,
+      "allRequired": true,
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-real-notification-catalog.png"
+    },
+    {
+      "name": "desktop-protected-shell-workflowforms",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-protected-shell-workflowforms.png"
+    },
+    {
+      "name": "desktop-protected-shell-workflowforms",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-protected-shell-workflowforms.png"
+    },
+    {
+      "name": "desktop-protected-shell-WORKFLOWFORMS",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-protected-shell-WORKFLOWFORMS.png"
+    },
+    {
+      "name": "desktop-profile-copy",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-profile-copy.png"
+    },
+    {
+      "name": "desktop-catalog-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP error/retry fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-catalog-error.png"
+    },
+    {
+      "name": "desktop-preferences-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP error/retry fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-preferences-error.png"
+    },
+    {
+      "name": "desktop-both-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP error/retry fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-both-error.png"
+    },
+    {
+      "name": "desktop-empty",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP empty fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-empty.png"
+    },
+    {
+      "name": "desktop-loading",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled delayed catalog fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-loading.png"
+    },
+    {
+      "name": "desktop-partial-save-retry-and-reopen",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled optional-group GET/PUT fixture; no preference DB writes",
+      "writes": [
+        {
+          "category": "uat_1",
+          "enabled": false
+        },
+        {
+          "category": "uat_2",
+          "enabled": false
+        },
+        {
+          "category": "uat_2",
+          "enabled": false
+        }
+      ],
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-partial-save-retry-and-reopen.png"
+    },
+    {
+      "name": "mobile-360-audit",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "status": "FAIL",
+      "error": "locator.waitFor: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Audit toàn hệ thống', exact: true }).first() to be visible\u001b[22m",
+      "screenshot": "mobile-360-audit.png"
+    },
+    {
+      "name": "mobile-360-events",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "status": "FAIL",
+      "error": "locator.waitFor: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Nhật ký sự kiện', exact: true }).first() to be visible\u001b[22m",
+      "screenshot": "mobile-360-events.png"
+    },
+    {
+      "name": "mobile-360-discussion",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "status": "FAIL",
+      "error": "Expected \"actual\" to be strictly unequal to:\n\n'/login'",
+      "screenshot": "mobile-360-discussion.png"
+    },
+    {
+      "name": "mobile-360-notification-real",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "status": "FAIL",
+      "error": "locator.waitFor: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Thông báo', exact: true }).first() to be visible\u001b[22m",
+      "screenshot": "mobile-360-notification-real.png"
+    },
+    {
+      "name": "mobile-390-audit",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "status": "FAIL",
+      "error": "locator.waitFor: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Audit toàn hệ thống', exact: true }).first() to be visible\u001b[22m",
+      "screenshot": "mobile-390-audit.png"
+    }
+  ],
+  "errors": [
+    "runner: page.screenshot: Target page, context or browser has been closed"
+  ],
+  "scope": "Real local catalog/layout; controlled HTTP fixtures explicitly labelled for optional preference writes and failures"
+}

@@ -1,0 +1,87 @@
+{
+  "frames": [
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/01-01.png",
+      "duration": 8.5
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/01-02.png",
+      "duration": 7.5
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/02-01.png",
+      "duration": 10.083333333333334
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/02-02.png",
+      "duration": 8.333333333333334
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/03-01.png",
+      "duration": 6.333333333333333
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/03-02.png",
+      "duration": 8.5
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/04-01.png",
+      "duration": 10.333333333333334
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/04-02.png",
+      "duration": 9.5
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/05-01.png",
+      "duration": 7.416666666666667
+    },
+    {
+      "image": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/05-02.png",
+      "duration": 9.25
+    }
+  ],
+  "scenes": [
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/01-01.aiff",
+      "duration": 8.5
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/01-02.aiff",
+      "duration": 7.5
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/02-01.aiff",
+      "duration": 10.083333333333334
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/02-02.aiff",
+      "duration": 8.333333333333334
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/03-01.aiff",
+      "duration": 6.333333333333333
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/03-02.aiff",
+      "duration": 8.5
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/04-01.aiff",
+      "duration": 10.333333333333334
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/04-02.aiff",
+      "duration": 9.5
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/05-01.aiff",
+      "duration": 7.416666666666667
+    },
+    {
+      "audio": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/assets/05-02.aiff",
+      "duration": 9.25
+    }
+  ],
+  "output": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/sau-khac-phuc/TechNote-Level4-Sau-khac-phuc.mp4"
+}

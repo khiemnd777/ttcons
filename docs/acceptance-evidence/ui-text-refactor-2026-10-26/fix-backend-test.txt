@@ -1,0 +1,57 @@
+Database: consflow_ui_fix_test_9fb9d24ace
+=== RUN   TestNotificationCatalogReadsPostgresPermissionArrays
+--- PASS: TestNotificationCatalogReadsPostgresPermissionArrays (2.48s)
+PASS
+ok  	consflow/backend/internal/core	3.245s
+go: downloading codeberg.org/go-pdf/fpdf v0.11.0
+go: downloading github.com/gofiber/fiber/v2 v2.52.6
+go: downloading github.com/jackc/pgx/v5 v5.7.1
+go: downloading github.com/redis/go-redis/v9 v9.7.0
+go: downloading github.com/xuri/excelize/v2 v2.9.1
+go: downloading github.com/google/uuid v1.6.0
+go: downloading github.com/golang-jwt/jwt/v5 v5.2.2
+go: downloading golang.org/x/image v0.28.0
+go: downloading golang.org/x/crypto v0.38.0
+go: downloading golang.org/x/sync v0.15.0
+go: downloading golang.org/x/text v0.26.0
+go: downloading github.com/aws/aws-sdk-go-v2 v1.36.0
+go: downloading github.com/aws/aws-sdk-go-v2/config v1.29.5
+go: downloading github.com/aws/aws-sdk-go-v2/service/s3 v1.74.0
+go: downloading github.com/aws/smithy-go v1.22.2
+go: downloading golang.org/x/sys v0.33.0
+go: downloading github.com/cespare/xxhash/v2 v2.3.0
+go: downloading github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+go: downloading github.com/richardlehane/mscfb v1.0.4
+go: downloading github.com/tiendc/go-deepcopy v1.6.0
+go: downloading github.com/xuri/efp v0.0.1
+go: downloading github.com/xuri/nfp v0.0.1
+go: downloading golang.org/x/net v0.40.0
+go: downloading github.com/mattn/go-colorable v0.1.13
+go: downloading github.com/mattn/go-isatty v0.0.20
+go: downloading github.com/mattn/go-runewidth v0.0.16
+go: downloading github.com/valyala/bytebufferpool v1.0.0
+go: downloading github.com/valyala/fasthttp v1.51.0
+go: downloading github.com/aws/aws-sdk-go-v2/credentials v1.17.58
+go: downloading github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.27
+go: downloading github.com/aws/aws-sdk-go-v2/internal/ini v1.8.2
+go: downloading github.com/aws/aws-sdk-go-v2/service/sso v1.24.14
+go: downloading github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.13
+go: downloading github.com/aws/aws-sdk-go-v2/service/sts v1.33.13
+go: downloading github.com/jackc/puddle/v2 v2.2.2
+go: downloading github.com/richardlehane/msoleps v1.0.4
+go: downloading github.com/rivo/uniseg v0.2.0
+go: downloading github.com/andybalholm/brotli v1.1.0
+go: downloading github.com/klauspost/compress v1.17.9
+go: downloading github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.7
+go: downloading github.com/valyala/tcplisten v1.0.0
+go: downloading github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.31
+go: downloading github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.28
+go: downloading github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.2
+go: downloading github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.5.2
+go: downloading github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.12
+go: downloading github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.9
+go: downloading github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.31
+
+exit=0

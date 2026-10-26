@@ -109,7 +109,7 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Cấu hình" description="Quản lý tài nguyên con dấu và các thiết lập vận hành có kiểm soát quyền." />
+      <PageHeader title="Cấu hình" />
       <div className="flex flex-wrap gap-2 border-b border-line" role="tablist" aria-label="Nhóm cấu hình">
         {canManageSeals ? <TabButton active={tab === 'seals'} onClick={() => setTab('seals')} icon={<Stamp className="h-4 w-4" />}>Con dấu</TabButton> : null}
         <TabButton active={tab === 'system'} onClick={() => setTab('system')} icon={<Settings2 className="h-4 w-4" />}>Thiết lập hệ thống</TabButton>
@@ -119,7 +119,7 @@ export function SettingsPage() {
       {tab === 'system' ? <SystemSettingsPanel data={settings.data} loading={settings.isLoading} error={settings.error} onRetry={() => settings.refetch()} /> : null}
       {tab === 'sample-data' && canCreateSampleData ? <SampleDataPanel /> : null}
 
-      <Dialog open={uploadOpen} title="Thêm tài nguyên con dấu" description="Chấp nhận PNG, JPG hoặc WebP tối đa 10 MB. Hệ thống chuẩn hóa ảnh sang PNG để dùng ổn định trong PDF." onClose={closeUpload} footer={(
+      <Dialog open={uploadOpen} title="Thêm tài nguyên con dấu" description="PNG, JPG hoặc WebP · tối đa 10 MB." onClose={closeUpload} footer={(
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100" disabled={upload.isPending} onClick={closeUpload}>Hủy</button>
           <button type="button" className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={upload.isPending} onClick={validateAndUpload}>{upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}Tải và lưu</button>

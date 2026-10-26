@@ -1,0 +1,1 @@
+Dialog hiển thị chưa có nhóm thông báo, nên ca tải danh mục chưa đạt. Backend vẫn là image local có sẵn.

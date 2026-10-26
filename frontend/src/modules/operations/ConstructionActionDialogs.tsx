@@ -113,7 +113,7 @@ function ActionFormDialog({ state, projectId, workspace, onClose, onSaved }: Pro
     }
   }
 
-  return <Dialog open title={action ? 'Chỉnh sửa việc cần xử lý' : 'Tạo việc cần xử lý'} description={action ? 'Nguồn phát sinh, công việc, ảnh hưởng và minh chứng được khóa để giữ lịch sử.' : sourceReport ? 'Việc này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Ghi rõ hiện trạng, giao đúng người và đặt hạn xử lý.'} size="xl" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel={action ? 'Lưu thay đổi' : 'Tạo việc'} onClose={onClose} onSave={save} />}>
+  return <Dialog open title={action ? 'Chỉnh sửa việc cần xử lý' : 'Tạo việc cần xử lý'} description={action ? 'Nguồn phát sinh, công việc, ảnh hưởng và minh chứng được khóa để giữ lịch sử.' : sourceReport ? 'Việc này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : undefined} size="xl" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel={action ? 'Lưu thay đổi' : 'Tạo việc'} onClose={onClose} onSave={save} />}>
     <fieldset disabled={saving} className="min-w-0"><div ref={formRef} className="space-y-5">
       {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <details className="rounded-md border border-line p-3"><summary className="cursor-pointer text-sm font-semibold">Chi tiết hiện trường</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">

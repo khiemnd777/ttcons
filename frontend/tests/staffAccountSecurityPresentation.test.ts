@@ -56,8 +56,10 @@ test('staff creation requires account-security authority and creates one passwor
 test('staff department and position are optional with explicit empty-state presentation', async () => {
   const page = await source('../src/modules/staff/StaffPage.tsx');
 
-  assert.match(page, /name: 'department'[\s\S]*?placeholder: 'Không bắt buộc'[\s\S]*?Dùng cho phân công công việc theo phòng ban/);
-  assert.match(page, /name: 'position'[\s\S]*?placeholder: 'Không bắt buộc'[\s\S]*?không cấp quyền hệ thống/);
+  // Remove redundant department guidance; preserve optionality and the position/RBAC distinction.
+  assert.match(page, /name: 'department'[^\n]*placeholder: 'Không bắt buộc'/);
+  assert.doesNotMatch(page, /Dùng cho phân công công việc theo phòng ban/);
+  assert.match(page, /name: 'position'[^\n]*placeholder: 'Không bắt buộc'[^\n]*Không cấp quyền hệ thống/);
   assert.doesNotMatch(page, /name: 'department'[^\n]*required: true/);
   assert.doesNotMatch(page, /name: 'position'[^\n]*required: true/);
   assert.match(page, /render: \(row\) => optionalStaffValue\(row\.department\)/);

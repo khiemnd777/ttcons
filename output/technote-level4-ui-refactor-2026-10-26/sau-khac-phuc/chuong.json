@@ -1,0 +1,32 @@
+[
+  {
+    "chapter": 1,
+    "title": "Catalog thông báo đã hoạt động",
+    "start": 0,
+    "end": 16.0
+  },
+  {
+    "chapter": 2,
+    "title": "Ba trang mobile không còn tràn ngang",
+    "start": 16.0,
+    "end": 34.41666666666667
+  },
+  {
+    "chapter": 3,
+    "title": "Pipeline và Workflow Form được giữ nguyên",
+    "start": 34.41666666666667,
+    "end": 49.25000000000001
+  },
+  {
+    "chapter": 4,
+    "title": "Kết quả kỹ thuật và giới hạn kiểm thử",
+    "start": 49.25000000000001,
+    "end": 69.08333333333334
+  },
+  {
+    "chapter": 5,
+    "title": "Phần còn cần nghiệm thu",
+    "start": 69.08333333333334,
+    "end": 85.75000000000001
+  }
+]

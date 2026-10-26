@@ -207,7 +207,6 @@ export function AcceptancePage({ global = false }: { global?: boolean }) {
       <div className="mx-auto w-full max-w-[1180px]">
         <PageHeader
           title="Nghiệm thu"
-          description="Soạn, kiểm tra và kết luận biên bản nghiệm thu theo checklist; mỗi trạng thái chỉ hiển thị hành động tiếp theo cần làm."
           actions={<>
             {!global ? <ProjectBackLink projectId={projectId} /> : null}
             {global ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={(value) => { setProjectId(value); setSelectedId(''); }} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div> : null}
@@ -383,14 +382,14 @@ function AcceptanceDetail({ record, canCreate, canConclude, canCreateRework, bus
             <div className="consflow-table-viewport hidden md:block">
               <table className="min-w-[980px] w-full text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3"><span className="sr-only">Thao tác</span></th><th className="px-4 py-3">#</th><th className="px-4 py-3">Hạng mục / tiêu chí</th><th className="px-4 py-3">Kết quả</th><th className="px-4 py-3">Minh chứng</th><th className="px-4 py-3">Yêu cầu xử lý</th><th className="px-4 py-3">Hạn</th></tr></thead>
-                <tbody className="divide-y divide-line">{checklist.map((item, index) => <tr key={item.id ?? index} className="hover:bg-slate-50"><td className="px-4 py-3"><button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" onClick={() => onViewChecklistItem(item, index)}><Eye className="h-3.5 w-3.5" /> Xem</button></td><td className="px-4 py-3 text-slate-500">{index + 1}</td><td className="px-4 py-3"><p className="font-semibold text-ink">{item.title}</p><p className="mt-1 text-xs text-slate-500">{item.description || 'Không có mô tả bổ sung'}</p></td><td className="px-4 py-3"><EnumChip group="result" value={item.decision} /></td><td className="px-4 py-3">{checklistEvidenceCount(item) ? <div><p className="font-medium text-ink">{checklistEvidenceCount(item)} minh chứng</p>{item.evidence_status ? <StatusBadge status={item.evidence_status} /> : null}</div> : item.photo_url ? 'Ảnh đính kèm' : '-'}</td><td className="px-4 py-3 text-slate-700">{item.required_action || '-'}</td><td className="px-4 py-3 text-slate-600">{item.due_date ? dateText(item.due_date) : '-'}</td></tr>)}</tbody>
+                <tbody className="divide-y divide-line">{checklist.map((item, index) => <tr key={item.id ?? index} className="hover:bg-slate-50"><td className="px-4 py-3"><button type="button" className="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" onClick={() => onViewChecklistItem(item, index)}><Eye className="h-3.5 w-3.5" /> Xem</button></td><td className="px-4 py-3 text-slate-500">{index + 1}</td><td className="px-4 py-3"><p className="font-semibold text-ink">{item.title}</p>{item.description ? <p className="mt-1 text-xs text-slate-500">{item.description}</p> : null}</td><td className="px-4 py-3"><EnumChip group="result" value={item.decision} /></td><td className="px-4 py-3">{checklistEvidenceCount(item) ? <div><p className="font-medium text-ink">{checklistEvidenceCount(item)} minh chứng</p>{item.evidence_status ? <StatusBadge status={item.evidence_status} /> : null}</div> : item.photo_url ? 'Ảnh đính kèm' : '-'}</td><td className="px-4 py-3 text-slate-700">{item.required_action || '-'}</td><td className="px-4 py-3 text-slate-600">{item.due_date ? dateText(item.due_date) : '-'}</td></tr>)}</tbody>
               </table>
             </div>
             <div className="divide-y divide-line md:hidden">
               {checklist.map((item, index) => (
                 <article key={item.id ?? index} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0"><p className="text-xs font-semibold text-slate-500">Tiêu chí #{index + 1}</p><h4 className="mt-1 font-semibold text-ink">{item.title}</h4><p className="mt-1 text-xs leading-5 text-slate-500">{item.description || 'Không có mô tả bổ sung'}</p></div>
+                    <div className="min-w-0"><p className="text-xs font-semibold text-slate-500">Tiêu chí #{index + 1}</p><h4 className="mt-1 font-semibold text-ink">{item.title}</h4>{item.description ? <p className="mt-1 text-xs leading-5 text-slate-500">{item.description}</p> : null}</div>
                     <EnumChip group="result" value={item.decision} />
                   </div>
                   <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
@@ -490,7 +489,7 @@ function ChecklistItemDialog({ selected, record, onClose }: { selected: Selected
       {item ? (
         <div className="space-y-4">
           <div className="flex flex-col gap-3 rounded-md border border-line bg-slate-50 p-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0"><h3 className="text-lg font-semibold text-ink">{item.title}</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{item.description || 'Không có mô tả bổ sung.'}</p></div>
+            <div className="min-w-0"><h3 className="text-lg font-semibold text-ink">{item.title}</h3>{item.description ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{item.description}</p> : null}</div>
             <div className="flex shrink-0 flex-wrap gap-2"><EnumChip group="result" value={item.decision} /><EnumChip group="severity" value={item.severity ?? 'medium'} /></div>
           </div>
 

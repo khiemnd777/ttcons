@@ -1,0 +1,95 @@
+1
+00:00:00,000 --> 00:00:08,167
+Mục đích là kiểm tra giao diện đã rút gọn trên máy tính và điện thoại giả lập, rồi đối chiếu các vùng được giữ nguyên.
+
+2
+00:00:08,167 --> 00:00:19,333
+Trong một trăm hai mươi tám ca, một trăm hai mươi hai ca đạt tiêu chí; bốn ca mobile tràn ngang và hai ca thông báo bị chặn bởi lỗi API local.
+
+3
+00:00:19,333 --> 00:00:25,333
+Mục tiêu dọn text toàn phạm vi còn điểm mở, nên chưa kết luận nghiệm thu toàn bộ.
+
+4
+00:00:25,333 --> 00:00:32,500
+Trên desktop, tiêu đề trang gọn hơn; dữ liệu, trạng thái và nhãn hành động nghiệp vụ vẫn còn.
+
+5
+00:00:32,500 --> 00:00:41,917
+Các dialog đã được mở và đóng bằng dữ liệu thử có sẵn. Import nhân sự được kiểm tra bằng tài khoản Developer đã có quyền.
+
+6
+00:00:41,917 --> 00:00:46,750
+Các ca này không lưu, duyệt, xóa hoặc thực hiện giao dịch nghiệp vụ.
+
+7
+00:00:46,750 --> 00:00:54,167
+Bốn ca kiểm tra trên mobile bị tràn ngang, tại ba bề mặt: Audit, Nhật ký sự kiện và Thảo luận.
+
+8
+00:00:54,167 --> 00:01:04,833
+Độ rộng nội dung lần lượt là tám trăm hai mươi, tám trăm mười bốn và năm trăm bốn mươi pixel, vượt viewport cấu hình ba trăm chín mươi pixel.
+
+9
+00:01:04,833 --> 00:01:13,750
+Cần đo theo viewport cấu hình vì Chrome có thể tự giãn khung bố cục. Đây là giả lập, chưa kiểm tra trên điện thoại vật lý.
+
+10
+00:01:13,750 --> 00:01:21,750
+Trợ giúp đã được kiểm tra tại ảnh đại diện, thống kê, hồ sơ kế toán và sửa lỗi trên cả hai viewport.
+
+11
+00:01:21,750 --> 00:01:29,750
+Nút mở được bằng bàn phím hoặc chạm. Escape đóng trợ giúp, trả focus về nút và giữ dialog cha mở.
+
+12
+00:01:29,750 --> 00:01:37,667
+Click ngoài và chuyển focus ra ngoài cũng đóng nội dung trợ giúp. Giới hạn nhập và cảnh báo cần thiết vẫn hiển thị.
+
+13
+00:01:37,667 --> 00:01:43,833
+Mười bốn đối chiếu browser cho cùng nội dung nhìn thấy với baseline trước refactor.
+
+14
+00:01:43,833 --> 00:01:52,000
+Các mẫu gồm Pipeline Builder, thư viện Form, quy trình công trình, tab quy trình và các thẻ hoặc Form nhúng.
+
+15
+00:01:52,000 --> 00:02:03,750
+So sánh source xác nhận một trăm mười hai tệp và mười hai hàm được bảo vệ không đổi. Ảnh có thể khác trạng thái hover hoặc focus; không tuyên bố mọi pixel giống nhau.
+
+16
+00:02:03,750 --> 00:02:12,500
+Còn tagline ở thanh trên cùng, mô tả lặp trong hai thẻ Profile và câu hướng dẫn ở đầu hai dialog báo cáo.
+
+17
+00:02:12,500 --> 00:02:21,667
+Đề xuất bỏ hoặc rút gọn phần lặp, chuyển giải thích bổ sung sang trợ giúp. Thanh dùng chung cần áp riêng ngoài vùng Pipeline và Form.
+
+18
+00:02:21,667 --> 00:02:26,500
+Các điểm này mới được ghi nhận trong UAT; chưa sửa thêm source ứng dụng.
+
+19
+00:02:26,500 --> 00:02:32,417
+Danh mục thông báo local trả mã HTTP năm trăm trên cả desktop và mobile.
+
+20
+00:02:32,417 --> 00:02:40,917
+Dialog hiển thị chưa có nhóm thông báo, nên ca tải danh mục chưa đạt. Backend vẫn là image local có sẵn.
+
+21
+00:02:40,917 --> 00:02:47,833
+Nguyên nhân gốc chưa xác định. Cần chẩn đoán riêng; chưa quy kết lỗi này cho refactor giao diện.
+
+22
+00:02:47,833 --> 00:02:58,083
+Đã có bằng chứng browser local và đối chiếu vùng loại trừ. Còn tràn ngang mobile, copy cần dọn và lỗi danh mục thông báo cần xử lý.
+
+23
+00:02:58,083 --> 00:03:05,583
+Đề xuất duyệt phạm vi sửa các điểm mở, sau đó kiểm tra lại và mời người dùng đại diện nghiệm thu.
+
+24
+00:03:05,583 --> 00:03:15,500
+Chưa có điện thoại vật lý, chưa đo thời gian thao tác và chưa kiểm tra mọi biến thể Form. Không commit, push hoặc deploy trong lượt này.

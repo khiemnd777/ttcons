@@ -37,7 +37,7 @@ export function LoginPage() {
   if (user) return <Navigate to="/" replace />;
 
   return (
-    <AuthCard title="Đăng nhập" description="Dùng tài khoản của anh/chị để vào Thủ Thiêm Workflow.">
+    <AuthCard title="Đăng nhập">
         <form
           ref={formRef}
           className="space-y-4"

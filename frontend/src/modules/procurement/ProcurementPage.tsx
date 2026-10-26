@@ -88,7 +88,6 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
     {sourceLink.feedback}
     <PageHeader
       title="Mua sắm vật tư"
-      description="Theo dõi từ yêu cầu mua, đặt hàng, nghiệm thu đầu vào đến phiếu nhập kho."
       actions={<>
         {scoped ? <ProjectBackLink projectId={projectId} /> : null}
         {!scoped ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/procurement-requests/projects" queryKey="procurement-project-options" emptyLabel="Tất cả công trình được phép xem" /></div> : null}
@@ -114,7 +113,7 @@ export function ProcurementPage({ scoped = false }: { scoped?: boolean }) {
       <DataTable rows={filteredRows} loading={requests.isLoading} error={requests.error} onRetry={() => requests.refetch()} pageSize={10} defaultSort={{ key: 'created_at', direction: 'desc' }} columns={[
         { key: 'request', header: 'Yêu cầu / Nhà cung cấp', sortable: true, filterValue: (row) => [row.request_code, row.title, row.supplier_name], render: (row) => <button className="text-left" onClick={() => setViewId(row.id)}><span className="font-semibold text-blue-700 hover:underline">{row.request_code}</span><div className="font-semibold text-ink">{row.title}</div><div className="text-xs text-slate-500">{row.supplier_name || 'Chưa gán'} · {row.item_count ?? 0} dòng</div></button> },
         { key: 'progress', header: 'Tiến trình', render: (row) => <ProcurementProgress row={row} /> },
-        { key: 'total_estimated_amount', header: 'Giá trị từ dòng mua', align: 'right', sortable: true, sortValue: (row) => numeric(row.total_estimated_amount), render: (row) => <div><CurrencyText value={row.total_estimated_amount} /><div className="text-xs text-slate-400">Tự tổng hợp</div></div> },
+        { key: 'total_estimated_amount', header: 'Giá trị từ dòng mua', align: 'right', sortable: true, sortValue: (row) => numeric(row.total_estimated_amount), render: (row) => <CurrencyText value={row.total_estimated_amount} /> },
         { key: 'delivery', header: 'Giao dự kiến', sortable: true, sortValue: (row) => row.expected_delivery_date, render: (row) => <div className={isOverdue(row) ? 'font-semibold text-rose-700' : ''}>{formatDate(row.expected_delivery_date)}{isOverdue(row) ? <div className="mt-1 flex items-center gap-1 text-xs"><AlertTriangle className="h-3.5 w-3.5" />Trễ giao</div> : null}</div> },
         { key: 'next', header: 'Việc tiếp theo', action: true, align: 'right', render: (row) => <NextAction row={row} projectId={row.project_id ?? projectId} locationPath={`${location.pathname}${location.search}`} hasPermission={hasPermission} onView={() => setViewId(row.id)} onEdit={() => setViewId(row.id)} onAction={(name) => name === 'receive' ? action.mutate({ requestId: row.id, name }) : setViewId(row.id)} /> },
       ]} empty="Không có yêu cầu trong hàng đợi này" />

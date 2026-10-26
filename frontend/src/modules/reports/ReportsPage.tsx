@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { ChevronRight, ShieldAlert } from 'lucide-react';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
+import { ContextHelp } from '../../components/ContextHelp';
 import type { DataTableSort } from '../../components/DataTable';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get } from '../../lib/api/client';
@@ -123,7 +124,6 @@ export function StatisticsPage() {
     <>
       <PageHeader
         title="Thống kê"
-        description="Theo dõi số liệu tổng hợp từ dữ liệu vận hành; PDF, Excel và CSV dùng cùng phạm vi lọc và quyền truy cập."
         horizontalFrom="xl"
         actions={(
           <section className="w-full min-w-0 border-t border-line pt-4 xl:w-[36rem] xl:border-0 xl:pt-0" aria-label="Bộ lọc công trình thống kê">
@@ -159,7 +159,6 @@ export function StatisticsPage() {
       <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside className="hidden lg:block">
           <div className="sticky top-20 rounded-lg border border-line bg-white p-3 shadow-panel">
-            <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Danh mục thống kê</p>
             {(['operations', 'resources'] as ReportGroup[]).map((group) => {
               const reports = visibleReports.filter((report) => report.group === group);
               if (!reports.length) return null;
@@ -192,8 +191,10 @@ export function StatisticsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{reportGroupLabels[activeReport.group]}</p>
-                <h1 className="mt-1 text-xl font-semibold text-ink">{activeReport.label}</h1>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{activeReport.basis}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-semibold text-ink">{activeReport.label}</h1>
+                  <ContextHelp key={activeReport.key} label={`Cách tính và phạm vi: ${activeReport.label}`}>{activeReport.basis}</ContextHelp>
+                </div>
               </div>
               {canExport ? (
                 <ReportExportButton

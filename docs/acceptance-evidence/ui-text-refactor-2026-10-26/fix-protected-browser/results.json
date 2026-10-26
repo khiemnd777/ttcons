@@ -1,0 +1,758 @@
+{
+  "created_at": "2026-10-26T07:55:51.928Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "REVIEW_REQUIRED",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "fix-protected-browser",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-avatar-help",
+      "evidence_dir": "fix-protected-browser",
+      "helpText": "Ảnh được chuẩn hóa và lưu trong kho bảo vệ.",
+      "openScreenshot": "desktop-help-Vcchlunhidin.png",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 496,
+          "right": 944,
+          "top": 298,
+          "bottom": 702,
+          "width": 448
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Cập nhật ảnh đại diện"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-profile-avatar-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "statistics-help",
+      "evidence_dir": "fix-protected-browser",
+      "helpText": "Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.",
+      "openScreenshot": "desktop-help-CchtnhvphmviCngtrnhtin.png",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-statistics-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "accounting-help",
+      "evidence_dir": "fix-protected-browser",
+      "helpText": "Consflow ghi nhận bàn giao và tiếp nhận hồ sơ. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA.",
+      "openScreenshot": "desktop-help-Phmvihsbngiaokton.png",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ bàn giao kế toán"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-accounting-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "rework-help",
+      "evidence_dir": "fix-protected-browser",
+      "helpText": "Sửa lỗi trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ.",
+      "openScreenshot": "desktop-help-Phnbitsalivlpkhochli.png",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-rework-help.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "report-review-rail",
+      "evidence_dir": "fix-protected-browser",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1441,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 26,
+          "bottom": 994,
+          "width": 1320
+        },
+        "heading": [
+          "Báo cáo",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Duyệt báo cáo thi công · 23-10-2026",
+          "Đã xem · Lần 2",
+          "Công việc trong ngày",
+          "Minh chứng hiện trường · 1",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Bản gửi"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-report-review-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "report-detail-rail",
+      "evidence_dir": "fix-protected-browser",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 16,
+          "bottom": 984,
+          "width": 1320
+        },
+        "heading": [
+          "Thi công",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 1",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "Chi tiết báo cáo thi công",
+          "Công việc trong ngày",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Minh chứng · 1",
+          "Nguồn báo cáo",
+          "Chuỗi liên quan",
+          "Kiểm tra & xử lý"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-report-detail-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-mywork-startup",
+      "evidence_dir": "fix-protected-browser",
+      "currentRegion": "desktop-protected-mywork-startup-current-region.png",
+      "baselineRegion": "desktop-protected-mywork-startup-baseline-region.png",
+      "baselineGeometry": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440
+      },
+      "sameVisibleText": true,
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-mywork-startup.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-discussion-workflow",
+      "evidence_dir": "fix-protected-browser",
+      "currentRegion": "desktop-protected-discussion-workflow-current-region.png",
+      "baselineRegion": "desktop-protected-discussion-workflow-baseline-region.png",
+      "baselineGeometry": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440
+      },
+      "sameVisibleText": true,
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-discussion-workflow.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-pipeline-builder",
+      "evidence_dir": "fix-protected-browser",
+      "currentScreenshot": "desktop-protected-pipeline-builder-current.png",
+      "baselineScreenshot": "desktop-protected-pipeline-builder-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Thư viện node",
+        "Workflow",
+        "Tiếp nhận dự án",
+        "Khảo sát",
+        "Họp báo cáo khảo sát",
+        "Thiết kế",
+        "BOQ (Không thiết kế)",
+        "BOQ (Có thiết kế)",
+        "Chốt Hợp đồng với chủ đầu tư",
+        "Bóc tách và lấy giá đầu vào",
+        "Đàm phán giá",
+        "Hợp đồng và tạm ứng đầu vào",
+        "Kế hoạch thi công",
+        "Thi công",
+        "Nghiệm thu Đầu Vào",
+        "Nghiệm thu Đầu Ra",
+        "Kết thúc: Bàn giao + Tài chính công trình"
+      ],
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thư viện node",
+          "Workflow",
+          "Tiếp nhận dự án",
+          "Khảo sát",
+          "Họp báo cáo khảo sát",
+          "Thiết kế",
+          "BOQ (Không thiết kế)",
+          "BOQ (Có thiết kế)",
+          "Chốt Hợp đồng với chủ đầu tư",
+          "Bóc tách và lấy giá đầu vào",
+          "Đàm phán giá",
+          "Hợp đồng và tạm ứng đầu vào",
+          "Kế hoạch thi công",
+          "Thi công",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu Đầu Ra",
+          "Kết thúc: Bàn giao + Tài chính công trình"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-pipeline-builder.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-workflow-forms",
+      "evidence_dir": "fix-protected-browser",
+      "currentScreenshot": "desktop-protected-workflow-forms-current.png",
+      "baselineScreenshot": "desktop-protected-workflow-forms-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Workflow Forms",
+        "Thư viện biểu mẫu",
+        "Checklist",
+        "Cấu trúc biểu mẫu"
+      ],
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Workflow Forms",
+          "Thư viện biểu mẫu",
+          "Checklist",
+          "Cấu trúc biểu mẫu"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-workflow-forms.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-project-pipeline",
+      "evidence_dir": "fix-protected-browser",
+      "currentScreenshot": "desktop-protected-project-pipeline-current.png",
+      "baselineScreenshot": "desktop-protected-project-pipeline-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Quy trình",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-project-pipeline.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-project-workflow-tab",
+      "evidence_dir": "fix-protected-browser",
+      "currentScreenshot": "desktop-protected-project-workflow-tab-current.png",
+      "baselineScreenshot": "desktop-protected-project-workflow-tab-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-project-workflow-tab.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-embedded-form",
+      "evidence_dir": "fix-protected-browser",
+      "currentScreenshot": "desktop-protected-embedded-form-current.png",
+      "baselineScreenshot": "desktop-protected-embedded-form-baseline.png",
+      "sameVisibleText": false,
+      "baselineHeading": [
+        "Đăng nhập"
+      ],
+      "status": "CHECK_REQUIRED",
+      "error": "protected visible text differs from baseline; inspect screenshots",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Xác nhận điểm bắt đầu",
+          "Không có điều kiện đang chặn",
+          "Xác nhận điểm bắt đầu",
+          "1 hồ sơ minh chứng",
+          "Hồ sơ đã chốt · Có thể chỉnh sửa"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-embedded-form-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "fix-protected-browser",
+      "status": "NOT_RUN",
+      "error": "NOT_RUN: authentication rate limit still active after respecting Retry-After",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-login-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-avatar-help",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-profile-avatar-help-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "statistics-help",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-statistics-help-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "accounting-help",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-accounting-help-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "rework-help",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-rework-help-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "report-review-rail",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-report-review-rail-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "report-detail-rail",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-report-detail-rail-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-mywork-startup",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-mywork-startup-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-discussion-workflow",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-discussion-workflow-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-pipeline-builder",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-pipeline-builder-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-workflow-forms",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-workflow-forms-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-project-pipeline",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-project-pipeline-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-project-workflow-tab",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-project-workflow-tab-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-embedded-form",
+      "evidence_dir": "fix-protected-browser",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-embedded-form-check.png"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "desktop",
+      "name": "mywork-startup",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "desktop-protected-mywork-startup-current-region.png",
+      "baseline": "desktop-protected-mywork-startup-baseline-region.png"
+    },
+    {
+      "view": "desktop",
+      "name": "discussion-workflow",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "desktop-protected-discussion-workflow-current-region.png",
+      "baseline": "desktop-protected-discussion-workflow-baseline-region.png"
+    },
+    {
+      "view": "desktop",
+      "name": "pipeline-builder",
+      "sameVisibleText": true,
+      "current": "desktop-protected-pipeline-builder-current.png",
+      "baseline": "desktop-protected-pipeline-builder-baseline.png"
+    },
+    {
+      "view": "desktop",
+      "name": "workflow-forms",
+      "sameVisibleText": true,
+      "current": "desktop-protected-workflow-forms-current.png",
+      "baseline": "desktop-protected-workflow-forms-baseline.png"
+    },
+    {
+      "view": "desktop",
+      "name": "project-pipeline",
+      "sameVisibleText": true,
+      "current": "desktop-protected-project-pipeline-current.png",
+      "baseline": "desktop-protected-project-pipeline-baseline.png"
+    },
+    {
+      "view": "desktop",
+      "name": "project-workflow-tab",
+      "sameVisibleText": true,
+      "current": "desktop-protected-project-workflow-tab-current.png",
+      "baseline": "desktop-protected-project-workflow-tab-baseline.png"
+    },
+    {
+      "view": "desktop",
+      "name": "embedded-form",
+      "sameVisibleText": false,
+      "current": "desktop-protected-embedded-form-current.png",
+      "baseline": "desktop-protected-embedded-form-baseline.png"
+    }
+  ]
+}

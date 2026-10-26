@@ -16,7 +16,8 @@ test('Design receives a read-only material catalog without stock queries', async
   assert.match(page, /const canViewWarehouse = hasPermission\('warehouse\.view'\)/);
   assert.match(page, /enabled: canViewWarehouse/);
   assert.match(page, /if \(!canViewWarehouse\) \{[\s\S]*title="Vật tư"[\s\S]*<MaterialsTab/);
-  assert.match(page, /Số liệu tồn kho và nghiệp vụ kho không nằm trong phạm vi truy cập/);
+  // Approved concise copy; permission and query guards above remain required.
+  assert.match(page, /description="Chỉ xem danh mục vật tư\."/);
 });
 
 test('Preparation exposes immutable design package revisions and explicit PM handoff', async () => {

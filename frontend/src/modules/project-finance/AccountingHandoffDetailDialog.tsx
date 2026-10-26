@@ -85,7 +85,7 @@ export function AccountingHandoffDetailContent({ data, loading, error, tab, onTa
     <div><p className="font-semibold">{title?.source_code} · {title?.source_title}</p><p className="text-sm text-slate-600">{data.project.code} · {data.project.name}</p>{canViewHandoff && <StatusBadge status={data.status} />}</div>
     <p className="rounded bg-blue-50 p-3 text-xs text-blue-900">Giá trị tham chiếu từ hồ sơ nguồn. MISA là nguồn công nợ và thu/chi chính thức; mã tham chiếu không xác nhận đã đồng bộ hoặc thanh toán.</p>
     {canViewHandoff && <WorkspaceTabs tabs={[{ id: 'current', label: 'Đối chiếu nguồn', icon: ClipboardList }, { id: 'snapshot', label: 'Thông tin đã bàn giao', icon: History }]} activeTab={tab} onChange={onTab} ariaLabel="Chi tiết hồ sơ kế toán" />}
-    {canViewHandoff && tab === 'snapshot' ? <RecordSection title="Thông tin đã bàn giao" description="Bản chụp của lần bàn giao gần nhất được lưu trong hồ sơ; không bổ sung chứng từ hiện tại vào bản chụp.">
+    {canViewHandoff && tab === 'snapshot' ? <RecordSection title="Thông tin đã bàn giao" description="Bản chụp lần bàn giao gần nhất; không gồm chứng từ thêm sau đó.">
       {snapshot ? <SourceFields source={snapshot} snapshot /> : <RecordEmpty>Hồ sơ chưa được bàn giao.</RecordEmpty>}
     </RecordSection> : <>
       <RecordSection title="Nguồn hiện tại">
@@ -100,7 +100,7 @@ export function AccountingHandoffDetailContent({ data, loading, error, tab, onTa
         ]} />
         {data.current && data.source_type === 'procurement_request' && !data.related.some((row) => row.kind === 'stock_document') ? <p className="mt-2 text-xs text-slate-500">Chưa có phiếu kho liên kết được phép xem; điều này không xác nhận vật tư chưa nhập kho.</p> : null}
       </RecordSection>
-      <RecordSection title="Chứng từ có liên kết" description="Các tệp dưới đây thuộc nguồn hiện tại, không phải danh mục tệp đã chụp khi bàn giao.">
+      <RecordSection title="Chứng từ có liên kết" description="Tệp thuộc nguồn hiện tại, không phải bản chụp khi bàn giao.">
         {data.files.length ? <ul className="divide-y divide-line">{data.files.map((file) => <li key={`${file.kind}:${file.id}`} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="min-w-0 break-words">{file.name}</span>{file.kind === 'document' ? <DocumentReferenceViewButton file={file} sourceLabel="Hồ sơ hợp đồng" label={fileActionLabel(file)} /> : <button className="shrink-0 rounded border border-line px-3 py-1 text-blue-700" onClick={() => setEvidence(file)}>{fileActionLabel(file)}</button>}</li>)}</ul> : <RecordEmpty>Chưa có tệp liên kết được phép xem.</RecordEmpty>}
       </RecordSection>
     </>}

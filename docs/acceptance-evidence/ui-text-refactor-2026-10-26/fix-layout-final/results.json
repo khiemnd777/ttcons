@@ -1,0 +1,183 @@
+{
+  "results": [
+    {
+      "name": "desktop-audit",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-audit.png"
+    },
+    {
+      "name": "desktop-events",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-events.png"
+    },
+    {
+      "name": "desktop-discussion",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-discussion.png"
+    },
+    {
+      "name": "mobile-360-events",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 360,
+        "clientWidth": 360,
+        "layoutViewport": 360
+      },
+      "status": "PASS",
+      "screenshot": "mobile-360-events.png"
+    },
+    {
+      "name": "mobile-360-notification-real",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "dialog": {
+        "x": 16,
+        "y": 50,
+        "width": 328,
+        "height": 744
+      },
+      "openScreenshot": "mobile-360-notification-real-open.png",
+      "measurement": {
+        "documentWidth": 360,
+        "clientWidth": 360,
+        "layoutViewport": 360
+      },
+      "status": "PASS",
+      "screenshot": "mobile-360-notification-real.png"
+    },
+    {
+      "name": "mobile-390-events",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-events.png"
+    },
+    {
+      "name": "mobile-390-notification-real",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "dialog": {
+        "x": 16,
+        "y": 50,
+        "width": 358,
+        "height": 744
+      },
+      "openScreenshot": "mobile-390-notification-real-open.png",
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-notification-real.png"
+    },
+    {
+      "name": "mobile-390-profile-copy",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-profile-copy.png"
+    },
+    {
+      "name": "mobile-430-events",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-events.png"
+    },
+    {
+      "name": "mobile-430-notification-real",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "real local API",
+      "dialog": {
+        "x": 16,
+        "y": 50,
+        "width": 398,
+        "height": 744
+      },
+      "openScreenshot": "mobile-430-notification-real-open.png",
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-notification-real.png"
+    }
+  ],
+  "errors": [],
+  "scope": "Real local catalog/layout; controlled HTTP fixtures explicitly labelled for optional preference writes and failures"
+}

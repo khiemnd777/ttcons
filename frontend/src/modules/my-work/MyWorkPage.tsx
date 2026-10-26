@@ -603,7 +603,7 @@ export function MyWorkPage() {
     <>
       <PageHeader
         title="Bàn làm việc"
-        description={`${user?.full_name ?? 'Người dùng'}${roleSummary ? ` · ${roleSummary}` : ''} · Mở thẳng đúng sổ nghiệp vụ cần xử lý`}
+        description={`${user?.full_name ?? 'Người dùng'}${roleSummary ? ` · ${roleSummary}` : ''}`}
         compactMobile
         actions={(
           <div className="flex items-center gap-2">
@@ -1082,7 +1082,7 @@ function ScopeRail({ value, counts, loading, onChange, unavailable = false }: {
   const selectedLabel = scopes.find((item) => item.key === value)?.label ?? 'Tôi phụ trách';
   return (
     <aside className="min-w-0 rounded-lg border border-line bg-white p-2 md:p-3 xl:sticky xl:top-4 xl:self-start" aria-label="Phạm vi công việc" aria-busy={loading}>
-      {unavailable ? <p className="mb-2 text-xs text-amber-700">Số lượng chưa khả dụng. Bấm Làm mới để thử lại.</p> : null}
+      {unavailable ? <p className="mb-2 text-xs text-amber-700">Chưa tải được số lượng. Dùng nút Làm mới để thử lại.</p> : null}
       <div className="flex min-h-11 items-center justify-between gap-2 md:hidden">
         <span className="text-xs font-semibold text-slate-500">Phạm vi</span>
         <span className="min-w-0 truncate text-sm font-semibold text-ink">{selectedLabel}{!loading && !unavailable && countValue(value) > 0 ? ` · ${countValue(value)}` : ''}</span>
@@ -1468,7 +1468,7 @@ function ActivityAttentionPanel({ rows, loading, error, selectedQueue, streamSta
   const visibleRows = rows.filter((item) => inAttentionQueue(item, selectedQueue));
   return (
     <section className="mt-4 rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="flex flex-col gap-3 border-b border-line pb-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-semibold text-ink">Trao đổi cần phản hồi</h2><p className="mt-1 text-sm text-slate-500">Nhắc đến, câu hỏi, điểm chặn và nhắc hạn</p></div><LiveStatusBadge status={streamStatus} /></div>
+      <div className="flex flex-col gap-3 border-b border-line pb-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-semibold text-ink">Trao đổi cần phản hồi</h2></div><LiveStatusBadge status={streamStatus} /></div>
       <div className="my-3 flex gap-2 overflow-x-auto">{attentionQueues.map((item) => { const Icon = item.icon; return <button key={item.key} className={clsx('inline-flex min-w-fit items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold', selectedQueue === item.key ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-line text-slate-700 hover:bg-slate-50')} onClick={() => onSelectQueue(item.key)}><Icon className="h-4 w-4" />{item.label}<span className="rounded-md bg-white px-2 py-0.5 text-xs text-slate-600">{counts[item.key]}</span></button>; })}</div>
       {loading ? <AttentionListSkeleton /> : null}
       {error ? <SourceError title="Không tải được trao đổi cần phản hồi" onRetry={onRetry} /> : null}

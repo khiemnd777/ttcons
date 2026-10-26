@@ -1,0 +1,57 @@
+{
+  "results": [
+    {
+      "name": "mobile-360-events",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 360,
+        "clientWidth": 360,
+        "layoutViewport": 360
+      },
+      "status": "PASS",
+      "screenshot": "mobile-360-events.png"
+    },
+    {
+      "name": "mobile-390-events",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-events.png"
+    },
+    {
+      "name": "mobile-430-events",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-events.png"
+    }
+  ],
+  "errors": [],
+  "scope": "Real local catalog/layout; controlled HTTP fixtures explicitly labelled for optional preference writes and failures"
+}

@@ -79,7 +79,7 @@ function TemplateDialog({ projectId, onClose, onSaved }: Props) {
     }
   }
 
-  return <Dialog open title="Tạo mẫu kiểm tra" description="Mỗi dòng là một điều đội hiện trường cần nhìn và xác nhận." size="lg" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel="Tạo mẫu" onClose={onClose} onSave={save} />}>
+  return <Dialog open title="Tạo mẫu kiểm tra" size="lg" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel="Tạo mẫu" onClose={onClose} onSave={save} />}>
     <fieldset disabled={saving} className="min-w-0"><div ref={formRef} className="grid gap-4 sm:grid-cols-2">
       <FieldBlock label="Tên mẫu" required error={errors.name}><input className={controlClass(errors.name)} value={values.name} onChange={(event) => change(setValues, setErrors, 'name', event.target.value)} autoFocus /></FieldBlock>
       <FieldBlock label="Mô tả ngắn"><input className={controlClass()} value={values.description} onChange={(event) => change(setValues, setErrors, 'description', event.target.value)} /></FieldBlock>
@@ -180,7 +180,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
     }
   }
 
-  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : 'Đặt nội dung, công việc và thời điểm để đội hiện trường có thể thực hiện ngay.'} size="xl" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
+  return <Dialog open title={check ? 'Chỉnh sửa kiểm tra' : 'Tạo kiểm tra'} description={check ? 'Chỉ kiểm tra đang chờ và được tạo tại màn hình này mới có thể chỉnh sửa.' : sourceReport ? 'Kiểm tra này sẽ được truy vết trực tiếp về báo cáo hiện trường nguồn.' : undefined} size="xl" onClose={() => { if (!saving) onClose(); }} footer={<FormFooter saving={saving} submitLabel={check ? 'Lưu thay đổi' : 'Tạo kiểm tra'} onClose={onClose} onSave={save} />}>
     <fieldset disabled={saving} className="min-w-0"><div ref={formRef} className="space-y-5">
       {sourceReport ? <SourceReportBanner report={sourceReport} /> : null}
       <div><SectionTitle>Thông tin kiểm tra</SectionTitle><div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -190,7 +190,7 @@ function CheckFormDialog({ state, projectId, workspace, onClose, onSaved }: Prop
         <FieldBlock label="Thời điểm dự kiến"><input type="datetime-local" className={controlClass()} value={values.scheduled_at} onChange={(event) => change(setValues, setErrors, 'scheduled_at', event.target.value)} /></FieldBlock>
       </div></div>
       <div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><SectionTitle>Tiêu chí áp dụng</SectionTitle><p className="mt-1 text-xs text-slate-500">Nhập trực tiếp từng tiêu chí. Có thể nạp mẫu để bắt đầu nhanh rồi sửa ngay tại đây.</p></div><label className="w-full sm:w-64"><span className="sr-only">Nạp tiêu chí từ mẫu</span><select className={controlClass()} value={values.template_id} onChange={(event) => loadTemplate(event.target.value)}><option value="">Nạp từ mẫu (không bắt buộc)</option>{workspace.templates.filter((item) => item.status === 'active' || item.id === values.template_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><SectionTitle>Tiêu chí áp dụng</SectionTitle></div><label className="w-full sm:w-64"><span className="sr-only">Nạp tiêu chí từ mẫu</span><select className={controlClass()} value={values.template_id} onChange={(event) => loadTemplate(event.target.value)}><option value="">Nạp từ mẫu (không bắt buộc)</option>{workspace.templates.filter((item) => item.status === 'active' || item.id === values.template_id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div>
         <div className="mt-3 space-y-2">{criteria.map((item, index) => <div key={item.id} className="flex items-center gap-2"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">{index + 1}</span><input className={controlClass()} value={item.text} onChange={(event) => setCriteria((current) => current.map((row) => row.id === item.id ? { ...row, text: event.target.value } : row))} placeholder="Ví dụ: Cao độ và độ phẳng, sai số không quá 3mm" /><button type="button" className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setCriteria((current) => current.filter((row) => row.id !== item.id))} aria-label={`Xóa tiêu chí ${index + 1}`}><Trash2 className="h-4 w-4" /></button></div>)}</div>
         <button type="button" className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50" onClick={addCriterion}><Plus className="h-4 w-4" /> Thêm tiêu chí</button>
       </div>

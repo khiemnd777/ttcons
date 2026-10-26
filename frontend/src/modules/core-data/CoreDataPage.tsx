@@ -97,7 +97,6 @@ export function CoreDataPage({ group }: { group: PartnerCatalogGroup }) {
     <>
       <PageHeader
         title="Đối tác"
-        description="Quản lý khách hàng, nhà cung cấp, thầu phụ và đơn vị dịch vụ theo nhóm nghiệp vụ."
         actions={
           <button className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setDialog({ mode: 'create' })}>
             <Plus className="h-4 w-4" />
@@ -262,7 +261,7 @@ function partnerFields(record: Partner | undefined, defaultType: 'client' | 'sup
     { name: 'email', label: 'Email', defaultValue: record?.email ?? '' },
     { name: 'address', label: 'Địa chỉ', type: 'textarea', defaultValue: record?.address ?? '', fullWidth: true },
     { name: 'notes', label: 'Ghi chú', type: 'textarea', defaultValue: record?.notes ?? '', fullWidth: true },
-    { name: 'active', label: 'Active', type: 'checkbox', defaultValue: record?.active ?? true, helperText: 'Inactive partner sẽ không xuất hiện trong dropdown nghiệp vụ.' },
+    { name: 'active', label: 'Active', type: 'checkbox', defaultValue: record?.active ?? true, helperText: 'Đối tác ngừng hoạt động không xuất hiện khi chọn mới.' },
   ];
 }
 

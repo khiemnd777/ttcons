@@ -1,0 +1,63 @@
+{
+  "created_at": "2026-10-26T03:27:01.769Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "PASS",
+  "results": [
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-embedded-final",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-mywork-startup",
+      "evidence_dir": "browser-embedded-final",
+      "currentRegion": "mobile-protected-mywork-startup-current-region.png",
+      "baselineRegion": "mobile-protected-mywork-startup-baseline-region.png",
+      "sameVisibleText": true,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-protected-mywork-startup.png",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "mobile",
+      "name": "mywork-startup",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "mobile-protected-mywork-startup-current-region.png",
+      "baseline": "mobile-protected-mywork-startup-baseline-region.png"
+    }
+  ]
+}

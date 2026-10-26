@@ -426,7 +426,7 @@ func bumpNotificationActorRevisionTx(ctx context.Context, tx *sql.Tx, actorID st
 func (r *Repository) NotificationCatalog(ctx context.Context) ([]NotificationCatalogItem, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT event_key,domain_key,category_key,category_label,intent,severity,
-			icon_key,tone_key,enabled,required_delivery,permissions_any
+			icon_key,tone_key,enabled,required_delivery,array_to_json(permissions_any)::text
 		FROM notification_event_types
 		ORDER BY category_label,event_key
 	`)
@@ -437,8 +437,12 @@ func (r *Repository) NotificationCatalog(ctx context.Context) ([]NotificationCat
 	items := make([]NotificationCatalogItem, 0)
 	for rows.Next() {
 		item := NotificationCatalogItem{}
-		if err := rows.Scan(&item.EventKey, &item.DomainKey, &item.CategoryKey, &item.CategoryLabel, &item.Intent, &item.Severity, &item.IconKey, &item.ToneKey, &item.Enabled, &item.RequiredDelivery, &item.Permissions); err != nil {
+		var permissionsRaw []byte
+		if err := rows.Scan(&item.EventKey, &item.DomainKey, &item.CategoryKey, &item.CategoryLabel, &item.Intent, &item.Severity, &item.IconKey, &item.ToneKey, &item.Enabled, &item.RequiredDelivery, &permissionsRaw); err != nil {
 			return nil, err
+		}
+		if err := json.Unmarshal(permissionsRaw, &item.Permissions); err != nil {
+			return nil, fmt.Errorf("decode notification catalog permissions: %w", err)
 		}
 		items = append(items, item)
 	}

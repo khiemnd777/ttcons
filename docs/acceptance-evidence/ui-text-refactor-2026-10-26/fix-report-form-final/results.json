@@ -1,0 +1,288 @@
+{
+  "created_at": "2026-10-26T08:05:14.442Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "PASS",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "fix-report-form-final",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "report-review-rail",
+      "evidence_dir": "fix-report-form-final",
+      "businessWarningPresent": true,
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1441,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 26,
+          "bottom": 994,
+          "width": 1320
+        },
+        "heading": [
+          "Báo cáo",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Duyệt báo cáo thi công · 23-10-2026",
+          "Đã xem · Lần 2",
+          "Công việc trong ngày",
+          "Minh chứng hiện trường · 1",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Bản gửi"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-report-review-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "report-detail-rail",
+      "evidence_dir": "fix-report-form-final",
+      "redundantCopyAbsent": true,
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 16,
+          "bottom": 984,
+          "width": 1320
+        },
+        "heading": [
+          "Thi công",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 1",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "Chi tiết báo cáo thi công",
+          "Công việc trong ngày",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Minh chứng · 1",
+          "Nguồn báo cáo",
+          "Chuỗi liên quan",
+          "Kiểm tra & xử lý"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-report-detail-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-embedded-form",
+      "evidence_dir": "fix-report-form-final",
+      "currentScreenshot": "desktop-protected-embedded-form-current.png",
+      "currentRegion": "desktop-protected-embedded-form-current-region.png",
+      "baselineScreenshot": "desktop-protected-embedded-form-baseline.png",
+      "baselineRegion": "desktop-protected-embedded-form-baseline-region.png",
+      "comparisonScope": "Complete WorkflowFormPanel; approved outer AppShell tagline change excluded",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Xác nhận điểm bắt đầu",
+        "Không có điều kiện đang chặn",
+        "Xác nhận điểm bắt đầu",
+        "1 hồ sơ minh chứng",
+        "Hồ sơ đã chốt · Có thể chỉnh sửa"
+      ],
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Xác nhận điểm bắt đầu",
+          "Không có điều kiện đang chặn",
+          "Xác nhận điểm bắt đầu",
+          "1 hồ sơ minh chứng",
+          "Hồ sơ đã chốt · Có thể chỉnh sửa"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "screenshot": "desktop-protected-embedded-form.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "fix-report-form-final",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "report-review-rail",
+      "evidence_dir": "fix-report-form-final",
+      "businessWarningPresent": true,
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 26,
+          "bottom": 838,
+          "width": 358
+        },
+        "heading": [
+          "Báo cáo",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Duyệt báo cáo thi công · 23-10-2026",
+          "Đã xem · Lần 2",
+          "Công việc trong ngày",
+          "Minh chứng hiện trường · 1",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Bản gửi"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-report-review-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "report-detail-rail",
+      "evidence_dir": "fix-report-form-final",
+      "redundantCopyAbsent": true,
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "bottom": 828,
+          "width": 358
+        },
+        "heading": [
+          "Thi công",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 1",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "Chi tiết báo cáo thi công",
+          "Công việc trong ngày",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Minh chứng · 1",
+          "Nguồn báo cáo",
+          "Chuỗi liên quan",
+          "Kiểm tra & xử lý"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-report-detail-rail.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-embedded-form",
+      "evidence_dir": "fix-report-form-final",
+      "currentScreenshot": "mobile-protected-embedded-form-current.png",
+      "currentRegion": "mobile-protected-embedded-form-current-region.png",
+      "baselineScreenshot": "mobile-protected-embedded-form-baseline.png",
+      "baselineRegion": "mobile-protected-embedded-form-baseline-region.png",
+      "comparisonScope": "Complete WorkflowFormPanel; approved outer AppShell tagline change excluded",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Xác nhận điểm bắt đầu",
+        "Không có điều kiện đang chặn",
+        "Xác nhận điểm bắt đầu",
+        "1 hồ sơ minh chứng",
+        "Hồ sơ đã chốt · Có thể chỉnh sửa"
+      ],
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Xác nhận điểm bắt đầu",
+          "Không có điều kiện đang chặn",
+          "Xác nhận điểm bắt đầu",
+          "1 hồ sơ minh chứng",
+          "Hồ sơ đã chốt · Có thể chỉnh sửa"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-embedded-form.png",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "desktop",
+      "name": "embedded-form",
+      "sameVisibleText": true,
+      "current": "desktop-protected-embedded-form-current.png",
+      "baseline": "desktop-protected-embedded-form-baseline.png"
+    },
+    {
+      "view": "mobile",
+      "name": "embedded-form",
+      "sameVisibleText": true,
+      "current": "mobile-protected-embedded-form-current.png",
+      "baseline": "mobile-protected-embedded-form-baseline.png"
+    }
+  ]
+}

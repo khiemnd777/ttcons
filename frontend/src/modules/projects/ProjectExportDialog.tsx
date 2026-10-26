@@ -62,7 +62,6 @@ export function ProjectExportDialog({ open, selectedProjectIDs, filteredCount, f
     <Dialog
       open={open}
       title="Xuất công trình"
-      description="File xuất gồm dữ liệu công trình trong phạm vi được phép và đầy đủ danh mục reference hiện hành."
       size="lg"
       onClose={onClose}
       footer={(

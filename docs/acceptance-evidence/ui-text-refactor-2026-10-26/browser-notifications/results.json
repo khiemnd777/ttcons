@@ -1,0 +1,89 @@
+{
+  "created_at": "2026-10-26T03:25:36.431Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "REVIEW_REQUIRED",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "browser-notifications",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "notifications-loaded",
+      "evidence_dir": "browser-notifications",
+      "status": "CHECK_REQUIRED",
+      "error": "page.waitForResponse: Timeout 8000ms exceeded while waiting for event \"response\"",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 395,
+          "bottom": 605,
+          "width": 576
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-notifications-loaded-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-notifications",
+      "status": "CHECK_REQUIRED",
+      "error": "page.waitForURL: Timeout 8000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation to \"**/my-work\" until \"load\"\n============================================================",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-login-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "notifications-loaded",
+      "evidence_dir": "browser-notifications",
+      "status": "CHECK_REQUIRED",
+      "error": "Session lost; this is not a valid page acceptance",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đăng nhập"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-notifications-loaded-check.png"
+    }
+  ],
+  "errors": [],
+  "comparisons": []
+}

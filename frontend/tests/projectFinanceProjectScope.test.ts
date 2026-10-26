@@ -37,8 +37,9 @@ test('new accounting handoff is source-backed and contains no duplicate accounti
   assert.doesNotMatch(financePage, /Ghi nhận chi phí vật tư|Lập đề nghị thu\/chi|Báo cáo quản trị|provisional_profit|amount_before_vat|vat_amount/);
   assert.match(compatibilityWrapper, /return <AccountingHandoffPage global=\{global\} \/>/);
   assert.doesNotMatch(compatibilityWrapper, /LegacyProjectFinancePage|useQuery|project-finance\/options|material-costs|cash-requests/);
-  assert.match(financePage, /actions=\{global \? \([\s\S]*\) : id \? <ProjectBackLink \/> : undefined\}/);
-  assert.match(financePage, /actions=\{global \? \(/);
+  // Optional help shares the header action slot; the same global/project branches remain.
+  assert.match(financePage, /<ContextHelp label="Phạm vi hồ sơ bàn giao kế toán"/);
+  assert.match(financePage, /<\/ContextHelp>\{global \? \([\s\S]*\) : id \? <ProjectBackLink \/> : undefined\}<\/>\}/);
 });
 
 test('true-empty accounting handoff guides authorized users to canonical source modules', async () => {
@@ -49,7 +50,7 @@ test('true-empty accounting handoff guides authorized users to canonical source 
   assert.match(financePage, /hasAnyPermission\(\['contract\.view'\]\)/);
   assert.match(financePage, /to=\{`\/projects\/\$\{projectId\}\/procurement`\}/);
   assert.match(financePage, /to=\{`\/projects\/\$\{projectId\}\/contracts`\}/);
-  assert.match(financePage, /Không cần tạo hồ sơ kế toán thủ công trên Consflow/);
+  assert.match(financePage, /Hồ sơ được tạo từ nguồn đủ điều kiện:/);
   assert.match(financePage, /Không có hồ sơ phù hợp với bộ lọc hoặc tìm kiếm/);
   assert.doesNotMatch(financePage, /Tạo hồ sơ kế toán|Tạo bàn giao kế toán/);
 });

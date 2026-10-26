@@ -1,0 +1,493 @@
+{
+  "results": [
+    {
+      "name": "desktop-audit",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-audit.png"
+    },
+    {
+      "name": "desktop-events",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-events.png"
+    },
+    {
+      "name": "desktop-discussion",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-discussion.png"
+    },
+    {
+      "name": "desktop-real-notification-catalog",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "groups": 6,
+      "allRequired": true,
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-real-notification-catalog.png"
+    },
+    {
+      "name": "desktop-protected-shell-canonical",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "route": "/workflow-forms",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-protected-shell-canonical.png"
+    },
+    {
+      "name": "desktop-protected-shell-trailing-slash",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "route": "/workflow-forms/",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-protected-shell-trailing-slash.png"
+    },
+    {
+      "name": "desktop-protected-shell-uppercase",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "route": "/WORKFLOW-FORMS",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-protected-shell-uppercase.png"
+    },
+    {
+      "name": "desktop-profile-copy",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-profile-copy.png"
+    },
+    {
+      "name": "desktop-catalog-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP error/retry fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-catalog-error.png"
+    },
+    {
+      "name": "desktop-preferences-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP error/retry fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-preferences-error.png"
+    },
+    {
+      "name": "desktop-both-error",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP error/retry fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-both-error.png"
+    },
+    {
+      "name": "desktop-empty",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled HTTP empty fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-empty.png"
+    },
+    {
+      "name": "desktop-loading",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled delayed catalog fixture",
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-loading.png"
+    },
+    {
+      "name": "desktop-partial-save-retry-and-reopen",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "scope": "controlled optional-group GET/PUT fixture; no preference DB writes",
+      "writes": [
+        {
+          "category": "uat_1",
+          "enabled": false
+        },
+        {
+          "category": "uat_2",
+          "enabled": false
+        },
+        {
+          "category": "uat_2",
+          "enabled": false
+        }
+      ],
+      "measurement": {
+        "documentWidth": 1440,
+        "clientWidth": 1440,
+        "layoutViewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-partial-save-retry-and-reopen.png"
+    },
+    {
+      "name": "mobile-360-audit",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "2885d835-e21e-4c9f-a194-16acaa776857",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 360,
+        "clientWidth": 360,
+        "layoutViewport": 360
+      },
+      "status": "PASS",
+      "screenshot": "mobile-360-audit.png"
+    },
+    {
+      "name": "mobile-360-events",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 360,
+        "clientWidth": 360,
+        "layoutViewport": 360
+      },
+      "status": "PASS",
+      "screenshot": "mobile-360-events.png"
+    },
+    {
+      "name": "mobile-360-discussion",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "strip": {
+        "client": 328,
+        "scroll": 719,
+        "position": 391
+      },
+      "measurement": {
+        "documentWidth": 360,
+        "clientWidth": 360,
+        "layoutViewport": 360
+      },
+      "status": "PASS",
+      "screenshot": "mobile-360-discussion.png"
+    },
+    {
+      "name": "mobile-360-notification-real",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "scope": "real local API",
+      "dialog": {
+        "x": 16,
+        "y": 50,
+        "width": 328,
+        "height": 744
+      },
+      "openScreenshot": "mobile-360-notification-real-open.png",
+      "measurement": {
+        "documentWidth": 360,
+        "clientWidth": 360,
+        "layoutViewport": 360
+      },
+      "status": "PASS",
+      "screenshot": "mobile-360-notification-real.png"
+    },
+    {
+      "name": "mobile-390-audit",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "2885d835-e21e-4c9f-a194-16acaa776857",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-audit.png"
+    },
+    {
+      "name": "mobile-390-events",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-events.png"
+    },
+    {
+      "name": "mobile-390-discussion",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "strip": {
+        "client": 358,
+        "scroll": 719,
+        "position": 361
+      },
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-discussion.png"
+    },
+    {
+      "name": "mobile-390-notification-real",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "dialog": {
+        "x": 16,
+        "y": 50,
+        "width": 358,
+        "height": 744
+      },
+      "openScreenshot": "mobile-390-notification-real-open.png",
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-notification-real.png"
+    },
+    {
+      "name": "mobile-390-profile-copy",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "scope": "real local API",
+      "measurement": {
+        "documentWidth": 390,
+        "clientWidth": 390,
+        "layoutViewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-390-profile-copy.png"
+    },
+    {
+      "name": "mobile-430-audit",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "2885d835-e21e-4c9f-a194-16acaa776857",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-audit.png"
+    },
+    {
+      "name": "mobile-430-events",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "real local API",
+      "selectedProject": "55b561cb-fb31-4e59-b41a-a8b7e3505b97",
+      "optionLabelLength": 89,
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-events.png"
+    },
+    {
+      "name": "mobile-430-discussion",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "real local API",
+      "strip": {
+        "client": 398,
+        "scroll": 719,
+        "position": 321
+      },
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-discussion.png"
+    },
+    {
+      "name": "mobile-430-notification-real",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "real local API",
+      "dialog": {
+        "x": 16,
+        "y": 50,
+        "width": 398,
+        "height": 744
+      },
+      "openScreenshot": "mobile-430-notification-real-open.png",
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-notification-real.png"
+    },
+    {
+      "name": "mobile-430-error-and-retry",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "scope": "mobile touch + controlled HTTP error/retry fixture",
+      "measurement": {
+        "documentWidth": 430,
+        "clientWidth": 430,
+        "layoutViewport": 430
+      },
+      "status": "PASS",
+      "screenshot": "mobile-430-error-and-retry.png"
+    }
+  ],
+  "errors": [],
+  "scope": "Real local catalog/layout; controlled HTTP fixtures explicitly labelled for optional preference writes and failures"
+}

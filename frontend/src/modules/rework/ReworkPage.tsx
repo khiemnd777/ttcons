@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import { get, post } from '../../lib/api/client';
 import { dateText } from '../../lib/utils/format';
 import { PageHeader } from '../../components/PageHeader';
+import { ContextHelp } from '../../components/ContextHelp';
 import { DataTable } from '../../components/DataTable';
 import { StatusBadge } from '../../components/StatusBadge';
 import { CurrencyText } from '../../components/CurrencyText';
@@ -103,16 +104,16 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
     <>
       {!embedded ? <PageHeader
         title="Sửa lỗi / Lập kế hoạch lại"
-        description="Sửa lỗi khi xử lý trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ."
         actions={
           <>
+            <ContextHelp label="Phân biệt sửa lỗi và lập kế hoạch lại">Sửa lỗi trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ.</ContextHelp>
             {routeId ? <ProjectBackLink projectId={projectId} /> : null}
             {!routeId ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div> : null}
             {canCreateReplanning ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" />Lập kế hoạch lại</button> : null}
             {canCreateRework ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" />Sửa lỗi</button> : null}
           </>
         }
-      /> : <div className="mb-4 flex flex-col gap-3 rounded-lg border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-ink">Yêu cầu khắc phục & lập kế hoạch lại</h2><p className="mt-1 text-xs text-slate-500">Thực hiện sửa lỗi trong phạm vi hiện tại hoặc trình duyệt thay đổi kế hoạch khi ảnh hưởng tiến độ/chi phí.</p></div><div className="flex flex-wrap gap-2">{canCreateReplanning ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" /> Lập kế hoạch lại</button> : null}{canCreateRework ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" /> Yêu cầu sửa lỗi</button> : null}</div></div>}
+      /> : <div className="mb-4 flex flex-col gap-3 rounded-lg border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-semibold text-ink">Yêu cầu khắc phục & lập kế hoạch lại</h2><ContextHelp label="Phân biệt sửa lỗi và lập kế hoạch lại">Sửa lỗi trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ.</ContextHelp></div><div className="flex flex-wrap gap-2">{canCreateReplanning ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-50" onClick={() => setOpen('replanning')}><Plus className="h-4 w-4" /> Lập kế hoạch lại</button> : null}{canCreateRework ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => setOpen('rework')}><Plus className="h-4 w-4" /> Yêu cầu sửa lỗi</button> : null}</div></div>}
       <div className={`mb-4 grid gap-3 ${canViewReworks && canViewReplanning ? 'xl:grid-cols-2' : ''}`}>
         {canViewReworks ? <FilterBar label="Trạng thái sửa lỗi" value={reworkStatus} options={reworkFilterOptions} onChange={setReworkStatus} disabled={!projectId} /> : null}
         {canViewReplanning ? <FilterBar label="Trạng thái lập kế hoạch lại" value={replanningStatus} options={replanningFilterOptions} onChange={setReplanningStatus} disabled={!projectId} /> : null}
@@ -148,6 +149,7 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
       <RecordFormDialog
         open={open === 'rework'}
         title="Tạo yêu cầu sửa lỗi"
+        description="Dùng khi xử lý trong phạm vi hiện tại."
         submitLabel="Tạo yêu cầu sửa lỗi"
         onClose={() => setOpen(null)}
         fields={[
@@ -161,6 +163,7 @@ export function ReworkPage({ embedded = false, projectIdOverride }: { embedded?:
       <RecordFormDialog
         open={open === 'replanning'}
         title="Tạo yêu cầu lập kế hoạch lại"
+        description="Dùng khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ."
         submitLabel="Tạo yêu cầu lập kế hoạch lại"
         onClose={() => setOpen(null)}
         fields={[

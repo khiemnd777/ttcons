@@ -23,7 +23,7 @@ export default function RecordSourcePage() {
   const target: RecordTarget | null = isRecordKind(kind) && allowed.includes(kind) && isRecordID(recordId) && isRecordID(projectId)
     ? { kind, id: recordId, projectId } : null;
   const close = () => navigate(isRecordID(projectId) && hasPermission('project.view') ? `/projects/${projectId}` : '/my-work', { replace: true });
-  return <><PageHeader title="Hồ sơ nguồn" description="Xem thông tin và truy xuất hồ sơ liên quan." />
+  return <><PageHeader title="Hồ sơ nguồn" />
     <Dialog open title={target ? recordKinds[target.kind].label : 'Hồ sơ không khả dụng'} onClose={close} size="xl" manageFocus
       footer={<div className="flex justify-end"><button type="button" className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold" onClick={close}>Đóng</button></div>}>
       {!target || !user || !canOpenRecord(target, hasPermission) ? <p role="alert">Không tìm thấy hồ sơ hoặc anh không có quyền truy cập.</p>

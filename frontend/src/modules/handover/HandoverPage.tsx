@@ -136,7 +136,6 @@ export function HandoverPage() {
     {sourceLink.feedback}
     <PageHeader
       title="Bàn giao"
-      description="Hoàn tất hồ sơ bàn giao bằng readiness thật; mỗi điểm chặn dẫn về đúng module nguồn để xử lý."
       actions={<>{id ? <ProjectBackLink projectId={projectId} /> : <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={(value) => { setProjectId(value); setSelectedID(''); }} endpoint="/projects/options" queryKey="project-options" emptyLabel="Chọn công trình" allowEmptySelection={false} /></div>}{canCreate ? <button disabled={!projectId} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Tạo hồ sơ</button> : null}</>}
     />
 

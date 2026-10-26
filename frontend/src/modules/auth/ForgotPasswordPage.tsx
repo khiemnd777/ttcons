@@ -25,7 +25,7 @@ export function ForgotPasswordPage() {
   });
 
   return (
-    <AuthCard title="Quên mật khẩu" description="Gửi yêu cầu để bộ phận hỗ trợ xác minh danh tính và cung cấp liên kết đặt lại mật khẩu.">
+    <AuthCard title="Quên mật khẩu" description="Bộ phận hỗ trợ xác minh danh tính và cấp liên kết đặt lại mật khẩu.">
       {submitted ? (
         <div className="space-y-4">
           <div className="rounded-md border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800" role="status">

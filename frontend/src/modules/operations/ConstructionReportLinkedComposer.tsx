@@ -142,7 +142,6 @@ export function ConstructionReportLinkedComposer({ embedded = false, mode, draft
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between xl:flex-col">
       {!embedded ? <div>
         <h3 className="font-semibold text-ink">Kiểm tra & xử lý</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-500">Chuẩn bị việc phát sinh ngay tại báo cáo, không cần đổi màn hình.</p>
       </div> : null}
       <div className="flex flex-wrap gap-2">
         {canCreateCheck ? <button type="button" disabled={!canAdd} className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-white px-2.5 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50" onClick={() => add('check')}><ClipboardCheck className="h-3.5 w-3.5" /> Kiểm tra</button> : null}
@@ -160,7 +159,7 @@ export function ConstructionReportLinkedComposer({ embedded = false, mode, draft
     })}</div> : null}
 
     <div className="mt-4 space-y-3">
-      {!drafts.length && !embedded ? <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-center"><CheckCircle2 className="mx-auto h-5 w-5 text-emerald-500" /><p className="mt-2 text-sm font-semibold text-slate-700">Chưa có phát sinh cần tạo</p><p className="mt-1 text-xs text-slate-500">Có thể chỉ lưu báo cáo hoặc thêm nhanh khi cần.</p></div> : null}
+      {!drafts.length && !embedded ? <div className="rounded-lg border border-dashed border-slate-300 bg-white p-5 text-center"><CheckCircle2 className="mx-auto h-5 w-5 text-emerald-500" /><p className="mt-2 text-sm font-semibold text-slate-700">Chưa có phát sinh cần tạo</p></div> : null}
       {drafts.map((draft, index) => {
         const errors = showValidation || attempted[draft.id] ? validateReportLinkedDraft(draft, sourceWorkItemId, hasReportEvidence) : {};
         const selectedEvidenceId = draft.evidence_id || primaryEvidenceId || reportEvidence[0]?.id || '';

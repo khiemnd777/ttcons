@@ -1,0 +1,161 @@
+{
+  "created_at": "2026-10-26T03:25:22.467Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "REVIEW_REQUIRED",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "browser-embedded",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-mywork-startup",
+      "evidence_dir": "browser-embedded",
+      "currentRegion": "desktop-protected-mywork-startup-current-region.png",
+      "baselineRegion": "desktop-protected-mywork-startup-baseline-region.png",
+      "sameVisibleText": true,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-mywork-startup.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-discussion-workflow",
+      "evidence_dir": "browser-embedded",
+      "currentRegion": "desktop-protected-discussion-workflow-current-region.png",
+      "baselineRegion": "desktop-protected-discussion-workflow-baseline-region.png",
+      "sameVisibleText": true,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-discussion-workflow.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-embedded",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-mywork-startup",
+      "evidence_dir": "browser-embedded",
+      "currentRegion": "mobile-protected-mywork-startup-current-region.png",
+      "status": "CHECK_REQUIRED",
+      "error": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('article:has-text(\"TH-GOV-20261023\")').first() to be visible\u001b[22m\n",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-protected-mywork-startup-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-discussion-workflow",
+      "evidence_dir": "browser-embedded",
+      "currentRegion": "mobile-protected-discussion-workflow-current-region.png",
+      "baselineRegion": "mobile-protected-discussion-workflow-baseline-region.png",
+      "sameVisibleText": true,
+      "measurement": {
+        "viewport": 540,
+        "documentWidth": 540,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-protected-discussion-workflow.png",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "desktop",
+      "name": "mywork-startup",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "desktop-protected-mywork-startup-current-region.png",
+      "baseline": "desktop-protected-mywork-startup-baseline-region.png"
+    },
+    {
+      "view": "desktop",
+      "name": "discussion-workflow",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "desktop-protected-discussion-workflow-current-region.png",
+      "baseline": "desktop-protected-discussion-workflow-baseline-region.png"
+    },
+    {
+      "view": "mobile",
+      "name": "discussion-workflow",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "mobile-protected-discussion-workflow-current-region.png",
+      "baseline": "mobile-protected-discussion-workflow-baseline-region.png"
+    }
+  ]
+}

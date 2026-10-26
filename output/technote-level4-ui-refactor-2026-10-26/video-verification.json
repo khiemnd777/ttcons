@@ -1,0 +1,179 @@
+{
+  "verified_at": "2026-10-26T03:43:04.202236+00:00",
+  "media": {
+    "audio_tracks": 1,
+    "bytes": 9739747,
+    "duration_seconds": 195.5,
+    "height": 720,
+    "output": "/Users/khiemnguyen/Works/ttcons/ttcons/output/technote-level4-ui-refactor-2026-10-26/TechNote-Level4-Kiem-tra-giao-dien.mp4",
+    "video_tracks": 1,
+    "width": 1280
+  },
+  "sha256": "222a7b3b138416d30d479632bdb00e8a21758298f622fd82950029761c481401",
+  "voice": "Linh vi_VN, say175",
+  "synthetic_narration": true,
+  "audio_segments": [
+    {
+      "segment": 1,
+      "samples": 170110,
+      "rms": 4413.84,
+      "peak": 26715
+    },
+    {
+      "segment": 2,
+      "samples": 235687,
+      "rms": 4543.98,
+      "peak": 29099
+    },
+    {
+      "segment": 3,
+      "samples": 121470,
+      "rms": 4396.77,
+      "peak": 28124
+    },
+    {
+      "segment": 4,
+      "samples": 147335,
+      "rms": 4322.65,
+      "peak": 28575
+    },
+    {
+      "segment": 5,
+      "samples": 197325,
+      "rms": 4535.53,
+      "peak": 31056
+    },
+    {
+      "segment": 6,
+      "samples": 95949,
+      "rms": 4145.43,
+      "peak": 27137
+    },
+    {
+      "segment": 7,
+      "samples": 152454,
+      "rms": 4396.09,
+      "peak": 28002
+    },
+    {
+      "segment": 8,
+      "samples": 225185,
+      "rms": 4631.43,
+      "peak": 31463
+    },
+    {
+      "segment": 9,
+      "samples": 186059,
+      "rms": 4505.15,
+      "peak": 26853
+    },
+    {
+      "segment": 10,
+      "samples": 164936,
+      "rms": 4345.43,
+      "peak": 28027
+    },
+    {
+      "segment": 11,
+      "samples": 164652,
+      "rms": 4430.41,
+      "peak": 31142
+    },
+    {
+      "segment": 12,
+      "samples": 163521,
+      "rms": 4415.39,
+      "peak": 27349
+    },
+    {
+      "segment": 13,
+      "samples": 124797,
+      "rms": 4719.52,
+      "peak": 26245
+    },
+    {
+      "segment": 14,
+      "samples": 169421,
+      "rms": 4280.91,
+      "peak": 28625
+    },
+    {
+      "segment": 15,
+      "samples": 248140,
+      "rms": 4424.77,
+      "peak": 30767
+    },
+    {
+      "segment": 16,
+      "samples": 181707,
+      "rms": 4617.09,
+      "peak": 30246
+    },
+    {
+      "segment": 17,
+      "samples": 191369,
+      "rms": 4293.96,
+      "peak": 28372
+    },
+    {
+      "segment": 18,
+      "samples": 94925,
+      "rms": 4304.97,
+      "peak": 21858
+    },
+    {
+      "segment": 19,
+      "samples": 119172,
+      "rms": 4509.27,
+      "peak": 29172
+    },
+    {
+      "segment": 20,
+      "samples": 177419,
+      "rms": 4526.19,
+      "peak": 28846
+    },
+    {
+      "segment": 21,
+      "samples": 142004,
+      "rms": 4344.91,
+      "peak": 26588
+    },
+    {
+      "segment": 22,
+      "samples": 214689,
+      "rms": 4727.2,
+      "peak": 28084
+    },
+    {
+      "segment": 23,
+      "samples": 154505,
+      "rms": 4475.69,
+      "peak": 28654
+    },
+    {
+      "segment": 24,
+      "samples": 208263,
+      "rms": 4349.59,
+      "peak": 26652
+    }
+  ],
+  "subtitles": 24,
+  "subtitle_mode": "burn-in and separate SRT",
+  "chapters": 8,
+  "uat_counts": {
+    "PASS": 122,
+    "FAIL": 4,
+    "BLOCKED": 2,
+    "NOT_RUN": 0,
+    "CHECK_REQUIRED": 0
+  },
+  "uat_total": 128,
+  "protected_comparisons": 14,
+  "scope": "Narrated real browser screenshots, not a continuous screen recording; local synthetic data; NOT UX ACCEPTED",
+  "visual_preview_frames": [
+    "kiem-tra-video-1.png",
+    "kiem-tra-video-2.png",
+    "kiem-tra-video-3.png"
+  ]
+}

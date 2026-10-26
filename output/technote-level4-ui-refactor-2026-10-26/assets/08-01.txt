@@ -1,0 +1,1 @@
+Đã có bằng chứng browser local và đối chiếu vùng loại trừ. Còn tràn ngang mobile, copy cần dọn và lỗi danh mục thông báo cần xử lý.

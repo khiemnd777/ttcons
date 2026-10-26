@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { ArrowRight, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
+import { IconAction } from '../../components/IconAction';
 import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { reportPath, visibleReportDefinitions } from '../reports/reportRegistry';
@@ -39,12 +40,11 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard tổng hợp" description="Theo dõi toàn cảnh, diễn biến công trình và báo cáo vận hành trong phạm vi được phân quyền." horizontalFrom="xl" actions={(
+      <PageHeader title="Dashboard tổng hợp" horizontalFrom="xl" actions={(
         <>
           <DashboardPeriodToolbar period={period} canMoveForward={dashboard.data?.meta.can_move_forward ?? false} onChange={applyPeriod} />
-          <button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60" disabled={refreshing} onClick={refreshDashboard}>
-            <RefreshCw className={clsx('h-4 w-4', refreshing && 'animate-spin')} /><span className="hidden sm:inline">{refreshing ? 'Đang làm mới' : 'Làm mới'}</span>
-          </button>
+          <IconAction label={refreshing ? 'Đang làm mới Dashboard' : 'Làm mới Dashboard'} disabled={refreshing} onClick={refreshDashboard}
+            icon={<RefreshCw className={clsx('h-4 w-4', refreshing && 'animate-spin')} />} />
         </>
       )} />
       {dashboard.isLoading ? <DashboardLoading /> : dashboard.isError || !dashboard.data ? (
@@ -77,14 +77,13 @@ function ReportLinksPanel({ reports }: { reports: ReturnType<typeof visibleRepor
   return (
     <section className="mt-5 rounded-lg border border-line bg-white p-4 shadow-panel" aria-labelledby="dashboard-reports-title">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div><h2 id="dashboard-reports-title" className="text-base font-semibold text-ink">Báo cáo chuyên sâu</h2><p className="mt-1 text-xs leading-5 text-slate-500">Mở báo cáo nghiệp vụ để phân tích chi tiết hoặc xuất dữ liệu.</p></div>
+        <div><h2 id="dashboard-reports-title" className="text-base font-semibold text-ink">Báo cáo chuyên sâu</h2></div>
         <Link className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800" to="/reports">Tất cả báo cáo <ArrowRight className="h-4 w-4" /></Link>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {reports.map((report) => (
           <Link key={report.key} className="group rounded-md border border-line p-3 hover:border-blue-200 hover:bg-blue-50" to={reportPath(report.key)}>
             <div className="flex items-start justify-between gap-3"><h3 className="text-sm font-semibold text-ink group-hover:text-blue-700">{report.label}</h3><ArrowRight className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-blue-700" /></div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">{report.description}</p>
           </Link>
         ))}
       </div>

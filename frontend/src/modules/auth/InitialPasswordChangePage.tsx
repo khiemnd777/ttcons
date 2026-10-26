@@ -39,7 +39,7 @@ export function InitialPasswordChangePage() {
   });
 
   return (
-    <AuthCard title="Đổi mật khẩu ban đầu" description="Tài khoản đã được kích hoạt. Anh/chị cần đặt mật khẩu riêng trước khi sử dụng hệ thống.">
+    <AuthCard title="Đổi mật khẩu ban đầu" description="Đặt mật khẩu riêng trước khi sử dụng hệ thống.">
       <form
         ref={formRef}
         className="space-y-4"

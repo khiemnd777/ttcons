@@ -257,7 +257,6 @@ export function BOQPage() {
     <>
       <PageHeader
         title="Dự toán & báo giá"
-        description="Quản lý dòng dự toán, thu thập báo giá và chốt giá trước khi chuyển sang mua sắm."
         actions={
           <>
             <ProjectBackLink projectId={id} />
@@ -333,7 +332,7 @@ export function BOQPage() {
       {activeTab === 'compare' ? <SupplierQuotationWorkspace projectId={id} workItemId={taskId} boqItems={rows} mode="compare" /> : null}
       {activeTab === 'compare' && canGenerateProcurement ? <div className="mt-4 flex justify-end"><button className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={generate.isPending || priceReadiness.generateDisabled} title={priceReadiness.generateDisabledReason} onClick={() => generate.mutate()}>{generate.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}Tạo yêu cầu mua sắm</button></div> : null}
 
-      <Dialog open={open} title="Thêm dòng dự toán" description="Trạng thái khởi tạo do hệ thống quản lý." onClose={() => setOpen(false)} size="lg">
+      <Dialog open={open} title="Thêm dòng dự toán" onClose={() => setOpen(false)} size="lg">
         <SimpleForm
           submitLabel="Thêm dòng"
           fields={boqFields()}

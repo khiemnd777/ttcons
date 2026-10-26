@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ClipboardList, ChevronDown } from 'lucide-react';
+import { ClipboardList, ChevronDown, MessageSquareText } from 'lucide-react';
+import { IconAction } from '../../components/IconAction';
 import { get } from '../../lib/api/client';
 import { useAuth } from '../../lib/auth/AuthContext';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -26,14 +27,14 @@ export function DiscussionWorkRail({ projectId, onOpen, onDiscuss }: { projectId
     <div className={`${expanded ? 'block' : 'hidden'} mt-3 xl:block`}>
       {work.isPending ? <p role="status" className="text-sm text-slate-500">Đang tải việc của bạn…</p> : null}
       {work.isError ? <div role="alert" className="text-sm text-rose-700">Không tải được công việc. <button className="font-semibold underline" onClick={() => void work.refetch()}>Thử lại</button></div> : null}
-      {!work.isError && work.data?.total === 0 ? <p className="text-sm text-slate-500">Bạn chưa có việc cần xử lý trong công trình này.</p> : null}
+      {!work.isError && work.data?.total === 0 ? <p className="text-sm text-slate-500">Chưa có việc cần xử lý.</p> : null}
       <div className="divide-y divide-line">{work.data?.items.map(item => <div key={item.id} className="space-y-2 py-3 first:pt-0">
         <p className="break-words text-sm font-semibold text-ink">{item.title}</p>
         <StatusBadge status={item.status} />
         {item.due_at ? <p className="text-xs text-slate-500">Hạn: {dateTimeText(item.due_at)}</p> : null}
         <div className="flex flex-wrap gap-2">
           <button type="button" className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700" onClick={() => onOpen(item)}>{discussionWorkActionLabel(item)}</button>
-          <button type="button" className="text-xs font-semibold text-blue-700 underline" onClick={() => onDiscuss(item)}>Xem trao đổi</button>
+          <IconAction label={`Xem trao đổi: ${item.title}`} icon={<MessageSquareText className="h-4 w-4" />} onClick={() => onDiscuss(item)} />
         </div>
       </div>)}</div>
       <Link className="mt-3 block border-t border-line pt-3 text-sm font-semibold text-blue-700" to={`/my-work?project=${encodeURIComponent(projectId)}`}>Xem tất cả việc</Link>

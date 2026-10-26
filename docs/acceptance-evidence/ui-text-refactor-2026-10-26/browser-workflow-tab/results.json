@@ -1,0 +1,122 @@
+{
+  "created_at": "2026-10-26T03:24:20.594Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "PASS",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "browser-workflow-tab",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-project-workflow-tab",
+      "evidence_dir": "browser-workflow-tab",
+      "currentScreenshot": "desktop-protected-project-workflow-tab-current.png",
+      "baselineScreenshot": "desktop-protected-project-workflow-tab-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-protected-project-workflow-tab.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-workflow-tab",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-project-workflow-tab",
+      "evidence_dir": "browser-workflow-tab",
+      "currentScreenshot": "mobile-protected-project-workflow-tab-current.png",
+      "baselineScreenshot": "mobile-protected-project-workflow-tab-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-protected-project-workflow-tab.png",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "desktop",
+      "name": "project-workflow-tab",
+      "sameVisibleText": true,
+      "current": "desktop-protected-project-workflow-tab-current.png",
+      "baseline": "desktop-protected-project-workflow-tab-baseline.png"
+    },
+    {
+      "view": "mobile",
+      "name": "project-workflow-tab",
+      "sameVisibleText": true,
+      "current": "mobile-protected-project-workflow-tab-current.png",
+      "baseline": "mobile-protected-project-workflow-tab-baseline.png"
+    }
+  ]
+}

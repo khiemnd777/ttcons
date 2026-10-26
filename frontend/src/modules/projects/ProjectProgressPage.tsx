@@ -178,7 +178,6 @@ export function ProjectProgressPage() {
     <>
       <PageHeader
         title="Tiến trình công trình"
-        description="Theo dõi giai đoạn hiện tại và điểm cần xử lý của tất cả công trình."
         actions={(
           <div className="flex items-center gap-2">
             <LiveStatus status={streamStatus} generatedAt={summaryQuery.data?.generated_at} />

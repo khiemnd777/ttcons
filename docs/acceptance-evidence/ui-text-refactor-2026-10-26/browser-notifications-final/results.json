@@ -1,0 +1,105 @@
+{
+  "created_at": "2026-10-26T03:27:21.833Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "REVIEW_REQUIRED",
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "evidence_dir": "browser-notifications-final",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "desktop",
+      "name": "notifications-loaded",
+      "evidence_dir": "browser-notifications-final",
+      "catalogStatus": 500,
+      "catalogRequestId": "b6f81ee5-4eb6-47e3-a4e3-ae12e284ffb6",
+      "dialogText": "Tùy chọn thông báo\n\nThông báo cần hành động hoặc bảo mật luôn được giữ trên App.\n\nChưa có nhóm thông báo đang hoạt động.\n\nHủy\nLưu tùy chọn",
+      "status": "BLOCKED",
+      "error": "API_BLOCKED: notification catalog HTTP 500; unchanged local backend image",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 395,
+          "bottom": 605,
+          "width": 576
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": []
+      },
+      "screenshot": "desktop-notifications-loaded-check.png"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-notifications-final",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "notifications-loaded",
+      "evidence_dir": "browser-notifications-final",
+      "catalogStatus": 500,
+      "catalogRequestId": "ccf81ee5-4eb6-47e3-a4e3-ae12e284ffb6",
+      "dialogText": "Tùy chọn thông báo\n\nThông báo cần hành động hoặc bảo mật luôn được giữ trên App.\n\nChưa có nhóm thông báo đang hoạt động.\n\nHủy\nLưu tùy chọn",
+      "status": "BLOCKED",
+      "error": "API_BLOCKED: notification catalog HTTP 500; unchanged local backend image",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 307,
+          "bottom": 537,
+          "width": 358
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": []
+      },
+      "screenshot": "mobile-notifications-loaded-check.png"
+    }
+  ],
+  "errors": [],
+  "comparisons": []
+}

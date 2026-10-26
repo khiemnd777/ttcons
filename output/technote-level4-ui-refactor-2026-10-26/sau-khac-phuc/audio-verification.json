@@ -1,0 +1,55 @@
+{
+  "status": "PASS",
+  "segments": [
+    {
+      "segment": 1,
+      "peak": 31250,
+      "frames": 176776
+    },
+    {
+      "segment": 2,
+      "peak": 27328,
+      "frames": 153867
+    },
+    {
+      "segment": 3,
+      "peak": 27888,
+      "frames": 211157
+    },
+    {
+      "segment": 4,
+      "peak": 29269,
+      "frames": 172934
+    },
+    {
+      "segment": 5,
+      "peak": 26310,
+      "frames": 129152
+    },
+    {
+      "segment": 6,
+      "peak": 27445,
+      "frames": 175997
+    },
+    {
+      "segment": 7,
+      "peak": 27768,
+      "frames": 217901
+    },
+    {
+      "segment": 8,
+      "peak": 29927,
+      "frames": 198142
+    },
+    {
+      "segment": 9,
+      "peak": 29296,
+      "frames": 153488
+    },
+    {
+      "segment": 10,
+      "peak": 28815,
+      "frames": 193159
+    }
+  ]
+}

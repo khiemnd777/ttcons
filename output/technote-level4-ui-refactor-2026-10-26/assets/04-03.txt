@@ -1,0 +1,1 @@
+Click ngoài và chuyển focus ra ngoài cũng đóng nội dung trợ giúp. Giới hạn nhập và cảnh báo cần thiết vẫn hiển thị.

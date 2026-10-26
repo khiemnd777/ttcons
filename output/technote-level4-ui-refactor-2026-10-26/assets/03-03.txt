@@ -1,0 +1,1 @@
+Cần đo theo viewport cấu hình vì Chrome có thể tự giãn khung bố cục. Đây là giả lập, chưa kiểm tra trên điện thoại vật lý.

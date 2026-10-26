@@ -1,0 +1,1 @@
+Mục đích là kiểm tra giao diện đã rút gọn trên máy tính và điện thoại giả lập, rồi đối chiếu các vùng được giữ nguyên.

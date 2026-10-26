@@ -191,7 +191,7 @@ export function WorkReportReviewDialog({
     <Dialog
       open={open}
       title={detail ? `Duyệt báo cáo thi công · ${dateText(detail.report_date)}` : 'Duyệt báo cáo thi công'}
-      description={detail ? `${detail.project_code} · ${detail.project_name}${detail.work_item_title ? ` · ${detail.work_item_title}` : ''}` : 'Đọc nội dung, kiểm tra minh chứng và phản hồi trong cùng một không gian.'}
+      description={detail ? `${detail.project_code} · ${detail.project_name}${detail.work_item_title ? ` · ${detail.work_item_title}` : ''}` : undefined}
       size="report"
       onClose={onClose}
       footer={footer}
@@ -277,7 +277,6 @@ function ReportSummary({ detail, revision, view, weather }: { weather: unknown; 
             <span className="rounded-md bg-blue-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">{sourceKindLabel(view.sourceKind)}</span>
             <span className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-blue-100">Lần {(revision?.revision_no ?? detail.current_revision_no) || '—'}</span>
           </div>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Ưu tiên đọc kết quả trong ngày, đối chiếu minh chứng hiện trường, sau đó xác nhận đã xem hoặc trả lại với nội dung cần bổ sung.</p>
         </div>
         <div>
           <div className="mb-2 flex items-end justify-between gap-3"><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tiến độ ghi nhận</span><strong className="text-2xl text-blue-700">{view.hasProgress ? `${view.progressPercent}%` : 'Chưa ghi tiến độ'}</strong></div>
@@ -292,7 +291,7 @@ function ReportContent({ view, evidence, filePath }: { view: ReturnType<typeof c
   return (
     <div className="space-y-6">
       <section aria-labelledby="review-work-heading">
-        <SectionHeading id="review-work-heading" icon={<ClipboardCheck className="h-4 w-4" />} title="Công việc trong ngày" description="Kết quả, phần đang tiếp diễn, kế hoạch và trở ngại được đặt cạnh nhau để đối chiếu nhanh." />
+        <SectionHeading id="review-work-heading" icon={<ClipboardCheck className="h-4 w-4" />} title="Công việc trong ngày" />
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <WorkGroup title="Đã làm" items={view.done} tone="emerald" empty="Chưa ghi hạng mục hoàn tất" />
           <WorkGroup title="Đang làm" items={view.current} tone="blue" empty="Không có hạng mục đang thực hiện" />
@@ -317,7 +316,7 @@ function ReportContent({ view, evidence, filePath }: { view: ReturnType<typeof c
       </section>
 
       <section aria-labelledby="review-resource-heading">
-        <SectionHeading id="review-resource-heading" icon={<Users className="h-4 w-4" />} title="Nguồn lực sử dụng" description="Nhân lực và vật tư đã được người lập ghi nhận trong ngày." />
+        <SectionHeading id="review-resource-heading" icon={<Users className="h-4 w-4" />} title="Nguồn lực sử dụng" />
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <ResourceCard icon={<Users className="h-4 w-4" />} title="Nhân lực / tổ đội" items={view.crew} empty="Chưa ghi nhân lực" />
           <ResourceCard icon={<Package className="h-4 w-4" />} title="Vật tư sử dụng" items={view.materials} empty="Chưa ghi vật tư" />
@@ -327,7 +326,7 @@ function ReportContent({ view, evidence, filePath }: { view: ReturnType<typeof c
       </section>
 
       <section aria-labelledby="review-notes-heading">
-        <SectionHeading id="review-notes-heading" icon={<FileText className="h-4 w-4" />} title="Ghi chú hiện trường" description="Thông tin bổ sung được giữ tách biệt với blocker có cấu trúc." />
+        <SectionHeading id="review-notes-heading" icon={<FileText className="h-4 w-4" />} title="Ghi chú hiện trường" />
         <div className="mt-3 rounded-lg border border-line bg-slate-50 p-4">{view.fieldNotes.length ? <ItemList items={view.fieldNotes} bulletClass="bg-slate-400" /> : <p className="text-sm italic text-slate-500">Không có ghi chú hiện trường.</p>}</div>
       </section>
     </div>
@@ -348,8 +347,7 @@ function ReviewRail({ detail, revision, evidenceCount, isCurrentRevision, mayRev
     <aside className="space-y-3 xl:sticky xl:top-0">
       <section className="overflow-hidden rounded-xl border border-line bg-white shadow-sm" aria-labelledby="review-decision-heading">
         <div className="border-b border-line bg-slate-50 px-4 py-3">
-          <h3 id="review-decision-heading" className="flex items-center gap-2 font-semibold text-ink"><ShieldCheck className="h-4 w-4 text-blue-600" /> Kiểm tra trước khi phản hồi</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Thông tin nhận diện bản gửi và phạm vi xác nhận.</p>
+          <h3 id="review-decision-heading" className="flex items-center gap-2 font-semibold text-ink"><ShieldCheck className="h-4 w-4 text-blue-600" /> Bản gửi</h3>
         </div>
         <dl className="divide-y divide-line px-4">
           <RailMetric label="Trạng thái" value={<WorkReportStatusBadge status={detail.status} />} />
@@ -385,7 +383,7 @@ function ReportHistory({ events }: { events: WorkReportEvent[] }) {
   if (!events.length) return <EmptyPanel icon={<History className="h-6 w-6" />} title="Báo cáo chưa có lịch sử gửi và phản hồi" />;
   return (
     <section aria-labelledby="report-history-heading">
-      <SectionHeading id="report-history-heading" icon={<History className="h-4 w-4" />} title="Lịch sử gửi và phản hồi" description="Dòng thời gian bất biến của từng lần gửi, yêu cầu bổ sung và xác nhận đã xem." />
+      <SectionHeading id="report-history-heading" icon={<History className="h-4 w-4" />} title="Lịch sử gửi và phản hồi" />
       <div className="relative mt-4 space-y-3 before:absolute before:bottom-6 before:left-[17px] before:top-6 before:w-px before:bg-blue-200">
         {events.map((event) => (
           <article key={event.id} className="relative pl-11">
@@ -416,7 +414,7 @@ function ReportRevisions({ revisions, currentRevisionNo, selectedRevisionNo, can
   if (!revisions.length) return <EmptyPanel icon={<FileClock className="h-6 w-6" />} title="Báo cáo chưa có bản đã gửi" />;
   return (
     <section aria-labelledby="report-revisions-heading">
-      <SectionHeading id="report-revisions-heading" icon={<FileClock className="h-4 w-4" />} title="Các lần gửi" description="Mỗi lần gửi giữ nguyên nội dung, minh chứng và mã SHA-256 tại thời điểm gửi." />
+      <SectionHeading id="report-revisions-heading" icon={<FileClock className="h-4 w-4" />} title="Các lần gửi" description="Mỗi lần gửi giữ riêng nội dung và minh chứng." />
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {revisions.map((revision) => {
           const selected = Number(revision.revision_no) === selectedRevisionNo;
@@ -443,8 +441,8 @@ function ReviewTabButton({ active, icon, count, children, onClick }: { active: b
   return <button type="button" role="tab" aria-selected={active} className={clsx('inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-semibold', active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-ink')} onClick={onClick}>{icon}<span>{children}</span>{typeof count === 'number' ? <span className={clsx('rounded-full px-1.5 py-0.5 text-[11px]', active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500')}>{count}</span> : null}</button>;
 }
 
-function SectionHeading({ id, icon, title, description }: { id: string; icon: ReactNode; title: string; description: string }) {
-  return <div className="flex items-start gap-2"><span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-600">{icon}</span><div><h3 id={id} className="font-semibold text-ink">{title}</h3><p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p></div></div>;
+function SectionHeading({ id, icon, title, description }: { id: string; icon: ReactNode; title: string; description?: string }) {
+  return <div className="flex items-start gap-2"><span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-600">{icon}</span><div><h3 id={id} className="font-semibold text-ink">{title}</h3>{description ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p> : null}</div></div>;
 }
 
 function WorkGroup({ title, items, tone, empty }: { title: string; items: string[]; tone: 'emerald' | 'blue' | 'slate' | 'rose'; empty: string }) {

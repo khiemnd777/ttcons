@@ -56,7 +56,9 @@ test('global and project business pages share the same compact page chrome', asy
   const workReports = await source('modules/work-reports/WorkReportsPage.tsx');
   assert.match(workReports, /mb-3 border-b border-line pb-2/);
   assert.match(workReports, /text-lg font-semibold leading-6 tracking-normal text-ink/);
-  assert.match(workReports, /line-clamp-2 min-w-0 text-xs/);
+  // Approved cleanup removes the tagline from this custom header; shared chrome stays intact.
+  assert.doesNotMatch(workReports, /Trao đổi công việc có xác nhận|Nhân sự lập báo cáo từ dữ liệu công việc thực tế/);
+  assert.doesNotMatch(workReports, /md:max-w-\[42%\]/);
 });
 
 test('project workspace shell remains the visible project identity owner including sample status', async () => {

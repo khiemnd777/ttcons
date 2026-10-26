@@ -1,0 +1,1 @@
+So sánh source xác nhận một trăm mười hai tệp và mười hai hàm được bảo vệ không đổi. Ảnh có thể khác trạng thái hover hoặc focus; không tuyên bố mọi pixel giống nhau.

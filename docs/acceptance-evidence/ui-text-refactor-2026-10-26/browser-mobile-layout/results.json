@@ -1,0 +1,151 @@
+{
+  "created_at": "2026-10-26T03:34:52.504Z",
+  "browser": "Chrome156, Chromium sandbox enabled",
+  "environment": "local API18081, database consflow_guide_20261022, migrations160, current15173 / baseline15174",
+  "mobile": "390x844 emulation; not physical device",
+  "status": "REVIEW_REQUIRED",
+  "results": [
+    {
+      "view": "mobile",
+      "name": "login",
+      "evidence_dir": "browser-mobile-layout",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS"
+    },
+    {
+      "view": "mobile",
+      "name": "audit",
+      "evidence_dir": "browser-mobile-layout",
+      "route": "/audit",
+      "leftoverCopy": 1,
+      "baselineGeometry": {
+        "layoutViewport": 820,
+        "clientWidth": 390,
+        "documentWidth": 820,
+        "viewport": 390
+      },
+      "measurement": {
+        "layoutViewport": 820,
+        "clientWidth": 390,
+        "documentWidth": 820,
+        "dialog": null,
+        "heading": [
+          "Audit toàn hệ thống"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-audit-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 820/390"
+    },
+    {
+      "view": "mobile",
+      "name": "event-logs",
+      "evidence_dir": "browser-mobile-layout",
+      "route": "/event-logs",
+      "leftoverCopy": 1,
+      "baselineGeometry": {
+        "layoutViewport": 814,
+        "clientWidth": 390,
+        "documentWidth": 814,
+        "viewport": 390
+      },
+      "measurement": {
+        "layoutViewport": 814,
+        "clientWidth": 390,
+        "documentWidth": 814,
+        "dialog": null,
+        "heading": [
+          "Nhật ký sự kiện"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-event-logs-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 814/390"
+    },
+    {
+      "view": "mobile",
+      "name": "project-discussion-rail",
+      "evidence_dir": "browser-mobile-layout",
+      "railCount": 1,
+      "baselineGeometry": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540,
+        "viewport": 390
+      },
+      "measurement": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-project-discussion-rail-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 540/390"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-discussion-workflow",
+      "evidence_dir": "browser-mobile-layout",
+      "currentRegion": "mobile-protected-discussion-workflow-current-region.png",
+      "baselineRegion": "mobile-protected-discussion-workflow-baseline-region.png",
+      "baselineGeometry": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540
+      },
+      "sameVisibleText": true,
+      "measurement": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-discussion-workflow-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 540/390"
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "view": "mobile",
+      "name": "discussion-workflow",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "mobile-protected-discussion-workflow-current-region.png",
+      "baseline": "mobile-protected-discussion-workflow-baseline-region.png"
+    }
+  ]
+}

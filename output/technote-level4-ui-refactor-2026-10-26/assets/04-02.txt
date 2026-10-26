@@ -1,0 +1,1 @@
+Nút mở được bằng bàn phím hoặc chạm. Escape đóng trợ giúp, trả focus về nút và giữ dialog cha mở.

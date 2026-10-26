@@ -164,7 +164,7 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
     return <>
       <PageHeader
         title="Vật tư"
-        description="Tra cứu danh mục vật tư phục vụ thiết kế. Số liệu tồn kho và nghiệp vụ kho không nằm trong phạm vi truy cập."
+        description="Chỉ xem danh mục vật tư."
         actions={scoped ? <ProjectBackLink projectId={projectId} /> : undefined}
       />
       <div className="mb-4 rounded-lg border border-line bg-white p-3 shadow-panel">
@@ -180,7 +180,6 @@ export function WarehousePage({ scoped = false }: { scoped?: boolean }) {
   return <>
     <PageHeader
       title="Kho vật tư"
-      description="Tồn theo kho, phiếu nhập xuất, vật tư tại công trình và xử lý vật tư dư."
       actions={<>
         {scoped ? <ProjectBackLink projectId={projectId} /> : null}
         {!scoped ? <div className="w-full sm:w-80"><AsyncProjectPicker value={projectId} onChange={setProjectId} endpoint="/projects/options" queryKey="project-options" emptyLabel="Tất cả công trình" /></div> : null}

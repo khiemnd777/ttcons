@@ -48,7 +48,9 @@ test('notification platform uses server-owned presentation, safe routes, and one
 
   assert.match(page, /\/me\/notifications\/catalog/);
   assert.match(page, /\/me\/notifications\/projects/);
-  assert.match(page, /\/me\/notifications\/preferences/);
+  const preferences = await source('../src/modules/notifications/NotificationPreferencesDialog.tsx');
+  assert.match(page, /<NotificationPreferencesDialog open=\{preferencesOpen\} catalog=\{catalog\}/);
+  assert.match(preferences, /\/me\/notifications\/preferences/);
   assert.match(page, /\['action_required', 'Cần xử lý'/);
   assert.match(page, /listState === 'stale-error'/);
   assert.match(page, /Danh sách gần nhất vẫn được giữ/);

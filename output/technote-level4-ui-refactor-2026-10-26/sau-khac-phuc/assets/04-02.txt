@@ -1,0 +1,1 @@
+Luồng lưu nhóm tùy chọn và lỗi lưu một phần dùng HTTP fixtures có ghi rõ. Không thay dữ liệu catalog thật để tạo điều kiện thử.

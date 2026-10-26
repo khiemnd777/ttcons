@@ -1,0 +1,1 @@
+Chưa có điện thoại vật lý, chưa đo thời gian thao tác và chưa kiểm tra mọi biến thể Form. Không commit, push hoặc deploy trong lượt này.

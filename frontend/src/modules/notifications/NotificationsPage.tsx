@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCheck, CircleAlert, RefreshCw, Search, Settings2 } from 'lucide-react';
 import clsx from 'clsx';
 import { useNavigate } from 'react-router-dom';
-import { Dialog } from '../../components/Dialog';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
@@ -13,11 +12,11 @@ import { useAuth } from '../../lib/auth/AuthContext';
 import type {
   NotificationCatalogItem,
   NotificationPage,
-  NotificationPreference,
   NotificationSummary,
   UserNotification,
 } from '../../lib/types/domain';
 import { NotificationItem } from './NotificationItem';
+import { NotificationPreferencesDialog } from './NotificationPreferencesDialog';
 import {
   applyAllNotificationsReadCache,
   applyNotificationArchiveCache,
@@ -105,7 +104,7 @@ export function NotificationsPage() {
     <div className="p-4 sm:p-6">
       <PageHeader
         title="Thông báo"
-        description={`${summary.data?.unread_total ?? 0} chưa đọc · ${summary.data?.action_required ?? 0} cần xử lý. Thông báo chỉ dẫn đến màn hình nghiệp vụ; quyền và trạng thái nguồn luôn được kiểm tra lại.`}
+        description={`${summary.data?.unread_total ?? 0} chưa đọc · ${summary.data?.action_required ?? 0} cần xử lý`}
         actions={<><button type="button" className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setPreferencesOpen(true)}><Settings2 className="h-4 w-4" />Tùy chọn</button><button type="button" disabled={!summary.data?.unread_total || markAll.isPending} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50" onClick={() => markAll.mutate()}><CheckCheck className="h-4 w-4" />Đọc tất cả</button></>}
       />
 
@@ -145,55 +144,7 @@ export function NotificationsPage() {
         </section>
       </div>
 
-      <NotificationPreferencesDialog open={preferencesOpen} catalog={catalog.data ?? []} onClose={() => setPreferencesOpen(false)} />
+      <NotificationPreferencesDialog open={preferencesOpen} catalog={catalog} onClose={() => setPreferencesOpen(false)} />
     </div>
-  );
-}
-
-function NotificationPreferencesDialog({ open, catalog, onClose }: { open: boolean; catalog: NotificationCatalogItem[]; onClose: () => void }) {
-  const toast = useToast();
-  const queryClient = useQueryClient();
-  const preferences = useQuery({ queryKey: ['notification-preferences'], queryFn: () => get<NotificationPreference[]>('/me/notifications/preferences'), enabled: open, retry: false });
-  const categories = useMemo(() => {
-    const values = new Map<string, { key: string; label: string; required: boolean }>();
-    for (const event of catalog) {
-      if (!event.enabled) continue;
-      const current = values.get(event.category_key);
-      values.set(event.category_key, { key: event.category_key, label: event.category_label, required: Boolean(current?.required || event.required_delivery) });
-    }
-    return Array.from(values.values());
-  }, [catalog]);
-  const [values, setValues] = useState<Record<string, boolean>>({});
-  useEffect(() => {
-    if (!open || !preferences.data) return;
-    const next: Record<string, boolean> = {};
-    for (const category of categories) {
-      const preference = preferences.data.find((item) => item.category_key === category.key && item.event_key === '*');
-      next[category.key] = category.required || preference?.in_app_enabled !== false;
-    }
-    setValues(next);
-  }, [categories, open, preferences.data]);
-  const save = useMutation({
-    mutationFn: async () => {
-      for (const category of categories) {
-        await put('/me/notifications/preferences', {
-          category_key: category.key,
-          event_key: '*',
-          in_app_enabled: category.required || values[category.key] !== false,
-          email_enabled: false,
-          push_enabled: false,
-          digest_mode: category.required || values[category.key] !== false ? 'immediate' : 'off',
-          quiet_hours_json: {},
-        });
-      }
-    },
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ['notification-preferences'] }); toast.success('Đã lưu tùy chọn thông báo'); onClose(); },
-    onError: (error) => toast.error('Không lưu được tùy chọn thông báo', error),
-  });
-
-  return (
-    <Dialog open={open} title="Tùy chọn thông báo" description="Thông báo cần hành động hoặc bảo mật luôn được giữ trên App. Email và push sẽ được mở khi có delivery adapter chính thức." onClose={onClose} footer={<div className="flex justify-end gap-2"><button type="button" className="rounded-md border border-line px-3 py-2 text-sm font-semibold" onClick={onClose}>Hủy</button><button type="button" disabled={save.isPending || preferences.isLoading} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={() => save.mutate()}>Lưu tùy chọn</button></div>}>
-      {preferences.isLoading ? <LoadingSpinner /> : preferences.isError ? <p className="text-sm text-rose-700">Không tải được tùy chọn thông báo.</p> : categories.length ? <div className="space-y-3">{categories.map((category) => <label key={category.key} className="flex items-start justify-between gap-4 rounded-lg border border-line p-4"><span><strong className="block text-sm text-ink">{category.label}</strong><span className="mt-1 block text-xs text-slate-500">{category.required ? 'Có thông báo bắt buộc cần xử lý.' : 'Có thể tắt thông báo nhận biết trên App.'}</span></span><input type="checkbox" className="mt-1 h-4 w-4" checked={category.required || values[category.key] !== false} disabled={category.required} onChange={(event) => setValues((current) => ({ ...current, [category.key]: event.target.checked }))} /></label>)}</div> : <p className="text-sm text-slate-500">Chưa có nhóm thông báo đang hoạt động.</p>}
-    </Dialog>
   );
 }

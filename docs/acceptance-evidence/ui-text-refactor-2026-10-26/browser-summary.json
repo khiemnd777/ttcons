@@ -1,0 +1,3409 @@
+{
+  "status": "BROWSER_VERIFIED_WITH_FINDINGS",
+  "scope": "Agent-run Chrome browser checks, local synthetic guide data; no representative user acceptance",
+  "desktop": [
+    1440,
+    1000
+  ],
+  "mobile_emulation": [
+    390,
+    844
+  ],
+  "physical_mobile": "NOT_RUN",
+  "baseline": "fba39cdcf72a2d6714d5eac3d15eba8cdf4014c9",
+  "counts": {
+    "PASS": 122,
+    "FAIL": 4,
+    "BLOCKED": 2,
+    "NOT_RUN": 0,
+    "CHECK_REQUIRED": 0
+  },
+  "results": [
+    {
+      "view": "desktop",
+      "name": "login",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-login.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f5641196ef7f379c50045a34da9d9e2c028ea294e5440fbb66499f12ca67b186"
+    },
+    {
+      "view": "desktop",
+      "name": "dashboard",
+      "route": "/dashboard",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Dashboard tổng hợp",
+          "Toàn cảnh công trình",
+          "Hoạt động công trình",
+          "23-10-2026",
+          "22-10-2026",
+          "Báo cáo chuyên sâu",
+          "Công trình & tiến độ",
+          "Mua sắm",
+          "Vật tư / Kho",
+          "Nhân sự"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-dashboard.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "eb7be491abeb9def87f0376a55b44cc9e3a09972318665c262e7d6d2ccc8053b"
+    },
+    {
+      "view": "desktop",
+      "name": "my-work",
+      "route": "/my-work",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-my-work.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f5641196ef7f379c50045a34da9d9e2c028ea294e5440fbb66499f12ca67b186"
+    },
+    {
+      "view": "desktop",
+      "name": "progress",
+      "route": "/progress",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Tiến trình công trình",
+          "Chưa khởi động",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Thực hành Kho - dữ liệu giả định",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Khảo sát",
+          "Thực hành A · Ốp lát tầng 1",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Thiết kế",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Dự toán & Hợp đồng",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Kế hoạch",
+          "Thi công",
+          "Nghiệm thu",
+          "Bàn giao & Kế toán",
+          "Hoàn tất"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-progress.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "d2831921b4205c88382b8ce65d4de23e25c4a55de53248c7957be8316ac86436"
+    },
+    {
+      "view": "desktop",
+      "name": "projects",
+      "route": "/projects",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Công trình"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-projects.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "811cb959234a7a6e0f5fe93cb1c10a5813a53f995f6f8fd981ee066a3161360c"
+    },
+    {
+      "view": "desktop",
+      "name": "project-overview",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Tổng quan · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Nghiệm thu Đầu Vào",
+          "Năm việc cần chú ý nhất"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-project-overview.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "33464f077a7d59743991fba01caa1c4687993644bc2f6a7d481cc52b6416f80b"
+    },
+    {
+      "view": "desktop",
+      "name": "preparation",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/preparation",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ chuẩn bị",
+          "Revision hồ sơ thiết kế",
+          "Hồ sơ trong kế hoạch"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-preparation.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f733601ec617b30ea968a09dffc0fb77b8ed3037b2ee3be964adc6a132ddd0e4"
+    },
+    {
+      "view": "desktop",
+      "name": "planning",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/planning",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Kế hoạch công việc",
+          "Bàn giao hạng mục giám sát",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Hàng đợi công việc",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Nghiệm thu vật tư đầu vào",
+          "Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-planning.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "46d2b8c6ffe54ee72ee4ac3561b82ac38c3ad55c47f1cbad6d3e505f7420ce0d"
+    },
+    {
+      "view": "desktop",
+      "name": "planning-daily",
+      "route": "/planning/daily-reports",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Daily report kế hoạch",
+          "Daily reports planning"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-planning-daily.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f2b9176c3da28035baf22c7b0d0d451ab2dc74830673f506f6b779f4fceb659c"
+    },
+    {
+      "view": "desktop",
+      "name": "meeting-minutes",
+      "route": "/planning/meeting-minutes",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Biên bản họp",
+          "Biên bản họp"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-meeting-minutes.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "00357583c94f3b09261ab3148df507d6f7817cabd2c16454b0baa8658df0342f"
+    },
+    {
+      "view": "desktop",
+      "name": "planning-checklists",
+      "route": "/planning/checklists",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Checklist kế hoạch",
+          "Checklist kế hoạch"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-planning-checklists.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "36a34cc5a72fdef49fcd4b5a19a3551d2191abe09fce87e5ddb21b9ec96fe30b"
+    },
+    {
+      "view": "desktop",
+      "name": "boq",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/boq",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Dự toán & báo giá"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-boq.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f7d402f557845f351c1a819dcfa17a530f52640c11f3874e0b40529731b89c51"
+    },
+    {
+      "view": "desktop",
+      "name": "procurement",
+      "route": "/procurement",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Mua sắm vật tư"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-procurement.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "6487988565c32c61eda097d4300fbc0886b85c2961c7b5403f56fde56a44e565"
+    },
+    {
+      "view": "desktop",
+      "name": "procurement-scoped",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/procurement",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Mua sắm vật tư"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-procurement-scoped.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "9210bcadd4f1c4ff0578b9a74b14e1a199f71a67a9cf5d90d38ee788458bb662"
+    },
+    {
+      "view": "desktop",
+      "name": "contracts",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/contracts",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hợp đồng",
+          "Danh sách hợp đồng",
+          "TH-HDC-20261022 · Hợp đồng giả định cho thực hành đề xuất phát sinh",
+          "Điều kiện thực hiện hợp đồng"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-contracts.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "81adb2ace917b8a5626c6a9be1ccaddda0bbdb8afec2b28db4cb2a793c2733a9"
+    },
+    {
+      "view": "desktop",
+      "name": "warehouse",
+      "route": "/warehouse",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Kho vật tư"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-warehouse.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "64af2cebc84564f094619fb929b861eda02a5e2e6332b12601f5947f1ab0ac85"
+    },
+    {
+      "view": "desktop",
+      "name": "operations",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/operations",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thi công",
+          "24-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 0",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 0",
+          "Sẽ làm · 0",
+          "Vấn đề phát sinh · 0",
+          "22-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 0",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-operations.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "1d719772fe541887d388d48782e4bada4366ed86b40f53d15b40c1d052d400ca"
+    },
+    {
+      "view": "desktop",
+      "name": "checks",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/operations",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thi công",
+          "Kiểm tra"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-checks.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "0ca6f19f43aefe686601f600c3fc68782ab256a64166031698fd7c27c6324123"
+    },
+    {
+      "view": "desktop",
+      "name": "actions",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/operations",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thi công",
+          "Cần xử lý",
+          "Thực hành: thay đổi vật liệu khu vực A"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-actions.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "12e919f361ffa2cd7d4b5bb9888335cdf67e832f5a27759dacad9ecb720b0286"
+    },
+    {
+      "view": "desktop",
+      "name": "rework",
+      "route": "/rework",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-rework.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "0cb7ea6bd37c8b0cfecc4552044f85e0c768b4f9e692934be910e56e06e4e83e"
+    },
+    {
+      "view": "desktop",
+      "name": "acceptance",
+      "route": "/projects/f3d6a673-78f1-4fff-9830-9831478c99e1/acceptance",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Nghiệm thu",
+          "Nghiệm thu hoàn thành công trình mẫu",
+          "Checklist nghiệm thu",
+          "Ghi chú biên bản"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-acceptance.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "7779afb9453a0339ef9a4181550d0471581ea2f6cd20fa044db95cc3cbfd0d98"
+    },
+    {
+      "view": "desktop",
+      "name": "handover",
+      "route": "/projects/f3d6a673-78f1-4fff-9830-9831478c99e1/handover",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn giao",
+          "Danh sách hồ sơ",
+          "TH-BG-20261022",
+          "Nguồn và đại diện",
+          "Thời gian và ghi chú"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-handover.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "054d41402d1f415be3f0abaaf79b29367dc30f8b94bf00c71366a75fda0964c8"
+    },
+    {
+      "view": "desktop",
+      "name": "accounting",
+      "route": "/projects/f3d6a673-78f1-4fff-9830-9831478c99e1/accounting",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ bàn giao kế toán"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-accounting.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "4afe49a05ddc421c6c44a216eada7a0cbaea3cdbd4944575a5bc9f45ed891b4e"
+    },
+    {
+      "view": "desktop",
+      "name": "partners-input",
+      "route": "/core-data/input",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đối tác"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-partners-input.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "fb1981116b27f4c6a3da92af0633cb15e421660ca25bb7481fdbbe54e39c9496"
+    },
+    {
+      "view": "desktop",
+      "name": "partners-output",
+      "route": "/core-data/output",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Đối tác"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-partners-output.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "943c29f4f19e2a136e8c3f5b241c7b5ced81030670170dbf5b97bcc542a343e3"
+    },
+    {
+      "view": "desktop",
+      "name": "staff",
+      "route": "/staff",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Nhân sự"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-staff.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "fefc5677928c0632a6ceda7cf640df12406c55fa256b134bfc9dd85a75caed79"
+    },
+    {
+      "view": "desktop",
+      "name": "roles",
+      "route": "/roles",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Vai trò"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-roles.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "1cd0f1d91a6bbbae4335bb6cf52817b775e28962c2ada0251f2d06d08036c2c8"
+    },
+    {
+      "view": "desktop",
+      "name": "permissions",
+      "route": "/permissions",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Phân quyền"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-permissions.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "e001e373ce100efcea7be0aa5ecfeaa06e3e950cdabf76b141ae33a5895265aa"
+    },
+    {
+      "view": "desktop",
+      "name": "audit",
+      "route": "/audit",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Audit toàn hệ thống"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-audit.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "4233d5e7de7a884d2ba68cbf34002758fb8a1e0a34e49cc362f4161c3b90e948"
+    },
+    {
+      "view": "desktop",
+      "name": "event-logs",
+      "route": "/event-logs",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Nhật ký sự kiện"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-event-logs.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "35862e7d425c8b82a5ca3623d24c5c09a48a1726925e7e64dabdcf960a8fcdef"
+    },
+    {
+      "view": "desktop",
+      "name": "statistics",
+      "route": "/statistics/projects",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-statistics.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "ed81315d07cbddad63b32679f1a2323202d38e106a0cfff22806a1f1dfce4900"
+    },
+    {
+      "view": "desktop",
+      "name": "reports",
+      "route": "/reports",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1441,
+        "dialog": null,
+        "heading": [
+          "Báo cáo"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-reports.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f86a5f2ae0aacb9a83a3a68839c7751720742c19b1421f94c70a31e45e9b9d99"
+    },
+    {
+      "view": "desktop",
+      "name": "notifications",
+      "route": "/notifications",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thông báo"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-notifications.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "38b661da534cc57bd65d412c5b1641811cb46102d5be86405d207247ae15efd9"
+    },
+    {
+      "view": "desktop",
+      "name": "profile",
+      "route": "/profile",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-profile.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "2b368ad5d4f1135cf33b467db2a12e728fb84a1c6355608300b9c02ae97752a0"
+    },
+    {
+      "view": "desktop",
+      "name": "settings",
+      "route": "/settings",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-settings.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "3962a11a3220ffbd827dd49e7377225a2b196ac992aff61f1a2e98a0e88e01ae"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-edit-dialog",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 304,
+          "bottom": 696,
+          "width": 576
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Chỉnh sửa thông tin"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-profile-edit-dialog.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "0a1016c8fad617ac543d0161cf8802050f2575b3abadd9524b13dc9a114ba62e"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-avatar-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Ảnh được chuẩn hóa và lưu trong kho bảo vệ.",
+      "openScreenshot": "desktop-help-Vcchlunhidin.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 496,
+          "right": 944,
+          "top": 298,
+          "bottom": 702,
+          "width": 448
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Cập nhật ảnh đại diện"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-profile-avatar-help.png",
+      "status": "PASS",
+      "screenshot_sha256": "d0ca679460b66cf7a6528e236b7a6a9204fe234864e7d2f69938656199091d6c"
+    },
+    {
+      "view": "desktop",
+      "name": "profile-password-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 268,
+          "bottom": 732,
+          "width": 576
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Đổi mật khẩu"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-profile-password-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "028a0fe8c776fbaeabb7b5a7e61192be808fef2435b43a7292a0f095bbc78c9b"
+    },
+    {
+      "view": "desktop",
+      "name": "statistics-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.",
+      "openScreenshot": "desktop-help-CchtnhvphmviCngtrnhtin.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-statistics-help.png",
+      "status": "PASS",
+      "screenshot_sha256": "d4cb86ee8455a0ec8785ecc4b3e5e39598bccbd231c8926bc7f3baf5b3262e25"
+    },
+    {
+      "view": "desktop",
+      "name": "accounting-help",
+      "helpText": "Consflow ghi nhận bàn giao và tiếp nhận hồ sơ. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA.",
+      "openScreenshot": "desktop-help-Phmvihsbngiaokton.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ bàn giao kế toán"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-accounting-help.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f1dd83e255ba12f96bc88836ab011fae591f36965273e2ce35de85e77cca607c"
+    },
+    {
+      "view": "desktop",
+      "name": "rework-help",
+      "helpText": "Sửa lỗi trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ.",
+      "openScreenshot": "desktop-help-Phnbitsalivlpkhochli.png",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-rework-help.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "e2aef7662b4be7896790ae1892d84fff2e792a68bb94b64bc894218bd854adbf"
+    },
+    {
+      "view": "desktop",
+      "name": "notifications-dialog",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 378,
+          "bottom": 622,
+          "width": 576
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-notifications-dialog.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "65b900c9e794a1806e40bb5bd41018524e5bc521b13b2601a107c92fe197e34c"
+    },
+    {
+      "view": "desktop",
+      "name": "staff-import-dialog",
+      "evidence_dir": "browser-developer",
+      "actor": "developer",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 160,
+          "right": 1280,
+          "top": 284,
+          "bottom": 716,
+          "width": 1120
+        },
+        "heading": [
+          "Nhân sự",
+          "Import tài khoản nhân sự",
+          "1. Chuẩn bị tệp"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-staff-import-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "5195c9a87fc7705c95dae4ccad33952d3cd19a15ff7ce046d1faf61c744bef85"
+    },
+    {
+      "view": "desktop",
+      "name": "staff-create-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 88.5,
+          "bottom": 911.5,
+          "width": 800
+        },
+        "heading": [
+          "Nhân sự",
+          "Tạo nhân sự",
+          "Thông tin nhân sự",
+          "Tài khoản đăng nhập"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-staff-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "6ed26b2cbef134ad05c27f36717eab6434eff86f267a3807c78341e44d52da5e"
+    },
+    {
+      "view": "desktop",
+      "name": "settings-seal-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 328,
+          "bottom": 692,
+          "width": 576
+        },
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu",
+          "Thêm tài nguyên con dấu"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-settings-seal-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "da8928d93227f3d0ce996e52240448e92a44cd85a204a2b6e396ab9c4549cc27"
+    },
+    {
+      "view": "desktop",
+      "name": "project-discussion-rail",
+      "railCount": 1,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-project-discussion-rail.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "a19da9cc0b792058a170dc19ca037cdfcd7ab5ebb10a5a2cebaa6b40567e95f4"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-pipeline-builder",
+      "evidence_dir": "browser-extended",
+      "currentScreenshot": "desktop-protected-pipeline-builder-current.png",
+      "baselineScreenshot": "desktop-protected-pipeline-builder-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Thư viện node",
+        "Workflow",
+        "Tiếp nhận dự án",
+        "Khảo sát",
+        "Họp báo cáo khảo sát",
+        "Thiết kế",
+        "BOQ (Không thiết kế)",
+        "BOQ (Có thiết kế)",
+        "Chốt Hợp đồng với chủ đầu tư",
+        "Bóc tách và lấy giá đầu vào",
+        "Đàm phán giá",
+        "Hợp đồng và tạm ứng đầu vào",
+        "Kế hoạch thi công",
+        "Thi công",
+        "Nghiệm thu Đầu Vào",
+        "Nghiệm thu Đầu Ra",
+        "Kết thúc: Bàn giao + Tài chính công trình"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Thư viện node",
+          "Workflow",
+          "Tiếp nhận dự án",
+          "Khảo sát",
+          "Họp báo cáo khảo sát",
+          "Thiết kế",
+          "BOQ (Không thiết kế)",
+          "BOQ (Có thiết kế)",
+          "Chốt Hợp đồng với chủ đầu tư",
+          "Bóc tách và lấy giá đầu vào",
+          "Đàm phán giá",
+          "Hợp đồng và tạm ứng đầu vào",
+          "Kế hoạch thi công",
+          "Thi công",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu Đầu Ra",
+          "Kết thúc: Bàn giao + Tài chính công trình"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-protected-pipeline-builder.png",
+      "status": "PASS",
+      "screenshot_sha256": "77b496aaa4b338cd32b206334c80dc0b5121a6a5dcece5d025c25b36f312e707"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-workflow-forms",
+      "currentScreenshot": "desktop-protected-workflow-forms-current.png",
+      "baselineScreenshot": "desktop-protected-workflow-forms-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Workflow Forms",
+        "Thư viện biểu mẫu",
+        "Checklist",
+        "Cấu trúc biểu mẫu"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Workflow Forms",
+          "Thư viện biểu mẫu",
+          "Checklist",
+          "Cấu trúc biểu mẫu"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-protected-workflow-forms.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "45ef4300dbf915079148e6cbc72b85415c7a5043393c200e02621b2b27142acb"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-project-pipeline",
+      "currentScreenshot": "desktop-protected-project-pipeline-current.png",
+      "baselineScreenshot": "desktop-protected-project-pipeline-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Quy trình",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-protected-project-pipeline.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "6ca2d5b1b06006d7d82cc4675b86e442d20b6db3bc3d8d4b945e272e80673834"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-embedded-form",
+      "evidence_dir": "browser-recheck",
+      "currentScreenshot": "desktop-protected-embedded-form-current.png",
+      "baselineScreenshot": "desktop-protected-embedded-form-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Xác nhận điểm bắt đầu",
+        "Không có điều kiện đang chặn",
+        "Xác nhận điểm bắt đầu",
+        "1 hồ sơ minh chứng",
+        "Hồ sơ đã chốt · Có thể chỉnh sửa"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Xác nhận điểm bắt đầu",
+          "Không có điều kiện đang chặn",
+          "Xác nhận điểm bắt đầu",
+          "1 hồ sơ minh chứng",
+          "Hồ sơ đã chốt · Có thể chỉnh sửa"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-protected-embedded-form.png",
+      "status": "PASS",
+      "screenshot_sha256": "9583173bc0e78c27efe062fafdc5a0a7e1969b289a30ddc7129fd825ce350aa5"
+    },
+    {
+      "view": "mobile",
+      "name": "login",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-login.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "953b33e0262bd7d92e3fcd669ca680b235e51af0cd5244f1673ff0f9e479c017"
+    },
+    {
+      "view": "mobile",
+      "name": "dashboard",
+      "route": "/dashboard",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Dashboard tổng hợp",
+          "Toàn cảnh công trình",
+          "Hoạt động công trình",
+          "23-10-2026",
+          "22-10-2026",
+          "Báo cáo chuyên sâu",
+          "Công trình & tiến độ",
+          "Mua sắm",
+          "Vật tư / Kho",
+          "Nhân sự"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-dashboard.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f26cd840700747587f76bb3c68e6cf9172ac43070fe02bc86b516db58a38aecc"
+    },
+    {
+      "view": "mobile",
+      "name": "my-work",
+      "route": "/my-work",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-my-work.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "953b33e0262bd7d92e3fcd669ca680b235e51af0cd5244f1673ff0f9e479c017"
+    },
+    {
+      "view": "mobile",
+      "name": "progress",
+      "route": "/progress",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Tiến trình công trình",
+          "Chưa khởi động",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Thực hành Kho - dữ liệu giả định",
+          "Công trình mẫu mới · 22/10/2026 03:20"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-progress.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "de4f90faf6245774cdc64753b5ac38ced6c00740853dbb93337d0ca78179835a"
+    },
+    {
+      "view": "mobile",
+      "name": "projects",
+      "route": "/projects",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Công trình"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-projects.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f4c58b117d57718eb960e34532f9c3067177105e3cfaa7445e047c391945ab00"
+    },
+    {
+      "view": "mobile",
+      "name": "project-overview",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Tổng quan · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Nghiệm thu Đầu Vào",
+          "Năm việc cần chú ý nhất"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-project-overview.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "9c8083c32279afb63a7185f8701145850e4ecb847e7e2fd42a7770937da0a332"
+    },
+    {
+      "view": "mobile",
+      "name": "preparation",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/preparation",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ chuẩn bị",
+          "Revision hồ sơ thiết kế",
+          "Hồ sơ trong kế hoạch"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-preparation.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f6db516824bab608588c22497d8b6cd875b53d9819030922d51b60aa7f11fc38"
+    },
+    {
+      "view": "mobile",
+      "name": "planning",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/planning",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Kế hoạch công việc",
+          "Bàn giao hạng mục giám sát",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Hàng đợi công việc",
+          "Nghiệm thu gói thầu phụ và khối lượng",
+          "Nghiệm thu vật tư đầu vào",
+          "Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-planning.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "f8d751f27eebf8c0ceca21e0e38a74448254d89e915b53b2105ce0e826d1e9e9"
+    },
+    {
+      "view": "mobile",
+      "name": "planning-daily",
+      "route": "/planning/daily-reports",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Daily report kế hoạch",
+          "Daily reports planning"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-planning-daily.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "424b72de83e9b9c3cd364c5612c698b226c460fafe85560473c8d073cff3ea54"
+    },
+    {
+      "view": "mobile",
+      "name": "meeting-minutes",
+      "route": "/planning/meeting-minutes",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Biên bản họp",
+          "Biên bản họp"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-meeting-minutes.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "ba7d71ea52ec80c1fd9bc9d8ce466ba8ec3ee695e9e5b65ae13b54ee5404adea"
+    },
+    {
+      "view": "mobile",
+      "name": "planning-checklists",
+      "route": "/planning/checklists",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Checklist kế hoạch",
+          "Checklist kế hoạch"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-planning-checklists.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "413653e0b6c59fa06741aaa7f344a0d5a5f766a5a249a277c3ecdd03b8208655"
+    },
+    {
+      "view": "mobile",
+      "name": "boq",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/boq",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Dự toán & báo giá"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-boq.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "df46a4da17ff5fc9f25e288ba17b7edda5bd5d6ee7466de1c0b9184f15f43f46"
+    },
+    {
+      "view": "mobile",
+      "name": "procurement",
+      "route": "/procurement",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Mua sắm vật tư"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-procurement.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "b6e8537890482e4d505303430983589201f24ced2da04cbb71d9611a3bc8fae8"
+    },
+    {
+      "view": "mobile",
+      "name": "procurement-scoped",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/procurement",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Mua sắm vật tư"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-procurement-scoped.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "dc72040e9e421c4de41fa24f9fc213eeff14be9a2972174e2c2fc22725cb98c9"
+    },
+    {
+      "view": "mobile",
+      "name": "contracts",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/contracts",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Hợp đồng",
+          "Danh sách hợp đồng",
+          "TH-HDC-20261022 · Hợp đồng giả định cho thực hành đề xuất phát sinh",
+          "Điều kiện thực hiện hợp đồng"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-contracts.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "299abdf61957d225f1e4ba0318e5f70f7abe946738ca1ebdf4c41ed049dabce0"
+    },
+    {
+      "view": "mobile",
+      "name": "warehouse",
+      "route": "/warehouse",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Kho vật tư"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-warehouse.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "0debf22acf5e84047353bcf7d8a2471e86adbe797895f6cd6d6fdf9084eecaa6"
+    },
+    {
+      "view": "mobile",
+      "name": "operations",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/operations",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thi công",
+          "24-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 0",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 0",
+          "Sẽ làm · 0",
+          "Vấn đề phát sinh · 0",
+          "22-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 0",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-operations.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "254c7a0b6552ec2e040f26cfea0fe64a43b758234c177d4503da2833ce28b0c5"
+    },
+    {
+      "view": "mobile",
+      "name": "checks",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/operations",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thi công",
+          "Kiểm tra"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-checks.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "d6bd73c85221221724ec12505b721adf541a103a10886d8814bca01e0756c8fc"
+    },
+    {
+      "view": "mobile",
+      "name": "actions",
+      "route": "/projects/2885d835-e21e-4c9f-a194-16acaa776857/operations",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thi công",
+          "Cần xử lý",
+          "Thực hành: thay đổi vật liệu khu vực A"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-actions.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "5493712be605f245f74f6f67881d0cd249bbabf46407bfd9bf7354a7589a3270"
+    },
+    {
+      "view": "mobile",
+      "name": "rework",
+      "route": "/rework",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-rework.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "da98450f45d9fe2919f2c94566abec21213996bb28f601bd407db9bf1566d933"
+    },
+    {
+      "view": "mobile",
+      "name": "acceptance",
+      "route": "/projects/f3d6a673-78f1-4fff-9830-9831478c99e1/acceptance",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Nghiệm thu",
+          "Nghiệm thu hoàn thành công trình mẫu",
+          "Checklist nghiệm thu",
+          "Ghi chú biên bản"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-acceptance.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "d50311a7ddfb4b5ea47c4bc0e378d51c6c5b8d4c19d70d520f9681af0fd59be2"
+    },
+    {
+      "view": "mobile",
+      "name": "handover",
+      "route": "/projects/f3d6a673-78f1-4fff-9830-9831478c99e1/handover",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn giao",
+          "Danh sách hồ sơ",
+          "TH-BG-20261022",
+          "Nguồn và đại diện",
+          "Thời gian và ghi chú"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-handover.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "9981c3b775dcae6ca28e49d41932632dd4f3e25a9ef1ce51c1f23440f903578a"
+    },
+    {
+      "view": "mobile",
+      "name": "accounting",
+      "route": "/projects/f3d6a673-78f1-4fff-9830-9831478c99e1/accounting",
+      "leftoverCopy": 0,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ bàn giao kế toán"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-accounting.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "e70f33d396c0867fe2bdf446e8faff1488f1bc3339d956f3935d818e16435041"
+    },
+    {
+      "view": "mobile",
+      "name": "partners-input",
+      "route": "/core-data/input",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đối tác"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-partners-input.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "502e7b2eeb4b73120d6df54b40bda2bf66db7ecc6fd2648144a40be94d80cd1f"
+    },
+    {
+      "view": "mobile",
+      "name": "partners-output",
+      "route": "/core-data/output",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Đối tác"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-partners-output.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "1de7d68929cbd9ffe74557804980fbbef529644e8bcd98d4962cf1e5e2020f77"
+    },
+    {
+      "view": "mobile",
+      "name": "staff",
+      "route": "/staff",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Nhân sự"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-staff.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "98a8a445a55f5a36491f92fcdeb56a3d4b4dd572a1dcf89dcdbdf67ef9491419"
+    },
+    {
+      "view": "mobile",
+      "name": "roles",
+      "route": "/roles",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Vai trò"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-roles.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "528c569dc5466809d182603b0500cbda43d4dbfc5b362dff6a24de8c5e3544c6"
+    },
+    {
+      "view": "mobile",
+      "name": "permissions",
+      "route": "/permissions",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Phân quyền"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-permissions.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "c3e1d433f7403d6e19a0f0d0980d00eca8de514874ddc9b138c4bae7b288e4b6"
+    },
+    {
+      "view": "mobile",
+      "name": "audit",
+      "evidence_dir": "browser-mobile-layout",
+      "route": "/audit",
+      "leftoverCopy": 1,
+      "baselineGeometry": {
+        "layoutViewport": 820,
+        "clientWidth": 390,
+        "documentWidth": 820,
+        "viewport": 390
+      },
+      "measurement": {
+        "layoutViewport": 820,
+        "clientWidth": 390,
+        "documentWidth": 820,
+        "dialog": null,
+        "heading": [
+          "Audit toàn hệ thống"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-audit-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 820/390",
+      "screenshot_sha256": "1c91749024c52dc827353561b0e46b153c883dafd153be5fac7a841dbd6ccf36"
+    },
+    {
+      "view": "mobile",
+      "name": "event-logs",
+      "evidence_dir": "browser-mobile-layout",
+      "route": "/event-logs",
+      "leftoverCopy": 1,
+      "baselineGeometry": {
+        "layoutViewport": 814,
+        "clientWidth": 390,
+        "documentWidth": 814,
+        "viewport": 390
+      },
+      "measurement": {
+        "layoutViewport": 814,
+        "clientWidth": 390,
+        "documentWidth": 814,
+        "dialog": null,
+        "heading": [
+          "Nhật ký sự kiện"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-event-logs-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 814/390",
+      "screenshot_sha256": "be470af5e52f7b041ead57e9f8ecdc4fb1b23b6d719fba7056d1b4e84b1272eb"
+    },
+    {
+      "view": "mobile",
+      "name": "statistics",
+      "route": "/statistics/projects",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-statistics.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "3523eb9d18b6b97806358e6df0260d2b6a5085ccc85ae9b328b6b96ba5baeda5"
+    },
+    {
+      "view": "mobile",
+      "name": "reports",
+      "route": "/reports",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Báo cáo"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-reports.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "9a00c3aefce9e06813adc0800557b698ee05f18b0e6c150af09243837f9eb393"
+    },
+    {
+      "view": "mobile",
+      "name": "notifications",
+      "route": "/notifications",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thông báo"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-notifications.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "fb973d2587242560d5e98bd56dc451dd49df8880463405d01fc62886b4b3793b"
+    },
+    {
+      "view": "mobile",
+      "name": "profile",
+      "route": "/profile",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-profile.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "2c24f2c72502dec162dd76c30b3e7a330a9e44db5d0d87f06eb0ce966347e06b"
+    },
+    {
+      "view": "mobile",
+      "name": "settings",
+      "route": "/settings",
+      "leftoverCopy": 1,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-settings.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "5d80a60cc65ec0b0e17d5086aa619338f1746c10bcd5cb8f0d9f4dbd63d35dbc"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-edit-dialog",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 226,
+          "bottom": 618,
+          "width": 358
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Chỉnh sửa thông tin"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-profile-edit-dialog.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "e5b7182e05d03bac64e49f0a6d18385f55cd556fdea0a334bedc1add5a2c45f9"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-avatar-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Ảnh được chuẩn hóa và lưu trong kho bảo vệ.",
+      "openScreenshot": "mobile-help-Vcchlunhidin.png",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 212,
+          "bottom": 632,
+          "width": 358
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Cập nhật ảnh đại diện"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-profile-avatar-help.png",
+      "status": "PASS",
+      "screenshot_sha256": "e60da07c06ac1bba6298498509c416bc291135498b34aa81bd6140b48de6bfdd"
+    },
+    {
+      "view": "mobile",
+      "name": "profile-password-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 170,
+          "bottom": 674,
+          "width": 358
+        },
+        "heading": [
+          "Hồ sơ cá nhân",
+          "Điều phối dữ liệu thực hành",
+          "Thông tin cá nhân",
+          "Bảo mật",
+          "Đổi mật khẩu"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-profile-password-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "60a98e5f41a75f034b204608b1346a8ef09ff5f5a9e8f674ce9e817430c21711"
+    },
+    {
+      "view": "mobile",
+      "name": "statistics-help",
+      "evidence_dir": "browser-recheck",
+      "helpText": "Tiến độ công trình, số vấn đề đang mở và yêu cầu đang chờ duyệt trong phạm vi được phép xem.",
+      "openScreenshot": "mobile-help-CchtnhvphmviCngtrnhtin.png",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thống kê",
+          "Công trình & tiến độ",
+          "Công trình mẫu đã hoàn thành · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 15% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 25% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 40% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 5% · 22/10/2026 03:45",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 90% · 22/10/2026 03:20",
+          "Công trình mẫu mới · 22/10/2026 03:20",
+          "Thực hành A · Ốp lát tầng 1",
+          "Thực hành Kho - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-statistics-help.png",
+      "status": "PASS",
+      "screenshot_sha256": "d9341e93da5ff31173d5086cac747320a335044ef8f409f0d7fe304ec46035d5"
+    },
+    {
+      "view": "mobile",
+      "name": "accounting-help",
+      "helpText": "Consflow ghi nhận bàn giao và tiếp nhận hồ sơ. Hạch toán, hóa đơn, thuế, thanh toán và báo cáo tài chính thực hiện trên MISA.",
+      "openScreenshot": "mobile-help-Phmvihsbngiaokton.png",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Hồ sơ bàn giao kế toán"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-accounting-help.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "0f067946f275e2b8a16862806f89290ae882242b1038e2330f2399f55abc1d5a"
+    },
+    {
+      "view": "mobile",
+      "name": "rework-help",
+      "helpText": "Sửa lỗi trong phạm vi hiện tại; lập kế hoạch lại khi ảnh hưởng thiết kế, BOQ, ngân sách hoặc tiến độ.",
+      "openScreenshot": "mobile-help-Phnbitsalivlpkhochli.png",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-rework-help.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "7ea8bbd01e40414d2444eb426f2f66064c6b3571b49391fe5fdc15306e0f2dce"
+    },
+    {
+      "view": "mobile",
+      "name": "notifications-dialog",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 290,
+          "bottom": 554,
+          "width": 358
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-notifications-dialog.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "9ddce2b91ee9e1661913120063e8b1e7c758017488e0c900b7d4f5aa9148f06a"
+    },
+    {
+      "view": "mobile",
+      "name": "staff-import-dialog",
+      "evidence_dir": "browser-developer",
+      "actor": "developer",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 147,
+          "bottom": 697,
+          "width": 358
+        },
+        "heading": [
+          "Nhân sự",
+          "Import tài khoản nhân sự",
+          "1. Chuẩn bị tệp"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-staff-import-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "f14daa506cb6b3a9b73a2e3a68876f3a57dcb9e93c4ef06f5e00d75f63c82d19"
+    },
+    {
+      "view": "mobile",
+      "name": "staff-create-dialog",
+      "evidence_dir": "browser-recheck",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "bottom": 828,
+          "width": 358
+        },
+        "heading": [
+          "Nhân sự",
+          "Tạo nhân sự",
+          "Thông tin nhân sự",
+          "Tài khoản đăng nhập"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-staff-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "ba79c9a7677ffb7a78d838b593eca4fc4cba8e7ca57914500a0fc0045c2b8c78"
+    },
+    {
+      "view": "mobile",
+      "name": "settings-seal-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 242,
+          "bottom": 622,
+          "width": 358
+        },
+        "heading": [
+          "Cấu hình",
+          "Tài nguyên con dấu",
+          "Thêm tài nguyên con dấu"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-settings-seal-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "39e8c8b3bcd549e16543f7bdf880e0298d10a506d6384b0546e859f5e6032f79"
+    },
+    {
+      "view": "mobile",
+      "name": "project-discussion-rail",
+      "evidence_dir": "browser-mobile-layout",
+      "railCount": 1,
+      "baselineGeometry": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540,
+        "viewport": 390
+      },
+      "measurement": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-project-discussion-rail-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 540/390",
+      "screenshot_sha256": "a64f5072c1c4848c3763ceee495adc1c511a75566c17743f988770f288c13db2"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-pipeline-builder",
+      "evidence_dir": "browser-extended",
+      "currentScreenshot": "mobile-protected-pipeline-builder-current.png",
+      "baselineScreenshot": "mobile-protected-pipeline-builder-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Thư viện node",
+        "Workflow",
+        "Tiếp nhận dự án",
+        "Khảo sát",
+        "Họp báo cáo khảo sát",
+        "Thiết kế",
+        "BOQ (Không thiết kế)",
+        "BOQ (Có thiết kế)",
+        "Chốt Hợp đồng với chủ đầu tư",
+        "Bóc tách và lấy giá đầu vào",
+        "Đàm phán giá",
+        "Hợp đồng và tạm ứng đầu vào",
+        "Kế hoạch thi công",
+        "Thi công",
+        "Nghiệm thu Đầu Vào",
+        "Nghiệm thu Đầu Ra",
+        "Kết thúc: Bàn giao + Tài chính công trình"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Thư viện node",
+          "Workflow",
+          "Tiếp nhận dự án",
+          "Khảo sát",
+          "Họp báo cáo khảo sát",
+          "Thiết kế",
+          "BOQ (Không thiết kế)",
+          "BOQ (Có thiết kế)",
+          "Chốt Hợp đồng với chủ đầu tư",
+          "Bóc tách và lấy giá đầu vào",
+          "Đàm phán giá",
+          "Hợp đồng và tạm ứng đầu vào",
+          "Kế hoạch thi công",
+          "Thi công",
+          "Nghiệm thu Đầu Vào",
+          "Nghiệm thu Đầu Ra",
+          "Kết thúc: Bàn giao + Tài chính công trình"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-protected-pipeline-builder.png",
+      "status": "PASS",
+      "screenshot_sha256": "b48aa270971f1a7eb3fa22d2494646d88acc31ca76562a71ae84a77eb51b09a9"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-workflow-forms",
+      "currentScreenshot": "mobile-protected-workflow-forms-current.png",
+      "baselineScreenshot": "mobile-protected-workflow-forms-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Workflow Forms",
+        "Thư viện biểu mẫu",
+        "Checklist",
+        "Cấu trúc biểu mẫu"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Workflow Forms",
+          "Thư viện biểu mẫu",
+          "Checklist",
+          "Cấu trúc biểu mẫu"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-protected-workflow-forms.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "861b523e1f243c5e48bcd01ea8d9e77a9a2aaa97d71da57cae1f683626289d20"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-project-pipeline",
+      "currentScreenshot": "mobile-protected-project-pipeline-current.png",
+      "baselineScreenshot": "mobile-protected-project-pipeline-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Quy trình",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-protected-project-pipeline.png",
+      "status": "PASS",
+      "evidence_dir": "browser",
+      "screenshot_sha256": "af32516f25a335d60cf8bc52da5b6d71008b045efdee8547096e38b7e8bd6fb1"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-embedded-form",
+      "evidence_dir": "browser-recheck",
+      "currentScreenshot": "mobile-protected-embedded-form-current.png",
+      "baselineScreenshot": "mobile-protected-embedded-form-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Xác nhận điểm bắt đầu",
+        "Không có điều kiện đang chặn",
+        "Xác nhận điểm bắt đầu",
+        "1 hồ sơ minh chứng",
+        "Hồ sơ đã chốt · Có thể chỉnh sửa"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Xác nhận điểm bắt đầu",
+          "Không có điều kiện đang chặn",
+          "Xác nhận điểm bắt đầu",
+          "1 hồ sơ minh chứng",
+          "Hồ sơ đã chốt · Có thể chỉnh sửa"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-protected-embedded-form.png",
+      "status": "PASS",
+      "screenshot_sha256": "876c4c45b2d4ed8ec37ca07c3d7387d381f96565cbbf6f90670d841d6ab328b9"
+    },
+    {
+      "view": "desktop",
+      "name": "project-import-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 160,
+          "right": 1280,
+          "top": 243,
+          "bottom": 757,
+          "width": 1120
+        },
+        "heading": [
+          "Công trình",
+          "Import công trình",
+          "1. Chuẩn bị file từ mẫu hiện hành"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-project-import-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "2c64e8486f1afb9c3b312defa773684f4e55b8835476acf111214d9ae11014d0"
+    },
+    {
+      "view": "desktop",
+      "name": "project-export-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 223,
+          "bottom": 777,
+          "width": 800
+        },
+        "heading": [
+          "Công trình",
+          "Xuất công trình"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-project-export-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "48a7b0f32fe5bb6b5be57099e4d0aaf0f1de0c7e44e1bbebcc61e419b3ea368f"
+    },
+    {
+      "view": "desktop",
+      "name": "boq-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 219.5,
+          "bottom": 780.5,
+          "width": 800
+        },
+        "heading": [
+          "Dự toán & báo giá",
+          "Thêm dòng dự toán"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-boq-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "3eb06a9bc902c0d25d7ef571aa38585a397f044caed2a1c968f28b564b8f14cc"
+    },
+    {
+      "view": "desktop",
+      "name": "acceptance-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 16,
+          "right": 1424,
+          "top": 16,
+          "bottom": 984,
+          "width": 1408
+        },
+        "heading": [
+          "Nghiệm thu",
+          "Nghiệm thu hoàn thành công trình mẫu",
+          "Checklist nghiệm thu",
+          "Ghi chú biên bản",
+          "Tạo biên bản nghiệm thu",
+          "Thông tin biên bản",
+          "Tiêu chí nghiệm thu"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-acceptance-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "5573abd13739f76f630b7570301b189c70efda0625208acffd84900bf5415883"
+    },
+    {
+      "view": "desktop",
+      "name": "rework-create-dialog",
+      "evidence_dir": "browser-developer",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 320,
+          "right": 1120,
+          "top": 221,
+          "bottom": 779,
+          "width": 800
+        },
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại",
+          "Tạo yêu cầu sửa lỗi"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-rework-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "51970d094ef17a209cbe2f8954762edab83d99bb2091cff89f2a562cbe92e311"
+    },
+    {
+      "view": "desktop",
+      "name": "report-review-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1441,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 26,
+          "bottom": 994,
+          "width": 1320
+        },
+        "heading": [
+          "Báo cáo",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Duyệt báo cáo thi công · 23-10-2026",
+          "Đã xem · Lần 2",
+          "Công việc trong ngày",
+          "Minh chứng hiện trường · 1",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Bản gửi"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-report-review-rail.png",
+      "status": "PASS",
+      "screenshot_sha256": "ea3354f466fd9d2151b33aece89d5f6f1b84649fb255019995f2706275657897"
+    },
+    {
+      "view": "desktop",
+      "name": "report-detail-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 60,
+          "right": 1380,
+          "top": 16,
+          "bottom": 984,
+          "width": 1320
+        },
+        "heading": [
+          "Thi công",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 1",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "Chi tiết báo cáo thi công",
+          "Công việc trong ngày",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Minh chứng · 1",
+          "Nguồn báo cáo",
+          "Chuỗi liên quan",
+          "Kiểm tra & xử lý"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-report-detail-rail.png",
+      "status": "PASS",
+      "screenshot_sha256": "c55ee3e7b8e45a5e521a430a16ef1a197e015727a61cd43ce3b9fab6c07e1fe6"
+    },
+    {
+      "view": "mobile",
+      "name": "project-import-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 102,
+          "bottom": 742,
+          "width": 358
+        },
+        "heading": [
+          "Công trình",
+          "Import công trình",
+          "1. Chuẩn bị file từ mẫu hiện hành"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-project-import-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "324a7ab211fba4a5b303362a18fba780b7eb95de19e31f8aa1415ee6dc099473"
+    },
+    {
+      "view": "mobile",
+      "name": "project-export-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 69,
+          "bottom": 775,
+          "width": 358
+        },
+        "heading": [
+          "Công trình",
+          "Xuất công trình"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-project-export-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "67b715b6a3984eedc3f327549648dfdbab921ec873c2653038178189248d5d64"
+    },
+    {
+      "view": "mobile",
+      "name": "boq-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 18.5,
+          "bottom": 825.5,
+          "width": 358
+        },
+        "heading": [
+          "Dự toán & báo giá",
+          "Thêm dòng dự toán"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-boq-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "2e97b44fa05679a4672d9a62e129aad1c56224ca82e408294ae5666e10ff0437"
+    },
+    {
+      "view": "mobile",
+      "name": "acceptance-create-dialog",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "bottom": 828,
+          "width": 358
+        },
+        "heading": [
+          "Nghiệm thu",
+          "Nghiệm thu hoàn thành công trình mẫu",
+          "Checklist nghiệm thu",
+          "Ghi chú biên bản",
+          "Tạo biên bản nghiệm thu",
+          "Thông tin biên bản",
+          "Tiêu chí nghiệm thu"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-acceptance-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "552276537a9eb991c840f046163ddaeb3139e675865673544c5217d40cdab756"
+    },
+    {
+      "view": "mobile",
+      "name": "rework-create-dialog",
+      "evidence_dir": "browser-developer",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 142.5,
+          "bottom": 701.5,
+          "width": 358
+        },
+        "heading": [
+          "Sửa lỗi / Lập kế hoạch lại",
+          "Bảng sửa lỗi",
+          "Yêu cầu lập kế hoạch lại",
+          "Tạo yêu cầu sửa lỗi"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-rework-create-dialog.png",
+      "status": "PASS",
+      "screenshot_sha256": "7e7befe9707f83de6a30cc5e099ebc13c89349b54a5a2f49a9bf21752af811df"
+    },
+    {
+      "view": "mobile",
+      "name": "report-review-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 26,
+          "bottom": 838,
+          "width": 358
+        },
+        "heading": [
+          "Báo cáo",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Thực hành quản lý - dữ liệu giả định",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Duyệt báo cáo thi công · 23-10-2026",
+          "Đã xem · Lần 2",
+          "Công việc trong ngày",
+          "Minh chứng hiện trường · 1",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Bản gửi"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-report-review-rail.png",
+      "status": "PASS",
+      "screenshot_sha256": "aaa5733303737983930310abe0c280d35fe36e9205948bd72840f1c63a339f87"
+    },
+    {
+      "view": "mobile",
+      "name": "report-detail-rail",
+      "evidence_dir": "browser-extended",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "bottom": 828,
+          "width": 358
+        },
+        "heading": [
+          "Thi công",
+          "23-10-2026",
+          "Đã làm · 1",
+          "Đang làm · 1",
+          "Sẽ làm · 1",
+          "Vấn đề phát sinh · 0",
+          "Chi tiết báo cáo thi công",
+          "Công việc trong ngày",
+          "Nguồn lực sử dụng",
+          "Ghi chú hiện trường",
+          "Minh chứng · 1",
+          "Nguồn báo cáo",
+          "Chuỗi liên quan",
+          "Kiểm tra & xử lý"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-report-detail-rail.png",
+      "status": "PASS",
+      "screenshot_sha256": "776fc0431d10b94a359c61d54c94eb9fced1fd4c41e92e63500df48df62382de"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-project-workflow-tab",
+      "evidence_dir": "browser-workflow-tab",
+      "currentScreenshot": "desktop-protected-project-workflow-tab-current.png",
+      "baselineScreenshot": "desktop-protected-project-workflow-tab-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-protected-project-workflow-tab.png",
+      "status": "PASS",
+      "screenshot_sha256": "ffeae12b3bcb130c07abf6736558e216a893baa1d13f4a73757375e7a77cd62e"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-project-workflow-tab",
+      "evidence_dir": "browser-workflow-tab",
+      "currentScreenshot": "mobile-protected-project-workflow-tab-current.png",
+      "baselineScreenshot": "mobile-protected-project-workflow-tab-baseline.png",
+      "sameVisibleText": true,
+      "baselineHeading": [
+        "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+        "Quy trình",
+        "Giai đoạn",
+        "13. Nghiệm thu Đầu Vào"
+      ],
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Quy trình · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Quy trình",
+          "Giai đoạn",
+          "13. Nghiệm thu Đầu Vào"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-protected-project-workflow-tab.png",
+      "status": "PASS",
+      "screenshot_sha256": "165c230d7081892e9bec76938573be419c267340b176214a56cb85cb707826bf"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-mywork-startup",
+      "evidence_dir": "browser-embedded",
+      "currentRegion": "desktop-protected-mywork-startup-current-region.png",
+      "baselineRegion": "desktop-protected-mywork-startup-baseline-region.png",
+      "sameVisibleText": true,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-protected-mywork-startup.png",
+      "status": "PASS",
+      "screenshot_sha256": "c677096de4d6490c6834233135c9f3764c00c78163a0610ef108f3e7502b07f7"
+    },
+    {
+      "view": "desktop",
+      "name": "protected-discussion-workflow",
+      "evidence_dir": "browser-embedded",
+      "currentRegion": "desktop-protected-discussion-workflow-current-region.png",
+      "baselineRegion": "desktop-protected-discussion-workflow-baseline-region.png",
+      "sameVisibleText": true,
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-protected-discussion-workflow.png",
+      "status": "PASS",
+      "screenshot_sha256": "f12afbb8503badbda6a9d41e1cfb972959d307dc32269a16ff25199d3e280e98"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-mywork-startup",
+      "evidence_dir": "browser-embedded-final",
+      "currentRegion": "mobile-protected-mywork-startup-current-region.png",
+      "baselineRegion": "mobile-protected-mywork-startup-baseline-region.png",
+      "sameVisibleText": true,
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": null,
+        "heading": [
+          "Bàn làm việc",
+          "Phạm vi",
+          "Bộ lọc nhanh · Tôi phụ trách",
+          "Tìm công việc",
+          "TH-GOV-20261023 · Thực hành quản lý - dữ liệu giả định"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-protected-mywork-startup.png",
+      "status": "PASS",
+      "screenshot_sha256": "1bd26b5a906cdf9e83189a1af4f4cf4be85f8954f8bbb41557882e29345530c9"
+    },
+    {
+      "view": "mobile",
+      "name": "protected-discussion-workflow",
+      "evidence_dir": "browser-mobile-layout",
+      "currentRegion": "mobile-protected-discussion-workflow-current-region.png",
+      "baselineRegion": "mobile-protected-discussion-workflow-baseline-region.png",
+      "baselineGeometry": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540
+      },
+      "sameVisibleText": true,
+      "measurement": {
+        "layoutViewport": 540,
+        "clientWidth": 390,
+        "documentWidth": 540,
+        "dialog": null,
+        "heading": [
+          "Trao đổi · DEMO-PLAN-261022032003-2885D835 · Công trình mẫu đang lập kế hoạch 65% · 22/10/2026 03:20",
+          "Nghiệm thu gói thầu phụ và khối lượng"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "screenshot": "mobile-protected-discussion-workflow-check.png",
+      "status": "FAIL",
+      "error": "LAYOUT_FAIL: document overflow 540/390",
+      "screenshot_sha256": "bfe072cd0ec374baa9be54cf2db5adfd2cfe9e0184ddca5b642c36efb0fe7a66"
+    },
+    {
+      "view": "desktop",
+      "name": "notifications-loaded",
+      "evidence_dir": "browser-notifications-final",
+      "catalogStatus": 500,
+      "catalogRequestId": "b6f81ee5-4eb6-47e3-a4e3-ae12e284ffb6",
+      "dialogText": "Tùy chọn thông báo\n\nThông báo cần hành động hoặc bảo mật luôn được giữ trên App.\n\nChưa có nhóm thông báo đang hoạt động.\n\nHủy\nLưu tùy chọn",
+      "status": "BLOCKED",
+      "error": "API_BLOCKED: notification catalog HTTP 500; unchanged local backend image",
+      "measurement": {
+        "viewport": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "left": 432,
+          "right": 1008,
+          "top": 395,
+          "bottom": 605,
+          "width": 576
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": [],
+        "layoutViewport": 1440
+      },
+      "screenshot": "desktop-notifications-loaded-check.png",
+      "screenshot_sha256": "3a93acd904a3b98f592b4d6ff3ee4d1365c9e8e65899f14c42164d2df0f7da06"
+    },
+    {
+      "view": "mobile",
+      "name": "notifications-loaded",
+      "evidence_dir": "browser-notifications-final",
+      "catalogStatus": 500,
+      "catalogRequestId": "ccf81ee5-4eb6-47e3-a4e3-ae12e284ffb6",
+      "dialogText": "Tùy chọn thông báo\n\nThông báo cần hành động hoặc bảo mật luôn được giữ trên App.\n\nChưa có nhóm thông báo đang hoạt động.\n\nHủy\nLưu tùy chọn",
+      "status": "BLOCKED",
+      "error": "API_BLOCKED: notification catalog HTTP 500; unchanged local backend image",
+      "measurement": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "left": 16,
+          "right": 374,
+          "top": 307,
+          "bottom": 537,
+          "width": 358
+        },
+        "heading": [
+          "Thông báo",
+          "Tùy chọn thông báo"
+        ],
+        "alerts": [],
+        "layoutViewport": 390
+      },
+      "screenshot": "mobile-notifications-loaded-check.png",
+      "screenshot_sha256": "3181fdf40219f9cb31893ec924241d8255abe0ab3e97fda8ea59fa8a2c143e8b"
+    },
+    {
+      "view": "desktop",
+      "name": "recovery-requests",
+      "evidence_dir": "browser-supplement",
+      "route": "/recovery-requests",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "heading": [
+          "Yêu cầu khôi phục"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-recovery-requests.png",
+      "screenshot_sha256": "46b63d237afb1318d4d51306753d27800c9fb1195eccaea6f5b288a502134fe4"
+    },
+    {
+      "view": "desktop",
+      "name": "record-source-unavailable",
+      "evidence_dir": "browser-supplement",
+      "route": "/source-records/issue/00000000-0000-0000-0000-000000000000?project_id=2885d835-e21e-4c9f-a194-16acaa776857",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "heading": [
+          "Hồ sơ nguồn",
+          "Vấn đề công trình"
+        ],
+        "alerts": [
+          "Không tìm thấy hồ sơ hoặc anh không có quyền truy cập."
+        ],
+        "viewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-record-source-unavailable.png",
+      "screenshot_sha256": "89b8153a92ad1df93469a10208215d91561770e8730da97729a936234ccce3f1"
+    },
+    {
+      "view": "mobile",
+      "name": "recovery-requests",
+      "evidence_dir": "browser-supplement",
+      "route": "/recovery-requests",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "heading": [
+          "Yêu cầu khôi phục"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-recovery-requests.png",
+      "screenshot_sha256": "8487bf00a35ba3520ad742da2c31d3988a04b869267933ce63a40183dd5e15fe"
+    },
+    {
+      "view": "mobile",
+      "name": "record-source-unavailable",
+      "evidence_dir": "browser-supplement",
+      "route": "/source-records/issue/00000000-0000-0000-0000-000000000000?project_id=2885d835-e21e-4c9f-a194-16acaa776857",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "heading": [
+          "Hồ sơ nguồn",
+          "Vấn đề công trình"
+        ],
+        "alerts": [
+          "Không tìm thấy hồ sơ hoặc anh không có quyền truy cập."
+        ],
+        "viewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-record-source-unavailable.png",
+      "screenshot_sha256": "67819f71e6afad97a64201ec24e60895a57b0c201f5ae6f2256f667de901f89a"
+    },
+    {
+      "view": "desktop",
+      "name": "forgot-password",
+      "evidence_dir": "browser-supplement",
+      "status": "PASS",
+      "measurement": {
+        "documentWidth": 1440,
+        "layoutViewport": 1440,
+        "viewport": 1440
+      },
+      "screenshot": "desktop-forgot-password.png",
+      "screenshot_sha256": "351af6c01322bac259ce8a7a7fcdfa4737bfd9cee12f2496826fe43a25e3962a"
+    },
+    {
+      "view": "mobile",
+      "name": "forgot-password",
+      "evidence_dir": "browser-supplement",
+      "status": "PASS",
+      "measurement": {
+        "documentWidth": 390,
+        "layoutViewport": 390,
+        "viewport": 390
+      },
+      "screenshot": "mobile-forgot-password.png",
+      "screenshot_sha256": "272ed879fde67e2d01b40b05fe0b994ebd6b4eeae351ecaaf1910483db5edffe"
+    }
+  ],
+  "protected_comparisons": [
+    {
+      "view": "desktop",
+      "name": "pipeline-builder",
+      "sameVisibleText": true,
+      "current": "desktop-protected-pipeline-builder-current.png",
+      "baseline": "desktop-protected-pipeline-builder-baseline.png",
+      "evidence_dir": "browser-extended",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 0.000417
+    },
+    {
+      "view": "desktop",
+      "name": "workflow-forms",
+      "sameVisibleText": true,
+      "current": "desktop-protected-workflow-forms-current.png",
+      "baseline": "desktop-protected-workflow-forms-baseline.png",
+      "evidence_dir": "browser",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 0.000694
+    },
+    {
+      "view": "desktop",
+      "name": "project-pipeline",
+      "sameVisibleText": true,
+      "current": "desktop-protected-project-pipeline-current.png",
+      "baseline": "desktop-protected-project-pipeline-baseline.png",
+      "evidence_dir": "browser",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 0.000556
+    },
+    {
+      "view": "mobile",
+      "name": "pipeline-builder",
+      "sameVisibleText": true,
+      "current": "mobile-protected-pipeline-builder-current.png",
+      "baseline": "mobile-protected-pipeline-builder-baseline.png",
+      "evidence_dir": "browser-extended",
+      "whole_image_exact": true,
+      "whole_image_changed_percent": 0.0
+    },
+    {
+      "view": "mobile",
+      "name": "workflow-forms",
+      "sameVisibleText": true,
+      "current": "mobile-protected-workflow-forms-current.png",
+      "baseline": "mobile-protected-workflow-forms-baseline.png",
+      "evidence_dir": "browser",
+      "whole_image_exact": true,
+      "whole_image_changed_percent": 0.0
+    },
+    {
+      "view": "mobile",
+      "name": "project-pipeline",
+      "sameVisibleText": true,
+      "current": "mobile-protected-project-pipeline-current.png",
+      "baseline": "mobile-protected-project-pipeline-baseline.png",
+      "evidence_dir": "browser",
+      "whole_image_exact": true,
+      "whole_image_changed_percent": 0.0
+    },
+    {
+      "view": "desktop",
+      "name": "embedded-form",
+      "sameVisibleText": true,
+      "current": "desktop-protected-embedded-form-current.png",
+      "baseline": "desktop-protected-embedded-form-baseline.png",
+      "evidence_dir": "browser-recheck",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 0.656528,
+      "form_content_exact": true
+    },
+    {
+      "view": "mobile",
+      "name": "embedded-form",
+      "sameVisibleText": true,
+      "current": "mobile-protected-embedded-form-current.png",
+      "baseline": "mobile-protected-embedded-form-baseline.png",
+      "evidence_dir": "browser-recheck",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 0.004253,
+      "form_content_exact": true
+    },
+    {
+      "view": "desktop",
+      "name": "project-workflow-tab",
+      "sameVisibleText": true,
+      "current": "desktop-protected-project-workflow-tab-current.png",
+      "baseline": "desktop-protected-project-workflow-tab-baseline.png",
+      "evidence_dir": "browser-workflow-tab",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 3.089514
+    },
+    {
+      "view": "mobile",
+      "name": "project-workflow-tab",
+      "sameVisibleText": true,
+      "current": "mobile-protected-project-workflow-tab-current.png",
+      "baseline": "mobile-protected-project-workflow-tab-baseline.png",
+      "evidence_dir": "browser-workflow-tab",
+      "whole_image_exact": true,
+      "whole_image_changed_percent": 0.0
+    },
+    {
+      "view": "desktop",
+      "name": "mywork-startup",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "desktop-protected-mywork-startup-current-region.png",
+      "baseline": "desktop-protected-mywork-startup-baseline-region.png",
+      "evidence_dir": "browser-embedded",
+      "whole_image_exact": true,
+      "whole_image_changed_percent": 0.0
+    },
+    {
+      "view": "desktop",
+      "name": "discussion-workflow",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "desktop-protected-discussion-workflow-current-region.png",
+      "baseline": "desktop-protected-discussion-workflow-baseline-region.png",
+      "evidence_dir": "browser-embedded",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 0.002446
+    },
+    {
+      "view": "mobile",
+      "name": "discussion-workflow",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "mobile-protected-discussion-workflow-current-region.png",
+      "baseline": "mobile-protected-discussion-workflow-baseline-region.png",
+      "evidence_dir": "browser-mobile-layout",
+      "whole_image_exact": false,
+      "whole_image_changed_percent": 50.454482
+    },
+    {
+      "view": "mobile",
+      "name": "mywork-startup",
+      "region_only": true,
+      "sameVisibleText": true,
+      "current": "mobile-protected-mywork-startup-current-region.png",
+      "baseline": "mobile-protected-mywork-startup-baseline-region.png",
+      "evidence_dir": "browser-embedded-final",
+      "whole_image_exact": true,
+      "whole_image_changed_percent": 0.0
+    }
+  ],
+  "page_errors": [],
+  "findings": [
+    {
+      "id": "MOBILE-01",
+      "status": "OPEN",
+      "priority": "P1",
+      "fact": "Bốn ca mobile tại ba bề mặt có documentWidth vượt viewport cấu hình390px: Audit820, EventLogs814, Thảo luận540 (hai ca).",
+      "cause": "Đo bằng viewport cấu hình, không dùng innerWidth tự giãn của Chrome. Đối chiếu baseline được lưu ở từng ca; không tự quy lỗi cho refactor.",
+      "proposal": "Giới hạn các vùng bảng/rail trong viewport và kiểm tra lại responsive sau khi được duyệt; không đổi Pipeline/Form."
+    },
+    {
+      "id": "UI-TEXT-01",
+      "status": "OPEN",
+      "priority": "P2",
+      "fact": "Còn tagline tĩnh ở AppShell, hai thẻ Profile và hai banner báo cáo.",
+      "sources": [
+        "frontend/src/layouts/AppShell.tsx:268",
+        "frontend/src/modules/profile/ProfilePage.tsx:323",
+        "frontend/src/modules/profile/ProfilePage.tsx:347",
+        "frontend/src/modules/operations/ConstructionReportDetailDialog.tsx:241",
+        "frontend/src/modules/work-reports/WorkReportReviewDialog.tsx:280"
+      ],
+      "proposal": "Rút/bỏ copy lặp, cân nhắc help cho hướng dẫn bổ sung; AppShell phải áp riêng ngoài vùng loại trừ. Cần duyệt trước sửa."
+    },
+    {
+      "id": "LOCAL-API-01",
+      "status": "OPEN",
+      "priority": "P2",
+      "fact": "Endpoint catalog thông báo local trả HTTP500; dialog không chứng minh tải danh mục thành công.",
+      "cause": "Chưa xác định nguyên nhân gốc; backend image không đổi. Chưa quy kết cho refactor frontend.",
+      "proposal": "Chẩn đoán riêng, không sửa trong lượt browser/UAT."
+    }
+  ],
+  "limits": [
+    "Không người dùng đại diện",
+    "Không điện thoại vật lý/camera",
+    "Không lưu/phê duyệt/xóa nghiệp vụ hoặc thay quyền",
+    "Không kiểm tra mọi biến thể của mọi Workflow Form; source comparison bảo vệ 112 file và 12 hàm",
+    "InitialPasswordChange cần tài khoản must_change_password: chưa kiểm tra trực quan",
+    "Lượt đầu dùng reload dày gặp rate limit và bị loại; những ca quay về login không được tính PASS"
+  ],
+  "total": 128
+}

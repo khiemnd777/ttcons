@@ -1212,7 +1212,6 @@ function ProjectOperationsError({ error, onRetry }: { error: unknown; onRetry: (
     <>
       <PageHeader
         title="Điều hành công trình"
-        description="Tổng quan vận hành và công việc cần xử lý"
         actions={
           <Link to="/projects" className="rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
             Quay lại công trình

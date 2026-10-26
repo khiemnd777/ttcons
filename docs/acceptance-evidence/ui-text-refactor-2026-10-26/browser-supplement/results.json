@@ -1,0 +1,108 @@
+{
+  "results": [
+    {
+      "view": "desktop",
+      "name": "recovery-requests",
+      "evidence_dir": "browser-supplement",
+      "route": "/recovery-requests",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "heading": [
+          "Yêu cầu khôi phục"
+        ],
+        "alerts": [],
+        "viewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-recovery-requests.png"
+    },
+    {
+      "view": "desktop",
+      "name": "record-source-unavailable",
+      "evidence_dir": "browser-supplement",
+      "route": "/source-records/issue/00000000-0000-0000-0000-000000000000?project_id=2885d835-e21e-4c9f-a194-16acaa776857",
+      "measurement": {
+        "layoutViewport": 1440,
+        "clientWidth": 1440,
+        "documentWidth": 1440,
+        "heading": [
+          "Hồ sơ nguồn",
+          "Vấn đề công trình"
+        ],
+        "alerts": [
+          "Không tìm thấy hồ sơ hoặc anh không có quyền truy cập."
+        ],
+        "viewport": 1440
+      },
+      "status": "PASS",
+      "screenshot": "desktop-record-source-unavailable.png"
+    },
+    {
+      "view": "mobile",
+      "name": "recovery-requests",
+      "evidence_dir": "browser-supplement",
+      "route": "/recovery-requests",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "heading": [
+          "Yêu cầu khôi phục"
+        ],
+        "alerts": [],
+        "viewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-recovery-requests.png"
+    },
+    {
+      "view": "mobile",
+      "name": "record-source-unavailable",
+      "evidence_dir": "browser-supplement",
+      "route": "/source-records/issue/00000000-0000-0000-0000-000000000000?project_id=2885d835-e21e-4c9f-a194-16acaa776857",
+      "measurement": {
+        "layoutViewport": 390,
+        "clientWidth": 390,
+        "documentWidth": 390,
+        "heading": [
+          "Hồ sơ nguồn",
+          "Vấn đề công trình"
+        ],
+        "alerts": [
+          "Không tìm thấy hồ sơ hoặc anh không có quyền truy cập."
+        ],
+        "viewport": 390
+      },
+      "status": "PASS",
+      "screenshot": "mobile-record-source-unavailable.png"
+    },
+    {
+      "view": "desktop",
+      "name": "forgot-password",
+      "evidence_dir": "browser-supplement",
+      "status": "PASS",
+      "measurement": {
+        "documentWidth": 1440,
+        "layoutViewport": 1440,
+        "viewport": 1440
+      },
+      "screenshot": "desktop-forgot-password.png"
+    },
+    {
+      "view": "mobile",
+      "name": "forgot-password",
+      "evidence_dir": "browser-supplement",
+      "status": "PASS",
+      "measurement": {
+        "documentWidth": 390,
+        "layoutViewport": 390,
+        "viewport": 390
+      },
+      "screenshot": "mobile-forgot-password.png"
+    }
+  ],
+  "comparisons": [],
+  "errors": []
+}
