@@ -8,6 +8,7 @@ import type { EvidenceRecord, WorkItem } from '../../lib/types/domain';
 import { dateText } from '../../lib/utils/format';
 import { EvidencePanel } from './EvidencePanel';
 import { IncomingAcceptancePanel } from './IncomingAcceptancePanel';
+import { WordlessExplanation, WordlessLabel, useWordless } from '../../components/Wordless';
 import { MaterialSnapshotPanel } from './MaterialSnapshotPanel';
 import { OwnerClientReconciliationPanel } from './OwnerClientReconciliationPanel';
 import { OutgoingAcceptancePanel } from './OutgoingAcceptancePanel';
@@ -491,13 +492,14 @@ function HandoverPrimaryPanel({ item }: { item: WorkItem }) {
 }
 
 function PrimarySurfaceHeader({ surface, item }: { surface: WorkItemPrimarySurfaceDefinition; item: WorkItem }) {
+  const wordless = useWordless();
   return (
     <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Nội dung chính</p>
-          <h3 className="mt-0.5 text-sm font-semibold text-ink">{surface.title}</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-600">{surface.description}</p>
+          {!wordless ? <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Nội dung chính</p> : null}
+          <h3 className="mt-0.5 text-sm font-semibold text-ink"><WordlessLabel text={surface.title} label={`Mục đích: ${surface.title}`} help={surface.description} /></h3>
+          <WordlessExplanation label={`Mục đích: ${surface.title}`} className="mt-1 text-xs leading-5 text-slate-600">{surface.description}</WordlessExplanation>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs font-semibold text-slate-600">
           <SurfacePill icon={surfaceIcon(surface.kind)} label={workTypeLabel(item.work_type)} />

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ChevronDown, FilePlus2, FileText, History, Send } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
+import { WordlessExplanation, WordlessLabel, useWordless } from '../../components/Wordless';
 import { EmptyState } from '../../components/EmptyState';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { dateTimeText } from '../../lib/utils/format';
@@ -13,6 +14,10 @@ import { EvidenceDraftViewerDialog, formatEvidenceFileSize } from '../_shared/Ev
 import { EvidenceUploader, type EvidenceUploadRow } from '../_shared/EvidenceUploader';
 import { classifyEvidenceFile, evidenceSupportedFileHint } from '../_shared/evidenceFileTypes';
 import { runEvidenceUploadQueue } from './evidenceUploadQueue';
+
+function DesignReleaseEyebrow() {
+  return useWordless() ? null : <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Thiết kế</p>;
+}
 
 type PendingDesignFile = EvidenceUploadRow & {
   documentType: 'layout' | 'render_3d' | 'construction_drawing' | 'other';
@@ -100,9 +105,9 @@ export function DesignReleasePanel({ projectId, workItems = [], readOnly = false
     <section hidden={workspace.isError} className="overflow-hidden rounded-lg border border-line bg-white shadow-panel" aria-label="Revision hồ sơ thiết kế">
       <div className="flex flex-col gap-3 border-b border-line px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Thiết kế</p>
-          <h2 className="mt-1 text-base font-semibold text-ink">Revision hồ sơ thiết kế</h2>
-          <p className="mt-1 text-sm text-slate-600">Mỗi lần phát hành là một gói hồ sơ độc lập. Revision mới không tự thay revision Quản lý dự án đã bàn giao cho QS.</p>
+          <DesignReleaseEyebrow />
+          <h2 className="mt-1 text-base font-semibold text-ink"><WordlessLabel text="Revision hồ sơ thiết kế" label="Cơ chế revision thiết kế" help="Mỗi lần phát hành là một gói hồ sơ độc lập. Revision mới không tự thay revision Quản lý dự án đã bàn giao cho QS." /></h2>
+          <WordlessExplanation label="Cơ chế revision thiết kế" className="mt-1 text-sm text-slate-600">Mỗi lần phát hành là một gói hồ sơ độc lập. Revision mới không tự thay revision Quản lý dự án đã bàn giao cho QS.</WordlessExplanation>
         </div>
         {!readOnly && workspace.data.capabilities.can_manage ? (
           <button type="button" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700" onClick={() => setEditorOpen(true)}>

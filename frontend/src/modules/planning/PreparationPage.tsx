@@ -1,4 +1,5 @@
 import { roleSummary } from '../../lib/utils/roles';
+import { withWordless } from '../../lib/utils/wordless';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -66,8 +67,8 @@ export function PreparationPage() {
       ].some((value) => String(value ?? '').toLocaleLowerCase('vi').includes(needle)));
   }, [allPreparationItems, filter, search]);
   const selectedItem = allPreparationItems.find((item) => item.id === taskId);
-  const returnTo = projectPipelineReturnTo(searchParams.get('returnTo'), id, selectedItem?.run_node_id);
-  const pipelinePath = projectPipelinePath(id, selectedItem?.run_node_id);
+  const returnTo = withWordless(projectPipelineReturnTo(searchParams.get('returnTo'), id, selectedItem?.run_node_id), location.search);
+  const pipelinePath = projectPipelinePath(id, selectedItem?.run_node_id, location);
   const workflowNavigation = useMemo(() => {
     const context = buildWorkItemWorkflowNavigation(operations.data?.work_items ?? [], taskId);
     return context ? {

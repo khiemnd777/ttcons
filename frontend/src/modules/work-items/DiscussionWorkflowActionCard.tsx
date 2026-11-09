@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowUpRight, CheckCircle2, GitBranch, MessageSquareText, PlayCircle } from 'lucide-react';
 import { StatusBadge } from '../../components/StatusBadge';
+import { BannerLabel, useBannerWordless } from '../../components/Wordless';
+import { withWordless } from '../../lib/utils/wordless';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { get } from '../../lib/api/client';
 import type { ProjectOperationsTimelineNode, WorkItem } from '../../lib/types/domain';
@@ -27,6 +29,7 @@ export function DiscussionWorkflowActionCard({
   onOpenWork: (item: WorkItem) => void;
   onDiscuss: (item: WorkItem) => void;
 }) {
+  const wordless = useBannerWordless('discussion');
   const primaryWorkId = workflow.hasPipeline ? workflow.primaryWork?.id ?? '' : '';
   const detail = useQuery({
     queryKey: ['work-item', primaryWorkId],
@@ -40,13 +43,13 @@ export function DiscussionWorkflowActionCard({
   if (!workflow.hasPipeline) {
     return (
       <section className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 shadow-panel" aria-label="Bước tiếp theo của quy trình">
-        <ActionHeading label="Bước tiếp theo" />
+        {!wordless ? <ActionHeading label="Bước tiếp theo" /> : null}
         <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-600">
           <span className="rounded bg-white px-2 py-1 ring-1 ring-blue-100">Chưa khởi động</span>
         </div>
-        <h3 className="mt-3 text-sm font-semibold leading-5 text-ink">Hoàn tất thiết lập công trình</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-600">Kiểm tra thông tin, nhân sự, Quản lý dự án và điều kiện bước đầu trước khi tạo công việc thật.</p>
-        <p className="mt-2 text-xs font-medium text-blue-800">Thông tin → Nhân sự → Thiết lập</p>
+        <h3 className="mt-3 text-sm font-semibold leading-5 text-ink"><BannerLabel surface="discussion" text="Hoàn tất thiết lập công trình" help="Kiểm tra thông tin, nhân sự, Quản lý dự án và điều kiện bước đầu trước khi tạo công việc thật. Thông tin → Nhân sự → Thiết lập." /></h3>
+        {!wordless ? <><p className="mt-1 text-xs leading-5 text-slate-600">Kiểm tra thông tin, nhân sự, Quản lý dự án và điều kiện bước đầu trước khi tạo công việc thật.</p>
+        <p className="mt-2 text-xs font-medium text-blue-800">Thông tin → Nhân sự → Thiết lập</p></> : null}
         <button
           type="button"
           className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -63,14 +66,14 @@ export function DiscussionWorkflowActionCard({
     const completed = ['completed', 'closed'].includes(workflow.pipelineStatus ?? '');
     return (
       <section className="rounded-lg border border-line bg-white p-3 shadow-panel" aria-label="Bước tiếp theo của quy trình">
-        <ActionHeading label="Bước tiếp theo" />
+        {!wordless ? <ActionHeading label="Bước tiếp theo" /> : null}
         <div className="mt-3 flex items-start gap-2">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
           <div>
-            <h3 className="text-sm font-semibold text-ink">{completed ? 'Quy trình đã hoàn tất' : 'Hiện không có việc cần can thiệp'}</h3>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
+            <h3 className="text-sm font-semibold text-ink"><BannerLabel surface="discussion" text={completed ? 'Quy trình đã hoàn tất' : 'Hiện không có việc cần can thiệp'} help={completed ? 'Có thể xem lại toàn bộ giai đoạn và lịch sử xử lý.' : 'Theo dõi giai đoạn hiện tại hoặc xem các công việc sắp tới trong Quy trình.'} /></h3>
+            {!wordless ? <p className="mt-1 text-xs leading-5 text-slate-600">
               {completed ? 'Có thể xem lại toàn bộ giai đoạn và lịch sử xử lý.' : 'Theo dõi giai đoạn hiện tại hoặc xem các công việc sắp tới trong Quy trình.'}
-            </p>
+            </p> : null}
           </div>
         </div>
         <WorkflowLink projectId={projectId} label={completed ? 'Xem lịch sử quy trình' : 'Xem quy trình'} />
@@ -99,12 +102,12 @@ export function DiscussionWorkflowActionCard({
 
   return (
     <section className="rounded-lg border border-blue-200 bg-white p-3 shadow-panel" aria-label="Bước tiếp theo của quy trình">
-      <ActionHeading label="Bước tiếp theo" />
-      <p className="mt-2 truncate text-xs font-semibold text-blue-700" title={workflow.currentNode?.name ?? currentWork.run_node_name}>
+      {!wordless ? <ActionHeading label="Bước tiếp theo" /> : null}
+      {!wordless ? <p className="mt-2 truncate text-xs font-semibold text-blue-700" title={workflow.currentNode?.name ?? currentWork.run_node_name}>
         {workflow.currentNode?.name ?? currentWork.run_node_name ?? 'Giai đoạn hiện tại'}
-      </p>
+      </p> : null}
       <div className="mt-2"><StatusBadge status={currentWork.status} /></div>
-      <h3 className="mt-3 break-words text-sm font-semibold leading-5 text-ink">{currentWork.title}</h3>
+      <h3 className="mt-3 break-words text-sm font-semibold leading-5 text-ink"><BannerLabel surface="discussion" text={currentWork.title} help={`Giai đoạn: ${workflow.currentNode?.name ?? currentWork.run_node_name ?? 'Giai đoạn hiện tại'}`} /></h3>
       <dl className="mt-2 space-y-1 text-xs leading-5 text-slate-600">
         <div className="flex gap-1"><dt className="shrink-0">Phụ trách:</dt><dd className="min-w-0 font-semibold text-slate-800">{workOwner(currentWork)}</dd></div>
         <div className="flex gap-1"><dt>Hạn:</dt><dd className="font-semibold text-slate-800">{dateText(workDueDate(currentWork), '—')}</dd></div>
@@ -140,8 +143,9 @@ function ActionHeading({ label }: { label: string }) {
 }
 
 function WorkflowLink({ projectId, label }: { projectId: string; label: string }) {
+  const wordless = useBannerWordless('discussion');
   return (
-    <Link className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50" to={`/projects/${projectId}/pipeline`}>
+    <Link className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50" to={withWordless(`/projects/${projectId}/pipeline`, wordless ? '?wordless=1' : '?wordless=0')}>
       {label}
       <ArrowUpRight className="h-3.5 w-3.5" />
     </Link>

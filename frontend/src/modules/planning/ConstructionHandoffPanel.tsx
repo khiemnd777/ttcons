@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, ClipboardCheck, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
+import { WordlessExplanation, WordlessLabel, useWordless } from '../../components/Wordless';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
 import { useToast } from '../../components/ToastProvider';
 import { useAuth } from '../../lib/auth/AuthContext';
@@ -25,6 +26,10 @@ import {
   workItemAutoStartedNotice,
   type WorkItemMutationResult,
 } from '../work-items/workItemMutationContext';
+
+function HandoffEyebrow() {
+  return useWordless() ? null : <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Planning → Thi công</p>;
+}
 
 type EditableItem = ConstructionHandoffCandidate & {
   local_id: string;
@@ -176,13 +181,13 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="grid h-9 w-9 place-items-center rounded-md bg-blue-50 text-blue-700"><ClipboardCheck className="h-5 w-5" /></span>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Planning → Thi công</p>
-                    <h2 className="mt-0.5 font-bold text-ink">Bàn giao hạng mục giám sát</h2>
+                    <HandoffEyebrow />
+                    <h2 className="mt-0.5 font-bold text-ink"><WordlessLabel text="Bàn giao hạng mục giám sát" label="Cơ chế bàn giao giám sát" help="Chốt danh sách một lần tại Planning; hệ thống tạo sẵn đầu việc và kiểm tra để giám sát viên chỉ cần kiểm tra, khắc phục và báo cáo." /></h2>
                   </div>
                 </div>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                <WordlessExplanation label="Cơ chế bàn giao giám sát" className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
                   Chốt danh sách một lần tại Planning; hệ thống tạo sẵn đầu việc và kiểm tra để giám sát viên chỉ cần kiểm tra, khắc phục và báo cáo.
-                </p>
+                </WordlessExplanation>
               </div>
               {sourceRelevant && handoff.data?.can_activate && canManage ? (
                 <button className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700" onClick={openCandidates}>
@@ -223,8 +228,8 @@ export function ConstructionHandoffPanel({ projectId, currentNode }: { projectId
               </div>
             ) : (
               <div className="mt-3">
-                <p className="font-semibold text-slate-800">Chưa có hạng mục giám sát</p>
-                <p className="mt-1 text-xs leading-5 text-slate-600">Hoàn tất bước “Chốt hạng mục giám sát và bàn giao thi công” trong hàng đợi kế hoạch.</p>
+                <p className="font-semibold text-slate-800"><WordlessLabel text="Chưa có hạng mục giám sát" label="Điều kiện có hạng mục bàn giao" help="Hoàn tất bước “Chốt hạng mục giám sát và bàn giao thi công” trong hàng đợi kế hoạch." /></p>
+                <WordlessExplanation label="Điều kiện có hạng mục bàn giao" className="mt-1 text-xs leading-5 text-slate-600">Hoàn tất bước “Chốt hạng mục giám sát và bàn giao thi công” trong hàng đợi kế hoạch.</WordlessExplanation>
               </div>
             )}
           </aside>

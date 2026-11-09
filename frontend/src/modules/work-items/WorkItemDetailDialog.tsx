@@ -99,6 +99,9 @@ import {
 } from './workItemDetailDomain';
 import { DesignReleasePanel, isDesignReleaseWorkItem } from './DesignReleasePanel';
 import { WorkItemRequirementPanel } from './WorkItemRequirementPanel';
+import { WordlessExplanation, WordlessLabel, useWordless } from '../../components/Wordless';
+import { ContextHelp } from '../../components/ContextHelp';
+import { withWordless } from '../../lib/utils/wordless';
 
 export function WorkItemDetailDialog({
   open,
@@ -114,22 +117,25 @@ export function WorkItemDetailDialog({
   readOnly?: boolean;
 }) {
   const workContextLabel = item ? workItemWorkflowContext(item).path : undefined;
+  const wordless = useWordless();
 
   return (
     <Dialog
       manageFocus
       open={open}
       title={item?.title ?? 'Chi tiết đầu việc'}
-      description={item ? `${workContextLabel} · ${departmentLabel(item.department)}` : undefined}
+      titleAside={wordless && item?.description ? <ContextHelp tooltip label="Mục đích Đầu việc">{item.description}</ContextHelp> : undefined}
+      description={item ? wordless ? workContextLabel : `${workContextLabel} · ${departmentLabel(item.department)}` : undefined}
       onClose={onClose}
       size="workspace"
     >
-      <WorkItemDetailWorkspace item={item} readOnly={readOnly} onClose={onClose} onChanged={onChanged} />
+      <WorkItemDetailWorkspace item={item} readOnly={readOnly} onClose={onClose} onChanged={onChanged} titleInDialog />
     </Dialog>
   );
 }
 
 export function WorkItemDetailWorkspace({
+  titleInDialog = false,
   item,
   workItemId,
   workflowNavigation,
@@ -139,6 +145,7 @@ export function WorkItemDetailWorkspace({
   onBusyChange,
   readOnly: requestedReadOnly = false,
 }: {
+  titleInDialog?: boolean;
   item?: WorkItem | null;
   workItemId?: string;
   workflowNavigation?: WorkItemWorkflowNavigation;
@@ -311,7 +318,7 @@ export function WorkItemDetailWorkspace({
 
   function openConstructionHandoff() {
     if (!detailItem?.project_id) return;
-    const planningPath = `/projects/${encodeURIComponent(detailItem.project_id)}/planning`;
+    const planningPath = withWordless(`/projects/${encodeURIComponent(detailItem.project_id)}/planning`, location.search);
     closeDialog();
     navigate(planningPath, {
       state: constructionHandoffNavigationState(detailItem.project_id, location.state),
@@ -388,7 +395,7 @@ export function WorkItemDetailWorkspace({
       {workDetail.error && !detailItem ? <EmptyState title="Không tải được chi tiết đầu việc" /> : null}
       {detailItem ? (
         <div className={clsx('space-y-4', showMobileWorkflowFormActions && 'pb-20 xl:pb-0')}>
-          <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} workflowNavigation={workflowNavigation} />
+          <WorkItemWorkspaceHeader item={detailItem} evidence={evidence} workflowNavigation={workflowNavigation} titleInDialog={titleInDialog} />
           {readOnly ? <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">Theo dõi công việc · Chỉ xem. Trao đổi tại trang thảo luận của công trình.</p> : null}
 
           {futureReadOnly ? (
@@ -777,14 +784,17 @@ function SkippedWorkItemHistory({ activities, evidence }: { activities: WorkItem
 type SupportTabKey = 'evidence' | 'activity' | 'form';
 type ActivityHistoryFilter = 'all' | 'discussion' | 'form';
 function WorkItemWorkspaceHeader({
+  titleInDialog = false,
   item,
   evidence,
   workflowNavigation,
 }: {
+  titleInDialog?: boolean;
   item: WorkItem;
   evidence: EvidenceRecord[];
   workflowNavigation?: WorkItemWorkflowNavigation;
 }) {
+  const wordless = useWordless();
   const activeEvidence = evidence.filter((record) => record.status !== 'rejected');
   const context = workItemWorkflowContext(item);
 
@@ -792,11 +802,11 @@ function WorkItemWorkspaceHeader({
     <section className="rounded-lg border border-line bg-white px-4 py-3 shadow-panel">
       {workflowNavigation ? <WorkItemWorkflowToolbar navigation={workflowNavigation} /> : null}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          {!workflowNavigation ? <p className="truncate text-xs font-semibold text-blue-700">{context.node} · {context.step}</p> : null}
-          <h3 className={clsx('text-base font-semibold text-ink', !workflowNavigation && 'mt-1')}>{item.title}</h3>
-          {item.description ? <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{item.description}</p> : null}
-        </div>
+        {!(wordless && titleInDialog) ? <div className="min-w-0">
+          {!workflowNavigation && !(wordless && titleInDialog) ? <p className="truncate text-xs font-semibold text-blue-700">{context.node} · {context.step}</p> : null}
+          {!(wordless && titleInDialog) ? <h3 className={clsx('text-base font-semibold text-ink', !workflowNavigation && 'mt-1')}><WordlessLabel text={item.title} label="Mục đích Đầu việc" help={item.description} /></h3> : null}
+          {item.description ? <WordlessExplanation label="Mục đích Đầu việc" className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{item.description}</WordlessExplanation> : null}
+        </div> : null}
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <StatusBadge status={isWorkOverdue(item) ? 'overdue' : item.status} />
           {item.project_code ? <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{item.project_code}</span> : null}

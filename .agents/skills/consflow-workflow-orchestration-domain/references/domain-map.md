@@ -1,5 +1,17 @@
 # Workflow Orchestration Domain Map
 
+## Wordless Work Item presentation — 2026-11-09
+
+- Latest mode default: absent flag = Wordless within eligible scopes/provenance; explicit wordless=0 = legacy, single 1 = Wordless; invalid/duplicate flags legacy. ReturnTo cannot override outer URL choice. Existing scope, guards and lifecycle invariants unchanged; earlier opt-in/default-off wording is superseded.
+
+- ProjectTaskContext summary now reduces only optional context/auto-start copy in scoped Wordless mode. Source_message, source-ready/status badges, errors, project rejection and existing action eligibility remain visible/unchanged. Title-linked WordlessLabel reuses approved wrap-tail help composition; no lifecycle write changed.
+
+- Approved wrap correction uses LabelWithHelp for Dialog titleAside and form field label/required-star; WordlessLabel for standalone title and primary-surface heading. Default branch and actual form controls remain. No schema/answer/history/permission or CTA changes.
+
+- Approved placement fix: dialog purpose help lives in optional `Dialog.titleAside`, beside primary heading; body title/help block is omitted in Wordless dialog composition. Standalone workspace title/help retained. No form or action mutation. Full visual reduction across scope remains partial pending follow-up; tests do not establish user acceptance.
+
+- Route-scoped presentation only; standalone project detail additionally requires same-project scoped returnTo and its own flag. WorkItemWorkspaceHeader removes duplicate title only inside titled dialog, retains standalone title and workflow toolbar. WorkflowFormPanel keeps schema/controls, required errors, draft/submit, signature/PDF gates and evidence policy; optional help uses ContextHelp tooltip, handoff evidence requirement remains directly visible. No schema/snapshot/API/migration change. Default consumers unchanged; see frontend Wordless map/tests; browser/UAT separate.
+
 ## Checkbox Draft And Submit Type Contract — 2026-10-13
 
 - Existing checkbox fields require exact JSON boolean values at top level and inside structured lists. Optional nested false is a stored answer; absent/null optional values remain omitted. Required true is necessary on submit; existing nested required checks also reject missing/false on draft, while top-level required checks remain submit-only. Present strings/numbers/maps/arrays reject before normalization can drop them. Exact handoff evidence policy keeps new drafts/submissions true for absent/null/false and preserves wrong types for strict rejection. Activation still forces criterion evidence and completion requires the canonical same-WorkItem source; no field/schema/UI or historical backfill.

@@ -6,6 +6,7 @@ import ts from 'typescript';
 import { executionTargetPath } from '../src/modules/work-items/workItemExecutionTarget.ts';
 import { projectPipelinePath, projectPipelineReturnTo } from '../src/modules/work-items/workItemNavigation.ts';
 import { currentTimelineNode } from '../src/modules/projects/projectOperationsDomain.ts';
+import { withWordless } from '../src/lib/utils/wordless.ts';
 import type { WorkItem } from '../src/lib/types/domain.ts';
 
 function source(path: string) {
@@ -61,7 +62,7 @@ function selectedStage(path: string) {
 }
 
 test('Preparation Quy trình and Tiến độ both return to the viewed Finance stage', () => {
-  const pipelinePath = vm.runInNewContext(variableExpression(preparation, 'pipelinePath'), { id: projectId, selectedItem: financeItem, projectPipelinePath });
+  const pipelinePath = vm.runInNewContext(variableExpression(preparation, 'pipelinePath'), { id: projectId, selectedItem: financeItem, projectPipelinePath, location: { search: '' } });
   const progress = findNode(preparation, (node) => ts.isPropertyAssignment(node) && node.name.getText(preparation) === 'progressPath') as ts.PropertyAssignment;
   assert.ok(progress);
   for (const expression of [linkTo(preparation, 'Quy trình'), progress.initializer.getText(preparation)]) {
@@ -124,7 +125,7 @@ test('old and stale same-project Pipeline return links recover the current work 
   for (const file of [preparation, taskContext]) {
     const params = new URLSearchParams({ returnTo: `/projects/${projectId}/pipeline?queue=all&stage=old&task=old&returnTo=%2Fold#workflow` });
     const path = vm.runInNewContext(variableExpression(file, 'returnTo'), {
-      searchParams: params, params, id: projectId, projectId, selectedItem: financeItem, item: financeItem, projectPipelineReturnTo,
+      searchParams: params, params, id: projectId, projectId, selectedItem: financeItem, item: financeItem, projectPipelineReturnTo, withWordless, location: { search: '' },
     });
     const url = new URL(path, 'http://localhost');
     assert.deepEqual([...url.searchParams], [['queue', 'all'], ['stage', 'fixture-finance']]);
@@ -145,6 +146,6 @@ test('return normalization leaves other destinations and unknown work context in
 });
 
 test('domain task context progress uses the same work stage as Preparation', () => {
-  const path = vm.runInNewContext(linkTo(taskContext, 'Tiến độ'), { projectId, item: financeItem, projectPipelinePath });
+  const path = vm.runInNewContext(linkTo(taskContext, 'Tiến độ'), { projectId, item: financeItem, projectPipelinePath, location: { search: '' } });
   assert.equal(selectedStage(path).id, 'fixture-finance');
 });

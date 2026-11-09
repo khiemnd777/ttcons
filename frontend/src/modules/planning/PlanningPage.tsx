@@ -27,6 +27,8 @@ import {
   workflowFormNextAction,
 } from '../work-items/workItemPresentation';
 import { ConstructionHandoffPanel } from './ConstructionHandoffPanel';
+import { WordlessExplanation, WordlessLabel } from '../../components/Wordless';
+import { withWordless } from '../../lib/utils/wordless';
 import { ApprovalPanel } from '../../components/ApprovalPanel';
 import type { ApprovalRequest } from '../../lib/types/domain';
 
@@ -158,7 +160,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
               {run.data ? (
                 <button
                   className="inline-flex items-center gap-2 rounded-md border border-line bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-                  onClick={() => navigate(`/projects/${id}/pipeline`)}
+                  onClick={() => navigate(withWordless(`/projects/${id}/pipeline`, location.search))}
                 >
                   <GitBranch className="h-4 w-4" />
                   Xem quy trình
@@ -225,7 +227,7 @@ export function PlanningPage({ mode = 'planning' }: { mode?: 'planning' | 'pipel
             onStatusFilterChange={setWorkStatusFilter}
             onRequirementFilterChange={setWorkRequirementFilter}
             onOpenRow={(row) => openStepWorkItem(row.step)}
-            onOpenPipeline={() => navigate(`/projects/${id}/pipeline`)}
+            onOpenPipeline={() => navigate(withWordless(`/projects/${id}/pipeline`, location.search))}
           />
         </div>
       ) : operations.isLoading ? (
@@ -604,8 +606,8 @@ function PlanningActionWorkspace({
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Giai đoạn hiện tại</p>
               <StatusBadge status={currentNode?.status ?? 'pending'} />
             </div>
-            <h2 className="mt-2 text-lg font-bold text-ink">{currentNode?.name ?? 'Chưa có giai đoạn đang chạy'}</h2>
-            <p className="mt-1 line-clamp-2 text-sm text-slate-600">{currentNode?.description ?? 'Mở tiến độ để kiểm tra trạng thái vận hành và phụ thuộc.'}</p>
+            <h2 className="mt-2 text-lg font-bold text-ink"><WordlessLabel text={currentNode?.name ?? 'Chưa có giai đoạn đang chạy'} label="Mục đích giai đoạn" help={currentNode?.description ?? 'Mở tiến độ để kiểm tra trạng thái vận hành và phụ thuộc.'} /></h2>
+            <WordlessExplanation label="Mục đích giai đoạn" className="mt-1 line-clamp-2 text-sm text-slate-600">{currentNode?.description ?? 'Mở tiến độ để kiểm tra trạng thái vận hành và phụ thuộc.'}</WordlessExplanation>
           </div>
           <div className="w-full shrink-0 lg:w-80">
             <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold">
@@ -643,9 +645,9 @@ function PlanningActionWorkspace({
                   </span>
                 ) : null}
               </div>
-              <h2 className="mt-2 text-base font-bold text-ink">{nextWork.title}</h2>
+              <h2 className="mt-2 text-base font-bold text-ink"><WordlessLabel text={nextWork.title} label="Hành động tiếp theo" help={nextWork.blocked ? undefined : `Tiếp theo: ${nextWork.nextAction}`} /></h2>
               <p className="mt-1 text-sm text-slate-600">{nextWork.node.name ?? '-'} · {nextWork.ownerLabel} · {nextWork.evidenceCount} minh chứng</p>
-              <p className="mt-2 text-sm font-medium text-slate-700">Tiếp theo: {nextWork.nextAction}</p>
+              {nextWork.blocked ? <p className="mt-2 text-sm font-medium text-slate-700">Tiếp theo: {nextWork.nextAction}</p> : <WordlessExplanation label="Hành động tiếp theo" className="mt-2 text-sm font-medium text-slate-700">Tiếp theo: {nextWork.nextAction}</WordlessExplanation>}
             </div>
             <button
               className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"

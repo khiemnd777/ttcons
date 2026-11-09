@@ -1,8 +1,8 @@
-import { constructionReportWeatherLabel } from './constructionWeatherPresentation';
+import { SourceReportContextBanner } from './SourceReportContextBanner';
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CalendarDays, CheckCircle2, GitPullRequestArrow, Loader2, Pencil, ShieldCheck, Wrench } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, GitPullRequestArrow, Loader2, Pencil, ShieldCheck, Wrench } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
 import { NativeExcelExportButton } from '../_shared/NativeExcelExportButton';
 import { identityReferenceText } from '../../components/IdentityReferenceLabel';
@@ -185,7 +185,7 @@ function ActionViewDialog({ action, projectId, workspace, canEdit, canResolve, c
 }
 
 function SourceReportBanner({ report }: { report: ConstructionDailyReportSource }) {
-  return <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-white text-blue-600"><CalendarDays className="h-5 w-5" /></span><div><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Nguồn đã liên kết</p><p className="mt-1 font-semibold text-blue-900">Báo cáo ngày {dateText(report.report_date)}</p><p className="mt-1 text-xs text-blue-700">{constructionReportWeatherLabel(report.weather)}{report.evidence.length ? ` · Có ${report.evidence.length} minh chứng có thể tái sử dụng` : ''}</p></div></div>;
+  return <SourceReportContextBanner report={report} variant="action" />;
 }
 
 function VariationReadinessNote({ projectId, loading, error, available, canViewContracts, onRetry }: { projectId: string; loading: boolean; error: boolean; available: boolean; canViewContracts: boolean; onRetry?: () => void }) {

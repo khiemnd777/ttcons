@@ -1,4 +1,5 @@
 import type { WorkItem, WorkItemExecutionTarget } from '../../lib/types/domain';
+import { withWordless, wordlessScope, wordlessEnabled, wordlessBannerSurface } from '../../lib/utils/wordless.ts';
 
 const workspaceLabels: Record<string, string> = {
   preparation: 'Hồ sơ chuẩn bị',
@@ -47,8 +48,19 @@ function routeWithReturnTo(route: string, returnTo?: string) {
   if (!safeReturnTo) return route;
   const [pathname, query = ''] = route.split('?', 2);
   const params = new URLSearchParams(query);
-  params.set('returnTo', safeReturnTo);
-  return `${pathname}?${params.toString()}`;
+  if (safeReturnTo.includes('\\')) {
+    params.set('returnTo', safeReturnTo);
+    return `${pathname}?${params.toString()}`;
+  }
+  const source = new URL(safeReturnTo, 'http://consflow.local');
+  const scopedSource = wordlessScope(source.pathname) || Boolean(wordlessBannerSurface(source.pathname));
+  if (scopedSource && wordlessEnabled(source.search)) {
+    source.searchParams.delete('task');
+    source.searchParams.delete('returnTo');
+    params.set('returnTo', `${source.pathname}${source.search}${source.hash}`);
+  } else params.set('returnTo', safeReturnTo);
+  const path = `${pathname}?${params.toString()}`;
+  return scopedSource ? withWordless(path, source.search) : path;
 }
 
 function fallbackWorkItemPath(item: WorkItem, returnTo?: string) {
