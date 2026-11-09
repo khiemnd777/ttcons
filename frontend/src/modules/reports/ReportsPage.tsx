@@ -6,6 +6,7 @@ import { ChevronRight, ShieldAlert } from 'lucide-react';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { PageHeader } from '../../components/PageHeader';
 import { ContextHelp } from '../../components/ContextHelp';
+import { WordlessLabel, useWordless } from '../../components/Wordless';
 import type { DataTableSort } from '../../components/DataTable';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, get } from '../../lib/api/client';
@@ -19,6 +20,7 @@ import {
   reportPath,
   type ReportGroup,
   type ReportKey,
+  type ReportDefinition,
   visibleReportDefinitions,
 } from './reportRegistry';
 
@@ -191,10 +193,7 @@ export function StatisticsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{reportGroupLabels[activeReport.group]}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-semibold text-ink">{activeReport.label}</h1>
-                  <ContextHelp key={activeReport.key} label={`Cách tính và phạm vi: ${activeReport.label}`}>{activeReport.basis}</ContextHelp>
-                </div>
+                <StatisticsReportHeading key={activeReport.key} report={activeReport} />
               </div>
               {canExport ? (
                 <ReportExportButton
@@ -224,6 +223,14 @@ export function StatisticsPage() {
 
 // Alias giữ tương thích tạm thời cho các import nội bộ cũ trong lúc URL sản phẩm đã chuyển sang /statistics.
 export const ReportsPage = StatisticsPage;
+
+function StatisticsReportHeading({ report }: { report: ReportDefinition }) {
+  const wordless = useWordless();
+  return <div className="flex flex-wrap items-center gap-2">
+    <h1 className="text-xl font-semibold text-ink"><WordlessLabel text={report.label} label={`Cách tính và phạm vi: ${report.label}`} help={report.basis} /></h1>
+    {!wordless ? <ContextHelp label={`Cách tính và phạm vi: ${report.label}`}>{report.basis}</ContextHelp> : null}
+  </div>;
+}
 
 function ActiveReport({ reportKey, projectId, searchQuery, sortState, onSearchQueryChange, onSortStateChange }: {
   reportKey: ReportKey;

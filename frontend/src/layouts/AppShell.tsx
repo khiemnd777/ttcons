@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { matchPath, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { withWordless } from '../lib/utils/wordless';
 import {
   BarChart3,
   BriefcaseBusiness,
@@ -171,7 +172,7 @@ export function AppShell() {
           <div className="h-16 border-b border-line">
             <BrandHomeLink />
           </div>
-          <AppNavigation groups={visibleNavGroups} badges={navigationBadges} className="flex-1 overflow-auto" />
+          <AppNavigation groups={visibleNavGroups} badges={navigationBadges} className="flex-1 overflow-auto" modeSearch={location.search} />
           <div className="border-t border-line px-4 py-3">
             <PoweredBySignature />
           </div>
@@ -209,7 +210,7 @@ export function AppShell() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <AppNavigation groups={visibleNavGroups} badges={navigationBadges} className="min-h-0 flex-1 overflow-auto" onNavigate={() => setMobileNavOpen(false)} />
+            <AppNavigation groups={visibleNavGroups} badges={navigationBadges} className="min-h-0 flex-1 overflow-auto" modeSearch={location.search} onNavigate={() => setMobileNavOpen(false)} />
             <div className="border-t border-line px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 {user ? <UserAvatar user={user} size="md" decorative /> : null}
@@ -307,11 +308,13 @@ export function AppShell() {
 }
 
 function AppNavigation({
+  modeSearch = '',
   groups,
   badges,
   className,
   onNavigate,
 }: {
+  modeSearch?: string;
   groups: NavGroup[];
   badges: Record<string, NavBadge>;
   className?: string;
@@ -326,7 +329,7 @@ function AppNavigation({
             {group.items.map((item) => (
               <NavLink
                 key={item.to}
-                to={item.to}
+                to={withWordless(item.to, modeSearch)}
                 onClick={onNavigate}
                 className={({ isActive }) =>
                   clsx(

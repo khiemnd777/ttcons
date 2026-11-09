@@ -2,6 +2,7 @@ import { DragEvent, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, Download, FileJson, Loader2, RotateCcw, Upload } from 'lucide-react';
 import { Dialog } from '../../components/Dialog';
+import { WordlessLabel, WordlessExplanation, useWordless } from '../../components/Wordless';
 import { useToast } from '../../components/ToastProvider';
 import { downloadBlob, postForm } from '../../lib/api/client';
 import { dateTimeText } from '../../lib/utils/format';
@@ -46,6 +47,7 @@ type RestoreResult = {
 };
 
 export function SettingsBackupPanel({ canRestore }: { canRestore: boolean }) {
+  const wordless = useWordless();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -179,8 +181,9 @@ export function SettingsBackupPanel({ canRestore }: { canRestore: boolean }) {
       <section className="rounded-lg border border-line bg-white p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <div className="flex items-center gap-2"><FileJson className="h-5 w-5 text-blue-600" /><h2 className="text-sm font-semibold text-ink">Sao lưu và khôi phục cấu hình</h2></div>
-            <p className="mt-1 max-w-3xl text-sm text-slate-600">JSON chỉ gồm thiết lập database/UI. Cấu hình lõi .env, con dấu và giá trị secret không được đưa vào bản sao.</p>
+            <div className="flex items-center gap-2"><FileJson className="h-5 w-5 text-blue-600" /><h2 className="text-sm font-semibold text-ink"><WordlessLabel text="Sao lưu và khôi phục cấu hình" label="Phạm vi bản sao cấu hình" help="JSON chỉ gồm thiết lập database/UI. Cấu hình lõi .env, con dấu và giá trị secret không được đưa vào bản sao." /></h2></div>
+            <WordlessExplanation label="Phạm vi bản sao cấu hình" className="mt-1 max-w-3xl text-sm text-slate-600">JSON chỉ gồm thiết lập database/UI. Cấu hình lõi .env, con dấu và giá trị secret không được đưa vào bản sao.</WordlessExplanation>
+            {wordless ? <p className="mt-1 text-xs text-slate-500">Bản sao thiết lập database/UI</p> : null}
             {!canRestore ? <p className="mt-2 text-xs font-medium text-blue-700">Admin được tải bản sao; chỉ vai trò Nhà phát triển được khôi phục.</p> : null}
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row">

@@ -1,5 +1,17 @@
 # Project Planning Domain Map
 
+## Wordless presentation — 2026-11-09
+
+- Latest selection override: absent query flag now enables Wordless in approved scopes; explicit wordless=0 returns legacy. Single 1 also on, invalid/duplicate off. Navigation preserves explicit legacy selection. Older opt-in wording below is superseded only for mode default.
+
+- DiscussionWorkflowActionCard now has independently scoped banner Wordless at project discussion: optional stage/introduction copy in title-linked help, preserve source-backed current work/status/owner/due/blockers and original actions, loading/error. Startup/no-current-work/completed branches use the same optional help. Whole-page form/detail scope remains unchanged.
+
+- ProjectTaskContext opted-in summary keeps title/status/source readiness and all actions; workspace/stage/first-write-start explanation is help, while actual source messages/errors remain visible. Presentation only; no opening/reading/tooltip action starts Work Item, and source mutation retains authority.
+
+- Approved wrap correction anchors handoff title/status, stage/next-work, revision and pipeline-row explanations with WordlessLabel/LabelWithHelp, grouping final word and Info only. No changes to controls, DDLs, metrics, source state or warnings; prior paragraphs remain in default mode.
+
+- Single exact `wordless=1` opts project Preparation/Planning/runtime Pipeline into reduced copy and optional explanations; default UI remains. Keep three Planning DDLs, source revision/handoff warnings, metrics, queues, capabilities and activation behavior. Owners `components/Wordless.tsx`, `lib/utils/wordless.ts` and existing page/panel consumers; navigation synchronizes current mode and safe returnTo. Tests wordless/wordlessPresentation/pipelineStageNavigation; browser/UAT separate.
+
 ## Native Survey And Risk Exports — 2026-10-08
 
 - BM01 is exported in the exact supported dimensional survey form: client_survey_work_package or client_site_measurement_record. Intake questionnaires and survey minutes without dimension rows are not automatically measured surveys; their existing native output remains separate. Project Detail has no BM-GS chooser.

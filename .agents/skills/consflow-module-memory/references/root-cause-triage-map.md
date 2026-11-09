@@ -366,3 +366,14 @@ For bugfixes and unclear behavior changes, include:
 - Owners: `frontend/src/components/UserAvatar.tsx`, `frontend/src/modules/work-items/ActivityThread.tsx`, `frontend/src/modules/utilities/UtilityDock.tsx`, `frontend/tests/activityAvatarPresentation.test.ts`.
 - First search: `rg -n "UserAvatar|actorInitials|currentUser|own && user" frontend/src/modules/work-items/ActivityThread.tsx frontend/src/modules/utilities/UtilityDock.tsx frontend/src/components/UserAvatar.tsx`.
 - The protected `/auth/avatar` endpoint serves only the current actor. Discussion renderers must pass the authenticated `User` to `UserAvatar` for own messages; loading/error/no image and every peer retain initials. Do not add a peer-avatar route, leak storage metadata, or change Project Activity visibility, read cursors, posting authority or audit behavior for this presentation repair.
+
+## Wordless bật nhưng vẫn nhiều chữ / Info đứng một mình — 2026-11-09
+
+- Latest URL contract: no flag now intentionally renders Wordless in approved scopes; use wordless=0 to reproduce legacy. Do not diagnose absence as off. Navigation must carry explicit 0; stale returnTo cannot override outer choice. Invalid/duplicate flags remain off. Earlier opt-in language is historical.
+
+- Last word vertically lower than preceding title: old LabelWithHelp tail used align-middle around a 44px help. Approved fix uses align-baseline with an explicit first text span so text defines the inline flex baseline; required star stays inside that text span. Preserve prefix wrapping, nowrap tail and help target size. Non-browser markup tests do not prove pixel alignment.
+
+- Generalized wrap-line cause: replacing a block paragraph with an inline help still leaves it after a block heading. Approved fix uses LabelWithHelp/WordlessLabel directly inside each associated heading/label and suppresses the old explanation only in Wordless. Tail groups final word + required marker + help; do not apply nowrap to the whole heading, truncate text, shrink trigger styles or alter controls.
+
+- Inspect `WordlessScope` with exact single flag and active route, then actual consumer rendering, not only parser/tests. Vite serving Wordless source is not runtime UI proof. Previous authorized browser observation confirmed Planning explanation triggers and detail field tooltips; overall text reduction was partial, not a full accepted redesign.
+- Lone body purpose Info: `WorkItemWorkspaceHeader` hid duplicate heading but retained its explanation. Approved correction moves it into optional `Dialog.titleAside` from WorkItemDetailDialog and omits old body left container. Search `titleAside|titleInDialog|Mục đích Đầu việc`. Render regression in wordlessPresentation verifies title-adjacent help, standalone title and unchanged close button. Browser verification of correction remains separate.

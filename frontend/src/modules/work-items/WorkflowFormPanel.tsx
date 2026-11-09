@@ -3,6 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, ExternalLink, FileText, Loader2, LockKeyhole, PenLine, Plus, Stamp, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { Dialog } from '../../components/Dialog';
+import { useWordless } from '../../components/Wordless';
+import { ContextHelp } from '../../components/ContextHelp';
+import { LabelWithHelp } from '../../components/LabelWithHelp';
 import { NativeExcelExportButton } from '../_shared/NativeExcelExportButton';
 import { workflowFormExcelCode, workflowFormRiskExcelEligible } from './workflowFormExcelEligibility';
 import { CurrencyInput } from '../../components/CurrencyInput';
@@ -752,7 +755,7 @@ export function WorkflowFormPanel({
                 onClick={() => setFieldsOpen((current) => !current)}
               >
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung cần xử lý</p>
+                  <FormSectionEyebrow />
                   <h4 className="mt-0.5 text-sm font-semibold text-ink">Thông tin nghiệp vụ</h4>
                 </div>
                 <span className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap sm:justify-end">
@@ -845,7 +848,7 @@ export function WorkflowFormPanel({
                 onClick={() => { if (submitted && !amending) setDocumentsOpen((current) => !current); }}
               >
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tài liệu nghiệp vụ</p>
+                  <FormSectionEyebrow documents />
                   <h4 className="mt-0.5 text-sm font-semibold text-ink">Xác nhận hồ sơ và PDF</h4>
                   {!submitted ? <p className="mt-1 text-xs text-slate-500">Hoàn tất bước 1 để ký, đóng dấu hoặc tạo PDF.</p> : null}
                   {amending ? <p className="mt-1 text-xs text-amber-700">Tạm khóa khi đang chỉnh sửa nội dung hồ sơ.</p> : null}
@@ -1069,6 +1072,7 @@ function WorkflowFormActionCenter({
   saveLabel: string;
   submitLabel: string;
 }) {
+  const wordless = useWordless();
   const blocked = !readOnly && !submitted && validationIssueLabels.length > 0;
   const issuePreview = validationIssueLabels.slice(0, 4).join(', ');
   const extraIssues = validationIssueLabels.length > 4 ? ` +${validationIssueLabels.length - 4}` : '';
@@ -1077,7 +1081,7 @@ function WorkflowFormActionCenter({
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-ink">{title}</h3>
+            <h3 className="text-sm font-semibold text-ink">{wordless ? 'Hồ sơ nghiệp vụ' : title}</h3>
             <StatusBadge status={status} label={workflowFormStatusLabel(status)} />
           </div>
           <p className="mt-1 text-xs text-slate-500">
@@ -2115,6 +2119,10 @@ function workflowPDFExportConfirmationSummary(record: WorkflowFormPDFExport) {
   return `Đã xuất: ${signatureCount} chữ ký · ${sealCount} con dấu`;
 }
 
+function FormSectionEyebrow({ documents = false }: { documents?: boolean }) {
+  return useWordless() ? null : <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{documents ? 'Tài liệu nghiệp vụ' : 'Nội dung cần xử lý'}</p>;
+}
+
 function WorkflowFieldControl({
   templateCode,
   field,
@@ -2136,6 +2144,7 @@ function WorkflowFieldControl({
   displayOnly: boolean;
   onChange: (value: unknown) => void;
 }) {
+  const wordless = useWordless();
   const required = field.required || workflowTopLevelOtherDetailRequired(templateCode, field.field_key, formValues);
   const controlClassName = clsx(
     'mt-1 w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100',
@@ -2149,13 +2158,17 @@ function WorkflowFieldControl({
       tabIndex={-1}
       className="min-w-0 scroll-mt-24 rounded-md outline-none"
     >
-      <span className="text-sm font-semibold text-slate-700">{field.label}</span>
-      {required ? <span className="ml-1 text-rose-600">*</span> : null}
+      {wordless && field.help_text ? <span className="text-sm font-semibold text-slate-700"><LabelWithHelp text={field.label} required={required} help={<ContextHelp tooltip label={`Hướng dẫn: ${field.label}`}>{field.help_text}</ContextHelp>} /></span> : <><span className="text-sm font-semibold text-slate-700">{field.label}</span>{required ? <span className="ml-1 text-rose-600">*</span> : null}</>}
       {fieldContent}
-      {field.help_text ? <p className="mt-1 text-xs text-slate-500">{field.help_text}</p> : null}
+      {!wordless && field.help_text ? <p className="mt-1 text-xs text-slate-500">{field.help_text}</p> : null}
+      {wordless && templateCode === 'client_construction_handoff_plan' && field.field_key === 'inspection_items' ? <HandoffEvidenceNotice /> : null}
       {error ? <p className="mt-1 text-xs font-medium text-rose-700">{error}</p> : null}
     </div>
   );
+}
+
+function HandoffEvidenceNotice() {
+  return useWordless() ? <p className="mt-1 text-xs text-slate-500">Kết quả mỗi hạng mục cần ít nhất 1 ảnh hoặc tài liệu.</p> : null;
 }
 
 function renderFieldControl(

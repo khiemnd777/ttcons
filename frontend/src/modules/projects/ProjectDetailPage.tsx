@@ -1,4 +1,6 @@
 import { roleSummary } from '../../lib/utils/roles';
+import { WordlessExplanation, WordlessLabel, useWordless } from '../../components/Wordless';
+import { withWordless } from '../../lib/utils/wordless';
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -686,15 +688,16 @@ function WorkflowExecutionSummary({
   nextWork?: WorkItem;
   onOpenWork: (item: WorkItem) => void;
 }) {
+  const wordless = useWordless();
   const progress = workflowProgressSummary(nodes);
   const counts = workflowWorkCounts(rows);
 
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+      {!wordless ? <div className="flex items-center gap-2 border-b border-line px-4 py-3">
         <GitBranch className="h-5 w-5 text-blue-700" />
         <h2 className="font-semibold text-ink">Quy trình</h2>
-      </div>
+      </div> : null}
       <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-[minmax(180px,1.15fr)_minmax(210px,1.25fr)_110px_110px_110px_minmax(250px,1.3fr)] xl:items-center xl:gap-0 xl:p-0">
         <div className="min-w-0 xl:border-r xl:border-line xl:px-5 xl:py-4">
           <p className="text-xs font-semibold text-slate-500">Đang ở</p>
@@ -730,7 +733,7 @@ function WorkflowExecutionSummary({
             <ArrowUpRight className="h-4 w-4" />
           </button>
           <Link
-            to={`/projects/${projectId}/planning`}
+            to={withWordless(`/projects/${projectId}/planning`, wordless ? '?wordless=1' : '?wordless=0')}
             className="inline-flex items-center justify-center gap-2 rounded-md border border-line px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             <GitBranch className="h-4 w-4" />
@@ -984,8 +987,8 @@ function WorkflowWorkTableRow({
           {String(item.run_step_order_index ?? fallbackIndex + 1).padStart(2, '0')}
         </span>
         <div className="min-w-0">
-          <p className="font-semibold text-ink">{item.title}</p>
-          {item.description ? <p className="mt-1 line-clamp-1 text-xs text-slate-500">{item.description}</p> : null}
+          <p className="font-semibold text-ink"><WordlessLabel text={item.title} label={`Mô tả: ${item.title}`} help={item.description} /></p>
+          {item.description ? <WordlessExplanation label={`Mô tả: ${item.title}`} className="mt-1 line-clamp-1 text-xs text-slate-500">{item.description}</WordlessExplanation> : null}
           {item.blocked_reason ? <p className="mt-1 line-clamp-2 text-xs font-medium text-rose-700">{item.blocked_reason}</p> : null}
         </div>
       </div>

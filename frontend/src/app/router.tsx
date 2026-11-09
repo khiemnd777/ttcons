@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PermissionDenied } from '../components/PermissionDenied';
 import { LoginPage } from '../modules/auth/LoginPage';
 import { RouteModuleBoundary } from './RouteModuleBoundary';
+import { WordlessScope } from '../components/Wordless';
 
 const DashboardPage = lazy(() => import('../modules/dashboard/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })));
 const ProjectsPage = lazy(() => import('../modules/projects/ProjectsPage').then(({ ProjectsPage }) => ({ default: ProjectsPage })));
@@ -156,9 +157,9 @@ export const router = createBrowserRouter([
       { path: '/event-logs', element: guarded(<EventLogsPage />, ['event_log.view'], false, ['project.reconciliation.view']) },
       { path: '/reports', element: guarded(<WorkReportsPage />, ['work_report.view']) },
       { path: '/reports/:reportKey', element: guarded(<LegacyStatisticsRedirect />, ['statistics.view']) },
-      { path: '/statistics', element: guarded(<ReportsPage />, ['statistics.view']) },
-      { path: '/statistics/:reportKey', element: guarded(<ReportsPage />, ['statistics.view']) },
-      { path: '/settings', element: guarded(<SettingsPage />, ['settings.view'], false, ['project.reconciliation.view']) },
+      { path: '/statistics', element: guarded(<WordlessScope><ReportsPage /></WordlessScope>, ['statistics.view']) },
+      { path: '/statistics/:reportKey', element: guarded(<WordlessScope><ReportsPage /></WordlessScope>, ['statistics.view']) },
+      { path: '/settings', element: guarded(<WordlessScope><SettingsPage /></WordlessScope>, ['settings.view'], false, ['project.reconciliation.view']) },
     ],
   },
 ]);

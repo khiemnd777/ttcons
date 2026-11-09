@@ -1,5 +1,11 @@
 # Reporting Analytics Domain Map
 
+## Statistics Wordless opt-in — 2026-11-09
+
+- Latest user override: Statistics defaults to Wordless without a flag; wordless=0 selects the old UI, single 1 also enables Wordless. Invalid/duplicate flags stay legacy. Navigation retains explicit zero. No data/filter/export behavior change; older opt-in default wording below is superseded.
+
+- Protected statistics routes have WordlessScope, enabled only by one exact wordless=1. StatisticsReportHeading in ReportsPage keeps one title-linked tooltip in on mode; off retains original inline ContextHelp disclosure. Registry basis remains the explanation authority; current report key resets help. Existing report navigation query suffix, project/search/sort/export parity, canExport permission, table and controls unchanged. No query/API/schema/report data change. Tests wordlessPresentation cover all four report headings and off-mode controls; browser/UAT separate.
+
 ## PDF Recorded Progress Parity — 2026-10-12
 
 - Selected immutable revision PDF renders progress from the same existing source authority as BM02: nativeBMGSDailyRecordedProgress chooses workflow structured snapshot or manual header and calls finite decimal0–100 parser. No live fallback or latest-version query. Absent/invalid prints Chưa ghi tiến độ without a bar; recorded0 prints0%. Source report/revision/events/hash, raw weather, material facts and protected media remain unchanged. Export service/permission/revision routing untouched. Owners bm_gs_export_projection.go/work_report_pdf.go; actual-PDF text/bar/nonmutation and reopened-XLSX regressions precede actual-button browser acceptance.

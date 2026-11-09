@@ -44,6 +44,8 @@ import {
   type ProjectWorkspaceGroup,
 } from './projectWorkspaceNavigation';
 import { ProjectTaskContext } from './ProjectTaskContext';
+import { WordlessScope, WordlessBannerScope } from '../../components/Wordless';
+import { withWordless } from '../../lib/utils/wordless';
 import { UtilityDockLauncherHost } from '../utilities/UtilityDockLauncherHost';
 
 type ProjectWorkspaceOperations = ProjectOperationsResponse | ProjectOperationsSidebarResponse;
@@ -189,8 +191,12 @@ export function ProjectWorkspaceLayout() {
                 <p className="mt-1 leading-6 text-blue-900">Anh/chị được xem dữ liệu nguồn xuyên suốt công trình. Ngoài nghiệp vụ Kế toán được phân quyền, các bước khác chỉ được xem.</p>
               </div>
             ) : null}
-            <ProjectTaskContext projectId={id} />
-            <Outlet />
+            <WordlessScope>
+              <WordlessBannerScope>
+              <ProjectTaskContext projectId={id} />
+              <Outlet />
+              </WordlessBannerScope>
+            </WordlessScope>
           </main>
           <footer className="border-t border-line bg-white px-4 py-3 lg:hidden">
             <PoweredBySignature />
@@ -666,7 +672,7 @@ function WorkspaceGroupNode({
   return (
     <div>
       <Link
-        to={groupTarget}
+        to={withWordless(groupTarget, location.search)}
         aria-current={!group.children.length && groupActive ? 'page' : undefined}
         className={clsx(
           'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold focus-ring',
@@ -698,7 +704,7 @@ function WorkspaceGroupNode({
             return (
               <Link
                 key={`${group.key}-${child.label}`}
-                to={childTarget}
+                to={withWordless(childTarget, location.search)}
                 aria-current={active ? 'page' : undefined}
                 className={clsx(
                   'ml-8 flex w-[calc(100%-2rem)] items-center gap-2 px-4 py-1.5 text-sm focus-ring',

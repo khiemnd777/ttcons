@@ -28,7 +28,7 @@ const bundle = await build({
 function load(hooks = react, query: any = {}) {
   const module = { exports: {} as Record<string, any> };
   new Function('require', 'module', 'exports', bundle.outputFiles[0].text)((name: string) =>
-    name === 'react' ? hooks : name === '@tanstack/react-query'
+    name === 'react' ? hooks : name === 'react-dom' ? { ...require(name), createPortal: (child: any) => child } : name === '@tanstack/react-query'
       ? { ...require(name), useQuery: () => query } : require(name), module, module.exports);
   return module.exports;
 }
@@ -99,6 +99,35 @@ function withEvents(run: (environment: any) => void) {
 const helpProps = { label: 'Cách tính tồn kho', children: 'Tồn kho và vật tư dư được tổng hợp độc lập.' };
 const helpButton = (tree: any) => nodes(tree).find(node => node.type === 'button');
 const helpPanel = (tree: any) => nodes(tree).find(node => node.props?.id === 'help-test-id');
+
+test('opt-in tooltip opens for hover/focus, pins on touch click and dismisses without changing trigger style', () => withEvents(({ emit }: any) => {
+  const f = harness();
+  const props = { ...helpProps, tooltip: true };
+  let tree = f.render('ContextHelp', props);
+  const baselineClass = helpButton(f.render('ContextHelp', helpProps)).props.className;
+  tree = f.render('ContextHelp', props);
+  assert.equal(helpButton(tree).props.className, baselineClass);
+  assert.equal(helpPanel(tree), undefined);
+  helpButton(tree).props.onPointerEnter({ pointerType: 'touch' });
+  assert.equal(helpPanel(f.render('ContextHelp', props)), undefined);
+  helpButton(tree).props.onPointerEnter({ pointerType: 'mouse' });
+  tree = f.render('ContextHelp', props);
+  assert.equal(helpPanel(tree).props.role, 'tooltip');
+  assert.match(text(helpPanel(tree)), /tổng hợp độc lập/);
+  assert.equal(helpButton(tree).props['aria-describedby'], 'help-test-id');
+  helpButton(tree).props.onClick(); // pin the explanation opened by hover/focus
+  tree = f.render('ContextHelp', props);
+  assert.ok(helpPanel(tree));
+  helpButton(tree).props.onClick();
+  tree = f.render('ContextHelp', props);
+  assert.equal(helpPanel(tree), undefined);
+  helpButton(tree).props.onFocus();
+  tree = f.render('ContextHelp', props);
+  assert.ok(helpPanel(tree));
+  tree.props.onBlur({ relatedTarget: null });
+  assert.equal(helpPanel(f.render('ContextHelp', props)), undefined);
+  f.unmount();
+}));
 
 test('help is named, initially closed, toggles by button, and preserves optional explanation', () => withEvents(() => {
   const f = harness();

@@ -91,7 +91,7 @@ test('Preparation detail replaces the queue and gives the existing work-item wor
   assert.match(detail, /aria-label="Vị trí trong giai đoạn"/);
   assert.match(detail, /min-h-11[\s\S]*sm:flex-row/);
   assert.match(detail, /Bước \{navigation\.position\}\/\{navigation\.total\}/);
-  assert.match(detail, /!workflowNavigation \? <p[\s\S]*context\.node/);
+  assert.match(detail, /!workflowNavigation && !\(wordless && titleInDialog\) \? <p[\s\S]*context\.node/);
 });
 
 test('project business tree highlights only the active child inside expanded groups', async () => {

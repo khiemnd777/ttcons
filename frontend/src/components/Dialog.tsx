@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import clsx from 'clsx';
 import './dialog.css';
 
+import { LabelWithHelp } from './LabelWithHelp';
+
 export type DialogSize = 'sm' | 'md' | 'lg' | 'xl' | 'report' | 'workspace';
 
 const sizeClass: Record<DialogSize, string> = {
@@ -17,6 +19,7 @@ const sizeClass: Record<DialogSize, string> = {
 export function Dialog({
   open,
   title,
+  titleAside,
   description,
   children,
   footer,
@@ -27,6 +30,7 @@ export function Dialog({
 }: {
   open: boolean;
   title: string;
+  titleAside?: ReactNode;
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
@@ -119,7 +123,7 @@ export function Dialog({
       >
         <div className="dialog-header flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-semibold text-ink">{title}</h2>
+            <h2 id={titleId} className="text-lg font-semibold text-ink">{titleAside ? <LabelWithHelp text={title} help={titleAside} /> : title}</h2>
             {description ? <p className="mt-1 text-sm leading-5 text-slate-600">{description}</p> : null}
           </div>
           <button type="button" data-dialog-close className="rounded-md p-2 text-slate-500 hover:bg-slate-100" onClick={onClose} aria-label="Đóng">
