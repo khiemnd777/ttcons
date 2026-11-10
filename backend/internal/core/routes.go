@@ -2,8 +2,11 @@ package core
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"consflow/backend/internal/shared/config"
@@ -32,6 +35,20 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 		log.Printf("level=info component=account_recovery operation=configure status=ready provider=smtp")
 	}
 	service.ConfigureAccountRecovery(cfg.AuthRecoveryEnabled, recoverySender, cfg.FrontendOrigin, cfg.AuthRecoveryTokenTTL, cfg.AuthRecoveryVerifyTTL)
+	// Bootstrap mail is independent of account recovery and never uses its
+	// development preview sender, which intentionally discards messages.
+	if cfg.SettingsEncryptionKey != "" {
+		key := sha256.Sum256([]byte("consflow/developer-bootstrap/key/v1:" + cfg.SettingsEncryptionKey))
+		service.bootstrapKey = key[:]
+	}
+	bootstrapMailConfig := developerBootstrapMailConfig(cfg, settingsStore)
+	bootstrapSender, bootstrapErr := newDeveloperBootstrapSender(bootstrapMailConfig)
+	service.bootstrapSender = bootstrapSender
+	if bootstrapErr != nil {
+		log.Printf("level=warn component=developer_bootstrap operation=configure status=unavailable")
+	} else {
+		log.Printf("level=info component=developer_bootstrap operation=configure status=ready provider=smtp")
+	}
 	service.ConfigureActivityStreaming(redisClient, cfg.SSEBrokerChannel, cfg.RedisOperationTimeout, cfg.SSEMaxConnections, cfg.SSEMaxConnectionsPerIP, cfg.SSEMaxConnectionsPerActor, cfg.SSEVisibilityTimeout, cfg.SSEMaxConnectionLifetime)
 	service.ConfigureProjectExplorerCache(redisCacheClient, ProjectExplorerCacheConfig{
 		Mode:             cfg.ProjectExplorerCacheMode,
@@ -58,6 +75,10 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 	api := app.Group("/api", rateLimiter.LimitIP(rateLimitPolicies(cfg.RateLimitIP)))
 	api.Get("/health", h.Health)
 	api.Get("/ready", h.Ready)
+	api.Get("/bootstrap/status", h.DeveloperBootstrapStatus)
+	api.Post("/auth/bootstrap/otp", h.SendDeveloperBootstrapOTP)
+	api.Post("/auth/bootstrap/complete", h.CompleteDeveloperBootstrap)
+	api.Use(bootstrapGate(db))
 	api.Post("/auth/login", h.Login)
 	api.Post("/auth/refresh", h.Refresh)
 	api.Post("/auth/logout", h.Logout)
@@ -102,6 +123,30 @@ func RegisterRoutes(app *fiber.App, db *sql.DB, redisClient, redisCacheClient *r
 			service.CloseActivityStreaming()
 		})
 	}, nil
+}
+
+func developerBootstrapMailConfig(runtime config.Config, store *SystemSettingsStore) config.Config {
+	// A partially configured database is authoritative and fails closed; only
+	// a completely unconfigured SMTP identity may use the startup environment.
+	if store != nil && strings.TrimSpace(runtime.SMTPHost) == "" && strings.TrimSpace(runtime.SMTPFromAddress) == "" && strings.TrimSpace(runtime.SMTPUsername) == "" && runtime.SMTPPassword == "" {
+		return store.startupEnv
+	}
+	return runtime
+}
+
+func newDeveloperBootstrapSender(cfg config.Config) (mailer.Sender, error) {
+	cfg.AuthRecoveryEnabled = true
+	if err := cfg.AccountRecoveryConfigurationError(); err != nil {
+		return nil, err
+	}
+	if cfg.SMTPFromAddress != "khiem@knasoftware.com" || cfg.SMTPUsername == "" || cfg.SMTPPassword == "" || (cfg.SMTPTLSMode != "tls" && cfg.SMTPTLSMode != "starttls") {
+		return nil, fmt.Errorf("bootstrap SMTP requires the approved sender, authentication and TLS")
+	}
+	sender, err := mailer.NewSMTP(mailer.SMTPConfig{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUsername, Password: cfg.SMTPPassword, FromAddress: cfg.SMTPFromAddress, FromName: cfg.SMTPFromName, TLSMode: cfg.SMTPTLSMode, Timeout: cfg.SMTPTimeout})
+	if err != nil {
+		return nil, err
+	}
+	return sender, nil
 }
 
 func newAccountRecoverySender(cfg config.Config) (mailer.Sender, error) {

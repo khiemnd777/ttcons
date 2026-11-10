@@ -32,6 +32,8 @@ type Service struct {
 	recoveryVerifyTTL           time.Duration
 	frontendOrigin              string
 	mailSender                  mailer.Sender
+	bootstrapSender             mailer.Sender
+	bootstrapKey                []byte
 }
 
 func NewService(repo *Repository, jwtSecret string) *Service {

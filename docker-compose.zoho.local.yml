@@ -1,0 +1,20 @@
+# Optional local override. Use only together with docker-compose.yml.
+# The Zoho password is supplied as a mounted file, not a Compose value.
+services:
+  backend:
+    environment:
+      SMTP_HOST: "${ZOHO_SMTP_HOST:-smtp.zoho.com}"
+      SMTP_PORT: "${ZOHO_SMTP_PORT:-465}"
+      SMTP_USERNAME: "${ZOHO_SMTP_USERNAME:-khiem@knasoftware.com}"
+      SMTP_PASSWORD: ""
+      SMTP_PASSWORD_FILE: /run/secrets/zoho_smtp_password
+      SMTP_FROM_ADDRESS: "khiem@knasoftware.com"
+      SMTP_FROM_NAME: "${ZOHO_SMTP_FROM_NAME:-Consflow}"
+      SMTP_TLS_MODE: "${ZOHO_SMTP_TLS_MODE:-tls}"
+      SMTP_TIMEOUT: "${ZOHO_SMTP_TIMEOUT:-10s}"
+    secrets:
+      - zoho_smtp_password
+
+secrets:
+  zoho_smtp_password:
+    file: "${ZOHO_SMTP_PASSWORD_FILE:-/dev/null}"

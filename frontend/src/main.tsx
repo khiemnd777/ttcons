@@ -6,6 +6,7 @@ import { AuthProvider } from './lib/auth/AuthContext';
 import { router } from './app/router';
 import { ToastProvider } from './components/ToastProvider';
 import { ActorRealtimeProvider } from './modules/notifications/ActorRealtimeProvider';
+import { DeveloperBootstrapGate } from './modules/auth/DeveloperBootstrapGate';
 import { shouldRetryQuery } from './lib/api/backpressure';
 import './index.css';
 
@@ -21,13 +22,15 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ActorRealtimeProvider>
-          <ToastProvider>
+      <ToastProvider>
+        <DeveloperBootstrapGate>
+          <AuthProvider>
+            <ActorRealtimeProvider>
             <RouterProvider router={router} />
-          </ToastProvider>
-        </ActorRealtimeProvider>
-      </AuthProvider>
+            </ActorRealtimeProvider>
+          </AuthProvider>
+        </DeveloperBootstrapGate>
+      </ToastProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );

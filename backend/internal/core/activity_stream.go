@@ -646,14 +646,29 @@ func (h *Handler) writeActivityStream(c *fiber.Ctx, release func(), filter func(
 		}
 		heartbeat := time.NewTicker(20 * time.Second)
 		defer heartbeat.Stop()
+		bootstrapCheck := time.NewTicker(2 * time.Second)
+		defer bootstrapCheck.Stop()
+		allowed := func() bool {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			exists, err := developerExists(ctx, h.service.repo.db)
+			return err == nil && exists
+		}
 		lifetime := time.NewTimer(jitteredSSEConnectionLifetime(h.service.streamMaxConnectionLifetime, cryptoRandomOffset))
 		defer lifetime.Stop()
 		for {
 			select {
 			case <-lifetime.C:
 				return
+			case <-bootstrapCheck.C:
+				if !allowed() {
+					return
+				}
 			case event, ok := <-events:
 				if !ok {
+					return
+				}
+				if !allowed() {
 					return
 				}
 				eventName, out, matched := filter(event)
@@ -664,6 +679,9 @@ func (h *Handler) writeActivityStream(c *fiber.Ctx, release func(), filter func(
 					return
 				}
 			case <-heartbeat.C:
+				if !allowed() {
+					return
+				}
 				if err := writeSSE(w, "heartbeat", ActivityStreamEvent{Type: "heartbeat", At: time.Now().UTC().Format(time.RFC3339)}); err != nil {
 					return
 				}

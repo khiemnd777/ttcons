@@ -1,6 +1,12 @@
 ENV_FILE ?= .env
 -include $(ENV_FILE)
 
+ZOHO_LOCAL_ENV ?= .env.zoho.local
+ifeq ($(ENV_FILE),.env)
+ifneq ($(wildcard $(ZOHO_LOCAL_ENV)),)
+COMPOSE ?= docker compose --env-file $(ENV_FILE) --env-file $(ZOHO_LOCAL_ENV) -f docker-compose.yml -f docker-compose.zoho.local.yml
+endif
+endif
 COMPOSE ?= docker compose --env-file $(ENV_FILE)
 SERVICE ?=
 BACKEND_GOCACHE ?= $(CURDIR)/backend/.gocache

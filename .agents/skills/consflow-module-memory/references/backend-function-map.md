@@ -1,5 +1,9 @@
 # Consflow Backend Function Map
 
+## Developer bootstrap OTP — 2026-11-09
+
+- `developer_bootstrap.go` owns `developerExists`, backend API gate, status, OTP issuance and atomic account creation; `routes.go` registers pre-gate bootstrap endpoints and real SMTP sender independently of recovery; `activity_stream.go` rechecks the gate for open streams. `developerBootstrapMailConfig` selects the immutable `SystemSettingsStore.startupEnv` only when all persisted SMTP identity fields are empty; partial DB configuration remains authoritative and fails closed. `V161__developer_bootstrap_otp.sql` stores the serialized OTP challenge and counters. Local `make` selects `docker-compose.zoho.local.yml` when `.env.zoho.local` exists. SMTP integration test uses a private test CA and synthetic local message. First searches: `developerExists|bootstrapGate|DeveloperBootstrap|developerBootstrapMailConfig`.
+
 ## Notification catalog array decoding — 2026-10-26
 
 - `GET /me/notifications/catalog` follows `handlers_notifications.go::NotificationCatalog` → `service_notifications.go::NotificationCatalog` → `repository_notifications.go::NotificationCatalog`. PostgreSQL `permissions_any TEXT[] NOT NULL` is projected as `array_to_json(permissions_any)::text`, scanned as bytes and JSON-decoded into the existing `[]string` DTO, following the dispatcher pattern. Direct database/sql scanning into `[]string` fails with pgx stdlib. Preserve disabled entries, required-delivery flags, metadata and ordering; decoding failure remains an error. No API/schema/migration/producer change. Real PostgreSQL regression: `TestNotificationCatalogReadsPostgresPermissionArrays` in `notification_catalog_test.go`, using an isolated test schema.

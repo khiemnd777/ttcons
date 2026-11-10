@@ -23,6 +23,10 @@
 - Consumers: DesignReleasePanel revision help/eyebrow; ConstructionHandoffPanel introduction/empty help; PlanningPage stage/next-action help; ProjectDetailPage WorkflowExecutionSummary/WorkflowWorkTableRow; WorkItemWorkspaceHeader removes duplicate title only with titleInDialog, retains standalone title/navigation; PrimarySurfaceHeader; WorkflowFormActionCenter/FormSectionEyebrow/WorkflowFieldControl. Actual controls/errors/handoff evidence policy remain; canonical EvidencePanel/viewers unchanged.
 - URL adapters: workspace sidebar, executionTargetPath, PreparationPage, ProjectTaskContext, WorkItemDetailPage and WorkItemDetailWorkspace handoff action. Preserve destination query/hash; do not copy source task/filter context. Tests wordless, wordlessPresentation, uiTextRefactor, pipelineStageNavigation cover mode, rollback/provenance, real rendering/controls and help events. Browser/touch/position/UAT not established by non-browser tests.
 
+## Developer bootstrap OTP — 2026-11-09
+
+- `DeveloperBootstrapGate.tsx` checks the backend status before mounting auth/router and fails closed on error; `DeveloperBootstrapPage.tsx` provides fixed recipient, OTP and account setup using `AuthCard`, `PasswordInput`, `ToastProvider` and `lucide-react`. Entry point `main.tsx`; first searches `DeveloperBootstrapGate|DeveloperBootstrapPage|/bootstrap/status`.
+
 ## Khắc phục UAT dọn text — 2026-10-26
 
 - `notifications/NotificationPreferencesDialog.tsx` owns category preference editing using shared `Dialog`/`LoadingSpinner`/`ToastProvider`; `NotificationsPage` passes the full catalog query. Both queries must succeed before saving. Required groups stay locked. Only changed optional groups are written. On partial failure, refetch the server baseline while retaining unsaved choices; no success toast. Close clears draft and mutation errors. Tests: `notificationPreferences.test.ts`, updated `notificationPresentation.test.ts`.
