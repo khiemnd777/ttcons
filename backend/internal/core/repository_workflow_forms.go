@@ -749,7 +749,16 @@ func (r *Repository) PublishWorkflowFormVersion(ctx context.Context, versionID s
 		return nil, err
 	}
 	defer tx.Rollback()
+	if err := publishWorkflowFormVersionTx(ctx, tx, versionID, actorID, actorName); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return r.WorkflowFormVersionDetail(ctx, versionID)
+}
 
+func publishWorkflowFormVersionTx(ctx context.Context, tx *sql.Tx, versionID, actorID, actorName string) error {
 	var templateID, templateName, status string
 	var versionNo int
 	if err := tx.QueryRowContext(ctx, `
@@ -759,21 +768,21 @@ func (r *Repository) PublishWorkflowFormVersion(ctx context.Context, versionID s
 		WHERE v.id=$1
 		FOR UPDATE
 	`, versionID).Scan(&templateID, &templateName, &versionNo, &status); err != nil {
-		return nil, err
+		return err
 	}
 	if status != "draft" {
-		return nil, validationError("Chỉ phiên bản nháp biểu mẫu quy trình mới được phát hành", Record{"status": status})
+		return validationError("Chỉ phiên bản nháp biểu mẫu quy trình mới được phát hành", Record{"status": status})
 	}
 	var fieldCount int
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM workflow_form_fields WHERE form_version_id=$1`, versionID).Scan(&fieldCount); err != nil {
-		return nil, err
+		return err
 	}
 	if fieldCount == 0 {
-		return nil, validationError("Phiên bản biểu mẫu quy trình cần ít nhất một trường trước khi phát hành")
+		return validationError("Phiên bản biểu mẫu quy trình cần ít nhất một trường trước khi phát hành")
 	}
 	definitionHash, err := workflowFormDefinitionHashTx(ctx, tx, versionID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE workflow_form_versions
@@ -783,15 +792,12 @@ func (r *Repository) PublishWorkflowFormVersion(ctx context.Context, versionID s
 			updated_at=now()
 		WHERE id=$1
 	`, versionID, definitionHash); err != nil {
-		return nil, err
+		return err
 	}
 	if err := addAuditTx(ctx, tx, "", actorID, actorName, "workflow_form_version_published", "workflow_form_version", versionID, fmt.Sprintf("Phát hành biểu mẫu quy trình %s v%d", templateName, versionNo), Record{"template_id": templateID, "field_count": fieldCount}); err != nil {
-		return nil, err
+		return err
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return r.WorkflowFormVersionDetail(ctx, versionID)
+	return nil
 }
 
 func (r *Repository) ArchiveWorkflowFormVersion(ctx context.Context, versionID string, actorID, actorName string) (Record, error) {

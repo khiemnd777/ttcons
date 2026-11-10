@@ -22,6 +22,7 @@
 ## Pipeline Builder false Form-version warnings — 2026-10-20
 
 - If `Kiểm tra` reports a pinned Form as unpublished/inactive while publish succeeds, compare `WorkflowFormCatalog` selection filtering with `GetTemplateDetail.pinned_workflow_forms` and `TemplatePublishFormIssues`. Read `PipelineBuilderPage.tsx::workflowFormsForTemplate` and `NodeInspectorPanel.tsx::workflowFormOptions`; only active/published pins qualify, and hidden pins must not enter new selections. First search: `pinned_workflow_forms|workflowFormsForTemplate|workflowFormOptions|buildValidationIssues|TemplatePublishFormIssues`.
+- If bulk Form publication is missing, stale, or partial, inspect `PipelineFormPublishPreview` and `PublishPipelineForms` against exact Pipeline pins, version statuses/hashes, field counts and audit records. The POST must roll back every Form when one fails. First search: `pipelineFormPublishPreviewSQL|validatePipelineFormPublishExpectation|publishWorkflowFormVersionTx|PipelineFormPublishDialog`.
 
 ## BM05/BM06/BM07 Project Name Wraps Into A Tall Header — 2026-10-13
 

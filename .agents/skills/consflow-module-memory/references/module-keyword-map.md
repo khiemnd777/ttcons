@@ -47,6 +47,7 @@
 ## Pipeline Builder pinned Form validation — 2026-10-20
 
 - Keywords: Pipeline v10 `Kiểm tra`, 14 false Workflow Form warnings, hidden `operational_capture_v3` pins. Owner: `repository_pipeline.go::GetTemplateDetail` supplies active/published `pinned_workflow_forms`; `PipelineBuilderPage.tsx` merges these with the selection catalog for validation and condition-field metadata; `NodeInspectorPanel.tsx` shows an already pinned hidden version without offering it as a new choice. `pipelineBuilderDomain.ts::workflowFormsForTemplate/workflowFormOptions` owns that distinction. First searches: `pinned_workflow_forms|workflowFormsForTemplate|workflowFormOptions|buildValidationIssues|WorkflowFormCatalog|TemplatePublishFormIssues`.
+- Related bulk Form publication: `PipelineBuilderPage.tsx` + `components/PipelineFormPublishDialog.tsx` preview distinct pinned versions and confirm; `handlers_workflow_definitions.go`, `service_workflow_definitions.go`, `pipeline_form_batch_publish.go` own `/pipeline-templates/:id/workflow-forms/publish-preview|publish`. `pipeline.edit` is required, the Pipeline must be draft, and publication uses one transaction with per-Form audit. First searches: `PipelineFormPublishPreview|PublishPipelineForms|publishWorkflowFormVersionTx|PipelineFormPublishDialog`.
 
 ## Structured Checkbox Validation — 2026-10-13
 

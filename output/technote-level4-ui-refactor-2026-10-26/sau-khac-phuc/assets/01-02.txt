@@ -1,1 +1,0 @@
-Dialog phân biệt lỗi tải với danh sách rỗng. Sáu nhóm trong dữ liệu local đều bắt buộc và vẫn luôn bật.

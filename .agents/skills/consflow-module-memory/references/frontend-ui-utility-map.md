@@ -48,6 +48,7 @@
 ## Pipeline Builder pinned Form display — 2026-10-20
 
 - `PipelineBuilderPage.tsx` merges the new `PipelineTemplate.pinned_workflow_forms` response with `/workflow-form-templates` only for validation, existing-pin display and condition-field metadata. `pipelineBuilderDomain.ts::workflowFormsForTemplate` marks catalog-hidden valid pins `selectable=false`; `workflowFormOptions` leaves them in the selector only when already selected. New defaults still read the original selection catalog. `NodeInspectorPanel.tsx` uses the merged metadata and filtered options. Regression: `pipelineFormDefaults.test.ts`.
+- `components/PipelineBuilderShell.tsx` shows the bulk Form publish action for a draft Pipeline when the preview reports eligible draft versions. `PipelineBuilderPage.tsx` owns preview/mutation and revalidation; `components/PipelineFormPublishDialog.tsx` uses shared `Dialog` for list, loading, retry, blocked and confirmation states. The API publishes Forms only; Pipeline publication remains separate.
 
 ## Existing Contract App-Sign Modal Uses Rev10 Source — 2026-10-13
 

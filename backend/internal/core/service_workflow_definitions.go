@@ -201,6 +201,22 @@ func (s *Service) PublishWorkflowFormVersion(ctx context.Context, versionID, act
 	return s.repo.PublishWorkflowFormVersion(ctx, versionID, actorID, actorName)
 }
 
+func (s *Service) PipelineFormPublishPreview(ctx context.Context, templateID string) (Record, error) {
+	templateID = cleanID(templateID)
+	if templateID == "" {
+		return nil, validationError("ID Pipeline không hợp lệ")
+	}
+	return s.repo.PipelineFormPublishPreview(ctx, templateID)
+}
+
+func (s *Service) PublishPipelineForms(ctx context.Context, templateID string, request PipelineFormPublishRequest, actorID, actorName string) (Record, error) {
+	templateID = cleanID(templateID)
+	if templateID == "" {
+		return nil, validationError("ID Pipeline không hợp lệ")
+	}
+	return s.repo.PublishPipelineForms(ctx, templateID, request, actorID, actorName)
+}
+
 func (s *Service) ArchiveWorkflowFormVersion(ctx context.Context, versionID, actorID, actorName string) (Record, error) {
 	versionID = cleanID(versionID)
 	if versionID == "" {

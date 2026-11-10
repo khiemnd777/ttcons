@@ -16,6 +16,7 @@
 ## Pipeline detail pinned Form metadata — 2026-10-20
 
 - `repository_pipeline.go::GetTemplateDetail` adds `pinned_workflow_forms` using published versions of active Form templates referenced by that exact Pipeline revision. It reuses `workflowFormVersionDetailSQL` to include fields used by condition editing. The selection catalog still excludes unmarked `operational_capture_v3` versions; publish validation still uses `TemplatePublishFormIssues`. Regression: `TestPipelineDetailIncludesValidPinnedFormHiddenFromSelectionCatalog`.
+- `GET /pipeline-templates/:id/workflow-forms/publish-preview` lists distinct pinned versions, statuses, hashes, field counts and use counts. `POST /pipeline-templates/:id/workflow-forms/publish` requires the exact previewed version/status/hash set, draft Pipeline and `pipeline.edit`; `pipeline_form_batch_publish.go` locks graph and versions, validates active/nonempty drafts, and calls shared `publishWorkflowFormVersionTx` inside one transaction. Published versions and runtime instances are not rewritten. Regression: `TestPublishPipelineFormsIsAtomicAndUsesDistinctVersions`.
 
 ## Shared Strict Workflow Checkbox Validation — 2026-10-13
 
