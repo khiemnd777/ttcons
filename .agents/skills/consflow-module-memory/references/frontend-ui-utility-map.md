@@ -23,6 +23,10 @@
 - Consumers: DesignReleasePanel revision help/eyebrow; ConstructionHandoffPanel introduction/empty help; PlanningPage stage/next-action help; ProjectDetailPage WorkflowExecutionSummary/WorkflowWorkTableRow; WorkItemWorkspaceHeader removes duplicate title only with titleInDialog, retains standalone title/navigation; PrimarySurfaceHeader; WorkflowFormActionCenter/FormSectionEyebrow/WorkflowFieldControl. Actual controls/errors/handoff evidence policy remain; canonical EvidencePanel/viewers unchanged.
 - URL adapters: workspace sidebar, executionTargetPath, PreparationPage, ProjectTaskContext, WorkItemDetailPage and WorkItemDetailWorkspace handoff action. Preserve destination query/hash; do not copy source task/filter context. Tests wordless, wordlessPresentation, uiTextRefactor, pipelineStageNavigation cover mode, rollback/provenance, real rendering/controls and help events. Browser/touch/position/UAT not established by non-browser tests.
 
+## Developer bootstrap OTP — 2026-11-09
+
+- `DeveloperBootstrapGate.tsx` checks the backend status before mounting auth/router and fails closed on error; `DeveloperBootstrapPage.tsx` provides fixed recipient, OTP and account setup using `AuthCard`, `PasswordInput`, `ToastProvider` and `lucide-react`. Entry point `main.tsx`; first searches `DeveloperBootstrapGate|DeveloperBootstrapPage|/bootstrap/status`.
+
 ## Khắc phục UAT dọn text — 2026-10-26
 
 - `notifications/NotificationPreferencesDialog.tsx` owns category preference editing using shared `Dialog`/`LoadingSpinner`/`ToastProvider`; `NotificationsPage` passes the full catalog query. Both queries must succeed before saving. Required groups stay locked. Only changed optional groups are written. On partial failure, refetch the server baseline while retaining unsaved choices; no success toast. Close clears draft and mutation errors. Tests: `notificationPreferences.test.ts`, updated `notificationPresentation.test.ts`.
@@ -44,6 +48,7 @@
 ## Pipeline Builder pinned Form display — 2026-10-20
 
 - `PipelineBuilderPage.tsx` merges the new `PipelineTemplate.pinned_workflow_forms` response with `/workflow-form-templates` only for validation, existing-pin display and condition-field metadata. `pipelineBuilderDomain.ts::workflowFormsForTemplate` marks catalog-hidden valid pins `selectable=false`; `workflowFormOptions` leaves them in the selector only when already selected. New defaults still read the original selection catalog. `NodeInspectorPanel.tsx` uses the merged metadata and filtered options. Regression: `pipelineFormDefaults.test.ts`.
+- `components/PipelineBuilderShell.tsx` shows the bulk Form publish action for a draft Pipeline when the preview reports eligible draft versions. `PipelineBuilderPage.tsx` owns preview/mutation and revalidation; `components/PipelineFormPublishDialog.tsx` uses shared `Dialog` for list, loading, retry, blocked and confirmation states. The API publishes Forms only; Pipeline publication remains separate.
 
 ## Existing Contract App-Sign Modal Uses Rev10 Source — 2026-10-13
 

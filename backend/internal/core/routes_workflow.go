@@ -15,6 +15,8 @@ func registerWorkflowRoutes(protected fiber.Router, h *Handler) {
 	protected.Put("/pipeline-templates/:id/layout", h.UpdateTemplateLayout)
 	protected.Delete("/pipeline-templates/:id", h.DeleteTemplate)
 	protected.Post("/pipeline-templates/:id/publish", h.PublishTemplate)
+	protected.Get("/pipeline-templates/:id/workflow-forms/publish-preview", h.PreviewPipelineFormPublish)
+	protected.Post("/pipeline-templates/:id/workflow-forms/publish", h.PublishPipelineForms)
 	protected.Post("/pipeline-templates/:id/clone", h.CloneTemplate)
 	protected.Post("/pipeline-templates/:id/nodes", h.AddTemplateNode)
 	protected.Post("/pipeline-templates/:id/edges", h.AddTemplateEdge)

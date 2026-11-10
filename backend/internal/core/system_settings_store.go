@@ -23,6 +23,7 @@ type SystemSettingsStore struct {
 	mu            sync.RWMutex
 	db            *sql.DB
 	bootstrap     config.Config
+	startupEnv    config.Config
 	startupValues map[string]string
 	encryptionKey []byte
 }
@@ -55,7 +56,7 @@ type storedSystemSetting struct {
 }
 
 func NewSystemSettingsStore(db *sql.DB, cfg config.Config) *SystemSettingsStore {
-	store := &SystemSettingsStore{db: db, bootstrap: cfg, startupValues: map[string]string{}}
+	store := &SystemSettingsStore{db: db, bootstrap: cfg, startupEnv: cfg, startupValues: map[string]string{}}
 	if cfg.SettingsEncryptionKey != "" {
 		digest := sha256.Sum256([]byte(cfg.SettingsEncryptionKey))
 		store.encryptionKey = digest[:]

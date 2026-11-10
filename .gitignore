@@ -9,6 +9,7 @@ dist/
 frontend/dist/
 tmp/
 outputs/
+/output/
 uploads/
 backend/uploads/
 /storage/

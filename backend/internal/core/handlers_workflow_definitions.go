@@ -110,6 +110,32 @@ func (h *Handler) PublishTemplate(c *fiber.Ctx) error {
 	return response.OK(c, template)
 }
 
+func (h *Handler) PreviewPipelineFormPublish(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	preview, err := h.service.PipelineFormPublishPreview(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, preview)
+}
+
+func (h *Handler) PublishPipelineForms(c *fiber.Ctx) error {
+	if err := h.requirePermission(c, []string{"pipeline.edit"}); err != nil {
+		return err
+	}
+	var request PipelineFormPublishRequest
+	if err := c.BodyParser(&request); err != nil {
+		return response.Fail(c, fiber.StatusBadRequest, "VALIDATION_ERROR", "Danh sách biểu mẫu không hợp lệ")
+	}
+	result, err := h.service.PublishPipelineForms(c.Context(), c.Params("id"), request, actorID(c), actorName(c))
+	if err != nil {
+		return err
+	}
+	return response.OK(c, result)
+}
+
 func (h *Handler) CloneTemplate(c *fiber.Ctx) error {
 	if err := h.requirePermission(c, []string{"pipeline.create"}); err != nil {
 		return err

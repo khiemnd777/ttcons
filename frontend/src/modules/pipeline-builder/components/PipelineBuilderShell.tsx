@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
-import { CheckCircle2, Copy, Download, Pencil, Send, Trash2, Upload, Wand2 } from 'lucide-react';
+import { CheckCircle2, Copy, Download, FileCheck2, Pencil, Send, Trash2, Upload, Wand2 } from 'lucide-react';
 import { StatusBadge } from '../../../components/StatusBadge';
 
 type PipelineBuilderShellProps = {
@@ -18,6 +18,8 @@ type PipelineBuilderShellProps = {
   deleteSelectionLabel: string;
   nodeCount: number;
   validationIssueCount: number;
+  publishableFormCount: number;
+  canPublishForms: boolean;
   autoLayoutPending: boolean;
   canExportPDF: boolean;
   canImportDefinition: boolean;
@@ -31,6 +33,7 @@ type PipelineBuilderShellProps = {
   onPublishTemplate: () => void;
   onAutoLayout: () => void;
   onValidatePipeline: () => void;
+  onPublishForms: () => void;
   onExportPDF: () => void;
   onImportDefinition: () => void;
   onExportDefinition: () => void;
@@ -52,6 +55,8 @@ export function PipelineBuilderShell({
   deleteSelectionLabel,
   nodeCount,
   validationIssueCount,
+  publishableFormCount,
+  canPublishForms,
   autoLayoutPending,
   canExportPDF,
   canImportDefinition,
@@ -65,6 +70,7 @@ export function PipelineBuilderShell({
   onPublishTemplate,
   onAutoLayout,
   onValidatePipeline,
+  onPublishForms,
   onExportPDF,
   onImportDefinition,
   onExportDefinition,
@@ -112,6 +118,12 @@ export function PipelineBuilderShell({
                 <CheckCircle2 className="h-4 w-4" />
                 Kiểm tra
               </button>
+              {canPublishForms && publishableFormCount > 0 ? (
+                <button className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100" onClick={onPublishForms}>
+                  <FileCheck2 className="h-4 w-4" />
+                  Phát hành {publishableFormCount} biểu mẫu
+                </button>
+              ) : null}
               <button
                 title="Xuất mô tả node và checklist/step thành PDF"
                 className="inline-flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"

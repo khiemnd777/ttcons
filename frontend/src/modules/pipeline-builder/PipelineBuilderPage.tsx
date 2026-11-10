@@ -10,6 +10,7 @@ import { Dialog } from '../../components/Dialog';
 import { useAuth } from '../../lib/auth/AuthContext';
 import type { PipelineEdgeConditionDefinition, PipelineNode, PipelineTemplate, PipelineTemplateEdge, WorkflowFormCatalogItem } from '../../lib/types/domain';
 import { PipelineBuilderShell } from './components/PipelineBuilderShell';
+import { PipelineFormPublishDialog, type PipelineFormPublishPreview } from './components/PipelineFormPublishDialog';
 import { TemplateSidebar } from './components/TemplateSidebar';
 import { NodeLibraryPanel } from './components/NodeLibraryPanel';
 import { NodeInspectorPanel } from './components/NodeInspectorPanel';
@@ -111,6 +112,7 @@ export function PipelineBuilderPage() {
   const [edgeValidationRequestId, setEdgeValidationRequestId] = useState(0);
   const [definitionImportOpen, setDefinitionImportOpen] = useState(false);
   const [definitionExportOpen, setDefinitionExportOpen] = useState(false);
+  const [formPublishDialogTemplateId, setFormPublishDialogTemplateId] = useState('');
   const renameDialogContentRef = useRef<HTMLDivElement | null>(null);
   const navigateRenameValidation = useValidationNavigation(renameDialogContentRef);
 
@@ -134,6 +136,11 @@ export function PipelineBuilderPage() {
     queryKey: ['permissions'],
     queryFn: () => get<Record<string, any>[]>('/permissions'),
     enabled: Boolean(selectedTemplateId),
+  });
+  const formPublishPreview = useQuery({
+    queryKey: ['pipeline-form-publish-preview', selectedTemplateId],
+    queryFn: () => get<PipelineFormPublishPreview>(`/pipeline-templates/${selectedTemplateId}/workflow-forms/publish-preview`),
+    enabled: Boolean(selectedTemplateId && template.data?.status === 'draft' && hasPermission('pipeline.edit')),
   });
 
   useEffect(() => {
@@ -171,6 +178,7 @@ export function PipelineBuilderPage() {
   const hasPipelineEditPermission = hasPermission('pipeline.edit');
   const canCreateTemplate = hasPermission('pipeline.create');
   const canPublishTemplate = hasPermission('pipeline.publish') && templateStatus === 'draft';
+  const canPublishForms = hasPipelineEditPermission && templateStatus === 'draft';
   const canImportDefinition = hasPermission('workflow_definition.import') && canCreateTemplate;
   const canExportDefinition = hasPermission('workflow_definition.export') && hasPermission('pipeline.view');
   const canEditLayout = Boolean(template.data && hasPipelineEditPermission && (templateStatus === 'draft' || templateStatus === 'published'));
@@ -293,6 +301,50 @@ export function PipelineBuilderPage() {
     () => buildValidationIssues(nodes, rawEdges, edgeConditions.data ?? [], workflowFormVersionIds, isPublished),
     [nodes, rawEdges, edgeConditions.data, workflowFormVersionIds, isPublished],
   );
+
+  const publishRelatedForms = useMutation({
+    mutationFn: ({ templateId, preview }: { templateId: string; preview: PipelineFormPublishPreview }) =>
+      post<{ published_count: number }>(`/pipeline-templates/${templateId}/workflow-forms/publish`, {
+        versions: preview.forms.map((form) => ({
+          version_id: form.version_id,
+          definition_hash: form.definition_hash,
+          version_status: form.version_status,
+        })),
+      }),
+    onSuccess: async (result, { templateId }) => {
+      setFormPublishDialogTemplateId('');
+      try {
+        const [freshTemplate, freshCatalog, freshConditions] = await Promise.all([
+          get<PipelineTemplate>(`/pipeline-templates/${templateId}`),
+          get<WorkflowFormCatalogItem[]>('/workflow-form-templates'),
+          get<PipelineEdgeConditionDefinition[]>('/pipeline-edge-conditions'),
+        ]);
+        queryClient.setQueryData(['pipeline-template', templateId], freshTemplate);
+        queryClient.setQueryData(['workflow-form-catalog'], freshCatalog);
+        queryClient.setQueryData(['pipeline-edge-conditions'], freshConditions);
+        void queryClient.invalidateQueries({ queryKey: ['pipeline-form-publish-preview', templateId] });
+        const freshForms = workflowFormsForTemplate(freshCatalog, freshTemplate.pinned_workflow_forms ?? []);
+        const issues = buildValidationIssues(
+          freshTemplate.nodes ?? [], freshTemplate.edges ?? [], freshConditions,
+          new Set(freshForms.map((form) => String(form.version_id))), false,
+        );
+        if (issues.length) {
+          toast.warn({ title: `Đã phát hành ${result.published_count} biểu mẫu; Pipeline còn ${issues.length} lỗi`, description: issues.slice(0, 3).join('; ') });
+        } else {
+          toast.success(`Đã phát hành ${result.published_count} biểu mẫu. Kiểm tra Pipeline hợp lệ.`);
+        }
+      } catch (error) {
+        void queryClient.invalidateQueries({ queryKey: ['pipeline-template', templateId] });
+        void queryClient.invalidateQueries({ queryKey: ['workflow-form-catalog'] });
+        void queryClient.invalidateQueries({ queryKey: ['pipeline-form-publish-preview', templateId] });
+        toast.warn({ title: `Đã phát hành ${result.published_count} biểu mẫu`, description: 'Chưa tải lại được kết quả kiểm tra Pipeline. Hãy bấm Kiểm tra sau khi tải lại trang.' });
+      }
+    },
+    onError: (error) => {
+      toast.error('Không phát hành được biểu mẫu liên quan', error);
+      void formPublishPreview.refetch();
+    },
+  });
 
   const invalidate = (templateId = selectedTemplateId) => {
     queryClient.invalidateQueries({ queryKey: ['pipeline-templates'] });
@@ -987,6 +1039,8 @@ export function PipelineBuilderPage() {
         deleteSelectionLabel={deleteSelectionLabel}
         nodeCount={nodes.length}
         validationIssueCount={validationIssues.length}
+        publishableFormCount={formPublishPreview.data?.publishable_count ?? 0}
+        canPublishForms={canPublishForms}
         autoLayoutPending={autoLayout.isPending}
         canExportPDF={Boolean(selectedTemplateId && template.data) && !template.isLoading}
         canImportDefinition={canImportDefinition}
@@ -1000,6 +1054,10 @@ export function PipelineBuilderPage() {
         onPublishTemplate={() => publish.mutate()}
         onAutoLayout={() => { if (canEditLayout) autoLayout.mutate(); }}
         onValidatePipeline={validatePipeline}
+        onPublishForms={() => {
+          setFormPublishDialogTemplateId(selectedTemplateId);
+          void formPublishPreview.refetch();
+        }}
         onExportPDF={() => exportPDF.mutate()}
         onImportDefinition={() => setDefinitionImportOpen(true)}
         onExportDefinition={() => setDefinitionExportOpen(true)}
@@ -1142,6 +1200,21 @@ export function PipelineBuilderPage() {
           />
         )}
       </PipelineBuilderShell>
+
+      <PipelineFormPublishDialog
+        open={Boolean(formPublishDialogTemplateId && formPublishDialogTemplateId === selectedTemplateId)}
+        preview={formPublishPreview.data}
+        loading={formPublishPreview.isFetching}
+        error={formPublishPreview.isError}
+        pending={publishRelatedForms.isPending}
+        onClose={() => setFormPublishDialogTemplateId('')}
+        onRetry={() => { void formPublishPreview.refetch(); }}
+        onConfirm={() => {
+          if (formPublishPreview.data && formPublishDialogTemplateId === selectedTemplateId) {
+            publishRelatedForms.mutate({ templateId: selectedTemplateId, preview: formPublishPreview.data });
+          }
+        }}
+      />
 
       <Dialog
         open={renameDialogOpen}

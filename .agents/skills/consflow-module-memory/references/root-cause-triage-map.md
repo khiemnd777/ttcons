@@ -4,6 +4,10 @@
 
 - Inspect public response for X-Robots-Tag and HTML robots meta. Owners `frontend/Caddyfile` and `frontend/index.html`. Do not Disallow all crawling: Google must read noindex. A deployed noindex does not prove existing search results have been removed. See `docs/operations/vps-production-deploy.md`.
 
+## Developer bootstrap email unavailable — 2026-11-09
+
+- Symptom `503 BOOTSTRAP_MAIL_UNAVAILABLE`: first compare running container Compose labels/env presence, mounted secret readability, and persisted SMTP field presence without exposing credentials. Earlier `make` omitted the optional Zoho override and `SystemSettingsStore.bootstrap` had already been overwritten with database settings. `Makefile` now selects the override when `.env.zoho.local` exists; `developerBootstrapMailConfig` uses immutable startup settings only if all persisted SMTP identity fields are empty. Partially configured database remains authoritative and invalid config fails closed. First searches: `startupEnv|developerBootstrapMailConfig|ZOHO_LOCAL_ENV|BOOTSTRAP_MAIL_UNAVAILABLE`. `TestDeveloperBootstrapStartupWithPreviouslyEmptySettings` covers actual startup/route selection on isolated PostgreSQL; SMTP delivery and browser acceptance remain separate.
+
 ## Catalog notification 500, empty preferences and mobile overflow — 2026-10-26
 
 - Catalog 500 with `unsupported Scan ... string into type *[]string`: inspect `repository_notifications.go::NotificationCatalog`, `permissions_any` and pgx database/sql decoding. The confirmed failure is a valid TEXT[] SQL result scanned directly into []string; use the existing JSON array projection pattern. Catalog errors must reach `NotificationPreferencesDialog`; an empty successful result is a distinct state. Check mutation guards, changed groups, partial-save baseline reconciliation and error reset on reopen.
@@ -18,6 +22,7 @@
 ## Pipeline Builder false Form-version warnings — 2026-10-20
 
 - If `Kiểm tra` reports a pinned Form as unpublished/inactive while publish succeeds, compare `WorkflowFormCatalog` selection filtering with `GetTemplateDetail.pinned_workflow_forms` and `TemplatePublishFormIssues`. Read `PipelineBuilderPage.tsx::workflowFormsForTemplate` and `NodeInspectorPanel.tsx::workflowFormOptions`; only active/published pins qualify, and hidden pins must not enter new selections. First search: `pinned_workflow_forms|workflowFormsForTemplate|workflowFormOptions|buildValidationIssues|TemplatePublishFormIssues`.
+- If bulk Form publication is missing, stale, or partial, inspect `PipelineFormPublishPreview` and `PublishPipelineForms` against exact Pipeline pins, version statuses/hashes, field counts and audit records. The POST must roll back every Form when one fails. First search: `pipelineFormPublishPreviewSQL|validatePipelineFormPublishExpectation|publishWorkflowFormVersionTx|PipelineFormPublishDialog`.
 
 ## BM05/BM06/BM07 Project Name Wraps Into A Tall Header — 2026-10-13
 

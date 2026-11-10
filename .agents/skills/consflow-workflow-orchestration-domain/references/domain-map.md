@@ -12,6 +12,10 @@
 
 - Route-scoped presentation only; standalone project detail additionally requires same-project scoped returnTo and its own flag. WorkItemWorkspaceHeader removes duplicate title only inside titled dialog, retains standalone title and workflow toolbar. WorkflowFormPanel keeps schema/controls, required errors, draft/submit, signature/PDF gates and evidence policy; optional help uses ContextHelp tooltip, handoff evidence requirement remains directly visible. No schema/snapshot/API/migration change. Default consumers unchanged; see frontend Wordless map/tests; browser/UAT separate.
 
+## Pipeline Form Bulk Publication — 2026-11-09
+
+- Pipeline Builder may preview distinct exact Form versions referenced by a draft Pipeline and publish eligible draft versions in one transaction after confirmation. The previewed IDs/statuses/hashes must still match; inactive/archived/empty Forms block the whole batch. Each published Form retains its own audit event and immutable definition hash. This does not publish the Pipeline or mutate historical runs/instances. Owners: `pipeline_form_batch_publish.go`, `repository_workflow_forms.go::publishWorkflowFormVersionTx`, `PipelineBuilderPage.tsx`, `components/PipelineFormPublishDialog.tsx`.
+
 ## Checkbox Draft And Submit Type Contract — 2026-10-13
 
 - Existing checkbox fields require exact JSON boolean values at top level and inside structured lists. Optional nested false is a stored answer; absent/null optional values remain omitted. Required true is necessary on submit; existing nested required checks also reject missing/false on draft, while top-level required checks remain submit-only. Present strings/numbers/maps/arrays reject before normalization can drop them. Exact handoff evidence policy keeps new drafts/submissions true for absent/null/false and preserves wrong types for strict rejection. Activation still forces criterion evidence and completion requires the canonical same-WorkItem source; no field/schema/UI or historical backfill.

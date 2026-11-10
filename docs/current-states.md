@@ -1,5 +1,15 @@
 # Current States
 
+## Phát hành hàng loạt Workflow Form liên quan Pipeline — duyệt 2026-11-09
+
+**Mục tiêu:** Pipeline Builder hiển thị nút phát hành các phiên bản Form nháp được Pipeline nháp tham chiếu. Người dùng xem danh sách trước khi xác nhận; backend kiểm tra lại và phát hành nguyên tử, rồi UI tải lại và chạy kiểm tra Pipeline. Không tự phát hành Pipeline.
+
+**Đã làm:** Đối chiếu Pipeline nháp local `025bb87e-c533-4d2f-a47a-2fc2ce7b227a`: 14 Form nháp active được dùng tại 15 Gói công việc, không Form nào thiếu trường. Người dùng duyệt review package và Mockup as Text. Đã thêm API preview/phát hành, giao dịch chung và audit từng Form, nút và dialog dùng `Dialog` chuẩn; frontend build PASS, backend integration test nguyên tử trên PostgreSQL tách biệt PASS.
+
+**Sẽ làm/còn thiếu:** Browser/UAT chưa chạy vì lượt này không được yêu cầu xác minh bằng browser. Chưa phát hành 14 Form local, chưa commit/push/deploy; cần kiểm tra thao tác thực tế trong lượt được phép dùng browser và xác nhận trước khi phát hành dữ liệu.
+
+**Kiểm chứng:** PostgreSQL test DB tách biệt chạy `TestPublishPipelineFormsIsAtomicAndUsesDistinctVersions` và `TestWorkflowFormVersionGovernancePublishesAndKeepsOldCatalogVersions`: PASS. Frontend `npm run build`: PASS. Source review xác nhận dùng `Dialog` chuẩn, API client chung, quyền `pipeline.edit` theo thao tác phát hành Form hiện hữu; không thêm migration. UX status: NOT UX ACCEPTED.
+
 ## Dọn text giao diện ngoài Pipeline và Workflow Form — đã duyệt, 2026-10-26
 
 **Mục đích:** giảm tagline và chỉ dẫn lặp để ưu tiên dữ liệu và hành động. Người dùng đã duyệt proposal và triển khai ba đợt. “Rail” là cột phụ/thanh bên trong màn hình.
@@ -27,6 +37,92 @@
 **Đã làm — ba đợt:** bỏ tagline tại page consumers, text tĩnh lặp trong bảng/metric và placeholder mô tả trống; rút dialog/rail ngoài vùng loại trừ; thêm ContextHelp (Reports/Profile/Accounting/Rework) và IconAction (Dashboard/Audit/DiscussionWorkRail) opt-in. Giữ thông tin chọn loại yêu cầu trong dialog Rework sau review độc lập; giữ dữ liệu, CTA nghiệp vụ và shared defaults. Cập nhật central/frontend mapping. Chi tiết/kiểm kê: `docs/ui-text-refactor.md`.
 
 **Kiểm chứng source giai đoạn đầu — lịch sử:** local Node v23.11.0, `npm test` PASS 617/617; `npm run build` PASS TypeScript/Vite; `npm run check:bundle-budget` PASS 133 chunks; `git diff --check` PASS. Baseline comparison PASS 112 file + 12 hàm Pipeline/Form embedded nguyên văn, cả shared defaults. Receipt/fingerprint: `docs/acceptance-evidence/ui-text-refactor-2026-10-26/checks.json`; thời điểm đó browser/UAT NOT_RUN. Kết quả hiện tại dùng `fix-summary.json` bên trên. Không commit/push/deploy.
+
+## Hướng dẫn Giám đốc, Phó Quản Lý và Quản trị viên - bản rà soát 01, chưa nghiệm thu, 2026-10-23
+
+**Phạm vi được chọn:** Tiếp tục ba sổ tay dễ hiểu, dùng local và dữ liệu giả định, ảnh thao tác thật, xuất ba PDF; không sửa ứng dụng/migrations/cấu hình, không deploy/commit/push. Giữ các kế hoạch và PDF trước nguyên trạng.
+
+**Sẽ làm/còn thiếu:** Người đại diện Giám đốc, Phó Quản Lý và Quản trị viên tự thực hành theo tài liệu, xác nhận phiên bản/cấu hình dùng đào tạo. Lưu cấp Viewer cho trainee.gov@dev.local tại riêng TH-GOV-20261023 chưa thực hiện: automatic approval review đã chặn, đã gửi câu hỏi xác nhận cấp tạm rồi thu hồi, chưa có trả lời; không đi vòng API/SQL/UI khác. Tạo tài khoản chỉ mở biểu mẫu, chưa thử tạo; các nhánh quyền/quy trình/ký hợp đồng/bàn giao/khôi phục/đồng thời/mất mạng/điện thoại ghi riêng, không sửa ứng dụng để đóng thiếu sót.
+
+**Đã làm:** Nạp mapping trung tâm/frontend/backend liên quan; skill quản trị, PDF/database và source hiện hành. Tạo công trình thường giả định TH-GOV-20261023 và tài khoản vai trò chuẩn trên local riêng, không đổi sample isolation/định nghĩa quyền. Seed nguyên tử một cặp WorkItem/daily report độc lập có nguồn đúng; không tạo lịch sử hoàn tất hoặc pipeline giả. Chuẩn bị gửi lần 1, GS gửi lại lần 2 và PM receipt qua API đúng quyền; phân biệt rõ phần chuẩn bị với UI proof.
+
+**Giám đốc:** Đọc hàng chờ (trống), tổng hợp/lọc hoạt động/xem công trình, đọc và thực sự duyệt TH-GD-01 qua UI, tải lại Đã duyệt, xem lịch sử đúng actor. 10 m² × 195.000 = 1.950.000 đồng, final price chưa khóa/chưa procurement. Không nhận quyết định dự toán là hoàn tất quy trình.
+
+**Phó Quản Lý:** Lọc/xem công việc Giám sát chỉ xem; gửi TH-PQL-01; chặn nhận xét trống, Yêu cầu bổ sung TH-PQL-02 thành công; sau gửi lại/PM receipt, nhìn rõ người khác đã xem nhưng mình chưa; cửa sổ còn lần cũ, Về bản hiện tại rồi xác nhận riêng lần 2. Hai receipts PM/Deputy độc lập; tải/đọc PDF bản lần 1 đúng 20%, giữ riêng với lần 2 35% và fingerprint khác. Chưa nghiệm thu chất lượng/hoàn tất Đầu việc.
+
+**Quản trị viên:** Tìm nhân sự; chặn họ tên trống; sửa/lưu/mở lại họ tên/phòng ban/chức vụ; chặn gán thiếu phạm vi/vai trò; chỉ chọn trước Viewer chưa lưu. Đọc vai trò/tám quyền rồi Huỷ; không sửa quyền chung. Ngừng tài khoản thử riêng trainee.stop.gov rồi mở lại; staff/user đều inactive, chưa thử đăng nhập lại. Tra lịch sử quyết định của Giám đốc; biểu mẫu tạo tài khoản chỉ mở rồi Huỷ; Admin bị từ chối hàng chờ recovery dành riêng Developer. Không đổi mật khẩu/phát hành recovery link.
+
+**PDF và kiểm tra:** Ba PDF tại output/pdf/governance-2026-10-23/: 17/21/24 trang, tổng 62 trang A4 ngang; 6/7/8 bài (21), 8/11/13 ảnh (32 ảnh gốc), mục lục liên kết, ảnh phóng/ghép vùng từ cùng bản gốc, đủ vai trò/môi trường/nguồn/thời điểm. validate_pdf.py PASS: 235 đơn vị nội dung, cấu trúc bài, font/vùng chữ/ngày/phiên bản/ảnh/mục lục. Đã xem 62 trang qua 11 bảng ảnh và 11 trang quan trọng cỡ 1280px; cả năm trang chỉnh cuối xem lại, 57 trang khác pixel-identical. visual-review.json khớp hash ba PDF cuối. PASS chỉ áp dụng tài liệu, không thay nghiệm thu người dùng.
+
+**Đọc lại local:** verify_local.py PASS: source fba39cdcf72a2d6714d5eac3d15eba8cdf4014c9, UI/API health 200, DB consflow_guide_20261022/160 migrations; dùng lại build 10:17 Việt Nam ngày 22-10, không build/test ứng dụng lại. Công trình draft/không pipeline/không procurement; WorkItem ready/completed_at null; hai report revisions/hai receipts riêng; trainee chưa có role. 32 ảnh khớp SHA gốc. Không đổi backend/frontend/migrations/cấu hình/.agents/.codex; không cập nhật mapping vì chỉ thêm tài liệu/bằng chứng/dữ liệu thử, không thay hành vi, contracts, schema, ownership hoặc định nghĩa quyền.
+
+**Bàn giao:** Ba nguồn tại docs/user-guides/giam-doc.md, pho-quan-ly.md, quan-tri-vien.md; sáu tiêu chí tại giam-doc-pho-quan-ly-quan-tri-vien-nghiem-thu.md; nguồn/giới hạn/preparation-vs-UI ở docs/acceptance-evidence/governance-local-2026-10-23/README.md. Danh mục nay 11 sổ tay riêng trên 19 vai trò, còn 8 chưa có riêng; các PDF cũ giữ nguyên.
+
+**Kiểm tra bàn giao:** 65 liên kết cục bộ không thiếu đích; 27 tệp văn bản được quét không thấy token theo mẫu/khóa riêng hoặc giá trị mật khẩu mẫu công khai; 32 tệp ảnh khớp 32 bản ghi nguồn. git diff --check sạch. Ba yêu cầu mở PDF trong Codex trả queued, không tuyên bố đã hiện trên màn hình người dùng.
+
+**Đóng gói theo yêu cầu 23-10:** output/huong-dan-su-dung-theo-vai-tro-2026-10-23.zip, 20.252.551 byte; gồm 11 sổ tay riêng + Vai trò và công việc (12 PDF), DOC-TU-DAY.txt và CAC-MUC-CAN-RA-SOAT.txt dùng lời thường. Không đưa script, tài khoản, dữ liệu thử hoặc bằng chứng nội bộ vào ZIP. Đã kiểm tra toàn bộ ZIP và đối chiếu nội dung giải nén với nguồn; 12 PDF khớp SHA trong manifest đã rà soát, không đổi PDF cũ. Kết quả tại output/delivery-2026-10-23/package-verification.json. Đóng gói không thay đổi trạng thái chưa nghiệm thu.
+
+**Nghiệm thu:** CHƯA ĐẠT — giữ kế hoạch mở. Không có người đại diện tự thực hành; bước Viewer bị chặn/chưa lưu và tạo tài khoản chưa thực hiện qua biểu mẫu. Phần chuẩn bị dữ liệu không thay thế bằng chứng thao tác trên màn hình. Các giới hạn phải được giải quyết hoặc ghi nhận trước phát hành đào tạo.
+
+## Hướng dẫn QS, Mua hàng, Thủ kho và QA/QC - bản rà soát 01, chưa nghiệm thu, 2026-10-22
+
+**Phạm vi được duyệt:** Bốn hướng dẫn dễ hiểu cho khách hàng, dữ liệu mẫu local, ảnh thao tác thật bằng tài khoản đúng vai trò, xuất bốn PDF. Chỉ tạo tài liệu/công cụ xuất tài liệu/bằng chứng và dữ liệu thử; không sửa ứng dụng, migrations hoặc cấu hình repo, không deploy/commit/push.
+
+**Sẽ làm/còn thiếu:** Người đại diện QS, Mua hàng, Thủ kho và QA/QC thực hành theo tài liệu; xác nhận phiên bản/cấu hình dùng đào tạo. Bước nhập báo giá Mua hàng, hồ sơ nguồn đầu vào QA/QC, chuỗi khắc phục/kiểm tra lại và bàn giao mua hàng sang nhập kho trên cùng công trình chưa được chứng minh trọn vẹn. Nhánh chưa thử ghi cuối từng sổ tay. Không tự sửa ứng dụng để đóng các phần này.
+
+**Đã làm:** Đọc kế hoạch, mapping và skill Mua hàng/Kho/Nghiệm thu/PDF; đối chiếu source hiện hành. Viết 7 bài QS, 7 bài Mua hàng, 8 bài Thủ kho, 9 bài QA/QC. Mỗi bài đủ điều kiện/nơi mở/bước/kết quả/người nhận và ảnh thao tác thật. Bốn PDF trong output/pdf/qs-purchase-warehouse-quality-2026-10-22/: QS 15 trang, Mua hàng 12, Thủ kho 17, QA/QC 19; tổng 63 trang, 31 bài, 51 vị trí ảnh từ 51 ảnh gốc, 80 ảnh gốc trong bằng chứng. Các bản PDF bốn vai trò trước giữ nguyên.
+
+**Thực hành:** QS tạo/gửi/khóa định mức/duyệt dự toán 20 m², đánh giá hai báo giá chuẩn bị sẵn, chặn căn cứ trống rồi chọn 185.000 và khóa giá cuối. Tạo yêu cầu mua báo HTTP 500 nhưng đã commit; không bấm lặp; mở lại và SELECT chứng minh đúng một request/một line. Mua hàng đọc/duyệt theo quyền native, chặn PO/ngày trống, lưu TH-PO-01 rồi ghi nhận đặt hàng; đối soát 12 + 8 m² sang received, stock 0. QS rồi Mua hàng xác nhận phát sinh 200.000 sang pending_approval; chưa duyệt hoặc đặt mua phát sinh. Mua hàng bị chặn boq.view; báo giá được chuẩn bị bằng API, không nhận là nhập UI thành công.
+
+**Thủ kho:** Tạo tài khoản thường và công trình TH-KHO riêng, gán role Thủ kho chuẩn qua project membership; giữ sample isolation khi API từ chối tài khoản thường vào mẫu Rev9. Nguồn incoming 20 m² chuẩn bị sẵn. UI nhập 21 bị chặn/nhập 20, xuất 25 bị chặn/xuất 12, hoàn 2, chuyển 4 từ A sang B và chặn trùng kho, trả 1 từ site. Sửa phiếu xuất cũ sau hoàn/trả bị chặn, giữ nguyên 12. Xuất mới 2 từ B rồi sửa ngay 2 thành 1 có lý do thành công; giữ phiếu cũ/phiếu thay thế. Đọc lại 7 phiếu (6 posted + 1 corrected), A 6/B 3/site 10/used 0/waste 0/pending; 20 = 6 + 3 + 10 + 1. Đây là công trình riêng, không chứng minh đã nhập kho TH-MH-01.
+
+**QA/QC:** Lập hai outgoing partial, lưu/mở lại, chọn/xem minh chứng đúng nguồn, chặn gửi thiếu điều kiện/nhận xét trống; QC01 fail/QC02 pass độc lập, rework approved còn mở/chưa giao người. GS hoàn tất báo cáo sẵn điều kiện và PM chuyển Giai đoạn bằng UI đúng vai trò để mở việc QA. QA nhận đúng việc, nhập 20/20, lưu nháp/mở lại, tải ảnh giả định thành công/xem đúng actor, chốt form submitted. Hoàn tất vẫn HTTP 400 thiếu incoming source; việc giữ in_progress/completed_at null, không seed ép gate. Tải vào việc GS bị từ chối; không tạo action, không nâng quyền. Không nhận QC02 là chuỗi khắc phục/kiểm tra lại đã hoàn thành.
+
+**Kiểm tra:** verify_local.py chỉ đọc SQL/Git/health, persistence-verification.json PASS trong phạm vi dữ liệu local; UI/API 200, 160 migrations, source fba39cdcf72a2d6714d5eac3d15eba8cdf4014c9, không diff backend/frontend/config/.agents/.codex. Dùng lại build 10:17 giờ Việt Nam, không build/test ứng dụng lại. validate_pdf.py PASS: 446 đơn vị nội dung/31 bài, ảnh gốc/chú thích, font, vùng chữ, mục lục. Đã xem 63 trang; lần chỉnh cuối 3 trang được thực sự xem lại cỡ đầy đủ, 60 trang còn lại pixel-identical; visual-review.json khớp hash 4 PDF. Đây là kiểm tra tài liệu, không phải nghiệm thu sử dụng.
+
+**Bàn giao nội bộ:** docs/user-guides/qs-mua-hang-thu-kho-qa-qc-nghiem-thu.md đối chiếu 6 tiêu chí; docs/acceptance-evidence/qs-purchase-warehouse-quality-local-2026-10-22/README.md ghi 31 bài, chuẩn bị API và thực hành UI, nguồn và giới hạn. Kiểm tra 86 liên kết cục bộ không có đích thiếu; 80 ảnh ghi nhận khớp 80 tệp và SHA gốc; quét mẫu credential không có hit trong 30 tệp văn bản được kiểm tra; git diff --check sạch. Không cập nhật mapping vì không đổi source, contracts, schema, permission definitions, ownership hoặc hành vi ứng dụng. Danh mục hiện có 8 sổ tay riêng trên 19 vai trò, chưa tuyên bố đủ sổ tay cho mọi vai trò.
+
+**Nghiệm thu:** Giữ kế hoạch mở. Thực hành của agent bằng tài khoản vai trò không thay thế người sử dụng đại diện làm theo tài liệu. Lỗi ứng dụng và nhánh chưa thử phải ghi rõ, không sửa code để làm cho kịch bản đạt.
+
+## Hướng dẫn Thiết kế và Kế toán — bản rà soát 01, chưa nghiệm thu, 2026-10-22
+
+**Phạm vi được duyệt:** Hai hướng dẫn khách hàng, dữ liệu mẫu và ảnh thao tác thật bằng tài khoản Thiết kế/Kế toán trên stack local riêng hiện có; xuất hai PDF dễ hiểu. Không sửa ứng dụng, migrations, cấu hình repo; không deploy, commit/push.
+
+**Đã làm:** Đọc mapping và source Thiết kế, bàn giao kế toán, đối chiếu MISA hiện hành. Viết 6 bài Thiết kế và 10 bài Kế toán, mỗi bài đủ điều kiện/nơi mở/bước làm/kết quả/người nhận và ảnh. Dùng đúng tài khoản Thiết kế/Kế toán, phối hợp PM/QS; không bổ sung quyền. Dữ liệu, chứng từ và CSV đều giả định.
+
+**Thực hành:** R01/R02 tạo mới qua UI; thiếu lý do/tệp bị chặn, lưu/mở lại, phân nhóm/tải tệp, phát hành, lịch sử giữ bản cũ; PM bàn giao R01 rồi R02, QS mở đúng ảnh R02. TH-KT-02 mới qua PM bàn giao/Kế toán trả có lý do/PM bổ sung và gửi lại/Kế toán tiếp nhận/PM kiểm tra kết quả. Căn cứ FINAL mới 5,2 tỷ, đúng chứng từ Chốt gói nghiệm thu cuối; CSV sai mẫu bị chặn, CSV hợp lệ preview/confirm đúng 3 dòng, cùng file không tạo trùng. Ghép vượt bị chặn; ghép một phần/đủ, review có chênh lệch, thay ghép làm review cũ không hiện hành; hủy có lý do, ghép/review lại, mở lại đúng chênh lệch 0. Database đọc lại 3 MISA records, 2 allocation active tổng 5,2 tỷ, 1 allocation bị hủy và 3 reviews. Không hạch toán hoặc thu/chi thật.
+
+**Kiểm tra tài liệu:** Hai PDF tại output/pdf/design-accounting-2026-10-22/: Thiết kế 15 trang, Kế toán 26 trang; 35 vị trí ảnh từ 33 ảnh gốc sử dụng, 41 ảnh gốc trong bằng chứng. validate_pdf.py PASS: 280 đơn vị nội dung, 16 bài đủ cấu trúc/ảnh, mục lục trỏ đúng trang, font/vùng chữ/ảnh/chú thích/hash đạt kiểm tra tài liệu. Đã xem cả 41 trang; hiệu chỉnh cuối đổi đúng 3 trang được xem lại cỡ đầy đủ, 38 trang còn lại pixel-identical; visual-review.json khớp hash hai PDF. Không dùng PASS tài liệu thay nghiệm thu sử dụng.
+
+**Giới hạn/còn thiếu:** Người đại diện tự thực hành và xác nhận phiên bản/cấu hình doanh nghiệp. Xem chứng từ PDF trong ứng dụng báo quá nhiều yêu cầu; Mở tab mở được tab blob nhưng công cụ bị chính sách URL chặn đọc nội dung, không đi vòng qua. Chưa nghiệm thu kiểm tra nội dung chứng từ; CSV chỉ là dữ liệu tự tạo, file gốc chưa đọc trực tiếp, chưa thử Excel/MISA thật. Chưa thử outbound/nhiều tiền tệ/mất quyền/cạnh tranh/mất mạng/điện thoại/hoàn tất Đầu việc Thiết kế. Không sửa ứng dụng để vượt các giới hạn.
+
+**Nghiệm thu:** Kế hoạch mở cho đến khi đủ bằng chứng. Agent thử bằng tài khoản vai trò không thay thế người sử dụng đại diện thực hành theo tài liệu; không tự ghi đạt tiêu chí này. Lỗi ứng dụng nếu gặp sẽ ghi rõ, không sửa trong nhiệm vụ tài liệu.
+
+**Bàn giao nội bộ:** docs/user-guides/thiet-ke-ke-toan-nghiem-thu.md theo dõi 6 tiêu chí; docs/acceptance-evidence/design-accounting-local-2026-10-22/README.md ghi TK1–TK6/KT1–KT10, nguồn/quyền/giới hạn, metadata 41 ảnh và kiểm tra lưu thực tế. Không cập nhật mapping vì không đổi source, contracts, schema, quyền, ownership hoặc hành vi ứng dụng. Không build/test ứng dụng lại vì source không đổi; local vẫn đúng fba39cd/Rev9/160 migration, build lúc 10:17 giờ Việt Nam.
+
+## Hướng dẫn sử dụng theo vai trò — đang rà soát bản 04, 2026-10-22
+
+**Trạng thái: CHƯA ĐẠT NGHIỆM THU — GIỮ KẾ HOẠCH MỞ.** Không lặp lại kết luận đã xong của các lượt trước. Kết quả xuất PDF, kiểm thử chức năng bằng tài khoản vai trò và nghiệm thu bởi người dùng là ba mức khác nhau.
+
+**Kiểm tra tài liệu cuối bản 04:** validate_pdf.py PASS, 632 đơn vị nội dung/75 trang, 46 vị trí ảnh từ 41 ảnh gốc, không lỗi cấu trúc/font/vùng chữ/ảnh/mục lục; visual-review.json khớp hash cả ba PDF. Đã xem đủ 75 trang; sau hiệu chỉnh cuối, 70 ảnh render không đổi, cả năm trang thay đổi được xem lại cỡ đầy đủ. 118 liên kết cục bộ tồn tại; không phát hiện giá trị credential trong tập tài liệu/bằng chứng được kiểm tra; git diff --check sạch. Backend/frontend/cấu hình repo/.agents/.codex không có diff. Đây là PASS tài liệu, không đóng tiêu chí nghiệm thu sử dụng.
+
+**Phạm vi được duyệt:** Tài liệu tổng hợp đủ vai trò/công việc, hai sổ tay mẫu PM và Giám sát, xuất ba PDF; không sửa ứng dụng. Ủy quyền bổ sung trực tiếp ngày 22-10: chủ động dùng local, Browser, tạo seed và hồ sơ qua giao diện; không hỏi lại quyền chuẩn bị dữ liệu/môi trường. Không deploy hoặc tác động production.
+
+**Đã làm:** Đọc mapping và các domain map liên quan, đối chiếu danh mục 19 vai trò, 43 công việc, 11 bàn giao; giữ 10 bài PM và 8 bài Giám sát. Bản khách hàng mang tên Vai trò và công việc, dùng thẻ và tiếng Việt thông thường; thông tin kỹ thuật giữ trong phụ lục nội bộ. Cả 43 thẻ có điều kiện, thao tác, kết quả/người nhận; 18 bài có bước cụ thể và ảnh.
+
+**Môi trường thực hành:** Source fba39cdcf72a2d6714d5eac3d15eba8cdf4014c9; backend/frontend không có diff. Build từ source này, stack riêng consflow-guide-20261022; UI 127.0.0.1:15173, API 127.0.0.1:18081/api, DB consflow_guide_20261022, 160 migration trên DB mới và seed hiện tại. Storage và cấu hình bí mật nằm trong thư mục tạm riêng, không đưa vào repo. Các stack khác giữ nguyên.
+
+**Thực hành bằng tài khoản vai trò:** PM tiếp nhận/start công trình mới, nháp/chốt/hoàn tất, xin duyệt/người được giao quyết định/chuyển Giai đoạn; TH-R2 được bàn giao và QS mở đúng bản; kế hoạch kích hoạt kiểm tra để GS nhận. GS khảo sát nháp/chốt/thiếu ảnh/tải ảnh/hoàn tất. Báo cáo trực tiếp và từ biểu mẫu đều qua gửi, PM yêu cầu bổ sung, sửa đúng nguồn, gửi lần 2 và PM xác nhận đã xem; bản cũ giữ riêng. Kiểm tra Không đạt sinh khắc phục, GS gửi, PM trả rồi xác nhận Đạt sau gửi lại. GS gửi phát sinh TH-PS tới QS, trạng thái qs_review. PM tạo TH-BG từ chặn 2/6 đến đủ 6/6 và Đã bàn giao; TH-KT qua Kế toán trả bổ sung rồi tiếp nhận. Xuất/đọc hai PDF đúng lần gửi và một Excel. Màn hình điện thoại 390×844 đã thử đọc/mở ảnh, chọn ảnh có sẵn, nhập, lưu nháp, mở lại và gửi báo cáo.
+
+**Nguồn dữ liệu/quyền:** Tất cả công trình, người và minh chứng là giả định. Chức năng mẫu chính thức chuẩn bị nền; không lấy trạng thái sinh sẵn làm bằng chứng thao tác. Công trình TH-20261022-A được tạo qua giao diện; GS khảo sát được planning.edit theo dự án, không sửa vai trò GS chuẩn. Tiền điều kiện hợp đồng cho GS7 được dựng qua API đủ bước và chữ ký mẫu cùng công trình; quyền ký bổ sung tạm cho người chuẩn bị đã khôi phục đúng ban đầu. Quyền GS dùng đề xuất không đổi. Chi tiết tại docs/acceptance-evidence/role-guides-local-2026-10-22/README.md.
+
+**Tài liệu bản 04:** Ba PDF tại output/pdf/role-guides-2026-10-22/: 23/28/24 trang A4 ngang, mục lục liên kết; 46 vị trí ảnh từ 41 ảnh gốc mới, 25 vị trí PM và 21 GS, sáu sơ đồ. Ảnh ghi vai trò/môi trường/dữ liệu mẫu/thời điểm/giới hạn; phóng to và khung số chỉ tại PDF, không chỉnh ảnh gốc. Kiểm tra cuối ghi trong verification.json và visual-review.json; báo cáo hình phải khớp hash PDF đang giao.
+
+**Lỗi/giới hạn:** PM Lưu thay đổi & tiếp tục tại thông tin công trình trả HTTP 500, request f839aca0-1489-4275-86d3-768df406df4a; chưa xác định nguyên nhân và không sửa code. Một số ảnh lịch sử lỗi xem trước; mã đối chiếu trên mobile bị cắt trong thẻ. Chưa thử mọi nhánh quyền, cạnh tranh, mất mạng, camera hoặc thiết bị thật. Npm audit khi build có 14 cảnh báo sẵn có; không sửa dependencies. Không tuyên bố UX accepted.
+
+**Sẽ làm/còn thiếu:** Người sử dụng đại diện đọc và thực hành theo tài liệu, xác nhận phiên bản/cấu hình áp dụng của doanh nghiệp; xử lý các phát hiện ứng dụng qua review/duyệt riêng nếu được giao. Sáu tiêu chí và phần chưa thử tại docs/user-guides/theo-doi-nghiem-thu.md; U01–U13 tại doi-chieu-nguon.md. Chỉ đóng khi đủ bằng chứng, không dùng PASS của script PDF để đóng plan.
+
+**Ranh giới:** Chỉ tài liệu, công cụ PDF và bằng chứng trong repo; không sửa backend/frontend, migrations hoặc cấu hình repo; không commit/push. Không cập nhật mapping vì không đổi code, contracts, ownership, nghiệp vụ hoặc quy trình agent.
 
 ## Developer-assisted password recovery — active 2026-10-20
 
