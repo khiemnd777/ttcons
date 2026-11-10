@@ -1,5 +1,9 @@
 # Consflow Module Keyword Map
 
+## Search indexing / noindex — 2026-11-10
+
+- Keywords: Google, SEO, index, robots, tt-dnh.com. Owners `frontend/Caddyfile` (site-wide `X-Robots-Tag: noindex`), `frontend/index.html` (robots meta). Keep Googlebot able to read noindex; do not block all crawling through robots.txt. `/robots.txt` currently falls through to SPA HTML. Runbook `docs/operations/vps-production-deploy.md` records scoped production hotfix and release reconciliation. Verify actual public headers/HTML separately from Google removal; Search Console Removals needs property access. First searches: `X-Robots-Tag|name="robots"|try_files` in those owners.
+
 ## Wordless Kế hoạch opt-in — 2026-11-09
 
 - LATEST USER OVERRIDE (09-11-2026): Wordless is now default on eligible routes/banners when parameter is absent; exact single 1 is also on; exact single 0 selects legacy. Invalid/duplicate flags remain legacy. Earlier opt-in descriptions below are superseded on default selection only. withWordless emits explicit 0 for legacy navigation/returnTo; global AppShell links and project sidebar retain selection. Scope/controls/data unchanged; tests explicitly select 0 for old-render fixtures and verify absent=1.
