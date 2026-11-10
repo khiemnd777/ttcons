@@ -1,5 +1,11 @@
 # VPS Production Deployment — `tt-dnh.com`
 
+## Hotfix noindex — 10-11-2026
+
+Được duyệt sửa và triển khai chặn index. Không phát hành các thay đổi main/local khác: giữ nguyên image v2026-10-26.1, backend và database. Hotfix gắn read-only `/opt/consflow/shared/noindex-2026-11-10/Caddyfile` và `index.html` vào admin qua Compose production hiện tại; chỉ recreate admin. Bản gốc nằm trong thư mục hotfix; Compose gốc lưu cạnh file với hậu tố `.before-noindex-2026-11-10`. Rollback: khôi phục Compose gốc và recreate riêng admin với release.env và shared/.env.prod hiện hữu.
+
+Source `frontend/Caddyfile` và `frontend/index.html` đã mang noindex cho release kế tiếp. Khi phát hành tag mới theo quy trình chuẩn, xác minh noindex trong image mới; không sao chép bind mounts từ hotfix vào release mới. Không block crawler toàn site bằng robots.txt vì Google phải đọc noindex. Search Console Removals là thao tác riêng cần quyền property; noindex production không chứng minh Google đã gỡ kết quả.
+
 Runbook này là nguồn vận hành chính cho single-host VPS `160.30.113.13`. Release chỉ đi từ tag `vYYYY-MM-DD.N`; push/merge vào `main` không deploy và không tự chạy GitHub Actions.
 
 ## Trạng thái prerequisite

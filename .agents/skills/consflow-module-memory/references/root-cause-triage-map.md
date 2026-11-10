@@ -1,5 +1,9 @@
 # Consflow Root-Cause Triage Map
 
+## Google indexing — 2026-11-10
+
+- Inspect public response for X-Robots-Tag and HTML robots meta. Owners `frontend/Caddyfile` and `frontend/index.html`. Do not Disallow all crawling: Google must read noindex. A deployed noindex does not prove existing search results have been removed. See `docs/operations/vps-production-deploy.md`.
+
 ## Catalog notification 500, empty preferences and mobile overflow — 2026-10-26
 
 - Catalog 500 with `unsupported Scan ... string into type *[]string`: inspect `repository_notifications.go::NotificationCatalog`, `permissions_any` and pgx database/sql decoding. The confirmed failure is a valid TEXT[] SQL result scanned directly into []string; use the existing JSON array projection pattern. Catalog errors must reach `NotificationPreferencesDialog`; an empty successful result is a distinct state. Check mutation guards, changed groups, partial-save baseline reconciliation and error reset on reopen.

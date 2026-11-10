@@ -1,5 +1,7 @@
 # Consflow Frontend UI And Utility Map
 
+- Search indexing policy (2026-11-10): `frontend/index.html` emits robots noindex; `frontend/Caddyfile` emits site-wide X-Robots-Tag noindex. No visible UI interaction changes; verify public HTTP/HTML, not only bundle build. Google removal is separate from deployment.
+
 ## Wordless presentation — 2026-11-09
 
 - Latest user-approved selection rule supersedes earlier opt-in/default-off wording below: absent flag = Wordless in approved scopes, single 1 = Wordless, single 0 = legacy; invalid/duplicate = legacy. Context defaults false outside route providers remain intentional. withWordless preserves explicit legacy 0 across project/global navigation and return paths; AppShell AppNavigation receives modeSearch without changing controls. wordlessPresentation verifies real default-on labels and explicit legacy fixtures; wordless tests cover parser/navigation/provenance.
