@@ -16,6 +16,24 @@ Khi người vận hành đã có application-specific password, đặt giá tr�
 
 Khi dùng `.env` mặc định và `.env.zoho.local` tồn tại, Makefile tự chọn override cho `make up`, `make restart`, `make down` và các lệnh Compose cùng nhóm. Khi dùng `ENV_FILE` khác hoặc cung cấp `COMPOSE` riêng, cần chọn override tường minh. Trước khi restart stack có dữ liệu, kiểm tra môi trường và ảnh hưởng: nếu database chưa có Developer hợp lệ, backend mới sẽ khóa API cho tới khi bootstrap thành công. Kiểm tra cấu hình bằng `docker compose --env-file .env --env-file .env.zoho.local -f docker-compose.yml -f docker-compose.zoho.local.yml config --quiet`; không in toàn bộ cấu hình vì các service khác có thể chứa secret.
 
+### Khắc phục file secret bị mất khi restart local
+
+Không đặt file mật khẩu trong `/tmp` hoặc `/private/tmp`: file có thể bị dọn trong khi `.env.zoho.local` vẫn giữ đường dẫn cũ. Dùng vị trí bền vững ngoài repository, ví dụ `~/.config/consflow/zoho_smtp_password`. Tạo thư mục riêng mode `0700`; cấp file mật khẩu thật qua trình soạn thảo hoặc công cụ quản lý secret tin cậy, mode `0600`, owner khớp `LOCAL_UID`. Không nhập mật khẩu vào lệnh shell hoặc chat. Trong `.env.zoho.local`, đặt `ZOHO_SMTP_PASSWORD_FILE` thành đường dẫn tuyệt đối của file đó (không dùng ký tự `~`). Giữ các cấu hình Zoho khác.
+
+`make up`, `make restart` và `make run` cần Python 3 để chạy `scripts/check-local-secrets.py`. Preflight gọi chính lệnh Compose được chọn để resolve cấu hình và kiểm tra file secret tồn tại, là file thường không rỗng, đọc được bởi người vận hành và UID:GID backend. Preflight chỉ đọc metadata, không đọc nội dung mật khẩu. Lỗi dừng trước khi dừng/build/start stack; không đổi chuỗi down → build → run. `make down`, `make log` và `make build` không bị chặn bởi preflight secret. Nếu dùng Docker context từ xa hoặc ánh xạ UID khác, kiểm tra mount/quyền ở môi trường đó riêng; kiểm tra local không chứng minh mount từ xa.
+
+Luồng kỹ thuật theo `Makefile` và `scripts/check-local-secrets.py` (sơ đồ không chứng minh stack đã chạy):
+
+```mermaid
+flowchart LR
+    A[make up hoặc restart] --> B[Resolve Compose và kiểm tra metadata secret]
+    B -->|Thiếu hoặc không đọc được| C[Dừng và báo lỗi trước down]
+    B -->|Hợp lệ hoặc chưa cấu hình| D[down → build → run]
+    D --> E[Kiểm tra mount và backend thực tế riêng]
+```
+
+`/dev/null` vẫn là trạng thái SMTP chưa cấu hình như trước; không dùng nó thay cho file mật khẩu đã mất để tuyên bố đã sửa SMTP. `docker compose config --quiet` có thể thành công dù file mount bị thiếu. Chạy `make check-startup-env` trước `make restart`; chỉ restart sau khi preflight thành công. Regression không dùng Docker hoặc mật khẩu thật: `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-local-secrets.py`. Preflight không chứng minh Zoho xác thực hay gửi thư thành công.
+
 Gửi thất bại, cấu hình không hợp lệ hoặc thiếu khóa làm bootstrap dừng. OTP dùng một lần, hết hạn sau 10 phút, tối đa 5 lần nhập sai và tối thiểu 60 giây giữa các lần gửi. Sau khi gửi thư, mã chỉ được chấp nhận khi backend đã xác nhận trạng thái lưu thành công. Khi tạo tài khoản thành công, đăng nhập bằng mật khẩu vừa đặt.
 
 Nếu Developer cuối cùng mất điều kiện hợp lệ, hệ thống khóa lại. Nếu email bootstrap đã tồn tại, cần xử lý sự cố theo quy trình được phê duyệt riêng; không xóa dữ liệu hoặc đặt lại tài khoản chỉ để vượt bootstrap.

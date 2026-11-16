@@ -1,5 +1,13 @@
 # Consflow Root-Cause Triage Map
 
+## V161 additive migration / old-image recovery — 2026-11-16
+
+- Owners `backend/internal/shared/migrations/runner.go::validateAppliedManifest`, `backend/migrations/V161__developer_bootstrap_otp.sql`, `docs/operations/vps-production-deploy.md::Recovery image sau migration additive V161`. Error `version 161 absent from the image migration manifest` is an intentional old-runner guard, not a reason to delete history. Do not run the old full deploy/migration job against DB161. A G2 local rehearsal used the exact old production image and synthetic DB161 with AUTO_MIGRATE=false: health/readiness/login passed; backup160 restore also passed. This proves only that synthetic/local scope, not production S3 or all workflows. Recovery production needs its own authority, image/digest and config pinning, drain, health and business checks; prefer roll-forward where compatibility is not established.
+
+## Missing local Zoho secret bind mount — 2026-11-16
+
+- For `secret file ttcons_zoho_smtp_password does not exist` / `invalid mount config`, inspect the resolved `secrets.zoho_smtp_password.file` and file metadata, never secret contents or full Compose output. Owners `Makefile::check-startup-env`, `scripts/check-local-secrets.py`; regression `scripts/test-local-secrets.py`. `docker compose config --quiet` alone does not catch a missing host file. Run `make check-startup-env` to check before stack stop/build/start; up/restart/run enforce it automatically. Recover the actual password into a persistent outside-repository private file, update the local ignored env path, then recheck. Do not fabricate an empty password or replace an explicit missing source with `/dev/null`. Keep down/log available for diagnosis; test local preflight separately from actual Docker mount, backend readiness and SMTP delivery.
+
 ## Google indexing — 2026-11-10
 
 - Inspect public response for X-Robots-Tag and HTML robots meta. Owners `frontend/Caddyfile` and `frontend/index.html`. Do not Disallow all crawling: Google must read noindex. A deployed noindex does not prove existing search results have been removed. See `docs/operations/vps-production-deploy.md`.
