@@ -11,7 +11,7 @@ COMPOSE ?= docker compose --env-file $(ENV_FILE)
 SERVICE ?=
 BACKEND_GOCACHE ?= $(CURDIR)/backend/.gocache
 
-.PHONY: check-local-env up down restart build run log test backend-test backend-fmt frontend-build migrate-check docker-config production-bootstrap production-check production-render production-github-secrets production-provision release
+.PHONY: check-local-env check-startup-env up down restart build run log test backend-test backend-fmt frontend-build migrate-check docker-config production-bootstrap production-check production-render production-github-secrets production-provision release
 
 check-local-env:
 	@test -f "$(ENV_FILE)" || (echo "Missing $(ENV_FILE); copy .env.example to $(ENV_FILE) and configure it."; exit 1)
@@ -19,7 +19,10 @@ check-local-env:
 	@test -n "$(LOCAL_UID)" || (echo "LOCAL_UID is required in $(ENV_FILE)."; exit 1)
 	@test -n "$(LOCAL_GID)" || (echo "LOCAL_GID is required in $(ENV_FILE)."; exit 1)
 
-up: check-local-env
+check-startup-env: check-local-env
+	@python3 scripts/check-local-secrets.py $(COMPOSE)
+
+up: check-startup-env
 	$(MAKE) --no-print-directory down
 	$(MAKE) --no-print-directory build
 	$(MAKE) --no-print-directory run
@@ -27,7 +30,7 @@ up: check-local-env
 down: check-local-env
 	$(COMPOSE) down --remove-orphans
 
-restart: check-local-env
+restart: check-startup-env
 	$(MAKE) --no-print-directory down
 	$(MAKE) --no-print-directory build
 	$(MAKE) --no-print-directory run
@@ -35,7 +38,7 @@ restart: check-local-env
 build: check-local-env
 	$(COMPOSE) build
 
-run: check-local-env
+run: check-startup-env
 	mkdir -p "$(STORAGE_PATH)"
 	$(COMPOSE) up -d
 

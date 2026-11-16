@@ -1,5 +1,25 @@
 # VPS Production Deployment — `tt-dnh.com`
 
+## Cấu hình Zoho trên release production đang chạy
+
+SMTP có hai nguồn: biến môi trường/secret lúc khởi động và `system_settings` database. Các rows đã có trong database là authoritative; thay `.env.prod` đơn lẻ không cập nhật các rows đó. Cập nhật SMTP bằng Settings API/UI với Developer có `settings.update`, giữ version check, mã hóa secret và audit; không ghi SQL trực tiếp, giả actor hoặc tạo token để vượt auth. Cấu hình Zoho không yêu cầu tự bật `AUTH_RECOVERY_ENABLED`.
+
+Dùng ASP riêng production. Secret host nằm ngoài release, dưới `/opt/consflow/shared/secrets/`, file mode0600 và owner UID:GID của backend (kiểm tra thực tế, không giả định mọi môi trường đều dùng10001). Thư mục host chứa secret phải private; Docker mount file phải đọc được bằng UID backend. Không đưa ASP vào `.env.prod`, Git, GitHub Secrets hoặc log. `.env.prod` chỉ chứa SMTP identity/TLS và đường dẫn `SMTP_PASSWORD_FILE`. Không chạy lại full provisioning/render để sửa SMTP: renderer bootstrap hiện tạo SMTP identity trống và có thể ghi đè cấu hình operator đang dùng.
+
+Trước restart: lưu bản env và snapshot rows liên quan trong thư mục backup private, kiểm tra Compose, ghi lại release/digest và container admin hiện tại. Khi chỉ đổi SMTP, recreate riêng backend bằng chính image đang chạy, không pull/build/migrate hoặc restart admin. Dùng `--no-deps --force-recreate --no-build --pull never` cùng Compose/release.env hiện tại; không đổi release tag hoặc các secret khác. Sau restart, kiểm tra backend healthy, secret mount đọc được/không rỗng, health/readiness, migration state và banner chờ restart trong Settings.
+
+Email thử cần người dùng cho phép rõ người nhận và số lượng. Ghi marker trước gửi; nếu kết quả không rõ sau DATA, không tự retry gây gửi trùng. Không in plaintext khi đối chiếu mật khẩu database với secret mount. Gửi được bằng công cụ SMTP trên VPS không chứng minh luồng email/OTP của ứng dụng; SMTP chấp nhận gửi không chứng minh inbox đã nhận. Trạng thái triển khai/nghiệm thu thực tế chỉ ghi ở `docs/current-states.md`.
+
+## Recovery image sau migration additive V161
+
+Custom migration runner từ chối database có version không nằm trong image manifest. Image cũ chỉ chứa V1–V160 không được chạy migration job hoặc full deploy script trên database đã áp dụng V161; không xóa history/table để vượt guard.
+
+Rehearsal G2 ngày16-11-2026 dùng đúng image production `sha256:71b99ac8559885e9107408ce83f6be72c664c9eb4c38bfaa1c2dd3479b7ff25e` tại Docker local, DB/Redis synthetic, `APP_ENV=development`, storage local tmpfs. Image cũ khởi động trên DB161 với `AUTO_MIGRATE=false`: health/readiness/login synthetic200; 160 checksums cũ, sentinel và số lượng identity/role được giữ. Restore backup synthetic160 sang database mới cũng qua các kiểm tra này. Đây không phải rehearsal dữ liệu/S3/network production hoặc chứng minh mọi workflow tương thích ngược.
+
+Khi được phép recovery thật: dừng ghi/drain backend và admin, dùng đúng Compose cùng `release.env` của release cũ và shared env/secret đang được bảo vệ, validate cấu hình, chỉ recreate image backend/admin với `--no-deps --force-recreate --no-build --pull never`, giữ `AUTO_MIGRATE=false`; không gọi migrate/bootstrap-admin/full deploy script. Kiểm tra health/readiness/login, SMTP secret, noindex và các thao tác bị ảnh hưởng trước khi đổi current symlink hoặc công bố đã phục hồi. Release cũ cần giữ bản Compose có hotfix noindex nếu image cũ chưa mang header/meta. Lưu release pointers/digests trước thay đổi; rehearsal không tự cấp quyền thao tác production.
+
+Nếu phải khôi phục database, dùng backup đã kiểm tra restore trên môi trường riêng và đánh giá các ghi phát sinh sau backup; đây là thao tác sự cố cần duyệt riêng. Với V161 đã commit, ưu tiên roll-forward nếu không thể bảo đảm recovery image theo phạm vi nghiệp vụ thực tế. Không tự drop bảng OTP hoặc chỉnh `schema_migrations`.
+
 ## Hotfix noindex — 10-11-2026
 
 Được duyệt sửa và triển khai chặn index. Không phát hành các thay đổi main/local khác: giữ nguyên image v2026-10-26.1, backend và database. Hotfix gắn read-only `/opt/consflow/shared/noindex-2026-11-10/Caddyfile` và `index.html` vào admin qua Compose production hiện tại; chỉ recreate admin. Bản gốc nằm trong thư mục hotfix; Compose gốc lưu cạnh file với hậu tố `.before-noindex-2026-11-10`. Rollback: khôi phục Compose gốc và recreate riêng admin với release.env và shared/.env.prod hiện hữu.

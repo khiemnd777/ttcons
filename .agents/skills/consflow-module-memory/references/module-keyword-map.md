@@ -1,5 +1,9 @@
 # Consflow Module Keyword Map
 
+## Local Zoho secret mount — 2026-11-16
+
+- Keywords: `secret file does not exist`, `invalid mount config`, `smtp_password`, `/private/tmp/consflow-zoho`, `ZOHO_SMTP_PASSWORD_FILE`. Owners: `Makefile::check-startup-env`, `scripts/check-local-secrets.py`, `scripts/test-local-secrets.py`, `docker-compose.zoho.local.yml`, `docs/operations/developer-bootstrap.md`. First searches: `check-startup-env|zoho_smtp_password|ZOHO_SMTP_PASSWORD_FILE`. Startup preflight resolves the selected Compose configuration without printing it, checks explicit Zoho file metadata/host and backend UID:GID readability before up/restart/run; down/log/build remain available. Preserve down → build → run and the existing unconfigured `/dev/null` sentinel; never silently replace a missing configured secret. Use a persistent private file outside Git, not a temporary directory. No SMTP delivery or runtime acceptance follows from preflight success.
+
 ## Search indexing / noindex — 2026-11-10
 
 - Keywords: Google, SEO, index, robots, tt-dnh.com. Owners `frontend/Caddyfile` (site-wide `X-Robots-Tag: noindex`), `frontend/index.html` (robots meta). Keep Googlebot able to read noindex; do not block all crawling through robots.txt. `/robots.txt` currently falls through to SPA HTML. Runbook `docs/operations/vps-production-deploy.md` records scoped production hotfix and release reconciliation. Verify actual public headers/HTML separately from Google removal; Search Console Removals needs property access. First searches: `X-Robots-Tag|name="robots"|try_files` in those owners.
