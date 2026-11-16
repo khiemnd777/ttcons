@@ -2,6 +2,8 @@
 
 ## Zoho production — G1 đã nghiệm thu; G2 đang review phạm vi phát hành
 
+**G2 Git delivery:** code/task-owned commit `5bf762ceba5a046ad345079b76c1dd82b6bb9fda` đã push lên `refactor/consflow-g2-release`; [PR #9](https://github.com/khiemnd777/ttcons/pull/9) mở vào main `b1ea48f`,9files,không chứa AGENTS/local-sample/output/secrets. Bản ghi PR này chỉ cập nhật tài liệu sau commit code; application fingerprint và bằng chứng build/test ở dưới không đổi. Chờ Khiêm review/nghiệm thu G2 và xem dependency findings; chưa merge/Git tag/deploy production. Các paragraphs “chuẩn bị/stage” bên dưới ghi lịch sử tiến độ trước Git delivery. CI trên PR được báo riêng theo kết quả thật,không suy từ local pass.
+
 **Roadmap:** G1 cấu hình và kiểm chứng SMTP trên release đang chạy → bàn giao/nghiệm thu → G2 chuẩn bị commit/push/release theo phạm vi riêng. Người dùng duyệt G1, ASP riêng production qua clipboard và đúng một email thử đến `khiemnd777@gmail.com`; không làm G2.
 
 **Nghiệm thu và quyền mới ngày16-11:** Khiêm xác nhận “Tôi đã nhận email. Nghiệm thu G1.” G1 được nghiệm thu đúng phạm vi cấu hình/restart/SMTP và email đã nhận; không suy ra nghiệm thu UX các feature khác. Khiêm yêu cầu chuẩn bị review package G2, nêu rõ code/migration trước commit/push/deploy. Chỉ được chuẩn bị review/tài liệu và kiểm tra READ ONLY ở lượt này, chưa được commit/push/merge/tag/deploy hoặc chạy implementation gates G2.
