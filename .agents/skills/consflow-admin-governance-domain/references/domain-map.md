@@ -1,5 +1,9 @@
 # Admin Governance Domain Map
 
+## Auth/Profile validation dependency compatibility — 2026-11-17
+
+- Auth/Profile remain object/string Zod schemas, now paired with compatible resolver5.2.2/Zod4.6.7. Validation policy, API authorization and session lifecycle do not change. Preserve minimum8 Unicode code points/maximum72 UTF-8 bytes, no all-whitespace password, exact confirmation, current/new password distinction, current-password requirement for email change, and Vietnamese field errors. `frontend/tests/authSchemaResolver.test.ts` evaluates existing page schemas and verifies real resolver plus RHF invalid-submit suppression/valid-submit callbacks; this is Node-only evidence and does not prove browser or production behavior.
+
 ## Settings Wordless opt-in — 2026-11-09
 
 - Latest user override: Settings defaults to Wordless without a flag; wordless=0 selects the old UI, single 1 also enables Wordless. Invalid/duplicate flags stay legacy. No permission, setting persistence or secret-handling change; older opt-in default wording below is superseded.
