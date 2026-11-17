@@ -1,5 +1,13 @@
 # Current States
 
+## Review phát hành production từ main — 17-11-2026
+
+**Mục tiêu/quyền:** Khiêm yêu cầu chuẩn bị review package từ main mới nhất, rõ SHA/V161/bảo toàn Zoho và dependency findings; chưa tạo tag hoặc deploy. Roadmap kế thừa G1 Zoho đã nghiệm thu → G2 đã merge PR9 → review quyền phát hành. Lượt này documentation/read-only, không sửa app/dependency/migration, không commit/push/tag/restart/deploy hoặc gửi mail.
+
+**Đã làm:** [package snapshot](proposals/PRODUCTION-RELEASE-REVIEW-2026-11-17.md). GitHub/local main cùng `d98c6cf9c77edf8f6aaf30a31044a7abbd9ff6dc`, tree giống head9758ac6 đã CI success43813766981;1095 app/config/test files vẫn khớp fingerprint G2. SSH/SQL READ ONLY: production d0b36fa5/v2026-10-26.1 healthy,160checksum khớp0mismatch, chỉ161pending, OTP table chưa có,1canonical Developer. Zoho DB/env465/tls/identity đúng, mật khẩu DB configuredv2, mount private0600UID10001 đọc được; giữ tên gửi DB mới nhất “Thủ Thiêm – Dương Nhật Hưng – Workflow”v2. PublicHTTPS /200/gateway204/health200/ready200 vànoindex đúng. Audit mới17-11 exit1:10findings(7high/3moderate),runtime3(2high/1moderate:react-router/react-router-dom/zod);không auto-fix. Bằng chứng localignored `output/acceptance-evidence/production-release-review-2026-11-17/` không theo Git clone,cần backup riêng.
+
+**Sẽ làm/còn mở:** chờ quyết định xử lý/chấp nhận findings và quyền phát hành; không tự gọi CI pass là security/UX acceptance. Browser/UAT NOT_RUN,3tests opt-in/perf từ G2 vẫnskip; rehearsal chỉsynthetic/localstorage,không chứng minh mọiworkflow/S3production. Workingtree còn thayđổi khác vàtài liệu reviewlocal,không đạt release-tag clean gate; future release cầncheckout sạchapprovedSHA,không reset/stash/gộptaskkhác. Chưa có backup production mới cho release17-11,tag,digests/releasebuild/deployrun. Khiđượcduyệt phải recheckmain=approvedSHA,backup+restorecheck,giữsharedZoho,drain/migrate161 vàverifyexactdigests/SHA/noindex/SMTP sau chạy. Không sửa mapping vì chỉ review/evidence theo contracts đã có.
+
 ## Zoho production — G1 đã nghiệm thu; G2 đang review phạm vi phát hành
 
 **G2 Git delivery:** code/task-owned commit `5bf762ceba5a046ad345079b76c1dd82b6bb9fda` đã push lên `refactor/consflow-g2-release`; [PR #9](https://github.com/khiemnd777/ttcons/pull/9) mở vào main `b1ea48f`,9files,không chứa AGENTS/local-sample/output/secrets. Bản ghi PR này chỉ cập nhật tài liệu sau commit code; application fingerprint và bằng chứng build/test ở dưới không đổi. Chờ Khiêm review/nghiệm thu G2 và xem dependency findings; chưa merge/Git tag/deploy production. Các paragraphs “chuẩn bị/stage” bên dưới ghi lịch sử tiến độ trước Git delivery. CI trên PR được báo riêng theo kết quả thật,không suy từ local pass.

@@ -1,0 +1,11 @@
+# [Closed] Sắp xếp sample local — 2026-11-16
+
+**Kiểu bàn giao:** Một lần bàn giao; không có roadmap cha. Khiêm đã duyệt chuyển `docs/sample-projects/` và bộ bằng chứng review Nhà chị Quyên sang `output/`, cập nhật liên kết và quy ước. Giữ nguyên các thay đổi Zoho và trạng thái nghiệm thu của bản mẫu.
+
+**Sẽ làm:** chuyển nguyên nội dung sang `output/sample-projects/` và `output/acceptance-evidence/nha-chi-quyen-local-review-2026-11-12/`; cập nhật liên kết, AGENTS và mapping; đối chiếu hash, Git ignore và diff. Không sửa ứng dụng, seed, fixtures, database hoặc các bộ bằng chứng khác; không commit/push/deploy.
+
+**Đã làm:** chuyển đủ 8 file sang output; đối chiếu SHA-256 ngay sau di chuyển xác nhận nguyên nội dung. Cập nhật 7 liên kết từ mục Nhà chị Quyên tới output và 2 liên kết ngược từ README về tracker; chỉ hai README đổi nội dung liên kết, sáu file dữ liệu/ảnh/biên nhận giữ nguyên hash. Bổ sung quy ước AGENTS và mapping cho artifact local; không thêm rule ignore trùng. Các liên kết output chỉ dùng trên máy có artifact; các file này không được Git sao lưu hoặc phân phối qua clone, cần sao lưu riêng. Không đổi trạng thái nghiệm thu bản mẫu.
+
+**Kiểm chứng 16-11-2026:** working tree local trên `b1ea48f8945049dfa362fee2b592fc092d97e87c`, giữ các thay đổi Zoho có trước. Python assertions: PASS cho đủ 8 file, sáu hash nguyên vẹn và hai README chỉ đổi liên kết, hai thư mục nguồn không còn, 12 liên kết local hợp lệ. `git check-ignore` và `git ls-files`: PASS, cả 8 file đều ignored và không tracked; rule hiện hữu `.gitignore:12` bao phủ cả hai thư mục đích. `git diff --check`: PASS. Đã review diff tài liệu/quy ước và giữ phần chỉnh sửa có trước. Không build/test ứng dụng hoặc browser vì chỉ sắp xếp artifact và tài liệu; database/migration không tác động. IMPLEMENTED và TECHNICALLY VERIFIED cho việc sắp xếp file; Khiêm đã nghiệm thu ngày 16-11-2026 và yêu cầu đóng plan. Không commit/push/deploy.
+
+**Nghiệm thu và đóng plan:** Khiêm xác nhận: “OK, nghiệm thu phần sắp xếp sample và bằng chứng sang output. Đóng plan này.” Chỉ đóng phạm vi sắp xếp file; không nghiệm thu bản mẫu Nhà chị Quyên, không đóng plan Zoho hoặc các plan khác. Quy ước bền vững đã có trong `AGENTS.md` và mapping; tài liệu này là lịch sử.

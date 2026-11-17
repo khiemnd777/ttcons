@@ -2,6 +2,7 @@
 
 ## Repository Expectations
 
+- Local examples, sample datasets and their generated review evidence belong under `output/` (for example `output/sample-projects/` and `output/acceptance-evidence/`), never under `docs/`. The root `/output/` is Git-ignored; do not force-add these artifacts. Keep maintained project documentation in `docs/` and current plan state only in `docs/current-states.md`; links to local output must state that the files are not included in Git clones and need separate backup. This rule does not relocate application seed data, regression fixtures or maintained operational guides. Existing tracked historical evidence is not automatically migrated; scope and approve any such migration separately.
 - Treat this repository as a full-stack construction workflow system: Go/Fiber API, PostgreSQL, Redis, custom SQL migrations, React/Vite admin UI, and Docker Compose.
 - Read the local code before deciding where to change behavior. Use `rg` and targeted file reads first.
 - Keep changes scoped to the requested module. Do not rewrite unrelated modules or generated artifacts.
