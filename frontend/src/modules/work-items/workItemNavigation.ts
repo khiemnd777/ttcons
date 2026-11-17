@@ -99,9 +99,20 @@ export function workItemDetailPath(workItemId: string, returnTo?: string, projec
 }
 
 export function safeReturnPath(value?: string | null) {
-  const cleanValue = String(value ?? '').trim();
+  const rawValue = String(value ?? '');
+  // URL parsing removes controls and treats backslashes as slashes; reject them first.
+  if (/[\\\u0000-\u001f\u007f]/.test(rawValue)) return '';
+  const cleanValue = rawValue.trim();
   if (!cleanValue || !cleanValue.startsWith('/') || cleanValue.startsWith('//')) return '';
-  return cleanValue;
+  const base = 'https://consflow.invalid';
+  try {
+    const url = new URL(cleanValue, base);
+    // Dot-segment normalization can expose a leading //, which becomes an authority on reuse.
+    if (url.origin !== base || url.pathname.startsWith('//')) return '';
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return '';
+  }
 }
 
 function navigationStateRecord(value: unknown): Record<string, unknown> {

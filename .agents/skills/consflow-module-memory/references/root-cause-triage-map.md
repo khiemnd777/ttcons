@@ -1,5 +1,10 @@
 # Consflow Root-Cause Triage Map
 
+## Unsafe returnTo / Zod resolver compatibility — 2026-11-17
+
+- For `External navigation is not allowed`, unexpected home navigation or unsafe returnTo, trace URLSearchParams → `workItemNavigation.ts::safeReturnPath` → withWordless → WorkItemDetailPage navigate. Guard must reject backslash/C0/DEL before normalization; execution targets share it and then check normalized project prefix. Wordless is not an input security guard. Preserve valid query/hash and fallback. Tests `safeReturnPath.test.ts` use synthetic History, not a browser; do not claim external redirect exploitation from package range alone.
+- For ZodError escaping form validation after a major upgrade, verify resolver version and `issues`/legacy `errors` handling. Current lock pins Zod4.6.7 with resolver5.2.2; do not upgrade only Zod. `authSchemaResolver.test.ts` runs actual schema declarations through real resolver and RHF handleSubmit. Reinstall exact lock in a disposable snapshot when workspace node_modules differs; existing dev dependency advisories remain separate from runtime audit.
+
 ## V161 additive migration / old-image recovery — 2026-11-16
 
 - Owners `backend/internal/shared/migrations/runner.go::validateAppliedManifest`, `backend/migrations/V161__developer_bootstrap_otp.sql`, `docs/operations/vps-production-deploy.md::Recovery image sau migration additive V161`. Error `version 161 absent from the image migration manifest` is an intentional old-runner guard, not a reason to delete history. Do not run the old full deploy/migration job against DB161. A G2 local rehearsal used the exact old production image and synthetic DB161 with AUTO_MIGRATE=false: health/readiness/login passed; backup160 restore also passed. This proves only that synthetic/local scope, not production S3 or all workflows. Recovery production needs its own authority, image/digest and config pinning, drain, health and business checks; prefer roll-forward where compatibility is not established.

@@ -1,5 +1,6 @@
 import type { WorkItem, WorkItemExecutionTarget } from '../../lib/types/domain';
 import { withWordless, wordlessScope, wordlessEnabled, wordlessBannerSurface } from '../../lib/utils/wordless.ts';
+import { safeReturnPath } from './workItemNavigation.ts';
 
 const workspaceLabels: Record<string, string> = {
   preparation: 'Hồ sơ chuẩn bị',
@@ -46,12 +47,8 @@ export function workItemMatchesProject(item: WorkItem, projectId: string) {
 function routeWithReturnTo(route: string, returnTo?: string) {
   const safeReturnTo = safeReturnPath(returnTo);
   if (!safeReturnTo) return route;
-  const [pathname, query = ''] = route.split('?', 2);
-  const params = new URLSearchParams(query);
-  if (safeReturnTo.includes('\\')) {
-    params.set('returnTo', safeReturnTo);
-    return `${pathname}?${params.toString()}`;
-  }
+  const destination = new URL(route, 'http://consflow.local');
+  const params = destination.searchParams;
   const source = new URL(safeReturnTo, 'http://consflow.local');
   const scopedSource = wordlessScope(source.pathname) || Boolean(wordlessBannerSurface(source.pathname));
   if (scopedSource && wordlessEnabled(source.search)) {
@@ -59,7 +56,7 @@ function routeWithReturnTo(route: string, returnTo?: string) {
     source.searchParams.delete('returnTo');
     params.set('returnTo', `${source.pathname}${source.search}${source.hash}`);
   } else params.set('returnTo', safeReturnTo);
-  const path = `${pathname}?${params.toString()}`;
+  const path = `${destination.pathname}${destination.search}${destination.hash}`;
   return scopedSource ? withWordless(path, source.search) : path;
 }
 
@@ -70,23 +67,12 @@ function fallbackWorkItemPath(item: WorkItem, returnTo?: string) {
   return routeWithReturnTo(base, returnTo);
 }
 
-function safeReturnPath(value?: string | null) {
-  const cleanValue = cleanText(value);
-  if (!cleanValue || !cleanValue.startsWith('/') || cleanValue.startsWith('//')) return '';
-  return cleanValue;
-}
-
-function safeInternalRoute(route?: string) {
-  const value = cleanText(route);
-  return value.startsWith('/') && !value.startsWith('//') ? value : '';
-}
-
 function safeExecutionRoute(item: WorkItem, route?: string) {
-  const value = safeInternalRoute(route);
+  const value = safeReturnPath(route);
   if (!value) return '';
   const projectId = cleanText(item.project_id);
   if (!projectId) return value;
-  const pathname = value.split('?', 1)[0];
+  const pathname = new URL(value, 'http://consflow.local').pathname;
   const expectedProjectPath = `/projects/${encodeURIComponent(projectId)}`;
   return pathname === expectedProjectPath || pathname.startsWith(`${expectedProjectPath}/`) ? value : '';
 }

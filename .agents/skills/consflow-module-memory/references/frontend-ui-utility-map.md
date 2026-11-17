@@ -1,5 +1,10 @@
 # Consflow Frontend UI And Utility Map
 
+## Safe WorkItem return paths and schema compatibility — 2026-11-17
+
+- `modules/work-items/workItemNavigation.ts::safeReturnPath` is the shared internal-path guard for returnTo and execution targets. Reject raw backslashes and C0/DEL before trim; require root-relative/non-protocol-relative URL, normalize against a fixed same-origin base and return pathname/search/hash without decoding nested query values. `workItemExecutionTarget.ts` reuses it, checks project prefix on normalized pathname, and preserves destination hash when appending returnTo. WorkItemDetailPage keeps its existing project/global fallback; Wordless remains a presentation utility, not a security guard.
+- Runtime graph pins `react-router-dom`7.18.3 (router transitive same version), Zod4.6.7 and resolver5.2.2. Preserve actual auth/profile object/string schemas and password helper; resolver3 with Zod4 throws instead of mapping field errors. `tests/authSchemaResolver.test.ts` evaluates actual page schema declarations and runs real resolver/createFormControl invalid/valid-submit behavior; `tests/safeReturnPath.test.ts` covers encoded/raw malicious paths, query/hash/Wordless/project scope and synthetic public Data Router navigation. These are Node checks, not browser/UAT acceptance.
+
 - Search indexing policy (2026-11-10): `frontend/index.html` emits robots noindex; `frontend/Caddyfile` emits site-wide X-Robots-Tag noindex. No visible UI interaction changes; verify public HTTP/HTML, not only bundle build. Google removal is separate from deployment.
 
 ## Wordless presentation — 2026-11-09
